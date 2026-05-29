@@ -405,13 +405,13 @@ def select_model_interactively_multi(
 
     # ── ANSI カラー ──────────────────────────────────────────────
     _RG  = "\033[38;2;0;255;65m"    # Razer Neon Green  #00FF41
-    _RGD = "\033[38;2;0;200;50m"    # Deep Neon Green   #00C832
+    _RGD = "\033[38;2;0;160;45m"    # Deep Green        #00A02D
     _WHT = "\033[38;2;255;255;255m" # Pure White        #FFFFFF
-    _GRY = "\033[38;2;0;220;160m"   # Neon Mint         #00DC80
-    _CYN = "\033[38;2;0;240;255m"   # Electric Cyan     #00F0FF
+    _GRY = "\033[38;2;0;200;100m"   # Medium Green      #00C864
+    _CYN = "\033[38;2;0;240;200m"   # Bright Cyan-Green #00F0C8
     _YLW = "\033[38;2;255;230;0m"   # Neon Yellow       #FFE600
-    _MEM = "\033[38;2;200;0;255m"   # Electric Violet   #C800FF
-    _ORG = "\033[38;2;255;100;0m"   # Neon Orange       #FF6400
+    _MEM = "\033[38;2;0;200;220m"   # Cyan              #00C8DC
+    _ORG = "\033[38;2;0;255;65m"    # = Razer Green
     _BLD = "\033[1m"
     _RST = "\033[0m"
 

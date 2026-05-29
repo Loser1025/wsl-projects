@@ -19,20 +19,20 @@ from .monitoring import ToolCallLog, ToolCallRecord, MonitoringToolRegistry
 from .proc_observer import SystemMonitor
 
 
-# ── ANSI カラー（Razer Cyberpunk Neon テーマ・watch対応16色版）────────
-# watch -c は 24bit RGB を解釈できないため標準 ANSI 16色で近似する
-# メイン UI(utils.py) の 24bit 版と視覚的に揃えた配色
+# ── ANSI カラー（Razer Green 統一テーマ・watch対応16色）────────────────
+# 基調色: グリーン + シアン + ホワイト
+# アクセント: イエロー（警告のみ）・レッド（エラーのみ）
 
-_RG  = "\033[92m"    # Bright Green   ≈ Razer Neon Green（成功・メイン）
-_RGD = "\033[1;32m"  # Bold Green     ≈ Deep Neon Green（ボーダー・強調）
-_WHT = "\033[97m"    # Bright White   ≈ Pure White（テキスト）
-_GRY = "\033[96m"    # Bright Cyan    ≈ Neon Mint（ラベル）
-_CYN = "\033[1;96m"  # Bold Cyan      ≈ Electric Cyan（値・時間）
-_YLW = "\033[93m"    # Bright Yellow  ≈ Neon Yellow（警告・CPU）
-_MEM = "\033[95m"    # Bright Magenta ≈ Electric Violet（メモリ）
-_RED = "\033[91m"    # Bright Red     ≈ Neon Red（エラー）
-_PNK = "\033[1;95m"  # Bold Magenta   ≈ Hot Magenta（アクセント）
-_ORG = "\033[1;93m"  # Bold Yellow    ≈ Neon Orange（注目・実行中）
+_RG  = "\033[92m"    # Bright Green  ← Razer メインカラー（成功・ボーダー）
+_RGD = "\033[32m"    # Green         ← 枠線・サブ要素（暗めのグリーン）
+_WHT = "\033[97m"    # Bright White  ← テキスト（読みやすさ優先）
+_GRY = "\033[32m"    # Green         ← ラベル（RGDと同じ落ち着いた緑）
+_CYN = "\033[96m"    # Bright Cyan   ← データ値・時間（緑系の隣接色）
+_YLW = "\033[93m"    # Bright Yellow ← 警告・CPU高負荷のみ
+_MEM = "\033[96m"    # Bright Cyan   ← メモリ（CYNと統一）
+_RED = "\033[91m"    # Bright Red    ← エラーのみ
+_PNK = "\033[1;92m"  # Bold Green    ← アクセント（グリーン系で統一）
+_ORG = "\033[1;92m"  # Bold Green    ← 実行中ツール（同上）
 _BLD = "\033[1m"
 _RST = "\033[0m"
 
