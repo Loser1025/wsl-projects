@@ -19,16 +19,18 @@ from .monitoring import ToolCallLog, ToolCallRecord, MonitoringToolRegistry
 from .proc_observer import SystemMonitor
 
 
-# ── ANSI カラー ───────────────────────────────────────────────────
+# ── ANSI カラー（Cyberpunk Neon テーマ）────────────────────────────
 
-_RG  = "\033[38;2;0;255;0m"
-_RGD = "\033[38;2;0;64;0m"
-_WHT = "\033[38;2;220;255;220m"
-_GRY = "\033[38;2;80;120;80m"
-_CYN = "\033[38;2;0;255;180m"
-_YLW = "\033[38;2;140;255;0m"
-_MEM = "\033[38;2;0;230;255m"
-_RED = "\033[38;2;200;50;50m"
+_RG  = "\033[38;2;0;255;80m"       # ネオングリーン（メイン）
+_RGD = "\033[38;2;0;120;40m"       # ダークグリーン（ボーダー）
+_WHT = "\033[38;2;220;255;220m"    # ソフトグリーンホワイト（テキスト）
+_GRY = "\033[38;2;120;200;120m"    # ミディアムグリーン（ラベル）
+_CYN = "\033[38;2;0;240;255m"      # エレクトリックシアン（値）
+_YLW = "\033[38;2;255;220;0m"      # ネオンイエロー（警告）
+_MEM = "\033[38;2;180;100;255m"    # パープル（メモリ）
+_RED = "\033[38;2;255;60;60m"      # ブライトレッド（エラー）
+_PNK = "\033[38;2;255;80;180m"     # ネオンピンク（アクセント）
+_ORG = "\033[38;2;255;140;0m"      # オレンジ（注目）
 _BLD = "\033[1m"
 _RST = "\033[0m"
 
@@ -187,47 +189,50 @@ class MonitorDashboard:
         # 実行中ツール（スピナー付き）
         cur_tool = self._registry.current_tool if self._registry else None
         if cur_tool:
-            spin = self._SPINNER_FRAMES[self._spin_idx % len(self._SPINNER_FRAMES)]
-            cur_str = f"{_YLW}{cur_tool}{_RST} {_GRY}{spin}{_RST}"
+            spin    = self._SPINNER_FRAMES[self._spin_idx % len(self._SPINNER_FRAMES)]
+            cur_str = f"{_BLD}{_ORG}{cur_tool}{_RST} {_YLW}{spin}{_RST}"
         else:
-            cur_str = f"{_GRY}待機中{_RST}"
+            cur_str = f"{_GRY}─ 待機中 ─{_RST}"
 
-        # 罫線
-        top = f"{_RGD}╔{'═' * _W}╗{_RST}"
+        # 罫線（ネオングリーン）
+        top = f"{_BLD}{_RGD}╔{'═' * _W}╗{_RST}"
         mid = f"{_RGD}╠{'═' * _W}╣{_RST}"
-        bot = f"{_RGD}╚{'═' * _W}╝{_RST}"
+        bot = f"{_BLD}{_RGD}╚{'═' * _W}╝{_RST}"
 
         # 作業フォルダ（長い場合は末尾を省略）
         cwd_disp = cwd if len(cwd) <= _W - 14 else "…" + cwd[-(_W - 15):]
 
+        # エラー数の表示色
+        err_col = _RED if errs else _RG
+
         lines = [
             top,
-            self._row(f"  {_BLD}{_RG}MIMIC LINUX — MONITOR{_RST}  {_GRY}{now}{_RST}"),
+            self._row(f"  {_BLD}{_RG}◆ MIMIC LINUX  MONITOR ◆{_RST}  {_GRY}{now}{_RST}"),
             mid,
-            self._row(f"  CPU [{_bar(snap.cpu_percent)}] {_pct(snap.cpu_percent)}  {_GRY}Load:{snap.load_avg_1m:.2f}{_RST}"),
-            self._row(f"  MEM [{_bar(snap.mem_percent)}] {_pct(snap.mem_percent)}  {_GRY}{snap.mem_used_mb/1024:.1f}/{snap.mem_total_mb/1024:.1f}GB{_RST}"),
+            self._row(f"  {_GRY}CPU{_RST} [{_bar(snap.cpu_percent)}] {_pct(snap.cpu_percent)}  {_GRY}Load {_CYN}{snap.load_avg_1m:.2f}{_RST}"),
+            self._row(f"  {_GRY}MEM{_RST} [{_bar(snap.mem_percent)}] {_pct(snap.mem_percent)}  {_GRY}{snap.mem_used_mb/1024:.1f}/{snap.mem_total_mb/1024:.1f} GB{_RST}"),
             mid,
-            self._row(f"  {_GRY}モデル  :{_RST} {_WHT}{model:<28}{_RST}  {_GRY}経過:{_RST} {_CYN}{elapsed}{_RST}"),
-            self._row(f"  {_GRY}作業Dir :{_RST} {_WHT}{cwd_disp}{_RST}"),
-            self._row(f"  {_GRY}実行中  :{_RST} {cur_str}"),
-            self._row(f"  {_GRY}履歴数  :{_RST} {_MEM}{hist} メッセージ{_RST}"),
+            self._row(f"  {_GRY}Model  {_RST}{_CYN}{model}{_RST}"),
+            self._row(f"  {_GRY}Dir    {_RST}{_WHT}{cwd_disp}{_RST}"),
+            self._row(f"  {_GRY}Running{_RST} {cur_str}"),
+            self._row(f"  {_GRY}Uptime {_RST}{_PNK}{elapsed}{_RST}  {_GRY}History {_RST}{_MEM}{hist} msgs{_RST}"),
             mid,
             self._row(
-                f"  {_GRY}ツール:{_RST} {_RG}{total}回{_RST}  "
-                f"{_GRY}エラー:{_RST} {(_RED if errs else _GRY)}{errs}回{_RST}  "
-                f"{_GRY}合計:{_RST} {_CYN}{t_sum:.1f}s{_RST}"
+                f"  {_GRY}Calls:{_RST} {_BLD}{_RG}{total}{_RST}  "
+                f"{_GRY}Err:{_RST} {_BLD}{err_col}{errs}{_RST}  "
+                f"{_GRY}Total:{_RST} {_CYN}{t_sum:.1f}s{_RST}"
             ),
             mid,
-            self._row(f"  {_BLD}{_WHT}直近の呼び出し:{_RST}"),
+            self._row(f"  {_BLD}{_RG}▼ Recent Calls{_RST}"),
         ]
 
         for rec in recs[-3:]:
-            icon = f"{_RG}✓{_RST}" if rec.status == "ok" else f"{_RED}✗{_RST}"
-            name = f"{_WHT}{rec.tool:<14}{_RST}"
+            icon = f"{_BLD}{_RG}✓{_RST}" if rec.status == "ok" else f"{_BLD}{_RED}✗{_RST}"
+            name = f"{_BLD}{_WHT}{rec.tool:<14}{_RST}"
             t_   = f"{_CYN}{rec.elapsed:5.2f}s{_RST}"
-            cpu_ = f"{_YLW}CPU:{rec.cpu_max_pct:3.0f}%{_RST}"
-            mem_ = f"{_MEM}MEM:{rec.rss_delta_mb:+5.0f}MB{_RST}"
-            lines.append(self._row(f"  {icon} {name} {t_} | {cpu_} | {mem_}"))
+            cpu_ = f"{_YLW}{rec.cpu_max_pct:3.0f}%{_RST}"
+            mem_ = f"{_MEM}{rec.rss_delta_mb:+5.0f}MB{_RST}"
+            lines.append(self._row(f"  {icon} {name} {t_}  cpu{cpu_}  mem{mem_}"))
 
         # 最低 5 行をパディング（ツール呼び出しが少ない場合に空行で埋める）
         for _ in range(max(0, 3 - len(recs[-3:]))):
