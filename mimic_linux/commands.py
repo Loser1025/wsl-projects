@@ -32,15 +32,20 @@ def cmd_model(agent: OpenRouterAgent, args: str):
     arg = args.strip()
 
     if not arg:
-        # 引数なし → 起動時と同じライブセレクタを起動
-        from .config import select_model_interactively
-        new_model, new_ctx = select_model_interactively(agent._config.api_keys[0], current)
-        if new_model != current:
-            agent._config.model = new_model
-            agent._config.context_length = new_ctx
+        # 引数なし → ライブセレクタを起動
+        from .config import select_model_interactively_multi, GoogleAIConfig
+        cfg = agent._config
+        # 現在のプロバイダーだけを渡す（もう一方は None）
+        if isinstance(cfg, GoogleAIConfig):
+            new_config = select_model_interactively_multi(None, cfg)
+        else:
+            new_config = select_model_interactively_multi(cfg, None)
+        if new_config.model != current:
+            agent._config.model          = new_config.model
+            agent._config.context_length = new_config.context_length
             agent._update_compaction_threshold()
             agent.clear_history()
-            safe_print(C.green(f"  ✓ モデルを変更しました: {new_model}"))
+            safe_print(C.green(f"  ✓ モデルを変更しました: {new_config.model}"))
             safe_print(C.gray("  会話履歴をリセットしました。"))
         else:
             safe_print(C.gray(f"  モデルは変更されませんでした: {current}"))
