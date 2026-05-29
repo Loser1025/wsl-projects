@@ -33,21 +33,21 @@ def _try_read_file_text(path: Path) -> str:
         return path.read_text(encoding="utf-8", errors="replace")
 
 class C:
-    """Matrix Green Theme (All colors unified to Green system)"""
+    """Razer Cyberpunk Neon テーマ（半透明黒背景最適化・24bit RGB）"""
     RESET   = "\033[0m"
     BOLD    = "\033[1m"
     DIM     = "\033[2m"
-    # --- ネオンカラー定義 (Green系統) ---
-    _RG     = "\033[38;2;0;255;0m"      # Razer Green (メイン)
-    _RG_DIM = "\033[38;2;0;64;0m"       # Dark Forest (枠線)
-    _WHITE  = "\033[38;2;220;255;220m"  # Mint White (重要テキスト)
-    _GRAY   = "\033[38;2;80;120;80m"    # Moss Gray (ログ)
-    _PURPLE = "\033[38;2;160;255;120m"  # Pale Lime (AIの思考)
-    _CYAN   = "\033[38;2;0;255;180m"    # Seafoam Green (観察・ツール結果)
-    _RED    = "\033[38;2;200;255;0m"    # Toxic Yellow (エラー)
-    _YELLOW = "\033[38;2;140;255;0m"    # Chartreuse (警告・待機)
-    _ORANGE = "\033[38;2;0;200;100m"    # Emerald (並列処理)
-    _MEM    = "\033[38;2;0;230;255m"    # Electric Aqua (長期記憶・RAG)
+    # Razer グリーン基調のサイバーパンクネオン配色
+    _RG     = "\033[38;2;0;255;65m"    # Razer Neon Green    #00FF41
+    _RG_DIM = "\033[38;2;0;200;50m"    # Deep Neon Green     #00C832（枠線）
+    _WHITE  = "\033[38;2;255;255;255m" # Pure White          #FFFFFF
+    _GRAY   = "\033[38;2;0;220;160m"   # Neon Mint           #00DC80
+    _PURPLE = "\033[38;2;200;0;255m"   # Electric Violet     #C800FF（AI思考）
+    _CYAN   = "\033[38;2;0;240;255m"   # Electric Cyan       #00F0FF
+    _RED    = "\033[38;2;255;0;60m"    # Neon Red            #FF003C
+    _YELLOW = "\033[38;2;255;230;0m"   # Neon Yellow         #FFE600
+    _ORANGE = "\033[38;2;255;100;0m"   # Neon Orange         #FF6400
+    _MEM    = "\033[38;2;160;0;255m"   # Electric Indigo     #A000FF
     @staticmethod
     def green(s):      return f"{C._RG}{s}{C.RESET}"
     @staticmethod

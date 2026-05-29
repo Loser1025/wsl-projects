@@ -19,18 +19,20 @@ from .monitoring import ToolCallLog, ToolCallRecord, MonitoringToolRegistry
 from .proc_observer import SystemMonitor
 
 
-# ── ANSI カラー（Cyberpunk Neon テーマ）────────────────────────────
+# ── ANSI カラー（Razer Cyberpunk Neon テーマ・watch対応16色版）────────
+# watch -c は 24bit RGB を解釈できないため標準 ANSI 16色で近似する
+# メイン UI(utils.py) の 24bit 版と視覚的に揃えた配色
 
-_RG  = "\033[38;2;0;255;80m"       # ネオングリーン（メイン）
-_RGD = "\033[38;2;0;120;40m"       # ダークグリーン（ボーダー）
-_WHT = "\033[38;2;220;255;220m"    # ソフトグリーンホワイト（テキスト）
-_GRY = "\033[38;2;120;200;120m"    # ミディアムグリーン（ラベル）
-_CYN = "\033[38;2;0;240;255m"      # エレクトリックシアン（値）
-_YLW = "\033[38;2;255;220;0m"      # ネオンイエロー（警告）
-_MEM = "\033[38;2;180;100;255m"    # パープル（メモリ）
-_RED = "\033[38;2;255;60;60m"      # ブライトレッド（エラー）
-_PNK = "\033[38;2;255;80;180m"     # ネオンピンク（アクセント）
-_ORG = "\033[38;2;255;140;0m"      # オレンジ（注目）
+_RG  = "\033[92m"    # Bright Green   ≈ Razer Neon Green（成功・メイン）
+_RGD = "\033[1;32m"  # Bold Green     ≈ Deep Neon Green（ボーダー・強調）
+_WHT = "\033[97m"    # Bright White   ≈ Pure White（テキスト）
+_GRY = "\033[96m"    # Bright Cyan    ≈ Neon Mint（ラベル）
+_CYN = "\033[1;96m"  # Bold Cyan      ≈ Electric Cyan（値・時間）
+_YLW = "\033[93m"    # Bright Yellow  ≈ Neon Yellow（警告・CPU）
+_MEM = "\033[95m"    # Bright Magenta ≈ Electric Violet（メモリ）
+_RED = "\033[91m"    # Bright Red     ≈ Neon Red（エラー）
+_PNK = "\033[1;95m"  # Bold Magenta   ≈ Hot Magenta（アクセント）
+_ORG = "\033[1;93m"  # Bold Yellow    ≈ Neon Orange（注目・実行中）
 _BLD = "\033[1m"
 _RST = "\033[0m"
 
@@ -121,12 +123,12 @@ class MonitorDashboard:
         except OSError:
             pass
         # watch が使えれば最優先（点滅なし・スクロール蓄積なし）
-        # --no-title でヘッダー行「Every 1.0s: ...」を非表示にして2行節約
+        # --no-title は古いwatch非対応のため除去
         # なければ \033[2J で全画面クリアしてから描画（点滅あるが蓄積なし）
         loop_cmd = (
             f"bash -c '"
             f"if command -v watch >/dev/null 2>&1; then "
-            f"  watch -n 1 --no-title -c cat {_TMP}; "
+            f"  watch -n 1 -c cat {_TMP}; "
             f"else "
             f"  while true; do "
             f"    printf \"\\033[2J\\033[H\"; "
