@@ -28,16 +28,6 @@ MAX_TOOL_ROUNDS    = 60
 _CACHEABLE_TOOLS   = ["read_file", "list_directory", "search_files", "get_repo_map"]
 _THINK_BUDGET_CHARS = 15_000  # この文字数を超えた未閉タグの思考を自動停止
 
-# ── 生リクエスト/レスポンス ロガーフック ─────────────────────────
-# raw_logger.py が set_raw_log_fn() でセットする。
-# fn(event: str, data: dict) の形式で呼ばれる。
-_raw_log_fn = None
-
-def set_raw_log_fn(fn) -> None:
-    """生API通信のロガーを登録する。fn(event, data) 形式。"""
-    global _raw_log_fn
-    _raw_log_fn = fn
-
 
 def _is_context_exceeded(message: str) -> bool:
     """エラーメッセージがコンテキスト超過を示しているか判定する。"""
@@ -218,19 +208,6 @@ def _build_openrouter_payload(
         payload["response_format"] = {"type": "json_object"}
 
     api_key = _acquire_key_with_wait(config)
-
-    if _raw_log_fn:
-        last_user = next(
-            (m.get("content", "") for m in reversed(send_messages)
-             if m.get("role") == "user"), ""
-        )
-        _raw_log_fn("request", {
-            "model":    config.model,
-            "msg_count": len(send_messages),
-            "tool_count": len(tool_specs),
-            "last_user": str(last_user) if last_user else "",
-        })
-
     return payload, api_key
 
 
@@ -254,14 +231,6 @@ def _call_openrouter_api(
         with urllib.request.urlopen(req, timeout=120) as resp:
             result = json.loads(resp.read().decode("utf-8"))
         config.report_success(api_key)
-        if _raw_log_fn:
-            msg  = result.get("choices", [{}])[0].get("message", {})
-            text = msg.get("content") or msg.get("reasoning") or ""
-            tcs  = msg.get("tool_calls") or []
-            _raw_log_fn("response", {
-                "text":       str(text)[:600],
-                "tool_calls": [tc.get("function", {}).get("name", "") for tc in tcs],
-            })
         return result
     except urllib.error.HTTPError as e:
         body_text = e.read().decode("utf-8", errors="replace")
@@ -307,8 +276,6 @@ def _stream_openrouter_api(
     # reasoning フォールバック用: content が一度も来なかった場合に使用
     accumulated_reasoning = ""
     had_content = False
-    # raw_logger 用: ストリーム全テキストを蓄積
-    _log_text = ""
 
     try:
         with urllib.request.urlopen(req, timeout=180) as resp:
@@ -337,11 +304,6 @@ def _stream_openrouter_api(
                         if not had_content and accumulated_reasoning:
                             yield accumulated_reasoning, [], ""
                         config.report_success(api_key)
-                        if _raw_log_fn:
-                            _raw_log_fn("response_stream", {
-                                "text":       _log_text or accumulated_reasoning,
-                                "tool_calls": [t.get("name","") for t in accumulated_tools.values()],
-                            })
                     continue
                 try:
                     chunk = json.loads(data_str)
@@ -358,7 +320,6 @@ def _stream_openrouter_api(
                 text_chunk = delta.get("content") or ""
                 if text_chunk:
                     had_content = True
-                    _log_text += text_chunk   # raw_logger 用に蓄積
                 elif not had_content:
                     accumulated_reasoning += delta.get("reasoning") or ""
 

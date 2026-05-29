@@ -153,25 +153,6 @@ class TmuxSession:
         self._monitor_pane = pane
         return pane
 
-    def create_raw_log_pane(self, monitor_pane: TmuxPane, log_path: str) -> TmuxPane:
-        """
-        Raw API Log 用の別ウィンドウ（タブ）を作成する。
-        Ctrl+B → 1 で切り替えられる。
-        Monitor は分割表示のまま維持される。
-        """
-        self.ensure()
-        r = _tmux(
-            "new-window",
-            "-t", self.name,
-            "-n", "raw-log",
-            "-d",
-            "-P", "-F", "#{pane_id}",
-            f"tail -f {log_path}",
-        )
-        pane_id = r.stdout.strip()
-        pane = TmuxPane(pane_id)
-        return pane
-
     # ── ユーティリティ ──────────────────────────────────────────
 
     @staticmethod
