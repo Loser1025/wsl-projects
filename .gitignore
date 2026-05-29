@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# mimic_linux 固有
+mimic_linux/.env
+mimic_linux/mimic.log
+mimic_linux/stream_debug.jsonl
+mimic_linux/.mimic/sessions/
+/tmp/mimic_monitor.ansi
+
+# エディタ
+.vscode/
+.idea/
+*.swp
