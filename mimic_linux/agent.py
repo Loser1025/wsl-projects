@@ -228,7 +228,7 @@ def _build_openrouter_payload(
             "model":    config.model,
             "msg_count": len(send_messages),
             "tool_count": len(tool_specs),
-            "last_user": str(last_user)[:600] if last_user else "",
+            "last_user": str(last_user) if last_user else "",
         })
 
     return payload, api_key
@@ -307,6 +307,8 @@ def _stream_openrouter_api(
     # reasoning フォールバック用: content が一度も来なかった場合に使用
     accumulated_reasoning = ""
     had_content = False
+    # raw_logger 用: ストリーム全テキストを蓄積
+    _log_text = ""
 
     try:
         with urllib.request.urlopen(req, timeout=180) as resp:
@@ -336,10 +338,9 @@ def _stream_openrouter_api(
                             yield accumulated_reasoning, [], ""
                         config.report_success(api_key)
                         if _raw_log_fn:
-                            tool_names = [t.get("name","") for t in accumulated_tools.values()]
                             _raw_log_fn("response_stream", {
-                                "tool_calls": tool_names,
-                                "had_content": had_content,
+                                "text":       _log_text or accumulated_reasoning,
+                                "tool_calls": [t.get("name","") for t in accumulated_tools.values()],
                             })
                     continue
                 try:
@@ -357,6 +358,7 @@ def _stream_openrouter_api(
                 text_chunk = delta.get("content") or ""
                 if text_chunk:
                     had_content = True
+                    _log_text += text_chunk   # raw_logger 用に蓄積
                 elif not had_content:
                     accumulated_reasoning += delta.get("reasoning") or ""
 
