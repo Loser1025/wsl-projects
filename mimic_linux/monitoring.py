@@ -148,11 +148,12 @@ class MonitoringToolRegistry(ToolRegistry):
         dashboard_fn: Optional[Callable[[ToolCallRecord], None]] = None,
     ):
         # base の内部状態をそのまま借用する（コピーではなく参照）
-        self._tools     = base._tools
-        self._log       = log
-        self._display   = display_fn    # インライン表示コールバック
-        self._dashboard = dashboard_fn  # tmux ダッシュボード更新コールバック
-        self._lock      = threading.Lock()
+        self._tools        = base._tools
+        self._log          = log
+        self._display      = display_fn
+        self._dashboard    = dashboard_fn
+        self._lock         = threading.Lock()
+        self.current_tool: Optional[str] = None   # 実行中ツール名（ダッシュボード参照用）
 
     # specs は親クラスに委譲（_tools を参照共有しているため正しく動く）
     def get_specs(self):
@@ -163,6 +164,9 @@ class MonitoringToolRegistry(ToolRegistry):
         args_preview = ", ".join(
             f"{k}={repr(v)[:30]}" for k, v in list(args.items())[:3]
         )
+
+        # ── 実行中ツールを記録（ダッシュボード参照用）──
+        self.current_tool = tool_name
 
         # ── 長時間コマンドにはスピナーを表示 ──
         spinner: Optional[_Spinner] = None
@@ -187,6 +191,7 @@ class MonitoringToolRegistry(ToolRegistry):
         finally:
             elapsed  = time.perf_counter() - t0
             summary: Summary = mon.stop()
+            self.current_tool = None   # 実行完了
             if spinner:
                 spinner.stop()
 

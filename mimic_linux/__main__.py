@@ -55,6 +55,17 @@ def main():
     use_tmux = "--tmux" in _args
     _args_clean = [a for a in _args if a != "--tmux"]
 
+    # ── tmux チェックをモデル選択より先に実行 ────────────────────
+    # tmux 外から --tmux で起動した場合は即座に tmux 内に入り直す。
+    # relaunch_inside_tmux は sys.exit() するのでここで処理が終わる。
+    if use_tmux:
+        import shutil
+        if shutil.which("tmux"):
+            from .tmux_orch import inside_tmux, relaunch_inside_tmux
+            if not inside_tmux():
+                relaunch_inside_tmux("mimic")
+                return  # 到達しない
+
     if not any(a in _args_clean for a in ("--prompt", "--auto-prompt", "--status")):
         active_config = select_model_interactively_multi(or_config, gemini_config)
 
@@ -131,7 +142,11 @@ def main():
 
     # ── tmux ダッシュボード起動（--tmux フラグ時のみ）────────────
     if use_tmux:
-        _start_tmux_dashboard(tool_log, active_config)
+        _start_tmux_dashboard(
+            tool_log, active_config, mon_tools,
+            get_cwd     = lambda: agent.cwd,
+            get_history = lambda: len(agent.conversation),
+        )
 
     # ── モード分岐 ────────────────────────────────────────────────
     args = _args_clean
@@ -154,7 +169,8 @@ def main():
         )
 
 
-def _start_tmux_dashboard(tool_log, active_config):
+def _start_tmux_dashboard(tool_log, active_config, mon_registry=None,
+                          get_cwd=None, get_history=None):
     """
     tmux ダッシュボードペインを起動する。
 
@@ -187,7 +203,12 @@ def _start_tmux_dashboard(tool_log, active_config):
         session      = TmuxSession("mimic")
         monitor_pane = session.get_or_create_monitor_pane()
         sys_mon      = SystemMonitor()
-        dashboard    = MonitorDashboard(monitor_pane, tool_log, sys_mon, active_config)
+        dashboard    = MonitorDashboard(
+            monitor_pane, tool_log, sys_mon, active_config,
+            mon_registry = mon_registry,
+            get_cwd      = get_cwd,
+            get_history  = get_history,
+        )
         dashboard.start()
         safe_print(C.green("  ✓ Monitor ペインを起動しました（下部ペインに表示）"), flush=True)
     except Exception as e:
