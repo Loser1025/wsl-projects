@@ -118,16 +118,19 @@ class MonitorDashboard:
             _TMP.write_text("起動中...\n", encoding="utf-8")
         except OSError:
             pass
-        # clear の代わりにカーソルをホームへ移動して上書き → 点滅なし
-        # \033[H : カーソルを (0,0) へ移動
-        # \033[J : カーソル以降を消去（古いコンテンツの残りを除去）
+        # watch が使えれば最優先（点滅なし・スクロール蓄積なし）
+        # なければ \033[2J で全画面クリアしてから描画（点滅あるが蓄積なし）
         loop_cmd = (
-            f"bash -c 'while true; do "
-            f"printf \"\\033[H\"; "
-            f"cat {_TMP} 2>/dev/null; "
-            f"printf \"\\033[J\"; "
-            f"sleep 1; "
-            f"done'"
+            f"bash -c '"
+            f"if command -v watch >/dev/null 2>&1; then "
+            f"  watch -n 1 -c cat {_TMP}; "
+            f"else "
+            f"  while true; do "
+            f"    printf \"\\033[2J\\033[H\"; "
+            f"    cat {_TMP} 2>/dev/null; "
+            f"    sleep 1; "
+            f"  done; "
+            f"fi'"
         )
         self._pane.send(loop_cmd)
         self._thread = threading.Thread(
