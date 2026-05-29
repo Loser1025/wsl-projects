@@ -95,9 +95,16 @@ class TmuxSession:
         return _tmux("has-session", "-t", self.name).returncode == 0
 
     def ensure(self) -> None:
-        """セッションがなければ detach 状態で新規作成する。"""
+        """セッションがなければ detach 状態で新規作成し、便利オプションを設定する。"""
         if not self.exists():
             _tmux("new-session", "-d", "-s", self.name)
+
+        # マウスクリックでペイン・ウィンドウを切り替えられるようにする
+        _tmux("set-option", "-t", self.name, "-g", "mouse", "on")
+        # ステータスバーにウィンドウ一覧と戻り方ヒントを表示
+        _tmux("set-option", "-t", self.name, "-g", "status-interval", "1")
+        _tmux("set-option", "-t", self.name, "-g", "status-right",
+              "#[fg=colour245] Ctrl+B→0:main  Ctrl+B→1:raw-log  #[fg=colour240]%H:%M")
 
     def attach(self) -> None:
         """セッションにアタッチする（フォアグラウンド）。"""
