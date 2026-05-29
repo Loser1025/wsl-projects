@@ -101,10 +101,15 @@ class TmuxSession:
 
         # マウスクリックでペイン・ウィンドウを切り替えられるようにする
         _tmux("set-option", "-t", self.name, "-g", "mouse", "on")
-        # ステータスバーにウィンドウ一覧と戻り方ヒントを表示
         _tmux("set-option", "-t", self.name, "-g", "status-interval", "1")
-        _tmux("set-option", "-t", self.name, "-g", "status-right",
-              "#[fg=colour245] Ctrl+B→0:main  Ctrl+B→1:raw-log  #[fg=colour240]%H:%M")
+        # ステータスバー: 黒文字（背景は tmux デフォルトのまま）
+        # -g はグローバル設定のため -t との共存不可 → -g のみで設定する
+        _tmux("set-option", "-g", "status-fg",                    "black")
+        _tmux("set-option", "-g", "status-style",                 "fg=black")
+        _tmux("set-option", "-g", "window-status-style",          "fg=black")
+        _tmux("set-option", "-g", "window-status-current-style",  "fg=black,bold")
+        _tmux("set-option", "-g", "status-right",
+              "#[fg=black] Ctrl+B→0:main  Ctrl+B→1:raw-log  %H:%M ")
 
     def attach(self) -> None:
         """セッションにアタッチする（フォアグラウンド）。"""
