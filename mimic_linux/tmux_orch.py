@@ -122,35 +122,55 @@ class TmuxSession:
         if self._monitor_pane and self._monitor_pane.is_alive():
             return self._monitor_pane
 
-        if inside_tmux():
-            # ── パターン A: tmux 内 → 現在のウィンドウを分割 ──
-            # -P -F で新しく作られたペインの ID を直接取得
-            r = _tmux(
-                "split-window",
-                "-v",                                       # 縦分割（上下）
-                "-p", str(self.MONITOR_PANE_HEIGHT_PCT),    # 下部 N%
-                "-d",                                       # フォーカスを移さない
-                "-P", "-F", "#{pane_id}",                   # 新ペインID を表示
-                "cat",                                      # プレースホルダ
-            )
-            pane_id = r.stdout.strip()
-        else:
-            # ── パターン B: tmux 外 → セッションを作って split ──
-            self.ensure()
-            r = _tmux(
-                "split-window",
-                "-t", self.name,
-                "-v",
-                "-p", str(self.MONITOR_PANE_HEIGHT_PCT),
-                "-d",
-                "-P", "-F", "#{pane_id}",
-                "cat",
-            )
-            pane_id = r.stdout.strip()
+        # "cat" をプレースホルダに使うと、後から send() したコマンドが
+        # cat の stdin に渡されてテキスト表示になってしまう。
+        # コマンドを指定しない（デフォルトシェルが開く）ことで send() が正しく動く。
+        split_args = [
+            "split-window",
+            "-v",
+            "-p", str(self.MONITOR_PANE_HEIGHT_PCT),
+            "-d",
+            "-P", "-F", "#{pane_id}",
+        ]
 
+        if inside_tmux():
+            r = _tmux(*split_args)
+        else:
+            self.ensure()
+            r = _tmux(*split_args, "-t", self.name)
+
+        pane_id = r.stdout.strip()
         pane = TmuxPane(pane_id)
         pane.set_title("mimic-monitor")
         self._monitor_pane = pane
+        return pane
+
+    def create_raw_log_pane(self, monitor_pane: TmuxPane, log_path: str) -> TmuxPane:
+        """
+        Monitor ペインの下に Raw API Log ペインを追加する。
+        Monitor は全幅のまま維持され、その下に Raw Log が表示される。
+
+        レイアウト結果:
+          ┌──────────────────────────────────────────┐
+          │  メイン                                   │
+          ├──────────────────────────────────────────┤
+          │  Monitor（全幅）                          │
+          ├──────────────────────────────────────────┤
+          │  Raw API Log（全幅）                      │
+          └──────────────────────────────────────────┘
+        """
+        r = _tmux(
+            "split-window",
+            "-t", monitor_pane.target,
+            "-v",               # 縦分割（Monitor の下に追加）
+            "-p", "40",         # Monitor の高さの 40%（全体の約 12%）
+            "-d",               # フォーカスを移さない
+            "-P", "-F", "#{pane_id}",
+            f"tail -f {log_path}",
+        )
+        pane_id = r.stdout.strip()
+        pane = TmuxPane(pane_id)
+        pane.set_title("raw-api-log")
         return pane
 
     # ── ユーティリティ ──────────────────────────────────────────

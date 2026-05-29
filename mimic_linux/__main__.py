@@ -200,6 +200,8 @@ def _start_tmux_dashboard(tool_log, active_config, mon_registry=None,
 
     # tmux 内から起動 → 現在のウィンドウを分割
     try:
+        from .raw_logger import enable as _enable_raw_log, _LOG_PATH as _RAW_LOG_PATH
+
         session      = TmuxSession("mimic")
         monitor_pane = session.get_or_create_monitor_pane()
         sys_mon      = SystemMonitor()
@@ -210,7 +212,12 @@ def _start_tmux_dashboard(tool_log, active_config, mon_registry=None,
             get_history  = get_history,
         )
         dashboard.start()
-        safe_print(C.green("  ✓ Monitor ペインを起動しました（下部ペインに表示）"), flush=True)
+
+        # Raw API Log ペイン（Monitor の右隣）
+        _enable_raw_log()
+        session.create_raw_log_pane(monitor_pane, str(_RAW_LOG_PATH))
+
+        safe_print(C.green("  ✓ Monitor / Raw API Log ペインを起動しました"), flush=True)
     except Exception as e:
         safe_print(C.yellow(f"  ⚠ tmux ダッシュボード起動失敗: {e}"), flush=True)
 

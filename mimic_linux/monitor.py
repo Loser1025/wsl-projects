@@ -105,7 +105,16 @@ class MonitorDashboard:
 
     def start(self) -> None:
         self._stop.clear()
-        self._pane.send(f"watch -n 1 -c cat {_TMP}")
+        # ファイルを先に作成（ないとペインでエラーになる）
+        try:
+            _TMP.write_text("起動中...\n", encoding="utf-8")
+        except OSError:
+            pass
+        # watch に依存しない bash ループ（watch が未インストールでも動く）
+        loop_cmd = (
+            f"bash -c 'while true; do clear; cat {_TMP} 2>/dev/null; sleep 1; done'"
+        )
+        self._pane.send(loop_cmd)
         self._thread = threading.Thread(
             target=self._loop, daemon=True, name="monitor-dashboard"
         )
@@ -199,8 +208,8 @@ class MonitorDashboard:
             mem_ = f"{_MEM}MEM:{rec.rss_delta_mb:+5.0f}MB{_RST}"
             lines.append(self._row(f"  {icon} {name} {t_} | {cpu_} | {mem_}"))
 
-        # 最低 5 行をパディング
-        while len(lines) < len(lines) + max(0, 5 - len(recs[-5:])):
+        # 最低 5 行をパディング（ツール呼び出しが少ない場合に空行で埋める）
+        for _ in range(max(0, 5 - len(recs[-5:]))):
             lines.append(self._row(""))
 
         lines.append(bot)
