@@ -155,25 +155,42 @@ def main():
 
 
 def _start_tmux_dashboard(tool_log, active_config):
-    """tmux が利用可能な場合にダッシュボードペインを起動する。"""
+    """
+    tmux ダッシュボードペインを起動する。
+
+    tmux 内から起動した場合:
+      現在のウィンドウを縦分割して下部に Monitor ペインを追加する。
+
+    tmux 外から起動した場合:
+      新しい tmux セッションを作り、その中で mimic を再起動して attach する。
+      この場合は現在のプロセスを終了する（relaunch_inside_tmux が sys.exit する）。
+    """
     import shutil
+    from .utils import safe_print, C
+
     if not shutil.which("tmux"):
-        from .utils import safe_print, C
         safe_print(C.yellow("  ⚠ tmux が見つかりません。通常モードで起動します。"), flush=True)
         return
-    try:
-        from .tmux_orch import TmuxSession
-        from .monitor import MonitorDashboard
-        from .proc_observer import SystemMonitor
 
-        session = TmuxSession("mimic")
-        session.ensure()
+    from .tmux_orch import inside_tmux, relaunch_inside_tmux, TmuxSession
+    from .monitor import MonitorDashboard
+    from .proc_observer import SystemMonitor
+
+    if not inside_tmux():
+        # tmux 外から起動 → 新しいセッションに入り直す
+        safe_print(C.green("  tmux セッションを起動してアタッチします..."), flush=True)
+        relaunch_inside_tmux("mimic")  # この関数は return しない
+        return  # 到達しない
+
+    # tmux 内から起動 → 現在のウィンドウを分割
+    try:
+        session      = TmuxSession("mimic")
         monitor_pane = session.get_or_create_monitor_pane()
         sys_mon      = SystemMonitor()
         dashboard    = MonitorDashboard(monitor_pane, tool_log, sys_mon, active_config)
         dashboard.start()
+        safe_print(C.green("  ✓ Monitor ペインを起動しました（下部ペインに表示）"), flush=True)
     except Exception as e:
-        from .utils import safe_print, C
         safe_print(C.yellow(f"  ⚠ tmux ダッシュボード起動失敗: {e}"), flush=True)
 
 

@@ -2,12 +2,17 @@
 tmux_orch.py — tmux セッション・ペイン管理
 TmuxPane:    1つのペインへの送信・内容取得
 TmuxSession: セッション全体の管理とレイアウト構築
+
+起動パターン:
+  A) tmux の中から --tmux → 現在のウィンドウを縦分割して Monitor ペインを追加
+  B) tmux の外から --tmux → 新しい tmux セッションを作って中で mimic を起動し attach
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
-import time
+import sys
 from typing import Optional
 
 
@@ -21,12 +26,17 @@ def _tmux(*args: str, check: bool = False) -> subprocess.CompletedProcess:
     )
 
 
+def inside_tmux() -> bool:
+    """現在のプロセスが tmux セッション内で動いているか確認する。"""
+    return bool(os.environ.get("TMUX"))
+
+
 # ── TmuxPane ─────────────────────────────────────────────────────
 
 class TmuxPane:
     """
     tmux の1ペインを表す。
-    target 書式: "session:window.pane"  例: "mimic:0.1"
+    target 書式: ペインID（例: "%3"）または "session:window.pane"
     """
 
     def __init__(self, target: str):
@@ -48,11 +58,9 @@ class TmuxPane:
         return r.stdout
 
     def set_title(self, title: str) -> None:
-        """ペインのタイトルを設定する。"""
         _tmux("select-pane", "-t", self.target, "-T", title)
 
     def kill(self) -> None:
-        """ペインを強制終了する。"""
         _tmux("kill-pane", "-t", self.target)
 
     def is_alive(self) -> bool:
@@ -66,17 +74,16 @@ class TmuxSession:
     """
     mimic_linux 用 tmux セッションを管理する。
 
-    レイアウト（--tmux 起動時に自動構築）:
+    レイアウト:
     ┌───────────────────────────────────┐
-    │  [0] メイン（インタラクティブ）    │
+    │  [上] メイン（インタラクティブ）   │
     ├───────────────────────────────────┤
-    │  [1] Monitor（1秒ごとに更新）     │
+    │  [下] Monitor（1秒ごとに更新）    │
     └───────────────────────────────────┘
-
     Monitor ペインは画面下部 30% を占有する。
     """
 
-    MONITOR_PANE_HEIGHT_PCT = 30  # Monitor ペインの高さ割合 (%)
+    MONITOR_PANE_HEIGHT_PCT = 30
 
     def __init__(self, session_name: str = "mimic"):
         self.name = session_name
@@ -85,11 +92,10 @@ class TmuxSession:
     # ── セッション存在確認・作成 ────────────────────────────────
 
     def exists(self) -> bool:
-        r = _tmux("has-session", "-t", self.name)
-        return r.returncode == 0
+        return _tmux("has-session", "-t", self.name).returncode == 0
 
     def ensure(self) -> None:
-        """セッションがなければ新規作成する（detach 状態）。"""
+        """セッションがなければ detach 状態で新規作成する。"""
         if not self.exists():
             _tmux("new-session", "-d", "-s", self.name)
 
@@ -98,47 +104,52 @@ class TmuxSession:
         subprocess.run(["tmux", "attach", "-t", self.name])
 
     def kill(self) -> None:
-        """セッション全体を終了する。"""
         _tmux("kill-session", "-t", self.name)
 
     # ── Monitor ペイン管理 ──────────────────────────────────────
 
     def get_or_create_monitor_pane(self) -> TmuxPane:
         """
-        Monitor ペインを取得または新規作成して返す。
-        既存のセッションの場合は画面下部を split して確保する。
+        Monitor ペインを返す。
+
+        パターン A（tmux 内から起動）:
+          現在のペインを縦分割して下部に Monitor を追加。
+          ペインIDを直接取得するため target が確実。
+
+        パターン B（tmux 外から起動）:
+          セッションを ensure() してから split する。
         """
         if self._monitor_pane and self._monitor_pane.is_alive():
             return self._monitor_pane
 
-        self.ensure()
-
-        # 現在のペイン数を確認
-        r = _tmux("list-panes", "-t", self.name, "-F", "#{pane_id}")
-        panes = [p.strip() for p in r.stdout.splitlines() if p.strip()]
-
-        if len(panes) < 2:
-            # Monitor ペインを下部に split で追加
-            r2 = _tmux(
-                "split-window", "-t", self.name,
-                "-v",                                          # 垂直分割
-                "-p", str(self.MONITOR_PANE_HEIGHT_PCT),      # 下部 N%
-                "-d",                                          # 作成後にフォーカスを移さない
-                "cat",                                        # 何もしないプレースホルダ
+        if inside_tmux():
+            # ── パターン A: tmux 内 → 現在のウィンドウを分割 ──
+            # -P -F で新しく作られたペインの ID を直接取得
+            r = _tmux(
+                "split-window",
+                "-v",                                       # 縦分割（上下）
+                "-p", str(self.MONITOR_PANE_HEIGHT_PCT),    # 下部 N%
+                "-d",                                       # フォーカスを移さない
+                "-P", "-F", "#{pane_id}",                   # 新ペインID を表示
+                "cat",                                      # プレースホルダ
             )
-            # 作成直後のペインID を取得
-            r3 = _tmux("list-panes", "-t", self.name, "-F", "#{pane_id}")
-            new_panes = [p.strip() for p in r3.stdout.splitlines() if p.strip()]
-            # 一番最後が新しいペイン
-            monitor_id = new_panes[-1] if new_panes else f"{self.name}:0.1"
+            pane_id = r.stdout.strip()
         else:
-            monitor_id = panes[-1]
+            # ── パターン B: tmux 外 → セッションを作って split ──
+            self.ensure()
+            r = _tmux(
+                "split-window",
+                "-t", self.name,
+                "-v",
+                "-p", str(self.MONITOR_PANE_HEIGHT_PCT),
+                "-d",
+                "-P", "-F", "#{pane_id}",
+                "cat",
+            )
+            pane_id = r.stdout.strip()
 
-        target = f"{self.name}:{monitor_id}"
-        pane   = TmuxPane(target)
+        pane = TmuxPane(pane_id)
         pane.set_title("mimic-monitor")
-        # 初期化: clear
-        _tmux("send-keys", "-t", target, "clear", "Enter")
         self._monitor_pane = pane
         return pane
 
@@ -152,3 +163,28 @@ class TmuxSession:
     def list_panes(self) -> list[str]:
         r = _tmux("list-panes", "-t", self.name, "-F", "#{pane_id} #{pane_title}")
         return r.stdout.splitlines()
+
+
+# ── tmux 外からの起動を tmux 内に切り替えるヘルパー ─────────────
+
+def relaunch_inside_tmux(session_name: str = "mimic") -> None:
+    """
+    tmux の外から --tmux で起動した場合に呼ぶ。
+    新しい tmux セッションを作り、その中で mimic_linux を再起動して attach する。
+    この関数は return しない（attach 後はユーザーが tmux を操作する）。
+    """
+    py   = sys.executable
+    args = [a for a in sys.argv[1:] if a != "--tmux"]  # --tmux は除去（無限ループ防止）
+    cmd  = " ".join([py, "-m", "mimic_linux", "--tmux"] + args)
+
+    # 既存セッションがあれば削除して作り直す
+    session = TmuxSession(session_name)
+    if session.exists():
+        session.kill()
+
+    # 新しいセッションを作って mimic を起動
+    subprocess.run([
+        "tmux", "new-session", "-s", session_name, cmd,
+    ])
+    # new-session が終わったら（ユーザーが tmux を閉じたら）プロセスを終了
+    sys.exit(0)
