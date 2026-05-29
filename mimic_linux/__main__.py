@@ -16,7 +16,7 @@ def main():
     if hasattr(sys.stdin, "reconfigure"):
         sys.stdin.reconfigure(encoding="utf-8", errors="replace")
 
-    # readline: Tab補完・履歴（Linux 標準ライブラリ）
+    # readline: 履歴のみ有効化（Tab補完は tmux 内で端末制御が競合するため無効）
     try:
         import readline
         import atexit
@@ -25,7 +25,7 @@ def main():
             readline.read_history_file(str(_hist))
         readline.set_history_length(500)
         atexit.register(readline.write_history_file, str(_hist))
-        readline.parse_and_bind("tab: complete")
+        # parse_and_bind("tab: complete") は tmux 内で端末崩れを起こすため除去
     except ImportError:
         pass
 

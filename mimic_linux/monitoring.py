@@ -185,6 +185,15 @@ class MonitoringToolRegistry(ToolRegistry):
             status = "ok"
         except UserRejectedWriteError:
             raise  # 書き込み拒否はそのまま再送出（ReActループを止める）
+        except KeyboardInterrupt:
+            # Ctrl+C でツール実行中に割り込まれた場合
+            # → finally でプロセス・モニターをクリーンアップしてから再送出
+            # → run_bash の finally が subprocess を SIGKILL で終了させる
+            # → main.py の KeyboardInterrupt ハンドラに届いてプロンプトに戻る
+            safe_print(
+                C.yellow(f"\n  [割り込み] {tool_name} を中断しました"), flush=True
+            )
+            raise
         except Exception as e:
             result = f"[エラー] {tool_name}: {e}"
             status = "error"

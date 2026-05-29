@@ -110,9 +110,16 @@ class MonitorDashboard:
             _TMP.write_text("起動中...\n", encoding="utf-8")
         except OSError:
             pass
-        # watch に依存しない bash ループ（watch が未インストールでも動く）
+        # clear の代わりにカーソルをホームへ移動して上書き → 点滅なし
+        # \033[H : カーソルを (0,0) へ移動
+        # \033[J : カーソル以降を消去（古いコンテンツの残りを除去）
         loop_cmd = (
-            f"bash -c 'while true; do clear; cat {_TMP} 2>/dev/null; sleep 1; done'"
+            f"bash -c 'while true; do "
+            f"printf \"\\033[H\"; "
+            f"cat {_TMP} 2>/dev/null; "
+            f"printf \"\\033[J\"; "
+            f"sleep 1; "
+            f"done'"
         )
         self._pane.send(loop_cmd)
         self._thread = threading.Thread(

@@ -143,21 +143,21 @@ class TmuxSession:
 
     def create_raw_log_pane(self, monitor_pane: TmuxPane, log_path: str) -> TmuxPane:
         """
-        Monitor ペインの下に Raw API Log ペインを追加する。
-        tail -f を直接起動するのでコマンド送信不要。
+        Raw API Log 用の別ウィンドウ（タブ）を作成する。
+        Ctrl+B → 1 で切り替えられる。
+        Monitor は分割表示のまま維持される。
         """
+        self.ensure()
         r = _tmux(
-            "split-window",
-            "-t", monitor_pane.target,
-            "-v",
-            "-p", "50",             # Monitor の 50% → 全体の約 15%
+            "new-window",
+            "-t", self.name,
+            "-n", "raw-log",
             "-d",
             "-P", "-F", "#{pane_id}",
-            f"tail -f {log_path}",  # 直接起動するので send() 不要
+            f"tail -f {log_path}",
         )
         pane_id = r.stdout.strip()
         pane = TmuxPane(pane_id)
-        pane.set_title("raw-log")
         return pane
 
     # ── ユーティリティ ──────────────────────────────────────────
