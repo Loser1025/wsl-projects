@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 import threading
 import time
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
@@ -37,8 +38,15 @@ _TMP = Path("/tmp/mimic_monitor.ansi")
 _ANSI_RE = re.compile(r"\033\[[0-9;]*m")
 
 
-def _visible_len(s: str) -> int:
-    return len(_ANSI_RE.sub("", s))
+def _display_width(s: str) -> int:
+    """ANSIコードを除いた端末表示幅を返す。
+    全角文字（日本語・CJK等）は2列、半角は1列としてカウントする。"""
+    s = _ANSI_RE.sub("", s)
+    width = 0
+    for ch in s:
+        eaw = unicodedata.east_asian_width(ch)
+        width += 2 if eaw in ("W", "F") else 1
+    return width
 
 
 def _bar(pct: float, width: int = 18) -> str:
@@ -149,8 +157,10 @@ class MonitorDashboard:
                 pass
 
     def _row(self, inner: str) -> str:
-        """幅 _W のボックス行を生成。ANSI コードを除いた可視幅でパディング。"""
-        pad = max(0, _W - 2 - _visible_len(inner))
+        """幅 _W のボックス行を生成。
+        全角文字を正しく2列としてカウントしてパディングを計算する。
+        ╔{'═'*_W}╗ の幅は _W+2 なので、║...║ も同じ幅になるよう調整する。"""
+        pad = max(0, _W - _display_width(inner))
         return f"{_RGD}║{_RST}{inner}{' ' * pad}{_RGD}║{_RST}"
 
     def _elapsed_str(self) -> str:
