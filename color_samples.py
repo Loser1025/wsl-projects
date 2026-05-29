@@ -354,7 +354,7 @@ def section_text_samples():
     print()
 
     # (b) ロードバー風（文字つき）
-    print(f"  {BOLD}ロードバー風 0%→100%（背景=グラデーション、文字="Loading…n%"）:{RESET}")
+    print(f"  {BOLD}ロードバー風 0%->100%（背景=グラデーション、文字=Loading n%）:{RESET}")
     total = 24
     for progress in [0, 10, 25, 50, 75, 90, 100]:
         filled = int(total * progress / 100)
