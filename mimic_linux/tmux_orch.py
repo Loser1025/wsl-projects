@@ -83,7 +83,7 @@ class TmuxSession:
     Monitor ペインは画面下部 30% を占有する。
     """
 
-    MONITOR_PANE_HEIGHT_PCT = 30
+    MONITOR_PANE_HEIGHT_PCT = 45
 
     def __init__(self, session_name: str = "mimic"):
         self.name = session_name

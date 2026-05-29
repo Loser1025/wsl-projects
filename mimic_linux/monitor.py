@@ -119,11 +119,12 @@ class MonitorDashboard:
         except OSError:
             pass
         # watch が使えれば最優先（点滅なし・スクロール蓄積なし）
+        # --no-title でヘッダー行「Every 1.0s: ...」を非表示にして2行節約
         # なければ \033[2J で全画面クリアしてから描画（点滅あるが蓄積なし）
         loop_cmd = (
             f"bash -c '"
             f"if command -v watch >/dev/null 2>&1; then "
-            f"  watch -n 1 -c cat {_TMP}; "
+            f"  watch -n 1 --no-title -c cat {_TMP}; "
             f"else "
             f"  while true; do "
             f"    printf \"\\033[2J\\033[H\"; "
@@ -220,7 +221,7 @@ class MonitorDashboard:
             self._row(f"  {_BLD}{_WHT}直近の呼び出し:{_RST}"),
         ]
 
-        for rec in recs[-5:]:
+        for rec in recs[-3:]:
             icon = f"{_RG}✓{_RST}" if rec.status == "ok" else f"{_RED}✗{_RST}"
             name = f"{_WHT}{rec.tool:<14}{_RST}"
             t_   = f"{_CYN}{rec.elapsed:5.2f}s{_RST}"
@@ -229,7 +230,7 @@ class MonitorDashboard:
             lines.append(self._row(f"  {icon} {name} {t_} | {cpu_} | {mem_}"))
 
         # 最低 5 行をパディング（ツール呼び出しが少ない場合に空行で埋める）
-        for _ in range(max(0, 5 - len(recs[-5:]))):
+        for _ in range(max(0, 3 - len(recs[-3:]))):
             lines.append(self._row(""))
 
         lines.append(bot)
