@@ -38,7 +38,7 @@ for slide_idx, slide in enumerate(presentation.get('slides', [])):
                         parts.append(content)
                 full = ''.join(parts).strip()
                 if full:
-                    text_items.append((ty, tx, full, element['objectId'])))
+                    text_items.append((ty, tx, full, element['objectId']))
 
     # Y座標でソート、同じYならXでソート
     text_items.sort()
