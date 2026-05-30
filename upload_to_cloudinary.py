@@ -5,9 +5,9 @@ import re
 
 # Cloudinaryの設定（直接APIキーを指定）
 cloudinary.config(
-  cloud_name = 'CLOUD_NAME',
-  api_key = 'API_KEY',
-  api_secret = 'API_SECRET'
+  cloud_name = 'YOUR_CLOUD_NAME',  # 例: 'mycloud'
+  api_key = 'YOUR_API_KEY',      # 例: '123456789012345'
+  api_secret = 'YOUR_API_SECRET' # 例: 'abcdefghijklmnopqrstuvwxyz'
 )
 
 # 画像をアップロード
