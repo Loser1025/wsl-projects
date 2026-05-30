@@ -26,7 +26,6 @@ def load_roman_mapping():
 
 # メンリストのローマ字マッピング
 ROMAN_MAPPING = load_roman_mapping()
-}
 
 
 def get_presentation(service, presentation_id):
