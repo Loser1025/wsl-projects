@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Googleスライドのローマ字をメンリストのローマ字に訂正するスクリプト（最終版・v5）
+Googleスライドのローマ字をroman_correction_list.csvの内容に基づいて訂正するスクリプト（最終版・v5）
 """
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import re
+import csv
 
 # サービスアカウントの認証情報
 SERVICE_ACCOUNT_FILE = '/home/loser/wsl-projects/ageless-impulse-488713-m6-03014b3cddad.json'
@@ -14,8 +15,17 @@ SCOPES = ['https://www.googleapis.com/auth/presentations']
 # スライドID
 SLIDE_ID = '1YIfc0YPCiqFFzInkfuhipkh8rC8X66i5VPpqIJS9HOE'
 
+# roman_correction_list.csvを読み込んでROMAN_MAPPINGを生成
+def load_roman_mapping():
+    roman_mapping = {}
+    with open('/home/loser/wsl-projects/roman_correction_list.csv', mode='r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            roman_mapping[row['名前']] = row['正しいローマ字']
+    return roman_mapping
+
 # メンリストのローマ字マッピング
-ROMAN_MAPPING = {
+ROMAN_MAPPING = load_roman_mapping()
     "廣田 珠輝": "TAMAKI HIROTA",
     "吉村 行雲": "KOUN YOSHIMURA",
     "塩見 慎太郎": "SHINTARO SHIOMI",
