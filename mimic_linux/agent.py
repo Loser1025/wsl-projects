@@ -540,34 +540,35 @@ class OpenRouterAgent:
         """
         API 例外を処理し (new_attempt, new_trim_count, working_messages) を返す。
         コンテキスト超過は即トリムしてリトライ。バックオフの sleep もここで実行。
-        リトライ不可の OpenRouterAPIError はそのまま再送出する。
+        401/403 のみリトライ不可として再送出する。
         """
-        if isinstance(e, (RateLimitError, OpenRouterAPIError)):
-            code = "429" if isinstance(e, RateLimitError) else "400"
-            msg  = e.message
-            is_ctx = _is_context_exceeded(msg) and (
-                isinstance(e, RateLimitError) or e.status == 400
-            )
+        # RateLimitError を最初にチェック（OpenRouterAPIError のサブクラスのため先に処理）
+        if isinstance(e, RateLimitError):
+            msg = e.message
+            backoff = min(BASE_BACKOFF * (2 ** attempt) + random.uniform(0, 1), MAX_BACKOFF)
+            safe_print(C.yellow(
+                f"  ⚠ 429 レート制限 → {backoff:.0f}秒待機してリトライ ({msg[:80]})"
+            ), flush=True)
+            time.sleep(backoff)
+            return attempt + 1, trim_count, working_messages
+
+        if isinstance(e, (ServerError, OpenRouterAPIError)):
+            msg = e.message
+            # コンテキスト超過チェック
+            is_ctx = _is_context_exceeded(msg) and e.status in (400, 429)
             if is_ctx and len(working_messages) > 4 and trim_count < 5:
                 safe_print(C.yellow(
-                    f"  ✂ {code} コンテキスト超過 → メッセージを削減してリトライ"
+                    f"  ✂ {e.status} コンテキスト超過 → メッセージを削減してリトライ"
                 ), flush=True)
                 return attempt + 1, trim_count + 1, _trim_messages_smart(working_messages)
-            if isinstance(e, RateLimitError):
-                backoff = min(BASE_BACKOFF * (2 ** attempt) + random.uniform(0, 1), MAX_BACKOFF)
-                safe_print(C.yellow(
-                    f"  ⚠ 429 レート制限 → {backoff:.0f}秒待機してリトライ ({msg[:80]})"
-                ), flush=True)
-                time.sleep(backoff)
-                return attempt + 1, trim_count, working_messages
-            # リトライ不可の OpenRouterAPIError
-            safe_print(C.red(f"  ✗ APIエラー({e.status}): {msg}"), flush=True)
-            raise e
-
-        if isinstance(e, ServerError):
+            # 認証・権限エラーはリトライ不可
+            if e.status in (401, 403):
+                safe_print(C.red(f"  ✗ APIエラー({e.status}): {msg}"), flush=True)
+                raise e
             backoff = min(BASE_BACKOFF * (2 ** attempt) + random.uniform(0, 2), MAX_BACKOFF)
+            label = "サーバーエラー" if isinstance(e, ServerError) else f"APIエラー({e.status})"
             safe_print(C.yellow(
-                f"  ⚠ サーバーエラー({e.status}): {e.message[:100]} → {backoff:.0f}秒待機"
+                f"  ⚠ {label}: {msg[:100]} → {backoff:.0f}秒待機してリトライ"
             ), flush=True)
             msgs, new_trim = working_messages, trim_count
             if len(msgs) > 4 and trim_count < 5:
