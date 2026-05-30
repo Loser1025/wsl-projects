@@ -62,8 +62,11 @@ def main():
                 shape = element['shape']
                 if 'text' in shape:
                     text_elements = shape['text'].get('textElements', [])
+                    # テキスト要素が空でないか確認
+                    has_text = False
                     for text_element in text_elements:
-                        if 'textRun' in text_element:
+                        if 'textRun' in text_element and text_element['textRun']['content'].strip():
+                            has_text = True
                             content = text_element['textRun']['content'].strip()
                             # 不要なテキスト（CHALLENGERやSTAFFなど）を削除
                             if content in ["CHALLENGER", "STAFF", "ORERATION", "S 軍"]:
@@ -80,15 +83,21 @@ def main():
                                 continue
                             else:
                                 # テキストが空でない場合のみ削除
-                                if content.strip():
-                                    requests.append({
-                                        "deleteText": {
-                                            "objectId": element['objectId'],
-                                            "textRange": {
-                                                "type": "ALL"
-                                            }
+                                requests.append({
+                                    "deleteText": {
+                                        "objectId": element['objectId'],
+                                        "textRange": {
+                                            "type": "ALL"
                                         }
-                                    })
+                                    }
+                                })
+                    # テキストが空の場合は要素自体を削除
+                    if not has_text:
+                        requests.append({
+                            "deleteObject": {
+                                "objectId": element['objectId']
+                            }
+                        })
 
     # 一括更新
     if requests:
