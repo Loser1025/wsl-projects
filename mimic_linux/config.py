@@ -468,14 +468,20 @@ def select_model_interactively_multi(
         print(f"  {y('⚠')}  モデル一覧の取得に失敗しました。現在の設定を使用します。\n")
         return _fallback
 
-    # ── フェーズ2: 疎通確認（並列） ─────────────────────────────
-    print(f"  {gr('実際にリクエストを送信して疎通確認中（並列）...')}\n")
+    # ── フェーズ2: 疎通確認（並列、エンターで途中終了可）──────────
+    import select as _select
+    from concurrent.futures import wait as _fut_wait, FIRST_COMPLETED
+
+    print(f"  {gr('疎通確認中...')}  {y('← エンターキーで現時点の結果を表示')}\n")
     results: dict[str, tuple[bool, float]] = {}
     tested_n = [0]
     lock = threading.Lock()
     BAR = 34
+    stop_testing = threading.Event()
 
     def _test_entry(entry: tuple) -> None:
+        if stop_testing.is_set():
+            return
         provider, mdl = entry
         mid = mdl["id"]
         if provider == "or" and or_config:
@@ -484,6 +490,8 @@ def select_model_interactively_multi(
             ok, elapsed = _test_model(gemini_config.api_keys[0], mid, GEMINI_API_BASE)
         else:
             ok, elapsed = False, 0.0
+        if stop_testing.is_set():
+            return
         key = f"{provider}:{mid}"
         with lock:
             results[key] = (ok, elapsed)
@@ -498,9 +506,26 @@ def select_model_interactively_multi(
                 end="", flush=True,
             )
 
-    with ThreadPoolExecutor(max_workers=10) as ex:
-        for f in as_completed([ex.submit(_test_entry, e) for e in all_entries]):
-            f.result()
+    ex = ThreadPoolExecutor(max_workers=10)
+    pending = {ex.submit(_test_entry, e) for e in all_entries}
+    try:
+        while pending and not stop_testing.is_set():
+            done, pending = _fut_wait(pending, timeout=0.2, return_when=FIRST_COMPLETED)
+            for f in done:
+                try:
+                    f.result()
+                except Exception:
+                    pass
+            # エンター押下を非ブロッキングで検知（select timeout=0）
+            if _select.select([sys.stdin], [], [], 0)[0]:
+                sys.stdin.readline()
+                stop_testing.set()
+    finally:
+        stop_testing.set()
+        try:
+            ex.shutdown(wait=False, cancel_futures=True)
+        except TypeError:
+            ex.shutdown(wait=False)
     print(f"\r{' ' * 80}\r", end="", flush=True)
 
     working = sorted(

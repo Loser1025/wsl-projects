@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import pty
+import re
 import signal
 import select
 import subprocess
@@ -15,6 +16,17 @@ from pathlib import Path
 from typing import Optional
 
 from .tools import tools
+
+# sudo パスワードプロンプト検出パターン（デコード後の文字列で照合）
+_SUDO_PROMPT_RE = re.compile(
+    r'\[sudo\] password for [^:]+'
+    r'|[Pp]assword:'
+    r'|パスワードを入力してください'
+)
+
+def _sudo_password() -> bytes:
+    """環境変数 SUDO_PASSWORD からパスワードを取得する（デフォルト: 1025）。"""
+    return (os.environ.get("SUDO_PASSWORD", "1025") + "\n").encode()
 
 
 @tools.register(
@@ -84,6 +96,7 @@ def run_bash(
     output_chunks: list[bytes] = []
     deadline = time.monotonic() + timeout
     timed_out = False
+    sudo_sent = 0  # 自動入力した回数（連続失敗ループを防ぐため最大3回）
 
     try:
         while True:
@@ -103,6 +116,11 @@ def run_bash(
                     chunk = os.read(master_fd, 4096)
                     if chunk:
                         output_chunks.append(chunk)
+                        # sudo パスワードプロンプトを検知したら自動入力（最大3回）
+                        if sudo_sent < 3 and _SUDO_PROMPT_RE.search(
+                                chunk.decode("utf-8", errors="replace")):
+                            os.write(master_fd, _sudo_password())
+                            sudo_sent += 1
                     else:
                         break  # EOF
                 except OSError:

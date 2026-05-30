@@ -254,10 +254,12 @@ def _stream_openrouter_api(
     tool_specs: list[dict],
     system_prompt: Optional[str] = None,
     json_mode: bool = False,
+    on_model=None,
 ):
     """
     ストリーミング呼び出し。
     yields (text_chunk: str, tool_calls: list[dict], finish_reason: str)
+    on_model(actual_model_id) は最初のチャンクで実際のモデルが判明した時点で1度だけ呼ばれる。
     """
     payload, api_key = _build_openrouter_payload(config, messages, tool_specs, system_prompt, json_mode)
     payload["stream"] = True
@@ -276,6 +278,7 @@ def _stream_openrouter_api(
     # reasoning フォールバック用: content が一度も来なかった場合に使用
     accumulated_reasoning = ""
     had_content = False
+    _model_reported = False  # on_model コールバックを1度だけ呼ぶためのフラグ
 
     try:
         with urllib.request.urlopen(req, timeout=180) as resp:
@@ -309,6 +312,13 @@ def _stream_openrouter_api(
                     chunk = json.loads(data_str)
                 except json.JSONDecodeError:
                     continue
+
+                # 実際に応答しているモデルを1度だけ通知
+                if not _model_reported and on_model:
+                    _actual = chunk.get("model", "")
+                    if _actual:
+                        on_model(_actual)
+                        _model_reported = True
 
                 choices = chunk.get("choices", [])
                 if not choices:
@@ -599,11 +609,15 @@ class OpenRouterAgent:
             working_messages = self._trim_to_fit(working_messages)
             try:
                 safe_print(C.gray(f"  → {self._config.name} ({self._config.model})"), flush=True)
-                return _call_openrouter_api(
+                result = _call_openrouter_api(
                     self._config, working_messages, tool_specs,
                     system_prompt=self.system_prompt,
                     json_mode=self.json_mode,
                 )
+                actual = result.get("model", "")
+                if actual and actual != self._config.model:
+                    safe_print(C.gray(f"  → 実際のモデル: {actual}"), flush=True)
+                return result
             except (RateLimitError, ServerError, OpenRouterAPIError,
                     http.client.RemoteDisconnected, ConnectionResetError,
                     ConnectionError, TimeoutError) as e:
@@ -639,11 +653,18 @@ class OpenRouterAgent:
                 cancel_event = threading.Event()
                 chunk_queue: queue.Queue = queue.Queue()
 
+                def _on_actual_model(actual: str):
+                    if actual != self._config.model:
+                        safe_print(
+                            C.gray(f"  → 実際のモデル: {actual}"), flush=True
+                        )
+
                 def _stream_worker():
                     try:
                         for item in _stream_openrouter_api(
                             self._config, working_messages, tool_specs,
                             self.system_prompt, json_mode=self.json_mode,
+                            on_model=_on_actual_model,
                         ):
                             chunk_queue.put(item)
                             if cancel_event.is_set():
