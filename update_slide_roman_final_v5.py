@@ -113,7 +113,7 @@ def main():
         for name, correct_roman in ROMAN_MAPPING.items():
             if name in full_text:
                 # ローマ字部分を抽出
-                current_roman = extract_roman_from_content(full_text)
+                current_roman = extract_roman_from_content_v2(full_text)
                 if not current_roman:
                     continue  # ローマ字が見つからない場合はスキップ
                 
@@ -132,7 +132,7 @@ def main():
                                     if 'textRun' in text_element:
                                         content = text_element['textRun']['content']
                                         # ローマ字部分を抽出
-                                        roman_in_element = extract_roman_from_content(content)
+                                        roman_in_element = extract_roman_from_content_v2(content)
                                         if roman_in_element and normalize_roman(roman_in_element) == normalized_roman:
                                             requests.append({
                                                 "replaceAllText": {
