@@ -112,7 +112,11 @@ def main():
         
         # 名前を検索
         for name, correct_roman in ROMAN_MAPPING.items():
-            if name in full_text:
+            # full_text内の名前を正規化（スペースを統一）
+            normalized_full_text = re.sub(r'\s+', ' ', full_text)
+            normalized_name = re.sub(r'\s+', ' ', name)
+            if normalized_name in normalized_full_text:
+                print(f"Matched name: {name} in slide {slide['objectId']}")
                 # ローマ字部分を抽出
                 current_roman = extract_roman_from_content_v2(full_text)
                 if not current_roman:
