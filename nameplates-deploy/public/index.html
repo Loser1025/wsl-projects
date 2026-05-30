@@ -12,8 +12,7 @@
             font-family: 'Noto Sans JP', 'Montserrat', sans-serif;
             margin: 0;
             padding: 20px;
-            background: url("background-optimized.png") no-repeat center center fixed;
-            background-size: cover;
+            background-color: #0f0f1a;
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
@@ -39,8 +38,8 @@
         .nameplate {
             width: 320px;
             height: 200px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
+            background: url("nameplate-bg.png") no-repeat center center;
+            background-size: cover;
             border-radius: 15px;
             display: flex;
             flex-direction: column;
@@ -80,16 +79,8 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(45deg, #ff00cc, #3333ff, #00ccff);
-            background-size: 300% 300%;
-            animation: gradient 5s ease infinite;
-            z-index: 1;
-            opacity: 0.7;
-        }
-        @keyframes gradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
         }
     </style>
 </head>
