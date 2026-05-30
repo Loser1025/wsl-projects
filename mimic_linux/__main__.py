@@ -47,9 +47,9 @@ def main():
         or isinstance(h, logging.FileHandler)]
 
     base_dir = str(Path(__file__).parent)
-    or_config, gemini_config, system_prompt = load_config(base_dir)
+    or_config, gemini_config, mistral_config, system_prompt = load_config(base_dir)
 
-    active_config = or_config or gemini_config
+    active_config = or_config or gemini_config or mistral_config
 
     _args = sys.argv[1:]
     use_tmux = "--tmux" in _args
@@ -67,7 +67,7 @@ def main():
                 return  # 到達しない
 
     if not any(a in _args_clean for a in ("--prompt", "--auto-prompt", "--status")):
-        active_config = select_model_interactively_multi(or_config, gemini_config)
+        active_config = select_model_interactively_multi(or_config, gemini_config, mistral_config)
 
     # ── MonitoringToolRegistry を構築 ────────────────────────────
     tool_log = ToolCallLog()

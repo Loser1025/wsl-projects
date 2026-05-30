@@ -18,7 +18,7 @@ from uuid import uuid4
 
 from .utils import safe_print, C, log, cache_tool_output, get_scratchpad, set_scratchpad
 from .config import (
-    OpenRouterConfig, GoogleAIConfig, OPENROUTER_API_BASE,
+    OpenRouterConfig, GoogleAIConfig, MistralConfig, OPENROUTER_API_BASE,
     MAX_RETRIES, BASE_BACKOFF, MAX_BACKOFF,
     _CHARS_PER_TOKEN, _COMPACTION_RATIO, _COMPACTION_DEFAULT,
     _CTX_EXCEEDED_KEYWORDS,
@@ -59,7 +59,7 @@ class AccountRotator:
     """OpenRouterConfig をラップし V4 の AccountRotator インタフェースを提供する。"""
 
     def __init__(self, config_or_list):
-        if isinstance(config_or_list, (OpenRouterConfig, GoogleAIConfig)):
+        if isinstance(config_or_list, (OpenRouterConfig, GoogleAIConfig, MistralConfig)):
             self._config = config_or_list
         else:
             # config オブジェクトのリストが渡された場合
@@ -418,7 +418,7 @@ class OpenRouterAgent:
         # AccountRotator でも OpenRouterConfig でも受け付ける
         if isinstance(config_or_rotator, AccountRotator):
             self._config = config_or_rotator._config
-        elif isinstance(config_or_rotator, OpenRouterConfig):
+        elif isinstance(config_or_rotator, (OpenRouterConfig, GoogleAIConfig, MistralConfig)):
             self._config = config_or_rotator
         else:
             raise TypeError(f"Unsupported config type: {type(config_or_rotator)}")

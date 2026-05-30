@@ -10,6 +10,7 @@ from typing import Optional
 
 OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
 GEMINI_API_BASE     = "https://generativelanguage.googleapis.com/v1beta/openai"
+MISTRAL_API_BASE    = "https://api.mistral.ai/v1"
 
 _DEFAULT_MODEL         = "openrouter/owl-alpha"
 _DEFAULT_CWD: Optional[str] = None
@@ -232,6 +233,54 @@ class GoogleAIConfig:
         pass
 
 
+# ── MistralConfig ────────────────────────────────────────────────
+
+@dataclass
+class MistralConfig:
+    api_keys: list[str]
+    model: str = "mistral-small-latest"
+    system_prompt: str = ""
+    rpm_limit: int = 50
+    context_length: int = 0
+    max_tokens: int = 0
+    _key_manager: "KeyManager" = field(default=None, init=False, repr=False)
+
+    def __post_init__(self):
+        self._key_manager = KeyManager(self.api_keys, self.rpm_limit)
+
+    @property
+    def api_key(self) -> str:
+        return self.api_keys[0] if self.api_keys else ""
+
+    def acquire_key(self) -> tuple:
+        return self._key_manager.acquire()
+
+    def report_429(self, api_key: str) -> None:
+        self._key_manager.report_429(api_key)
+
+    def report_success(self, api_key: str) -> None:
+        self._key_manager.report_success(api_key)
+
+    @property
+    def name(self) -> str:
+        return "mistral"
+
+    @property
+    def api_base(self) -> str:
+        return MISTRAL_API_BASE
+
+    def build_auth_headers(self, api_key: str) -> dict:
+        return {"Authorization": f"Bearer {api_key}"}
+
+    @property
+    def thinking_level(self) -> str:
+        return "NONE"
+
+    @thinking_level.setter
+    def thinking_level(self, v: str):
+        pass
+
+
 # ── PortContext (orchestrator.py が使用) ────────────────────────
 
 @dataclass(frozen=True)
@@ -391,12 +440,42 @@ def fetch_gemini_models(api_key: str) -> list[dict]:
     return result
 
 
+def fetch_mistral_models(api_key: str) -> list[dict]:
+    """Mistral AI から利用可能モデル一覧を取得して返す。"""
+    import urllib.request
+    import json
+
+    url = f"{MISTRAL_API_BASE}/models"
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  ⚠ Mistralモデル一覧の取得に失敗しました: {e}")
+        return []
+
+    models = data.get("data", [])
+    result = []
+    for m in models:
+        mid = m.get("id", "")
+        if not mid:
+            continue
+        ctx = m.get("max_context_length", 0) or 0
+        result.append({"id": mid, "context_length": ctx, "name": m.get("name", mid)})
+    result.sort(key=lambda m: m.get("id", ""))
+    return result
+
+
 def select_model_interactively_multi(
     or_config: Optional["OpenRouterConfig"],
     gemini_config: Optional["GoogleAIConfig"],
-) -> "OpenRouterConfig | GoogleAIConfig":
+    mistral_config: Optional["MistralConfig"] = None,
+) -> "OpenRouterConfig | GoogleAIConfig | MistralConfig":
     """
-    OpenRouter と Gemini 両プロバイダーのモデルを並列取得・疎通テストし、
+    OpenRouter / Gemini / Mistral のモデルを並列取得・疎通テストし、
     番号選択で使用モデルとプロバイダーを確定する。
     選択された config（model / context_length 更新済み）を返す。
     """
@@ -440,29 +519,36 @@ def select_model_interactively_multi(
     print(f"  {gr('⟳')}  モデル一覧を取得中...", end="", flush=True)
     or_models: list[dict] = []
     gemini_models: list[dict] = []
+    mistral_models: list[dict] = []
 
-    with ThreadPoolExecutor(max_workers=2) as ex:
-        or_fut     = ex.submit(fetch_free_models,   or_config.api_keys[0])     if or_config     else None
-        gemini_fut = ex.submit(fetch_gemini_models, gemini_config.api_keys[0]) if gemini_config else None
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        or_fut      = ex.submit(fetch_free_models,    or_config.api_keys[0])      if or_config      else None
+        gemini_fut  = ex.submit(fetch_gemini_models,  gemini_config.api_keys[0])  if gemini_config  else None
+        mistral_fut = ex.submit(fetch_mistral_models, mistral_config.api_keys[0]) if mistral_config else None
         if or_fut:
             or_models = or_fut.result()
         if gemini_fut:
             gemini_models = gemini_fut.result()
+        if mistral_fut:
+            mistral_models = mistral_fut.result()
 
     parts = []
     if or_config:
         parts.append(f"{g('OpenRouter')}: {w(str(len(or_models)))} 件の無料モデル")
     if gemini_config:
         parts.append(f"{gm('Gemini')}: {w(str(len(gemini_models)))} 件のモデル")
+    if mistral_config:
+        parts.append(f"{cy('Mistral')}: {w(str(len(mistral_models)))} 件のモデル")
     print(f"\r  {g('✓')}  {'  /  '.join(parts)}{' ' * 20}")
     print()
 
     all_entries = (
-        [("or",     m) for m in or_models] +
-        [("gemini", m) for m in gemini_models]
+        [("or",      m) for m in or_models] +
+        [("gemini",  m) for m in gemini_models] +
+        [("mistral", m) for m in mistral_models]
     )
     total = len(all_entries)
-    _fallback: "OpenRouterConfig | GoogleAIConfig" = or_config or gemini_config  # type: ignore[assignment]
+    _fallback = or_config or gemini_config or mistral_config  # type: ignore[assignment]
 
     if total == 0:
         print(f"  {y('⚠')}  モデル一覧の取得に失敗しました。現在の設定を使用します。\n")
@@ -488,6 +574,8 @@ def select_model_interactively_multi(
             ok, elapsed = _test_model(or_config.api_keys[0], mid, OPENROUTER_API_BASE)
         elif provider == "gemini" and gemini_config:
             ok, elapsed = _test_model(gemini_config.api_keys[0], mid, GEMINI_API_BASE)
+        elif provider == "mistral" and mistral_config:
+            ok, elapsed = _test_model(mistral_config.api_keys[0], mid, MISTRAL_API_BASE)
         else:
             ok, elapsed = False, 0.0
         if stop_testing.is_set():
@@ -560,6 +648,8 @@ def select_model_interactively_multi(
     def prov_badge(provider: str) -> str:
         if provider == "or":
             return f"{_RG}{'OR'.center(CPROV)}{_RST}"
+        if provider == "mistral":
+            return f"{_CYN}{'MI'.center(CPROV)}{_RST}"
         return f"{_ORG}{'GM'.center(CPROV)}{_RST}"
 
     EQ = "═"
@@ -570,8 +660,9 @@ def select_model_interactively_multi(
         )
 
     V = gd("║")
-    or_cur     = or_config.model     if or_config     else ""
-    gemini_cur = gemini_config.model if gemini_config else ""
+    or_cur      = or_config.model      if or_config      else ""
+    gemini_cur  = gemini_config.model  if gemini_config  else ""
+    mistral_cur = mistral_config.model if mistral_config else ""
 
     print(f"  {bw(str(len(working)))} 件が稼働中  {gr('/')}  {gr(str(total) + ' 件取得')}\n")
     print(hline("╔", "╗", "╦"))
@@ -585,8 +676,9 @@ def select_model_interactively_multi(
     for i, (provider, mdl, elapsed) in enumerate(working, 1):
         mid    = mdl.get("id", "")
         ctx    = mdl.get("context_length", 0)
-        is_cur = (provider == "or"     and mid == or_cur) or \
-                 (provider == "gemini" and mid == gemini_cur)
+        is_cur = (provider == "or"      and mid == or_cur)      or \
+                 (provider == "gemini"  and mid == gemini_cur)  or \
+                 (provider == "mistral" and mid == mistral_cur)
         is_top = i == 1
 
         no_p  = str(i).center(CN)
@@ -600,7 +692,7 @@ def select_model_interactively_multi(
         elif is_top:
             no_d, id_d, tag = bg(no_p), bg(id_p), f"  {bg('★ FASTEST')}"
         elif is_cur:
-            nc = gm if provider == "gemini" else cy
+            nc = cy if provider == "mistral" else (gm if provider == "gemini" else cy)
             no_d, id_d, tag = nc(no_p), nc(id_p), f"  {nc('← CURRENT')}"
         else:
             no_d, id_d, tag = gr(no_p), w(id_p), ""
@@ -609,14 +701,21 @@ def select_model_interactively_multi(
 
     print(hline("╚", "╝", "╩"))
 
-    if or_config and gemini_config:
-        print(f"\n  凡例: {g('OR')} = OpenRouter  {gm('GM')} = Google AI Studio\n")
+    active_providers = sum([bool(or_config), bool(gemini_config), bool(mistral_config)])
+    if active_providers > 1:
+        legend_parts = []
+        if or_config:      legend_parts.append(f"{g('OR')} = OpenRouter")
+        if gemini_config:  legend_parts.append(f"{gm('GM')} = Google AI Studio")
+        if mistral_config: legend_parts.append(f"{cy('MI')} = Mistral AI")
+        print(f"\n  凡例: {'  '.join(legend_parts)}\n")
 
     cancel_parts = []
     if or_config:
         cancel_parts.append(f"{g('OR')} {y(or_config.model)}")
     if gemini_config:
         cancel_parts.append(f"{gm('GM')} {y(gemini_config.model)}")
+    if mistral_config:
+        cancel_parts.append(f"{cy('MI')} {y(mistral_config.model)}")
     print(f"  {gd('[ 0 ]')}  {gr('キャンセル')}  {gr('·')}  {gr('現在:')}  {'  /  '.join(cancel_parts)}\n")
 
     while True:
@@ -646,6 +745,11 @@ def select_model_interactively_multi(
                 gemini_config.context_length = sel_ctx
                 print(f"\n  {bm('✓')}  {w('選択:')}  {gm('[GM]')} {gm(sel_id)}\n")
                 return gemini_config
+            elif provider == "mistral" and mistral_config:
+                mistral_config.model          = sel_id
+                mistral_config.context_length = sel_ctx
+                print(f"\n  {cy('✓')}  {w('選択:')}  {cy('[MI]')} {cy(sel_id)}\n")
+                return mistral_config
         print(f"  {y('⚠')}  1〜{len(working)} の番号を入力してください。")
 
 
@@ -753,11 +857,32 @@ def load_config(
                 max_tokens=max_tokens,
             )
 
-        if not or_config and not gemini_config:
-            print("[エラー] .env に有効な OPENROUTER_KEY または GEMINI_KEY が見つかりません。")
+        # ── Mistral AI ─────────────────────────────────────────
+        mistral_keys: list[str] = []
+        for i in range(1, 10):
+            k = env.get(f"MISTRAL_KEY_{i}", "")
+            if k and not k.startswith("YOUR_"):
+                mistral_keys.append(k)
+        if not mistral_keys:
+            k = env.get("MISTRAL_KEY", "")
+            if k and not k.startswith("YOUR_"):
+                mistral_keys.append(k)
+
+        mistral_config: Optional[MistralConfig] = None
+        if mistral_keys:
+            mistral_model = env.get("MISTRAL_MODEL", "mistral-small-latest")
+            mistral_rpm   = int(env.get("RPM_LIMIT_MISTRAL", "50"))
+            mistral_config = MistralConfig(
+                api_keys=mistral_keys, model=mistral_model,
+                system_prompt=system_prompt, rpm_limit=mistral_rpm,
+                max_tokens=max_tokens,
+            )
+
+        if not or_config and not gemini_config and not mistral_config:
+            print("[エラー] .env に有効な OPENROUTER_KEY / GEMINI_KEY / MISTRAL_KEY が見つかりません。")
             sys.exit(1)
 
-        return or_config, gemini_config, system_prompt
+        return or_config, gemini_config, mistral_config, system_prompt
 
     _generate_env_template(env_path)
     print("=" * 55)
