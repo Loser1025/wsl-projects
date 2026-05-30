@@ -63,41 +63,46 @@ def main():
                 if 'text' in shape:
                     text_elements = shape['text'].get('textElements', [])
                     # テキスト要素が空でないか確認
-                    has_text = False
+                    contents = []
                     for text_element in text_elements:
-                        if 'textRun' in text_element and text_element['textRun']['content'].strip():
-                            has_text = True
+                        if 'textRun' in text_element:
                             content = text_element['textRun']['content'].strip()
-                            # 不要なテキスト（CHALLENGERやSTAFFなど）を削除
-                            if content in ["CHALLENGER", "STAFF", "ORERATION", "S 軍"]:
-                                requests.append({
-                                    "deleteText": {
-                                        "objectId": element['objectId'],
-                                        "textRange": {
-                                            "type": "ALL"
-                                        }
-                                    }
-                                })
-                            # 名前とローマ字のみを残す
-                            elif content in ROMAN_MAPPING or content in ROMAN_MAPPING.values():
-                                continue
-                            else:
-                                # テキストが空でない場合のみ削除
-                                requests.append({
-                                    "deleteText": {
-                                        "objectId": element['objectId'],
-                                        "textRange": {
-                                            "type": "ALL"
-                                        }
-                                    }
-                                })
+                            if content:
+                                contents.append(content)
+                    
                     # テキストが空の場合は要素自体を削除
-                    if not has_text:
+                    if not contents:
                         requests.append({
                             "deleteObject": {
                                 "objectId": element['objectId']
                             }
                         })
+                        continue
+                    
+                    # 不要なテキストを削除
+                    for content in contents:
+                        if content in ["CHALLENGER", "STAFF", "ORERATION", "S 軍"]:
+                            requests.append({
+                                "deleteText": {
+                                    "objectId": element['objectId'],
+                                    "textRange": {
+                                        "type": "ALL"
+                                    }
+                                }
+                            })
+                            break
+                        elif content in ROMAN_MAPPING or content in ROMAN_MAPPING.values():
+                            continue
+                        else:
+                            requests.append({
+                                "deleteText": {
+                                    "objectId": element['objectId'],
+                                    "textRange": {
+                                        "type": "ALL"
+                                    }
+                                }
+                            })
+                            break
 
     # 一括更新
     if requests:
