@@ -38,7 +38,7 @@
         .nameplate {
             width: 320px;
             height: 200px;
-            background: url("nameplate-bg.png") no-repeat center center;
+            background: url("https://res.cloudinary.com/demo/image/upload/v1234567890/your-image.jpg") no-repeat center center;
             background-size: cover;
             border-radius: 15px;
             display: flex;
@@ -54,6 +54,7 @@
             position: relative;
             overflow: hidden;
             transition: transform 0.3s ease;
+            background-position: 20% center; /* 左寄りに配置 */
         }
         .nameplate:hover {
             transform: scale(1.05);
@@ -71,9 +72,6 @@
             opacity: 0.9;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
             z-index: 2;
-        }
-        .nameplate {
-            background-position: 20% center; /* 左寄りに配置 */
         }
     </style>
 </head>
