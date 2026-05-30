@@ -154,5 +154,29 @@ def main():
         print("No updates were made.")
 
 
+def extract_roman_from_content_v2(content):
+    """コンテンツからローマ字部分を抽出（名前の後のローマ字）"""
+    # 名前（漢字やひらがな）の後に続くローマ字を抽出
+    # 例：「濱田 涼介 RYOSUKE HAMADA」 → "RYOSUKE HAMADA"
+    # 例：「RYOSUKE HAMADA」 → "RYOSUKE HAMADA"
+    # 例：「T A K A H A S H I　S U Z U K A」 → "T A K A H A S H I　S U Z U K A"
+
+    # 1. 全体がローマ字の場合
+    if re.fullmatch(r'^[A-Z][A-Z\s]+$', content.strip()):
+        return content.strip()
+
+    # 2. 名前（漢字やひらがな）の後に続くローマ字を抽出
+    roman_matches = re.findall(r'([A-Z][A-Z\s]+)$', content.strip())
+    if roman_matches:
+        return roman_matches[0].strip()
+
+    # 3. スペース付きの大文字列を抽出（全体がローマ字の場合）
+    roman_matches = re.findall(r'([A-Z][A-Z\s]+)', content)
+    if roman_matches:
+        return roman_matches[-1].strip()
+
+    return None
+
+
 if __name__ == '__main__':
     main()
