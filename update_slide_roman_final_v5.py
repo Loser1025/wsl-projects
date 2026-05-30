@@ -108,6 +108,7 @@ def main():
                         if 'textRun' in text_element:
                             content = text_element['textRun']['content']
                             full_text += content + " "
+        print(f"Slide {slide['objectId']} full_text: {full_text}")
         
         # 名前を検索
         for name, correct_roman in ROMAN_MAPPING.items():
