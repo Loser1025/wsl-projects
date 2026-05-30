@@ -227,12 +227,30 @@ def read_file(path: str, offset: int = 0) -> str:
     p = Path(path)
     if not p.exists():
         return f"エラー: ファイルが見つかりません: {path}"
-    
+
     # 読み取り履歴に登録
     _read_files_registry.add(str(p.resolve()))
-    
+
     content = _try_read_file_text(p)
     total = len(content)
+
+    # 大ファイルかつ先頭から読む場合は Pipeline-First を促す
+    _LARGE_FILE_THRESHOLD = 5000
+    if total > _LARGE_FILE_THRESHOLD and offset == 0:
+        preview = content[:1500]
+        return (
+            f"[read_file: {path}]\n"
+            f"⚠ このファイルは {total:,} 文字あります（推奨上限 {_LARGE_FILE_THRESHOLD:,} 文字）。\n"
+            f"コンテキスト節約のため以下を先に検討してください:\n"
+            f"  • search_in_file(pattern='キーワード', path='{path}')  ← 特定箇所だけ取得\n"
+            f"  • smart_read(path='{path}', focus='関数名')            ← focus 指定で絞り込み\n"
+            f"  • grep_codebase(pattern='...')                         ← 複数ファイル横断検索\n"
+            f"それでも全文が必要な場合は read_file(path='{path}', offset=0) を続けてください。\n"
+            f"{'─' * 60}\n"
+            f"--- 先頭 1,500文字（プレビュー）---\n{preview}\n"
+            f"{'─' * 60}\n"
+            f"続き: read_file(path='{path}', offset=1500)\n"
+        )
     chunk = _READ_FILE_CHAR_CHUNK
 
 

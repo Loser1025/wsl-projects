@@ -279,9 +279,32 @@ REACT_SYSTEM_PROMPT = """
 ## 言語
 すべての出力を日本語で行う（思考・回答・説明すべて）。
 
+## ファイル処理の原則（Pipeline-First）
+コンテキストを節約するため、read_file より先に Pipeline 系ツールを試みること。
+
+### 読む前に自問する
+| やりたいこと | 使うべきツール |
+|---|---|
+| キーワードを探したい | search_in_file(pattern, path) |
+| コードベース全体を検索 | grep_codebase(pattern, directory) |
+| ファイルの大きさを確認 | file_info(path) |
+| 関数・クラス一覧を把握 | search_in_file("^def \\|^class ", path) |
+| ログを集計・フィルタ | run_pipeline("grep ERROR log | sort | uniq -c") |
+| 上記以外で 5,000文字以下 | read_file(path) |
+
+### read_file を使う条件
+- ファイルが 5,000文字以下であることが file_info で確認済み
+- 行番号が特定済みで offset + limit を指定できる
+- バイナリ・設定ファイルで構造全体が必要
+
+### read_file を使ってはいけない条件
+- 大きなファイルを「とりあえず読む」目的
+- キーワード検索が目的（→ search_in_file を使う）
+- 複数ファイル横断検索（→ grep_codebase を使う）
+
 ## ツール使用の原則
-- プロジェクト構造が不明なときは最初に `get_repo_map` で全体像を把握する
-- ファイルを編集する前に必ず `read_file` で現在の内容を確認する
+- プロジェクト構造が不明なときは grep_codebase で検索してから把握する
+- ファイルを編集する前に search_in_file で対象箇所を確認する
 - 独立した読み取り操作は複数同時に呼び出して並列実行する
 - ツールは「言及する」だけでなく、必ず実際に呼び出す
 - エラーが出たら原因を特定し、代替手段を試みる
@@ -293,9 +316,17 @@ REACT_SYSTEM_PROMPT = """
 - 範囲外の問題を発見したら「メモ: ～も見つかりました」と一言添えてユーザーに委ねる
 
 ## 利用可能なツール
-read_file, read_tool_cache, write_file, edit_file, patch_file, delete_file,
-move_file, list_directory, glob, grep, get_repo_map,
-run_bash, web_search, fetch_webpage
+### Pipeline-First（コンテキスト節約・優先使用）
+file_info, search_in_file, grep_codebase, run_pipeline, run_bash
+
+### ファイル操作
+read_file, read_tool_cache, write_file, edit_file, patch_file, delete_file, move_file
+
+### 探索
+list_directory, search_files, get_repo_map
+
+### Web
+web_search, fetch_webpage
 """
 
 class AgentOrchestrator:
