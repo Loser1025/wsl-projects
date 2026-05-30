@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""
+Google スライドのローマ字をメンリストの正しい表記に更新するスクリプト
+"""
+import re
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+
+# 設定
+SERVICE_ACCOUNT_FILE = '/home/loser/wsl-projects/ageless-impulse-488713-m6-03014b3cddad.json'
+PRESENTATION_ID = '1YIfc0YPCiqFFzInkfuhipkh8rC8X66i5VPpqIJS9HOE'
+SCOPES = ['https://www.googleapis.com/auth/presentations']
+MEMBER_LIST_FILE = '/home/loser/wsl-projects/メンリスト'
+
+# メンバーリストから名前とローマ字の辞書を作成
+name_to_roman = {}
+with open(MEMBER_LIST_FILE, 'r', encoding='utf-8') as f:
+    next(f)  # ヘッダー行をスキップ
+    for line in f:
+        parts = line.strip().split(',')
+        if len(parts) >= 3:
+            name = parts[0].strip()
+            roman = parts[2].strip()
+            name_to_roman[name] = roman
+
+# Google Slides APIの認証
+credentials = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+service = build('slides', 'v1', credentials=credentials)
+
+# スライドの取得
+presentation = service.presentations().get(presentationId=PRESENTATION_ID).execute()
+slides = presentation.get('slides', [])
+
+requests = []
+
+for slide in slides:
+    slide_id = slide['objectId']
+    page_elements = slide.get('pageElements', [])
+    
+    # 名前とローマ字の要素を特定
+    name_element = None
+    roman_element = None
+    
+    for element in page_elements:
+        if 'shape' not in element or 'text' not in element['shape']:
+            continue
+        
+        text_elements = element['shape']['text'].get('textElements', [])
+        parts = []
+        for te in text_elements:
+            if 'textRun' in te:
+                parts.append(te['textRun'].get('content', ''))
+        full_text = ''.join(parts).strip()
+        
+        # 名前の要素を特定
+        if full_text in name_to_roman:
+            name_element = element
+        # ローマ字の要素を特定（大文字のアルファベットとスペースのみ）
+        elif re.fullmatch(r'^[A-Z\s]+$', full_text):
+            roman_element = element
+    
+    # 名前とローマ字の要素が両方見つかった場合
+    if name_element and roman_element:
+        name = ''.join([
+            te['textRun']['content'] 
+            for te in name_element['shape']['text'].get('textElements', []) 
+            if 'textRun' in te
+        ]).strip()
+        
+        correct_roman = name_to_roman.get(name, '')
+        current_roman = ''.join([
+            te['textRun']['content'] 
+            for te in roman_element['shape']['text'].get('textElements', []) 
+            if 'textRun' in te
+        ]).strip()
+        
+        # ローマ字が一致しない場合は更新
+        if correct_roman and correct_roman != current_roman:
+            requests.append({
+                "updateText": {
+                    "objectId": roman_element['objectId'],
+                    "text": correct_roman,
+                    "fields": "text"
+                }
+            })
+            print(f"Slide {slide_id}: {name} -> {correct_roman} (was: {current_roman})")
+
+# 更新を実行
+if requests:
+    response = service.presentations().batchUpdate(
+        presentationId=PRESENTATION_ID, body={"requests": requests}
+    ).execute()
+    print(f"\n{len(requests)} 件のローマ字を更新しました。")
+else:
+    print("\n更新は不要です。")
