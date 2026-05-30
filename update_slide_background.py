@@ -79,15 +79,16 @@ def main():
                             elif content in ROMAN_MAPPING or content in ROMAN_MAPPING.values():
                                 continue
                             else:
-                                # 不要なテキストを削除
-                                requests.append({
-                                    "deleteText": {
-                                        "objectId": element['objectId'],
-                                        "textRange": {
-                                            "type": "ALL"
+                                # テキストが空でない場合のみ削除
+                                if content.strip():
+                                    requests.append({
+                                        "deleteText": {
+                                            "objectId": element['objectId'],
+                                            "textRange": {
+                                                "type": "ALL"
+                                            }
                                         }
-                                    }
-                                })
+                                    })
 
     # 一括更新
     if requests:
