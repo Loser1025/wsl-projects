@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time
 import threading
@@ -718,9 +719,10 @@ def select_model_interactively_multi(
         cancel_parts.append(f"{cy('MI')} {y(mistral_config.model)}")
     print(f"  {gd('[ 0 ]')}  {gr('キャンセル')}  {gr('·')}  {gr('現在:')}  {'  /  '.join(cancel_parts)}\n")
 
+    _ansi_re = re.compile(r'\033\[[^m]*m')
     while True:
         try:
-            raw = input(f"  {g('▸')}  番号を入力  {gd('›')}  ").strip()
+            raw = input(_ansi_re.sub(r'\001\g<0>\002', f"  {g('▸')}  番号を入力  {gd('›')}  ")).strip()
         except (EOFError, KeyboardInterrupt):
             print()
             return _fallback

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import os
+import re
 import json
 import time
 import threading
@@ -12,6 +13,12 @@ import traceback
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, field
+
+_ANSI_RE = re.compile(r'\033\[[^m]*m')
+
+def _rl(s: str) -> str:
+    """readline 向けに ANSI コードを \001...\002 で囲み幅ゼロと認識させる。"""
+    return _ANSI_RE.sub(r'\001\g<0>\002', s)
 from .utils import safe_print, C, log, print_ascii_art, render_markdown
 from .config import load_config, OpenRouterConfig
 from .agent import OpenRouterAgent
@@ -125,7 +132,7 @@ def interactive_loop(
     while True:
         try:
             mode_icon = C.green("⚡") if current_mode == "interactive" else C.orange("📋")
-            user_input = input(f"{mode_icon} {C.bold_green('❯')} ").strip()
+            user_input = input(_rl(f"{mode_icon} {C.bold_green('❯')} ")).strip()
         except (EOFError, KeyboardInterrupt):
             safe_print(C.gray("\n終了します。"))
             break
