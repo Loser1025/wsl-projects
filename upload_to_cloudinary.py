@@ -3,19 +3,16 @@ import cloudinary
 import cloudinary.uploader
 import re
 
-# Cloudinaryの設定（環境変数から直接取得）
-import os
-api_env = os.getenv('CLOUDINARY_URL')
-if api_env:
-    cloud_name, api_key_secret = api_env.split('@')[1], api_env.split('@')[0].split('://')[1]
-    api_key, api_secret = api_key_secret.split(':')
-    cloudinary.config(
-        cloud_name=cloud_name,
-        api_key=api_key,
-        api_secret=api_secret
-    )
-else:
-    raise ValueError("環境変数 CLOUDINARY_URL が設定されていません。")
+# Cloudinaryの設定（直接APIキーを指定）
+cloudinary.config(
+    cloud_name="YOUR_CLOUD_NAME",  # Cloudinaryのダッシュボードから取得
+    api_key="YOUR_API_KEY",       # Cloudinaryのダッシュボードから取得
+    api_secret="YOUR_API_SECRET"  # Cloudinaryのダッシュボードから取得
+)
+
+# デバッグ用: APIキーが正しく設定されているか確認
+print(f"Cloud Name: {cloudinary.config().cloud_name}")
+print(f"API Key: {cloudinary.config().api_key}")
 
 # 画像をアップロード
 result = cloudinary.uploader.upload('/home/loser/wsl-projects/1f7492b96a3432bfc244db7e6a15e7e8.png')
