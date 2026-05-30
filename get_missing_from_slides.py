@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import sys
+import re
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -10,6 +11,10 @@ PRESENTATION_ID = '1YIfc0YPCiqFFzInkfuhipkh8rC8X66i5VPpqIJS9HOE'  # extracted fr
 SCOPES = ['https://www.googleapis.com/auth/presentations.readonly']
 MEMBER_LIST_FILE = '/home/loser/wsl-projects/メンリスト'
 OUTPUT_FILE = '/home/loser/wsl-projects/メンリストにいない人分'
+
+def contains_japanese(text):
+    # Check if string contains any Japanese characters (Hiragana, Katakana, Kanji)
+    return bool(re.search(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]', text))
 
 def main():
     # Load member list
@@ -45,19 +50,24 @@ def main():
                             content = elem['textRun'].get('content', '')
                             slide_texts.append(content)
 
-    # Combine and split into lines/words
+    # Combine and extract lines that likely contain Japanese names
     full_text = ''.join(slide_texts)
-    # Normalize newlines and split by whitespace
-    # Replace various newline characters
-    import re
+    # Split by newline characters
     lines = re.split(r'[\r\n]+', full_text)
-    # Further split by spaces if needed, but names may contain spaces? Japanese names usually no space.
-    # We'll strip each line and treat as candidate name if not empty.
     slide_names = set()
     for line in lines:
-        stripped = line.strip()
-        if stripped:
-            slide_names.add(stripped)
+        # Replace tabs and multiple spaces
+        line = re.sub(r'\s+', ' ', line.strip())
+        if not line:
+            continue
+        # If line contains Japanese characters, treat as candidate
+        if contains_japanese(line):
+            # Possibly multiple names separated by spaces? Split by spaces and add each token that contains Japanese
+            tokens = line.split()
+            for token in tokens:
+                if contains_japanese(token):
+                    slide_names.add(token)
+        # Also consider lines without Japanese but maybe numbers? ignore.
 
     # Compute difference: names in slide but not in member list
     missing = slide_names - member_names
