@@ -224,6 +224,12 @@ BASH_EXECUTOR_GUIDANCE = """\
 - ディレクトリ削除は rm -rf、権限変更は chmod/chown を使う。
 - エラー発生時は stderr の内容を確認して原因を特定してから対処する。
 
+[専用ツールへの置き換え（必須）]
+以下のコマンドは run_bash を使わず、必ず専用ツールを呼ぶこと:
+- stat <file> / wc -l <file>  →  file_info(path=<file>)
+- ls / ls -la <dir>           →  list_directory(path=<dir>)
+- find <dir> -type f          →  search_files(pattern="*", directory=<dir>)
+
 [ツール出力の制限（必須遵守）]
 - すべてのツール出力は10000文字を超えると自動的にメモリにキャッシュされ、先頭10000文字と cache_key が返される。
 - 続きを読む場合は read_tool_cache(cache_key="...", offset=10000) を呼び出す。
