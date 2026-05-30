@@ -3,8 +3,12 @@ import cloudinary
 import cloudinary.uploader
 import re
 
-# Cloudinaryの設定
-cloudinary.config.from_env()
+# Cloudinaryの設定（直接APIキーを指定）
+cloudinary.config(
+  cloud_name = 'CLOUD_NAME',
+  api_key = 'API_KEY',
+  api_secret = 'API_SECRET'
+)
 
 # 画像をアップロード
 result = cloudinary.uploader.upload('/home/loser/wsl-projects/1f7492b96a3432bfc244db7e6a15e7e8.png')
