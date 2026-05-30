@@ -97,7 +97,7 @@ def main():
     requests = []
 
     for slide in slides:
-        # スライド内の全テキストを結合
+        # スライド内の全テキストを結合（改行をスペースに置換）
         full_text = ""
         for element in slide.get('pageElements', []):
             if 'shape' in element:
@@ -106,7 +106,7 @@ def main():
                     text_elements = shape['text'].get('textElements', [])
                     for text_element in text_elements:
                         if 'textRun' in text_element:
-                            content = text_element['textRun']['content']
+                            content = text_element['textRun']['content'].replace('\n', ' ')
                             full_text += content + " "
         print(f"Slide {slide['objectId']} full_text: {full_text}")
         
