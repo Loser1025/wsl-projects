@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stylish Nameplates</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     <style>
         body {
@@ -19,26 +19,22 @@
             gap: 20px;
             overflow-x: hidden;
         }
-        
-        .name {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-            margin: 0;
+        @media print {
+            body {
+                background-color: #0f0f1a;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .nameplate {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
         }
         
-        .roman {
-            font-size: 1.2rem;
-            font-weight: 400;
-            color: rgba(255, 255, 255, 0.9);
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
-            margin-top: 5px;
-        }
         .nameplate {
-            width: 320px;
-            height: 200px;
-            background: url("background-original.png") no-repeat 20% center;
+            width: 680px;
+            height: 420px;
+            background: url("background-original.png") no-repeat center center;
             background-size: cover;
             border-radius: 15px;
             display: flex;
@@ -46,32 +42,62 @@
             justify-content: center;
             align-items: center;
             color: white;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(150, 180, 255, 0.2);
             padding: 20px;
             box-sizing: border-box;
             text-align: center;
             position: relative;
             overflow: hidden;
             transition: transform 0.3s ease;
-            background-position: 20% center; /* 左寄りに配置 */
+        }
+        .nameplate::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(160deg, rgba(0,0,30,0.55) 0%, rgba(0,0,10,0.25) 60%, rgba(0,0,30,0.45) 100%);
+            z-index: 1;
         }
         .nameplate:hover {
             transform: scale(1.05);
         }
         .name {
-            font-size: clamp(28px, 6vw, 40px);
-            font-weight: bold;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            font-family: 'Noto Sans JP', sans-serif;
+            font-size: clamp(64px, 9vw, 96px);
+            font-weight: 900;
+            margin-bottom: 16px;
+            letter-spacing: 0.04em;
+            line-height: 1.1;
+            color: #ffffff;
+            text-shadow:
+                0 0 20px rgba(160, 200, 255, 0.7),
+                3px 3px 0px rgba(0, 0, 50, 0.9),
+                0 4px 16px rgba(0, 0, 0, 0.95);
             z-index: 2;
-            line-height: 1.2;
         }
         .roman {
-            font-size: clamp(20px, 4vw, 28px);
-            opacity: 0.9;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            font-family: 'Montserrat', sans-serif;
+            font-size: clamp(22px, 3vw, 30px);
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            color: rgba(200, 225, 255, 0.95);
+            text-shadow:
+                2px 2px 6px rgba(0, 0, 0, 0.95),
+                0 0 10px rgba(0, 0, 0, 0.8);
             z-index: 2;
+        }
+
+        /* 吉村専用: 画像にテキスト込みなのでオーバーレイ・テキスト非表示 */
+        .nameplate-yoshimura {
+            border: 1px solid rgba(255, 200, 100, 0.25);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
+        }
+        .nameplate-yoshimura::before {
+            display: none;
+        }
+        .nameplate-yoshimura .name,
+        .nameplate-yoshimura .roman {
+            display: none;
         }
     </style>
 </head>
@@ -84,7 +110,7 @@
         </div>
             
 
-        <div class="nameplate" data-aos="fade-up">
+        <div class="nameplate nameplate-yoshimura" data-aos="fade-up" style="background-image: url('Gemini_Generated_Image_lovcbplovcbplovc.png'); background-position: center center;">
             <div class="name">吉村 行雲</div>
             <div class="roman">KOUN YOSHIMURA</div>
         </div>
