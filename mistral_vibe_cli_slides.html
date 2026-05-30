@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mistral Vibe CLI 最新情報報告</title>
+    <style>
+        body {
+            font-family: 'Meiryo', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+        }
+        
+        .slide-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .slide {
+            background-color: white;
+            border-radius: 10px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            page-break-after: always;
+        }
+        
+        .slide h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .slide h2 {
+            color: #2c3e50;
+            font-size: 2em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-left: 5px solid #3498db;
+            padding-left: 15px;
+        }
+        
+        .slide h3 {
+            color: #2c3e50;
+            font-size: 1.5em;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .slide p {
+            font-size: 1.1em;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .slide ul, .slide ol {
+            font-size: 1.1em;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 15px;
+            padding-left: 30px;
+        }
+        
+        .slide li {
+            margin-bottom: 8px;
+        }
+        
+        .slide table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 1em;
+        }
+        
+        .slide th, .slide td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        .slide th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .slide tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .slide tr:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .code-block {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        
+        .highlight {
+            background-color: #fffde7;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        
+        .note {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .important {
+            background-color: #ffebee;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-left: 4px solid #f44336;
+        }
+        
+        .center {
+            text-align: center;
+        }
+        
+        .footer {
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+        
+        .toc {
+            background-color: #e8f4f8;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .toc ul {
+            columns: 2;
+            -webkit-columns: 2;
+            -moz-columns: 2;
+        }
+        
+        @media (max-width: 768px) {
+            .slide {
+                padding: 20px;
+            }
+            
+            .slide h1 {
+                font-size: 1.8em;
+            }
+            
+            .slide h2 {
+                font-size: 1.5em;
+            }
+            
+            .slide h3 {
+                font-size: 1.2em;
+            }
+            
+            .slide p, .slide ul, .slide ol {
+                font-size: 1em;
+            }
+        }
+        
+        @media print {
+            body {
+                background-color: white;
+            }
+            
+            .slide {
+                box-shadow: none;
+                page-break-after: always;
+                margin-bottom: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        
+        <!-- Slide 1: Title -->
+        <div class="slide">
+            <h1>Mistral Vibe CLI 最新情報報告</h1>
+            <p class="center">2025年12月版</p>
+            <div class="center">
+                <img src="https://mistral.ai/img/mistral-logo.svg" alt="Mistral AI Logo" style="max-width: 300px; margin: 20px 0;">
+            </div>
+            <p class="center">作成日: 2025年12月</p>
+        </div>
+
+        <!-- Slide 2: Table of Contents -->
+        <div class="slide">
+            <h2>目次</h2>
+            <div class="toc">
+                <ul>
+                    <li><a href="#概要">概要</a></li>
+                    <li><a href="#devstral-2">Devstral 2 モデルファミリー</a></li>
+                    <li><a href="#vibe-cli特徴">Mistral Vibe CLIの特徴</a></li>
+                    <li><a href="#インストール">インストール方法</a></li>
+                    <li><a href="#主な機能">主な機能</a></li>
+                    <li><a href="#利用シーン">利用シーン</a></li>
+                    <li><a href="#比較分析">比較分析</a></li>
+                    <li><a href="#今後の展望">今後の展望</a></li>
+                    <li><a href="#参考リンク">参考リンク</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Slide 3: Overview -->
+        <div class="slide" id="概要">
+            <h2>概要</h2>
+            <h3>Mistral AIの2025年12月発表</h3>
+            <ul>
+                <li><span class="highlight">Devstral 2</span>: オープンソースのコーディング特化AIモデル</li>
+                <li><span class="highlight">Mistral Vibe CLI</span>: コマンドライン上のコーディングエージェント</li>
+                <li>Mistral 3: オープンソースのマルチモーダルモデルファミリー</li>
+                <li>Mistral OCR 3: 次世代の文書処理モデル</li>
+            </ul>
+            <div class="note">
+                <p><strong>ポイント:</strong> 2025年12月はMistral AIにとって転換点となる月。特にDevstral 2とVibe CLIの発表は、オープンソースのコーディングエージェント分野に大きなインパクトを与える。</p>
+            </div>
+        </div>
+
+        <!-- Slide 4: Devstral 2 Models -->
+        <div class="slide" id="devstral-2">
+            <h2>Devstral 2 モデルファミリー</h2>
+            <h3>モデルラインナップ</h3>
+            <table>
+                <tr>
+                    <th>モデル</th>
+                    <th>パラメータ</th>
+                    <th>SWE-benchスコア</th>
+                    <th>API価格 (入力/出力)</th>
+                    <th>ライセンス</th>
+                </tr>
+                <tr>
+                    <td>Devstral 2</td>
+                    <td>123B</td>
+                    <td>72.2%</td>
+                    <td>$0.40 / $2.00</td>
+                    <td>Modified MIT</td>
+                </tr>
+                <tr>
+                    <td>Devstral Small 2</td>
+                    <td>24B</td>
+                    <td>68.0%</td>
+                    <td>$0.10 / $0.30</td>
+                    <td>Apache 2.0</td>
+                </tr>
+            </table>
+            <h3>特徴</h3>
+            <ul>
+                <li>DeepSeek V3.2より<span class="highlight">5倍小さい</span></li>
+                <li>Kimi K2より<span class="highlight">28倍小さい</span></li>
+                <li>Claude Sonnetより<span class="highlight">最大7倍費用対効果が高い</span></li>
+                <li>コンテキストウィンドウ: <span class="highlight">256Kトークン</span></li>
+            </ul>
+        </div>
+
+        <!-- Slide 5: Devstral 2 Performance -->
+        <div class="slide">
+            <h2>Devstral 2 性能評価</h2>
+            <h3>人間による評価</h3>
+            <table>
+                <tr>
+                    <th>対決相手</th>
+                    <th>勝率</th>
+                </tr>
+                <tr>
+                    <td>DeepSeek V3.2</td>
+                    <td>42.8%</td>
+                </tr>
+                <tr>
+                    <td>Claude Sonnet 4.5</td>
+                    <td>21.4% (敗率: 53.1%)</td>
+                </tr>
+            </table>
+            <h3>推奨環境</h3>
+            <table>
+                <tr>
+                    <th>モデル</th>
+                    <th>最小構成</th>
+                </tr>
+                <tr>
+                    <td>Devstral 2</td>
+                    <td>H100クラスGPU 4基</td>
+                </tr>
+                <tr>
+                    <td>Devstral Small 2</td>
+                    <td>シングルGPU (RTX), DGX Spark, CPUのみ</td>
+                </tr>
+            </table>
+            <div class="note">
+                <p><strong>注目点:</strong> 小型モデルでありながら、大型モデルに匹敵する性能を発揮。</p>
+            </div>
+        </div>
+
+        <!-- Slide 6: Vibe CLI Features -->
+        <div class="slide" id="vibe-cli特徴">
+            <h2>Mistral Vibe CLIの特徴</h2>
+            <h3>コアコンセプト</h3>
+            <ul>
+                <li>コマンドライン上のコーディングアシスタント</li>
+                <li>自然言語でコードベースを操作</li>
+                <li><span class="highlight">プロジェクト認識</span>: 自動的にプロジェクト構造とGitステータスを分析</li>
+                <li><span class="highlight">ツールセット</span>: ファイル操作、コード検索、バージョン管理、コマンド実行</li>
+            </ul>
+            <h3>主な機能</h3>
+            <ol>
+                <li>インタラクティブチャット</li>
+                <li>強力なツールセット</li>
+                <li>プロジェクト認識</li>
+                <li>高度なCLI体験</li>
+                <li>高いカスタマイズ性</li>
+            </ol>
+        </div>
+
+        <!-- Slide 7: Toolset -->
+        <div class="slide">
+            <h2>ツールセット</h2>
+            <h3>組み込みツール</h3>
+            <table>
+                <tr>
+                    <th>ツール</th>
+                    <th>説明</th>
+                </tr>
+                <tr>
+                    <td><code>read_file</code></td>
+                    <td>ファイルの読み取り</td>
+                </tr>
+                <tr>
+                    <td><code>write_file</code></td>
+                    <td>ファイルの書き込み</td>
+                </tr>
+                <tr>
+                    <td><code>search_replace</code></td>
+                    <td>ファイル内の置換</td>
+                </tr>
+                <tr>
+                    <td><code>bash</code></td>
+                    <td>シェルコマンド実行</td>
+                </tr>
+                <tr>
+                    <td><code>grep</code></td>
+                    <td>コード検索 (ripgrepサポート)</td>
+                </tr>
+                <tr>
+                    <td><code>ask_user_question</code></td>
+                    <td>ユーザーへの質問</td>
+                </tr>
+                <tr>
+                    <td><code>task</code></td>
+                    <td>タスクのサブエージェントへの委譲</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Slide 8: Installation -->
+        <div class="slide" id="インストール">
+            <h2>インストール方法</h2>
+            <h3>1. 一行インストール (推奨)</h3>
+            <div class="code-block">
+                # LinuxとmacOS<br>
+curl -LsSf https://mistral.ai/vibe/install.sh | bash
+            </div>
+            <div class="code-block">
+                # Windows (PowerShell)<br>
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+uv tool install mistral-vibe
+            </div>
+            <h3>2. uvを使ったインストール</h3>
+            <div class="code-block">
+                uv tool install mistral-vibe
+            </div>
+            <h3>3. pipを使ったインストール</h3>
+            <div class="code-block">
+                pip install mistral-vibe
+            </div>
+            <div class="note">
+                <p><strong>注意:</strong> Windowsはサポートされているが、公式にはUNIX環境をターゲットとしている。</p>
+            </div>
+        </div>
+
+        <!-- Slide 9: Usage -->
+        <div class="slide" id="主な機能">
+            <h2>主な機能</h2>
+            <h3>1. インタラクティブモード</h3>
+            <div class="code-block">
+                cd /path/to/your/project<br>
+vibe
+            </div>
+            <h3>2. プログラムモード (非インタラクティブ)</h3>
+            <div class="code-block">
+                vibe --prompt "リファクタリングを実行してください"
+            </div>
+            <h3>オプション</h3>
+            <ul>
+                <li><code>--max-turns N</code>: 最大ターン数</li>
+                <li><code>--max-price DOLLARS</code>: 最大コスト制限</li>
+                <li><code>--max-tokens N</code>: 最大トークン数</li>
+                <li><code>--output FORMAT</code>: 出力形式 (text/json/streaming)</li>
+            </ul>
+        </div>
+
+        <!-- Slide 10: Built-in Agents -->
+        <div class="slide">
+            <h2>組み込みエージェント</h2>
+            <table>
+                <tr>
+                    <th>エージェント</th>
+                    <th>説明</th>
+                </tr>
+                <tr>
+                    <td><code>default</code></td>
+                    <td>標準エージェント。ツール実行に承認が必要</td>
+                </tr>
+                <tr>
+                    <td><code>plan</code></td>
+                    <td>読み取り専用。安全なツールは自動承認</td>
+                </tr>
+                <tr>
+                    <td><code>accept-edits</code></td>
+                    <td>ファイル編集のみ自動承認</td>
+                </tr>
+                <tr>
+                    <td><code>auto-approve</code></td>
+                    <td>全てのツールを自動承認 (注意して使用)</td>
+                </tr>
+                <tr>
+                    <td><code>lean</code></td>
+                    <td>インストールされたエージェントのみ</td>
+                </tr>
+            </table>
+            <div class="code-block">
+                # 使用方法<br>
+vibe --agent plan
+            </div>
+        </div>
+
+        <!-- Slide 11: Use Cases -->
+        <div class="slide" id="利用シーン">
+            <h2>利用シーン</h2>
+            <div class="note">
+                <h3>1. コードの探索と理解</h3>
+                <p><strong>ユースケース:</strong> 新しいプロジェクトを理解する</p>
+                <p><strong>コマンド:</strong> <code>vibe "このプロジェクトのアーキテクチャを説明して"</code></p>
+                <p><strong>利点:</strong> 自動的にプロジェクト構造を分析</p>
+            </div>
+            <div class="note">
+                <h3>2. コードのリファクタリング</h3>
+                <p><strong>ユースケース:</strong> 関数やモジュールのリファクタリング</p>
+                <p><strong>コマンド:</strong> <code>vibe "main.pyのmain関数をモジュール化して"</code></p>
+                <p><strong>利点:</strong> 自然言語で指示可能</p>
+            </div>
+            <div class="note">
+                <h3>3. バグの修正</h3>
+                <p><strong>ユースケース:</strong> 特定のバグを修正</p>
+                <p><strong>コマンド:</strong> <code>vibe "このエラーを修正して: [エラーメッセージ]"</code></p>
+                <p><strong>利点:</strong> コードベース全体を分析して修正</p>
+            </div>
+        </div>
+
+        <!-- Slide 12: Comparison -->
+        <div class="slide" id="比較分析">
+            <h2>比較分析</h2>
+            <h3>他のCLIコーディングツールとの比較</h3>
+            <table>
+                <tr>
+                    <th>ツール</th>
+                    <th>オープンソース</th>
+                    <th>モデル</th>
+                    <th>主な特徴</th>
+                    <th>ライセンス</th>
+                </tr>
+                <tr>
+                    <td><span class="highlight">Mistral Vibe CLI</span></td>
+                    <td>✅</td>
+                    <td>Devstral 2</td>
+                    <td>高いカスタマイズ性、プロジェクト認識</td>
+                    <td>Apache 2.0</td>
+                </tr>
+                <tr>
+                    <td>Claude Code</td>
+                    <td>❌</td>
+                    <td>Claude 3</td>
+                    <td>統合された開発体験</td>
+                    <td>独自ライセンス</td>
+                </tr>
+                <tr>
+                    <td>Codex CLI</td>
+                    <td>❌</td>
+                    <td>GPT-4</td>
+                    <td>GitHubとの深い統合</td>
+                    <td>独自ライセンス</td>
+                </tr>
+                <tr>
+                    <td>Cline</td>
+                    <td>✅</td>
+                    <td>各種LLM</td>
+                    <td>プラグインアーキテクチャ</td>
+                    <td>MIT</td>
+                </tr>
+                <tr>
+                    <td>OpenHands</td>
+                    <td>✅</td>
+                    <td>各種LLM</td>
+                    <td>タスク自動化</td>
+                    <td>Apache 2.0</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Slide 13: Advantages -->
+        <div class="slide">
+            <h2>Mistral Vibe CLIの優位点</h2>
+            <ol>
+                <li><span class="highlight">オープンソース</span>: Apache 2.0ライセンスで自由に使用・改変可能</li>
+                <li><span class="highlight">高いコスト効率</span>: Devstral 2モデルはClaude Sonnetより7倍のコスト効率</li>
+                <li><span class="highlight">豊富な機能セット</span>: 豊富な組み込みツール</li>
+                <li><span class="highlight">高いカスタマイズ性</span>: 設定ファイルで細かく調整可能</li>
+                <li><span class="highlight">プロジェクト認識</span>: 自動的にプロジェクト構造を理解</li>
+                <li><span class="highlight">サブエージェント</span>: タスクを分割して並列処理</li>
+            </ol>
+            <div class="important">
+                <h3>課題</h3>
+                <ul>
+                    <li>Windowsサポート: 公式にはUNIX環境をターゲット</li>
+                    <li>モデル要求: Devstral 2はH100 GPU 4基を要求</li>
+                    <li>新しさ: 2025年12月発表のため、コミュニティがまだ成熟していない</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Slide 14: Future Outlook -->
+        <div class="slide" id="今後の展望">
+            <h2>今後の展望</h2>
+            <h3>短期的な展望 (2026年上半期)</h3>
+            <ul>
+                <li>コミュニティの成長</li>
+                <li>プラグインエコシステムの拡大</li>
+                <li>IDE統合の強化</li>
+                <li>モデル改善</li>
+            </ul>
+            <h3>中期的な展望 (2026年下半期)</h3>
+            <ul>
+                <li>エンタープライズ機能</li>
+                <li>クラウドサービス</li>
+                <li>マルチモーダル対応</li>
+                <li>国際化</li>
+            </ul>
+            <h3>長期的な展望 (2027年以降)</h3>
+            <ul>
+                <li>自律エージェント</li>
+                <li>コラボレーション機能</li>
+                <li>統合されたAI開発プラットフォーム</li>
+            </ul>
+        </div>
+
+        <!-- Slide 15: References -->
+        <div class="slide" id="参考リンク">
+            <h2>参考リンク</h2>
+            <h3>公式リソース</h3>
+            <ul>
+                <li><a href="https://github.com/mistralai/mistral-vibe" target="_blank">GitHub - mistralai/mistral-vibe</a></li>
+                <li><a href="https://mistral.ai/" target="_blank">Mistral AI公式サイト</a></li>
+                <li><a href="https://mistral.ai/news/devstral-2-vibe-cli" target="_blank">Devstral 2公式発表</a></li>
+            </ul>
+            <h3>ニュース記事</h3>
+            <ul>
+                <li><a href="https://www.jls42.org/ja/news/mistral-decembre-2025" target="_blank">2025年12月のMistral AI: Devstral 2, Mistral 3, Vibe CLI</a></li>
+                <li><a href="https://gigazine.net/news/20251210-mistral-ai-devstral-2-vibe-cli/" target="_blank">GIGAZINE: Mistral AIがDevstral 2とVibe CLIを公開</a></li>
+            </ul>
+            <h3>モデルリポジトリ</h3>
+            <ul>
+                <li><a href="https://huggingface.co/mistralai/Devstral-2-123B-Instruct-2512" target="_blank">Hugging Face: Devstral-2-123B-Instruct-2512</a></li>
+                <li><a href="https://huggingface.co/mistralai/Devstral-Small-2-24B-Instruct-2512" target="_blank">Hugging Face: Devstral-Small-2-24B-Instruct-2512</a></li>
+            </ul>
+        </div>
+
+        <!-- Slide 16: Summary -->
+        <div class="slide">
+            <h2>まとめ</h2>
+            <p>Mistral Vibe CLIは、2025年12月に発表されたばかりの最新のコーディングエージェントです。</p>
+            <h3>主なメリット</h3>
+            <ul>
+                <li>✅ <span class="highlight">オープンソース</span> (Apache 2.0)</li>
+                <li>✅ <span class="highlight">高いコストパフォーマンス</span></li>
+                <li>✅ <span class="highlight">豊富な機能セット</span></li>
+                <li>✅ <span class="highlight">高いカスタマイズ性</span></li>
+                <li>✅ <span class="highlight">プロジェクト認識</span></li>
+            </ul>
+            <h3>おすすめのユーザー</h3>
+            <ul>
+                <li>オープンソースを好む開発者</li>
+                <li>コスト効率を重視するチーム</li>
+                <li>高度なカスタマイズを求めるユーザー</li>
+                <li>新しいテクノロジーを積極的に採用する組織</li>
+            </ul>
+            <div class="center" style="margin-top: 40px; font-size: 1.2em;">
+                <p><strong>ご清聴ありがとうございました</strong></p>
+                <p>質問はお気軽にどうぞ！</p>
+            </div>
+        </div>
+
+        <!-- Slide 17: Footer -->
+        <div class="slide">
+            <div class="footer">
+                <p><strong>Mistral Vibe CLI 最新情報報告</strong></p>
+                <p>2025年12月版</p>
+                <p>作成日: 2025年12月</p>
+                <p style="font-size: 0.8em; margin-top: 20px;">
+                    この報告書は2025年12月時点の情報に基づいて作成されています。<br>
+                    最新の情報は公式リソースをご確認ください。
+                </p>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>
