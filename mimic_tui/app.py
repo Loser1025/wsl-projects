@@ -5,12 +5,13 @@ import ctypes
 import threading
 from typing import Optional, Callable
 
+from rich.markdown import Markdown as RichMarkdown
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
-from textual.widgets import Footer, Header, Input, Label, RichLog
+from textual.widgets import Footer, Input, Label, Markdown, RichLog, Static
 
 
 # ── メインアプリ ──────────────────────────────────────────────────────
@@ -21,13 +22,17 @@ class MimicApp(App):
     TITLE = "mimic_claude"
 
     CSS = """
-    Screen    { layout: vertical; background: #050f05; }
-    #chat-log { height: 1fr; border: solid #00a02d; background: #050f05;
-                scrollbar-color: #00ff41; padding: 0 1; }
-    #input-bar { height: 3; border: solid #00ff41; padding: 0 1; }
-    Input     { background: #050f05; color: #ffffff; border: none; }
-    Footer    { background: #050f05; color: #00c864; }
-    Header    { background: #050f05; color: #00ff41; }
+    Screen      { layout: vertical; background: #050f05; }
+    #title-art  { height: 11; background: #050f05; padding: 0 0; overflow-x: hidden; }
+    #chat-log   { height: 1fr; border: solid #00a02d; background: #050f05;
+                  scrollbar-color: #00ff41; padding: 0 1; }
+    #ai-stream  { height: auto; min-height: 0; padding: 0 2;
+                  background: #050f05; border-left: solid #00a02d;
+                  margin: 0 0 0 1; }
+    #input-bar  { height: 3; border: solid #00ff41; padding: 0 1; }
+    Input       { background: #050f05; color: #ffffff; border: none; }
+    Footer      { background: #050f05; color: #00c864; }
+    Markdown    { background: #050f05; }
     """
 
     BINDINGS = [
@@ -52,12 +57,16 @@ class MimicApp(App):
         self._out_buf_lock = threading.Lock()
         # 書き込み承認: エージェントスレッドが Y/n を待つためのコールバック
         self._approval_callback: Optional[Callable[[str], None]] = None
+        # AI レスポンスストリームバッファ（Markdown.update() 用）
+        self._ai_buf      = ""
+        self._ai_buf_lock = threading.Lock()
 
     # ── 構成 ──────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
+        yield Static("", id="title-art")     # ASCII アートタイトル
         yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
+        yield Markdown("", id="ai-stream")   # AI レスポンスストリーム表示領域
         with Vertical(id="input-bar"):
             yield Input(
                 placeholder="❯ メッセージを入力  (/help でコマンド一覧)",
@@ -68,20 +77,27 @@ class MimicApp(App):
     # ── 初期化 ────────────────────────────────────────────────────────
 
     def on_mount(self) -> None:
-        from .utils import set_tui_output, set_tui_mode
+        from .utils import set_tui_output, set_tui_mode, set_tui_stream, get_ascii_art_str
         from .tools import set_write_approval_handler
 
         self._log = self.query_one("#chat-log", RichLog)
         set_tui_mode(True)
         set_tui_output(self._output_callback)
+        set_tui_stream(self._stream_callback)
         set_write_approval_handler(self._make_approval_handler())
 
-        cfg = self._ctx["active_config"]
-        self.sub_title = f"{cfg.model}  ·  {self._ctx['agent'].cwd}"
+        # 100ms ごとに AI バッファを Markdown ウィジェットへ反映する（Web チャットと同方式）
+        self.set_interval(0.1, self._tick_ai_stream)
 
-        self._write_direct("mimic_claude TUI\n")
-        self._write_direct(f"モデル : {cfg.model}\n")
-        self._write_direct(f"作業Dir: {self._ctx['agent'].cwd}\n")
+        cfg = self._ctx["active_config"]
+        cwd = self._ctx["agent"].cwd
+
+        # ASCII アートタイトルを表示（サブタイトルにモデル情報を埋め込む）
+        subtitle = f"{cfg.model}  ·  {cwd}"
+        art_text = Text.from_ansi(get_ascii_art_str(subtitle))
+        self.query_one("#title-art", Static).update(art_text)
+
+        self._write_direct(f"作業Dir: {cwd}\n")
         self._write_direct("─" * 60 + "\n")
         self.query_one("#user-input", Input).focus()
 
@@ -127,6 +143,18 @@ class MimicApp(App):
             self._out_buf = ""
         if remaining:
             self._safe_write_line(remaining)
+
+    def _update_title(self) -> None:
+        """モデル名・CWD 変更時にアートのサブタイトル行を更新する。"""
+        from .utils import get_ascii_art_str
+        cfg     = self._ctx["active_config"]
+        cwd     = self._ctx["agent"].cwd
+        subtitle = f"{cfg.model}  ·  {cwd}"
+        try:
+            art_text = Text.from_ansi(get_ascii_art_str(subtitle))
+            self.query_one("#title-art", Static).update(art_text)
+        except Exception:
+            pass
 
     def _write_direct(self, text: str) -> None:
         """メインスレッドから直接 RichLog に書く。複数行を適切に分割する。"""
@@ -218,6 +246,47 @@ class MimicApp(App):
             inp.disabled    = True
             inp.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
 
+    # ── AI レスポンスストリーム（Markdown.update() 方式） ─────────────
+
+    def _stream_callback(self, text: str) -> None:
+        """PipelineTypewriter から生 Markdown テキストが来る（どのスレッドからでも安全）。
+        バッファに追記するだけ。実際の Markdown.update() は _tick_ai_stream() が行う。
+        """
+        with self._ai_buf_lock:
+            self._ai_buf += text
+
+    def _tick_ai_stream(self) -> None:
+        """100ms ごとにバッファ全体で Markdown ウィジェットを更新する（メインスレッド）。
+        Web チャットアプリと同じ仕組み: 毎フレーム全文を再パースして差分更新する。
+        """
+        with self._ai_buf_lock:
+            text = self._ai_buf
+        if not text:
+            return
+        try:
+            self.query_one("#ai-stream", Markdown).update(text)
+        except Exception:
+            pass
+
+    def _bake_ai_response(self) -> None:
+        """AI レスポンス完了時に Markdown ウィジェットの内容を RichLog に焼き込んで履歴に残す。
+        焼き込みには rich.markdown.Markdown を使い、RichLog が正式にレンダリングする。
+        """
+        with self._ai_buf_lock:
+            text = self._ai_buf
+            self._ai_buf = ""
+        if not text or self._log is None:
+            return
+        # 最終状態で Markdown ウィジェットを更新してから RichLog に移す
+        try:
+            self.query_one("#ai-stream", Markdown).update("")
+        except Exception:
+            pass
+        try:
+            self._log.write(RichMarkdown(text))
+        except Exception:
+            self._log.write(Text.from_ansi(text))
+
     # ── キーバインド・アクション ──────────────────────────────────────
 
     def action_interrupt(self) -> None:
@@ -248,8 +317,10 @@ class MimicApp(App):
             except Exception as e:
                 self._write_direct(f"  [Session] 保存失敗: {e}\n")
 
+        from .utils import set_tui_stream
         set_tui_mode(False)
         set_tui_output(None)
+        set_tui_stream(None)
         self.exit()
 
     def action_clear_log(self) -> None:
@@ -351,6 +422,9 @@ class MimicApp(App):
         if match:
             _, handler, args = match
             handler(self._ctx["agent"], args)
+            # /cd 実行後は CWD が変わるのでタイトルを更新
+            if cmd == "cd":
+                self._update_title()
         else:
             self._write_direct(
                 f"  不明なコマンド: {text}\n"
@@ -384,7 +458,7 @@ class MimicApp(App):
             self._ctx["agent"]._config.model = arg
             self._ctx["agent"].clear_history()
             self._write_direct(f"✓ モデルを変更しました: {arg}\n  会話履歴をリセットしました。\n")
-            self.sub_title = f"{arg}  ·  {self._ctx['agent'].cwd}"
+            self._update_title()
         else:
             current = self._ctx["agent"]._config.model
             self._write_direct(
@@ -459,6 +533,9 @@ class MimicApp(App):
 
     def _start_agent(self, user_input: str) -> None:
         self._agent_busy = True
+        # AI バッファをクリアして新しいレスポンス受け取り準備
+        with self._ai_buf_lock:
+            self._ai_buf = ""
         inp = self.query_one("#user-input", Input)
         inp.disabled    = True
         inp.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
@@ -470,7 +547,8 @@ class MimicApp(App):
     def _on_agent_done(self) -> None:
         self._agent_busy       = False
         self._worker_thread_id = None
-        self._flush_output_buf()   # 未完行バッファを書き出す
+        self._flush_output_buf()       # 未完行バッファを書き出す
+        self._bake_ai_response()       # AI レスポンスを RichLog に焼き込む
         inp = self.query_one("#user-input", Input)
         inp.disabled    = False
         inp.placeholder = "❯ メッセージを入力  (/help でコマンド一覧)"

@@ -21,16 +21,23 @@ from datetime import datetime, timedelta, timezone
 _print_lock = threading.Lock()
 
 # ── TUI 出力ブリッジ ──────────────────────────────────────────────────
-# set_tui_output() でコールバックを登録すると safe_print の出力が全てそちらへ流れる。
-# TUI 未使用時は従来の print() 動作になる。
+# safe_print / ツール表示 → _tui_output_callback → RichLog
+# AI レスポンス本文    → _tui_stream_callback  → Markdown.update()
 _tui_output_callback: Optional[Any] = None  # callable(str) | None
+_tui_stream_callback: Optional[Any] = None  # callable(str) | None（生Markdown）
 _tui_mode_global: bool = False              # PipelineTypewriter が参照するフラグ
 
 
 def set_tui_output(fn) -> None:
-    """TUI ウィジェットへの出力コールバックを登録する（None で解除）。"""
+    """safe_print / ツール表示の出力コールバックを登録する（None で解除）。"""
     global _tui_output_callback
     _tui_output_callback = fn
+
+
+def set_tui_stream(fn) -> None:
+    """AI レスポンス本文（生 Markdown）のストリームコールバックを登録する（None で解除）。"""
+    global _tui_stream_callback
+    _tui_stream_callback = fn
 
 
 def set_tui_mode(enabled: bool) -> None:
@@ -257,8 +264,8 @@ def render_markdown_thinker(text: str) -> str:
     return "\n".join(out)
 
 
-def print_ascii_art():
-    # 上から下へ green → teal → electric aqua のグラデーション
+def get_ascii_art_str(subtitle: str = "") -> str:
+    """ASCII アートを ANSI コード付き文字列として返す。TUI の Static ウィジェット用。"""
     _G = [
         "\033[38;2;0;255;0m",    # row1: Razer Green
         "\033[38;2;0;255;80m",   # row2: Green-Teal
@@ -271,20 +278,24 @@ def print_ascii_art():
     ]
     R = C.RESET
     SEP = f"\033[38;2;0;80;80m ──────────────────────────────────────────────────────────────────────────────────\033[0m"
-    art = f"""
-{_G[0]}   888     888 888b    888 8888888 888b     d888  .d88888b.   .d8888b.      d8888{R}
-{_G[1]}   888     888 8888b   888   888   8888b   d8888 d88P" "Y88b d88P  Y88b    d8P888{R}
-{_G[2]}   888     888 88888b  888   888   88888b.d88888 888     888 888    888   d8P 888{R}
-{_G[3]}   888     888 888Y88b 888   888   888Y88888P888 888     888 888         d8P  888{R}
-{_G[4]}   888     888 888 Y88b888   888   888 Y888P 888 888     888 888  88888 d88   888{R}
-{_G[5]}   888     888 888  Y88888   888   888  Y8P  888 888     888 888    888 8888888888{R}
-{_G[6]}   Y88b. .d88P 888   Y8888   888   888   "   888 Y88b. .d88P Y88b  d88P       888{R}
-{_G[7]}    "Y88888P"  888    Y888 8888888 888       888  "Y88888P"   "Y8888P88       888{R}
-{SEP}
-{C.BOLD}{_G[7]} MIMIC 2.0.0  ·  THE HYBRID AI AGENT  ·  RAG ENHANCED{R}
-{SEP}
-    """
-    safe_print(art, flush=True)
+    sub = f"{C.BOLD}{_G[7]} {subtitle}{R}" if subtitle else f"{C.BOLD}{_G[7]} MIMIC TUI  ·  THE HYBRID AI AGENT{R}"
+    return (
+        f"{_G[0]}   888     888 888b    888 8888888 888b     d888  .d88888b.   .d8888b.      d8888{R}\n"
+        f"{_G[1]}   888     888 8888b   888   888   8888b   d8888 d88P\" \"Y88b d88P  Y88b    d8P888{R}\n"
+        f"{_G[2]}   888     888 88888b  888   888   88888b.d88888 888     888 888    888   d8P 888{R}\n"
+        f"{_G[3]}   888     888 888Y88b 888   888   888Y88888P888 888     888 888         d8P  888{R}\n"
+        f"{_G[4]}   888     888 888 Y88b888   888   888 Y888P 888 888     888 888  88888 d88   888{R}\n"
+        f"{_G[5]}   888     888 888  Y88888   888   888  Y8P  888 888     888 888    888 8888888888{R}\n"
+        f"{_G[6]}   Y88b. .d88P 888   Y8888   888   888   \"   888 Y88b. .d88P Y88b  d88P       888{R}\n"
+        f"{_G[7]}    \"Y88888P\"  888    Y888 8888888 888       888  \"Y88888P\"   \"Y8888P88       888{R}\n"
+        f"{SEP}\n"
+        f"{sub}\n"
+        f"{SEP}"
+    )
+
+
+def print_ascii_art():
+    safe_print(get_ascii_art_str(), flush=True)
 
 # ── ログシンク（ReactLog への転送用）──────────────────────────────
 _log_sink = None  # callable(level: str, message: str) | None
@@ -588,20 +599,24 @@ class PipelineTypewriter:
             return
         last_nl = self._raw_buf.rfind("\n")
         if force or last_nl == -1:
-            rendered = self._renderer(self._strip_think_tags(self._raw_buf))
-            if not rendered.endswith("\n"):
-                rendered += "\n"
+            raw_text = self._strip_think_tags(self._raw_buf)
             self._raw_buf = ""
         else:
-            complete = self._raw_buf[:last_nl + 1]
+            raw_text = self._strip_think_tags(self._raw_buf[:last_nl + 1])
             self._raw_buf = self._raw_buf[last_nl + 1:]
-            rendered = self._renderer(self._strip_think_tags(complete))
+
+        if self._tui_mode:
+            # TUI モード: 生 Markdown テキストをストリームコールバックへ送る。
+            # render_markdown() は通さない（Textual の Markdown ウィジェットが処理する）。
+            if _tui_stream_callback and raw_text:
+                try:
+                    _tui_stream_callback(raw_text)
+                except Exception:
+                    pass
+        else:
+            rendered = self._renderer(raw_text)
             if not rendered.endswith("\n"):
                 rendered += "\n"
-        # TUI モード: render_markdown 済みテキストをコールバックへ直接送る
-        if self._tui_mode:
-            self._tui_send(rendered)
-        else:
             self._disp_q.extend(rendered)
 
     def _enter_think(self):
