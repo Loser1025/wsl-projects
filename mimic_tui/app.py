@@ -479,17 +479,26 @@ class MimicApp(App):
             return
         arg = args.strip()
         if not arg:
-            self._chat_log.add_message(
-                f"現在のモデル: {self._config.model}\n"
-                "変更するには: /model <モデル名>",
-                role="system",
-            ) if self._chat_log else None
+            # モーダルダイアログを表示
+            self.push_screen(ModelSelectDialog(self._config.model), self._on_model_selected)
             return
         old = self._config.model
         self._config.model = arg
         self._agent.clear_history()
         self._chat_log.add_message(
             f"モデルを変更: {old} → {arg}（会話履歴リセット）",
+            role="system",
+        ) if self._chat_log else None
+
+    def _on_model_selected(self, model_name: str | None) -> None:
+        if model_name is None or model_name == self._config.model:
+            self._chat_log.add_message("モデルは変更されませんでした。", role="system") if self._chat_log else None
+            return
+        old = self._config.model
+        self._config.model = model_name
+        self._agent.clear_history()
+        self._chat_log.add_message(
+            f"モデルを変更: {old} → {model_name}（会話履歴リセット）",
             role="system",
         ) if self._chat_log else None
 
