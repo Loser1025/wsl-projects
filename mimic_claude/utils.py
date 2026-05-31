@@ -20,8 +20,37 @@ from datetime import datetime, timedelta, timezone
 
 _print_lock = threading.Lock()
 
+# ── TUI 出力ブリッジ ──────────────────────────────────────────────────
+# set_tui_output() でコールバックを登録すると safe_print の出力が全てそちらへ流れる。
+# TUI 未使用時は従来の print() 動作になる。
+_tui_output_callback: Optional[Any] = None  # callable(str) | None
+_tui_mode_global: bool = False              # PipelineTypewriter が参照するフラグ
+
+
+def set_tui_output(fn) -> None:
+    """TUI ウィジェットへの出力コールバックを登録する（None で解除）。"""
+    global _tui_output_callback
+    _tui_output_callback = fn
+
+
+def set_tui_mode(enabled: bool) -> None:
+    """PipelineTypewriter の TUI モードを有効/無効にする。"""
+    global _tui_mode_global
+    _tui_mode_global = enabled
+
+
 def safe_print(*args, **kwargs):
-    """複数スレッドからの出力が混ざらないようロック制御する print"""
+    """複数スレッドからの出力が混ざらないようロック制御する print。
+    TUI コールバックが登録されている場合はそちらへ出力する。"""
+    if _tui_output_callback is not None:
+        text = " ".join(str(a) for a in args)
+        end  = kwargs.get("end", "\n")
+        full = text if (not end or text.endswith(end)) else text + end
+        try:
+            _tui_output_callback(full)
+        except Exception:
+            pass
+        return
     with _print_lock:
         print(*args, **kwargs)
 
@@ -519,16 +548,18 @@ class PipelineTypewriter:
     AIストリーミングを3段パイプラインで表示する:
       Stage1: rawバッファに蓄積（改行 or 200文字超で区切り）
       Stage2: render_markdown でレンダリング（完全行のみ）
-      Stage3: タイプライタースレッドが1文字ずつ出力（80文字/秒）
+      Stage3: タイプライタースレッドが1文字ずつ出力（500文字/秒）
     コードブロックが途中の場合は閉じるまでバッファを保持する。
     auto_mode=True のときは即時出力（遅延なし・レンダリングなし）。
+    tui_mode=True のときは _tui_output_callback に直接送る（スレッドなし）。
     <think>...</think> ブロックはグレーのボックスで別レンダリングする。
     """
     _CHARS_PER_SEC = 500
     _BUFFER_SIZE   = 200
 
     def __init__(self, auto_mode: bool = False, renderer=None):
-        self._auto_mode        = auto_mode
+        self._auto_mode        = auto_mode or _tui_mode_global
+        self._tui_mode         = _tui_mode_global
         self._renderer         = renderer or render_markdown
         self._raw_buf          = ""
         self._think_raw_buf    = ""
@@ -615,10 +646,25 @@ class PipelineTypewriter:
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
+    def _tui_send(self, text: str) -> None:
+        """TUI モード用: コールバックにテキストを送る。"""
+        if _tui_output_callback is not None:
+            try:
+                _tui_output_callback(text)
+            except Exception:
+                pass
+        else:
+            sys.stdout.write(text)
+            sys.stdout.flush()
+
     def feed(self, chunk: str):
         if not chunk:
             return
         self._full.append(chunk)
+        if self._tui_mode:
+            # TUI モード: チャンクをそのまま TUI コールバックへ（スレッド不要）
+            self._tui_send(chunk)
+            return
         if self._auto_mode:
             sys.stdout.write(chunk)
             sys.stdout.flush()
@@ -642,7 +688,7 @@ class PipelineTypewriter:
 
     def finalize(self) -> str:
         full = "".join(self._full)
-        if self._auto_mode:
+        if self._tui_mode or self._auto_mode:
             return full
         with self._lock:
             for is_think, text in self._think_aware.flush():

@@ -1,15 +1,15 @@
 """
-mcp_server.py  —  mimic_linux MCP Server (Full-Agent Edition)
+mcp_server.py  —  mimic_claude MCP Server (Full-Agent Edition)
 ==============================================================
-Claude Code (推論) ← MCP → このサーバー → mimic_linux フルエージェント
+Claude Code (推論) ← MCP → このサーバー → mimic_claude フルエージェント
 
 Claude の役割: ユーザー意図を理解して agent_run を呼ぶだけ
-mimic_linux の役割: OpenRouter ReAct ループ + AutoGit + 全ツール実行
+mimic_claude の役割: OpenRouter ReAct ループ + AutoGit + 全ツール実行
 
-起動: python -m mimic_linux.mcp_server  (tamalabo/ ディレクトリで実行)
+起動: python -m mimic_claude.mcp_server  (tamalabo/ ディレクトリで実行)
       Claude Code の settings.json からは以下のように設定する:
         "command": "python",
-        "args": ["-m", "mimic_linux.mcp_server"],
+        "args": ["-m", "mimic_claude.mcp_server"],
         "cwd": "<tamalabo のフルパス>"
 """
 
@@ -94,7 +94,7 @@ async def list_tools() -> list[Tool]:
     result.append(Tool(
         name="agent_run",
         description=(
-            "【最優先】タスクを mimic_linux のフルエージェントに委譲して実行する。\n"
+            "【最優先】タスクを mimic_claude のフルエージェントに委譲して実行する。\n"
             "\n"
             "内部で実行されること:\n"
             "  • AutoGit バックアップ（タスク前に自動コミット）\n"
@@ -133,7 +133,7 @@ async def list_tools() -> list[Tool]:
     result.append(Tool(
         name="agent_terminal",
         description=(
-            "mimic_linux を新しいターミナルウィンドウで起動する（インタラクティブモード）。\n"
+            "mimic_claude を新しいターミナルウィンドウで起動する（インタラクティブモード）。\n"
             "30分以上かかる作業・ユーザーが途中で確認したい場合に使う。\n"
             "このツールは起動だけして即返す（結果待ちなし）。"
         ),
@@ -189,7 +189,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 def _agent_run(task: str, working_dir: str | None,
                timeout: int, plan_mode: bool) -> str:
     """
-    mimic_linux を --auto-prompt で起動して結果を返す。
+    mimic_claude を --auto-prompt で起動して結果を返す。
     """
     _ensure_log_monitor()
 
@@ -210,7 +210,7 @@ def _agent_run(task: str, working_dir: str | None,
 
     try:
         proc = subprocess.Popen(
-            [py, "-m", "mimic_linux", flag, task_arg],
+            [py, "-m", "mimic_claude", flag, task_arg],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -221,7 +221,7 @@ def _agent_run(task: str, working_dir: str | None,
             env=env,
         )
     except Exception as e:
-        return f"mimic_linux 起動エラー: {type(e).__name__}: {e}"
+        return f"mimic_claude 起動エラー: {type(e).__name__}: {e}"
 
     result_lines: list[str] = []
     done_event = threading.Event()
@@ -245,7 +245,7 @@ def _agent_run(task: str, working_dir: str | None,
 
     if done_event.wait(timeout=timeout):
         answer = "".join(result_lines).strip()
-        return answer or "(mimic_linux の出力なし)"
+        return answer or "(mimic_claude の出力なし)"
     else:
         proc.kill()
         proc.wait()
@@ -261,7 +261,7 @@ def _agent_run(task: str, working_dir: str | None,
 # agent_terminal 実装
 # ════════════════════════════════════════════════════════════════
 def _agent_terminal(task: str, working_dir: str | None) -> str:
-    """新しいターミナルウィンドウで mimic_linux をインタラクティブ起動"""
+    """新しいターミナルウィンドウで mimic_claude をインタラクティブ起動"""
     cwd = working_dir or str(V4_DIR)
     py  = sys.executable
     task_preview = task[:300].replace('"', "'")
@@ -272,11 +272,11 @@ def _agent_terminal(task: str, working_dir: str | None) -> str:
             session = "mimic-terminal"
             subprocess.run(
                 ["tmux", "new-session", "-d", "-s", session,
-                 "-c", cwd, f"{py} -m mimic_linux"],
+                 "-c", cwd, f"{py} -m mimic_claude"],
                 check=False,
             )
             return (
-                f"mimic_linux ターミナルを tmux セッション '{session}' で起動しました。\n"
+                f"mimic_claude ターミナルを tmux セッション '{session}' で起動しました。\n"
                 f"作業フォルダ: {cwd}\n\n"
                 f"アタッチするには: tmux attach -t {session}\n\n"
                 f"以下のタスクをターミナルに貼り付けてください:\n"
@@ -285,11 +285,11 @@ def _agent_terminal(task: str, working_dir: str | None) -> str:
         elif shutil.which("xterm"):
             subprocess.Popen(
                 ["xterm", "-title", "mimic-terminal",
-                 "-e", f"cd {cwd} && {py} -m mimic_linux"],
+                 "-e", f"cd {cwd} && {py} -m mimic_claude"],
                 close_fds=True,
             )
             return (
-                f"mimic_linux ターミナルを xterm で起動しました。\n"
+                f"mimic_claude ターミナルを xterm で起動しました。\n"
                 f"作業フォルダ: {cwd}\n\n"
                 f"以下のタスクをターミナルに貼り付けてください:\n"
                 f"{'─'*50}\n{task_preview}\n{'─'*50}"
@@ -298,7 +298,7 @@ def _agent_terminal(task: str, working_dir: str | None) -> str:
             return (
                 "ターミナルエミュレータが見つかりません（tmux / xterm が必要）。\n"
                 f"手動で次のコマンドを実行してください:\n"
-                f"  cd {cwd} && {py} -m mimic_linux"
+                f"  cd {cwd} && {py} -m mimic_claude"
             )
     except Exception as e:
         return f"ターミナル起動エラー: {e}"
