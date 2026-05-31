@@ -1,0 +1,20 @@
+{
+  "modelProviders": {
+    "openai": [
+      {
+        "id": "mistral-large-latest",
+        "name": "Mistral Large (Latest)",
+        "baseUrl": "https://api.mistral.ai/v1",
+        "envKey": "MISTRAL_API_KEY"
+      }
+    ]
+  },
+  "security": {
+    "auth": {
+      "selectedType": "openai"
+    }
+  },
+  "model": {
+    "name": "mistral-large-latest"
+  }
+}
