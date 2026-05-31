@@ -131,7 +131,9 @@ def interactive_loop(
 
     while True:
         try:
-            mode_icon = C.green("⚡") if current_mode == "interactive" else C.orange("📋")
+            # 📋 (U+1F4CB) は表示幅2だが readline は1と計算するためカーソルがズレる
+            # → 表示幅1確定のナローUnicode文字に置換
+            mode_icon = C.green("⚡") if current_mode == "interactive" else C.orange("≡")
             user_input = input(_rl(f"{mode_icon} {C.bold_green('❯')} ")).strip()
         except (EOFError, KeyboardInterrupt):
             safe_print(C.gray("\n終了します。"))

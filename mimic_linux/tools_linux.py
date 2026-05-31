@@ -17,6 +17,11 @@ from typing import Optional
 
 from .tools import tools
 
+# PTY 出力から端末状態変更シーケンスを除去するパターン
+# DEC プライベートモード（代替画面・マウストラッキング・カーソルキーモード等）
+# これらが親ターミナルに送信されると端末状態が破壊される
+_TERMINAL_CTRL_RE = re.compile(r'\033\[\?[0-9;]*[hl]')
+
 # sudo パスワードプロンプト検出パターン（デコード後の文字列で照合）
 _SUDO_PROMPT_RE = re.compile(
     r'\[sudo\] password for [^:]+'
@@ -71,11 +76,16 @@ def run_bash(
 ) -> str:
     cwd = working_directory or str(Path.cwd())
 
-    # set -euo pipefail: エラー検出を強化
     # LC_ALL=C.UTF-8: 文字化け防止
+    # PAGER=cat / GIT_PAGER=cat: ページャー (less 等) を無効化
+    #   → less が起動すると PTY 経由で代替画面・マウストラッキング等の
+    #     端末制御シーケンスが親ターミナルに漏洩し端末状態を破壊するため
     wrapped = (
         "export LC_ALL=C.UTF-8\n"
         "export LANG=C.UTF-8\n"
+        "export PAGER=cat\n"
+        "export GIT_PAGER=cat\n"
+        "export GIT_TERMINAL_PROMPT=0\n"
         f"{command}"
     )
 
@@ -165,6 +175,9 @@ def run_bash(
     raw = b"".join(output_chunks)
     # pty はキャリッジリターンを混入させる場合があるので正規化
     output = raw.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+    # DEC プライベートモードシーケンスを除去
+    # (\033[?1049h=代替画面, \033[?1000h=マウストラッキング等が親端末に漏洩するのを防ぐ)
+    output = _TERMINAL_CTRL_RE.sub('', output)
     output = output.strip()
 
     if timed_out:

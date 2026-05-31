@@ -203,6 +203,19 @@ class MonitoringToolRegistry(ToolRegistry):
             self.current_tool = None   # 実行完了
             if spinner:
                 spinner.stop()
+            # run_bash (PTY実行) 後に端末状態をリセット
+            # PTY経由で有効化された代替画面・マウストラッキング等を解除する
+            if tool_name == "run_bash":
+                import sys as _sys
+                _sys.stdout.write(
+                    "\033[?1049l"  # 代替画面を終了
+                    "\033[?47l"    # 代替画面(古いバリアント)を終了
+                    "\033[?1000l"  # X10 マウストラッキングを無効化
+                    "\033[?1002l"  # ボタンイベント マウストラッキングを無効化
+                    "\033[?1003l"  # 全イベント マウストラッキングを無効化
+                    "\033[?1l"     # アプリケーションカーソルキーを無効化
+                )
+                _sys.stdout.flush()
 
         # ── ToolCallRecord を生成・記録 ──
         record = ToolCallRecord(
