@@ -33,10 +33,10 @@ def main():
     ]
 
     base_dir = str(Path(__file__).parent)
-    or_config, gemini_config, system_prompt = load_config(base_dir)
+    or_config, gemini_config, mistral_config, system_prompt = load_config(base_dir)
 
     # モデル選択: 最初に見つかった設定を使う（TUI モデル選択は Phase 5 で実装）
-    active_config = or_config or gemini_config
+    active_config = or_config or gemini_config or mistral_config
 
     # MonitoringToolRegistry — safe_print 経由で TUI にツール完了を表示
     from .utils import safe_print
