@@ -11,7 +11,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
-from textual.widgets import Footer, Input, Label, Markdown, RichLog, Static
+from textual.widgets import Footer, Input, Label, RichLog, Static
 
 
 # ── メインアプリ ──────────────────────────────────────────────────────
@@ -22,17 +22,13 @@ class MimicApp(App):
     TITLE = "mimic_claude"
 
     CSS = """
-    Screen      { layout: vertical; background: #050f05; }
-    #title-art  { height: 7; background: #050f05; padding: 0 0; overflow-x: hidden; }
-    #chat-log   { height: 1fr; border: solid #00a02d; background: #050f05;
-                  scrollbar-color: #00ff41; padding: 0 1; }
-    #ai-stream  { height: auto; min-height: 0; padding: 0 2;
-                  background: #050f05; border-left: solid #00a02d;
-                  margin: 0 0 0 1; }
-    #input-bar  { height: 3; border: solid #00ff41; padding: 0 1; }
-    Input       { background: #050f05; color: #ffffff; border: none; }
-    Footer      { background: #050f05; color: #00c864; }
-    Markdown    { background: #050f05; }
+    Screen     { layout: vertical; background: #050f05; }
+    #title-art { height: 7; background: #050f05; padding: 0 0; overflow-x: hidden; }
+    #chat-log  { height: 1fr; border: solid #00a02d; background: #050f05;
+                 scrollbar-color: #00ff41; padding: 0 1; }
+    #input-bar { height: 3; border: solid #00ff41; padding: 0 1; }
+    Input      { background: #050f05; color: #ffffff; border: none; }
+    Footer     { background: #050f05; color: #00c864; }
     """
 
     BINDINGS = [
@@ -57,16 +53,12 @@ class MimicApp(App):
         self._out_buf_lock = threading.Lock()
         # 書き込み承認: エージェントスレッドが Y/n を待つためのコールバック
         self._approval_callback: Optional[Callable[[str], None]] = None
-        # AI レスポンスストリームバッファ（Markdown.update() 用）
-        self._ai_buf      = ""
-        self._ai_buf_lock = threading.Lock()
 
     # ── 構成 ──────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
-        yield Static("", id="title-art")     # ASCII アートタイトル
+        yield Static("", id="title-art")
         yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
-        yield Markdown("", id="ai-stream")   # AI レスポンスストリーム表示領域
         with Vertical(id="input-bar"):
             yield Input(
                 placeholder="❯ メッセージを入力  (/help でコマンド一覧)",
@@ -85,9 +77,6 @@ class MimicApp(App):
         set_tui_output(self._output_callback)
         set_tui_stream(self._stream_callback)
         set_write_approval_handler(self._make_approval_handler())
-
-        # 100ms ごとに AI バッファを Markdown ウィジェットへ反映する（Web チャットと同方式）
-        self.set_interval(0.1, self._tick_ai_stream)
 
         cfg = self._ctx["active_config"]
         cwd = self._ctx["agent"].cwd
@@ -246,46 +235,28 @@ class MimicApp(App):
             inp.disabled    = True
             inp.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
 
-    # ── AI レスポンスストリーム（Markdown.update() 方式） ─────────────
+    # ── AI レスポンスストリーム（RichLog に直接書き込む方式） ──────────
 
     def _stream_callback(self, text: str) -> None:
-        """PipelineTypewriter から生 Markdown テキストが来る（どのスレッドからでも安全）。
-        バッファに追記するだけ。実際の Markdown.update() は _tick_ai_stream() が行う。
+        """PipelineTypewriter から生 Markdown テキストが来る（ワーカースレッドから呼ばれる）。
+        _flush_raw() が完結行/ブロック単位でバッファするので、
+        ここでは RichMarkdown として RichLog に直接書く。
+        ツール実行と AI レスポンスが同じログに時系列で流れる。
         """
-        with self._ai_buf_lock:
-            self._ai_buf += text
-
-    def _tick_ai_stream(self) -> None:
-        """100ms ごとにバッファ全体で Markdown ウィジェットを更新する（メインスレッド）。
-        Web チャットアプリと同じ仕組み: 毎フレーム全文を再パースして差分更新する。
-        """
-        with self._ai_buf_lock:
-            text = self._ai_buf
-        if not text:
+        if not text or not text.strip():
             return
+        if self._log is None:
+            return
+        rich_md = RichMarkdown(text)
         try:
-            self.query_one("#ai-stream", Markdown).update(text)
+            self.call_from_thread(self._log.write, rich_md)
+        except RuntimeError:
+            try:
+                self._log.write(rich_md)
+            except Exception:
+                pass
         except Exception:
             pass
-
-    def _bake_ai_response(self) -> None:
-        """AI レスポンス完了時に Markdown ウィジェットの内容を RichLog に焼き込んで履歴に残す。
-        焼き込みには rich.markdown.Markdown を使い、RichLog が正式にレンダリングする。
-        """
-        with self._ai_buf_lock:
-            text = self._ai_buf
-            self._ai_buf = ""
-        if not text or self._log is None:
-            return
-        # 最終状態で Markdown ウィジェットを更新してから RichLog に移す
-        try:
-            self.query_one("#ai-stream", Markdown).update("")
-        except Exception:
-            pass
-        try:
-            self._log.write(RichMarkdown(text))
-        except Exception:
-            self._log.write(Text.from_ansi(text))
 
     # ── キーバインド・アクション ──────────────────────────────────────
 
@@ -533,9 +504,6 @@ class MimicApp(App):
 
     def _start_agent(self, user_input: str) -> None:
         self._agent_busy = True
-        # AI バッファをクリアして新しいレスポンス受け取り準備
-        with self._ai_buf_lock:
-            self._ai_buf = ""
         inp = self.query_one("#user-input", Input)
         inp.disabled    = True
         inp.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
@@ -547,8 +515,7 @@ class MimicApp(App):
     def _on_agent_done(self) -> None:
         self._agent_busy       = False
         self._worker_thread_id = None
-        self._flush_output_buf()       # 未完行バッファを書き出す
-        self._bake_ai_response()       # AI レスポンスを RichLog に焼き込む
+        self._flush_output_buf()  # 未完行バッファを書き出す
         inp = self.query_one("#user-input", Input)
         inp.disabled    = False
         inp.placeholder = "❯ メッセージを入力  (/help でコマンド一覧)"
