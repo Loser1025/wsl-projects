@@ -27,20 +27,20 @@ class MimicApp(App):
 
     CSS = """
     Screen {
-        background: #080808;
+        background: transparent;
     }
 
     RichLog {
         height: 1fr;
-        background: #0a0a0a;
+        background: transparent;
         border: none;
         padding: 0 1;
-        scrollbar-color: #00a02d #080808;
+        scrollbar-color: #00a02d transparent;
     }
 
     #input-bar {
         height: 3;
-        background: #0d0d0d;
+        background: transparent;
         border-top: solid #00a02d;
         padding: 0 1;
         align: left middle;
@@ -49,7 +49,7 @@ class MimicApp(App):
     Input {
         width: 1fr;
         height: 1;
-        background: #0d0d0d;
+        background: transparent;
         color: #00ff41;
         border: none;
     }
@@ -59,13 +59,13 @@ class MimicApp(App):
     }
 
     Header {
-        background: #001800;
+        background: transparent;
         color: #00ff41;
         text-style: bold;
     }
 
     Footer {
-        background: #001800;
+        background: transparent;
         color: #00a02d;
     }
     """
@@ -222,9 +222,8 @@ class MimicApp(App):
                 return len(s)
 
             def flush(self_b) -> None:
-                if self_b._buf:
-                    app_ref._log_from_thread(self_b._buf)
-                    self_b._buf = ""
+                # 部分行は送らない。\n が来たときだけ _log_from_thread に渡す。
+                # finally ブロックで残余バッファを明示的にフラッシュする。
                 try:
                     original_stdout.flush()
                 except Exception:
@@ -241,7 +240,8 @@ class MimicApp(App):
 
         # PipelineTypewriter のアニメーション無効 (auto_mode=True → 直接 stdout 書き込み)
         self._orch._auto_mode = True
-        sys.stdout = _TuiLineBuffer()
+        tui_buf = _TuiLineBuffer()
+        sys.stdout = tui_buf
 
         try:
             self._orch.run_react(user_input)
@@ -256,10 +256,10 @@ class MimicApp(App):
                 f"\033[38;2;0;200;100m{traceback.format_exc()}\033[0m\n"
             )
         finally:
-            try:
-                sys.stdout.flush()
-            except Exception:
-                pass
+            # \n なしで終わった末尾行を明示的に書き出す
+            if tui_buf._buf:
+                app_ref._log_from_thread(tui_buf._buf + "\n")
+                tui_buf._buf = ""
             sys.stdout = original_stdout
             self._orch._auto_mode = False
             self._log_from_thread("\n")
