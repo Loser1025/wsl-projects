@@ -617,13 +617,23 @@ class PipelineTypewriter:
 
     def _run(self):
         delay = 1.0 / self._CHARS_PER_SEC
+        line_buf = ""
         while not self._done or self._disp_q:
             if self._disp_q:
-                sys.stdout.write(self._disp_q.popleft())
-                sys.stdout.flush()
-                time.sleep(delay)
+                ch = self._disp_q.popleft()
+                if _tui_print_fn is not None:
+                    line_buf += ch
+                    if ch == "\n" or len(line_buf) > 200:
+                        _tui_print_fn(line_buf.rstrip("\n"))
+                        line_buf = ""
+                else:
+                    sys.stdout.write(ch)
+                    sys.stdout.flush()
+                    time.sleep(delay)
             else:
                 time.sleep(0.002)
+        if line_buf and _tui_print_fn is not None:
+            _tui_print_fn(line_buf.rstrip("\n"))
 
     def start(self):
         if self._auto_mode:
@@ -636,8 +646,11 @@ class PipelineTypewriter:
             return
         self._full.append(chunk)
         if self._auto_mode:
-            sys.stdout.write(chunk)
-            sys.stdout.flush()
+            if _tui_print_fn is not None:
+                _tui_print_fn(chunk)
+            else:
+                sys.stdout.write(chunk)
+                sys.stdout.flush()
             return
         with self._lock:
             segments = self._think_aware.push(chunk)

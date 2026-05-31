@@ -1,73 +1,164 @@
 """
-mimic_tui — Textual TUI アプリ本体 (Phase 1)
+mimic_tui — Textual TUI アプリ本体 (Phase 3)
 
-基本的なチャットUI:
-  - Header（タイトル）
-  - ScrollableContainer（チャットログ）
-  - Input（プロンプト）
-  - Footer（キーバインド表示）
+チャットUI + エージェント統合:
+  - Header / Footer
+  - ScrollableContainer（チャットログ — ツール呼び出し・思考・最終回答）
+  - Input（プロンプト + スラッシュコマンド）
+  - worker thread で agent.run() を非同期実行
 """
 from __future__ import annotations
 
 import asyncio
+import threading
 from typing import Optional
 from datetime import datetime
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import ScrollableContainer
-from textual.widgets import Header, Footer, Input, Static, Label
+from textual.widgets import Header, Footer, Input, Static
 from textual.css.query import NoMatches
-from textual import events
 
+
+# ──────────────────────────────────────────────────────────────
+# UI 部品
+# ──────────────────────────────────────────────────────────────
 
 class ChatLog(ScrollableContainer):
     """チャットメッセージを表示するスクロール可能なコンテナ。"""
 
     def add_message(self, text: str, role: str = "assistant") -> None:
-        """メッセージを追加して自動スクロール。"""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        prefix = {"user": "👤", "assistant": "🤖", "system": "⚙️"}.get(role, "?")
-        colors = {
-            "user": "cyan",
-            "assistant": "green",
-            "system": "yellow",
+        style_map = {
+            "user":      ("👤", "cyan"),
+            "assistant": ("🤖", "green"),
+            "system":    ("⚙️", "yellow"),
+            "tool":      ("🔧", "magenta"),
+            "thinking":  ("💭", "#a0a0a0"),
         }
-        color = colors.get(role, "white")
+        prefix, color = style_map.get(role, ("?", "white"))
+        # 複数行メッセージ対応: 各行にスタイルを適用
+        formatted_lines = "\n".join(
+            f"[{color}]{line}[/]" for line in text.splitlines()
+        )
         msg = Static(
-            f"[{color}]{timestamp} {prefix} {text}[/]",
+            f"[#666666]{timestamp}[/] {prefix} {formatted_lines}",
             classes=f"chat-msg chat-{role}",
         )
         self.mount(msg)
         self.scroll_end(animate=False)
 
 
-class StatusBar(Static):
-    """画面上部（Header直下）に簡易ステータスを表示。"""
+# ──────────────────────────────────────────────────────────────
+# エージェント初期化
+# ──────────────────────────────────────────────────────────────
 
-    def __init__(self) -> None:
-        super().__init__("準備完了 | Phase 1", id="status-bar")
-        self.styles.background = "#1e1e2e"
-        self.styles.color = "#cdd6f4"
-        self.styles.height = 1
-        self.styles.padding = (0, 1)
+def _create_agent():
+    """
+    mimic_linux __main__.main() と同じ手順でエージェントを初期化して返す。
+    (tmux なし, モデルは .env の優先順位で自動選択)
+    """
+    import os
+    import logging
+    from pathlib import Path
 
-    def update_status(self, text: str) -> None:
-        self.update(text)
+    base_dir = str(Path(__file__).parent)
 
+    from .utils import set_log_sink
+    from .commands import register_search_command, register_sessions_command
+    from .tools import set_sessions_dir, tools as _base_tools
+    from . import config as _cfg
+    from .config import load_config
+    from .agent import OpenRouterAgent, AccountRotator
+    from .autogit import AutoGit
+    from .orchestrator import InteractiveOrchestrator, AgentOrchestrator, BASH_EXECUTOR_GUIDANCE, REACT_SYSTEM_PROMPT
+    from .monitoring import MonitoringToolRegistry, ToolCallLog
+
+    # ログの stdout 出力を抑制（TUI が崩れるのを防ぐ）
+    logging.getLogger("openrouter_agent").handlers = [
+        h for h in logging.getLogger("openrouter_agent").handlers
+        if not isinstance(h, logging.StreamHandler)
+        or isinstance(h, logging.FileHandler)
+    ]
+
+    or_config, gemini_config, mistral_config, system_prompt = load_config(base_dir)
+    active_config = or_config or gemini_config or mistral_config
+    if active_config is None:
+        raise RuntimeError(
+            "モデル設定が見つかりません。.env を確認してください。"
+        )
+
+    # セッションログ用ディレクトリ
+    sessions_dir = Path(__file__).parent / ".mimic" / "sessions"
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+
+    # ツール監視レジストリ
+    tool_log = ToolCallLog()
+
+    def _inline_display(record):
+        """ツール完了後にログへ記録する（出力はチャットで行うため表示しない）。"""
+        pass  # TUI 側でチャットログに表示する
+
+    mon_tools = MonitoringToolRegistry(
+        base=_base_tools,
+        log=tool_log,
+        display_fn=_inline_display,
+    )
+
+    rotator = AccountRotator(active_config)
+    agent = OpenRouterAgent(rotator, mon_tools)
+    auto_git = AutoGit()
+    orchestrator = AgentOrchestrator(rotator, mon_tools, executor=agent)
+
+    # CWD 設定
+    mimic_cwd = os.environ.get("MIMIC_CWD")
+    if mimic_cwd and Path(mimic_cwd).exists():
+        agent.cwd = str(Path(mimic_cwd).resolve())
+    elif _cfg._DEFAULT_CWD and Path(_cfg._DEFAULT_CWD).exists():
+        agent.cwd = str(Path(_cfg._DEFAULT_CWD).resolve())
+
+    # システムプロンプト
+    plan_prompt = (system_prompt or "") + BASH_EXECUTOR_GUIDANCE
+    react_prompt = plan_prompt + REACT_SYSTEM_PROMPT
+    agent.set_system_prompt(react_prompt)
+    orchestrator.set_executor_system_prompt(plan_prompt)
+    interactive_orch = InteractiveOrchestrator(agent, auto_git)
+
+    # セッションログ
+    from datetime import datetime as _dt
+    _jsonl_path = sessions_dir / f"{_dt.now().strftime('%Y-%m-%d_%H-%M')}.jsonl"
+    interactive_orch.react_log.set_jsonl_path(_jsonl_path)
+    interactive_orch.react_log.add(
+        "session_start",
+        model=active_config.model,
+        provider=active_config.name,
+        cwd=agent.cwd,
+    )
+    set_log_sink(
+        lambda level, msg: interactive_orch.react_log.add(
+            "system_event", level=level, content=msg
+        )
+    )
+    register_search_command(lambda: sessions_dir)
+    register_sessions_command(lambda: sessions_dir)
+    set_sessions_dir(sessions_dir)
+
+    return agent, active_config, sessions_dir, tool_log
+
+
+# ──────────────────────────────────────────────────────────────
+# メインアプリ
+# ──────────────────────────────────────────────────────────────
 
 class MimicApp(App):
-    """Textual TUI メインアプリ。"""
+    """Textual TUI メインアプリ (Phase 3)。"""
 
     TITLE = "mimic_tui"
+
     CSS = """
     Screen {
         layers: base overlay;
-    }
-
-    #status-bar {
-        dock: top;
-        height: 1;
     }
 
     #chat-log {
@@ -79,6 +170,7 @@ class MimicApp(App):
     .chat-msg {
         height: auto;
         margin-bottom: 0;
+        padding: 0 0;
     }
 
     #input-container {
@@ -103,13 +195,14 @@ class MimicApp(App):
 
     def __init__(self) -> None:
         super().__init__()
-        self._status: Optional[StatusBar] = None
         self._chat_log: Optional[ChatLog] = None
+        self._agent = None
+        self._config = None
+        self._busy = False
+        self._tool_call_count = 0
 
     def compose(self) -> ComposeResult:
         yield Header()
-        self._status = StatusBar()
-        yield self._status
         self._chat_log = ChatLog(id="chat-log")
         yield self._chat_log
         yield Input(placeholder="メッセージを入力... (Ctrl+C で終了)", id="chat-input")
@@ -117,8 +210,33 @@ class MimicApp(App):
 
     def on_mount(self) -> None:
         if self._chat_log:
-            self._chat_log.add_message("mimic_tui へようこそ！（Phase 1）", role="system")
-            self._chat_log.add_message("Ctrl+C または /exit で終了します。", role="system")
+            self._chat_log.add_message("mimic_tui へようこそ！（Phase 3）", role="system")
+
+        # エージェント初期化（少し時間がかかるので非同期で進捗表示）
+        self._chat_log.add_message("エージェントを初期化中...", role="system") if self._chat_log else None
+        self.call_later(self._init_agent)
+
+    def _init_agent(self) -> None:
+        try:
+            agent, config, sessions_dir, tool_log = _create_agent()
+            self._agent = agent
+            self._config = config
+            if self._chat_log:
+                self._chat_log.add_message(
+                    f"[{config.name}] モデル: {config.model}",
+                    role="system",
+                )
+                self._chat_log.add_message(
+                    "準備完了！質問を入力してください。",
+                    role="system",
+                )
+        except Exception as e:
+            if self._chat_log:
+                self._chat_log.add_message(
+                    f"初期化エラー: {e}",
+                    role="system",
+                )
+
         try:
             input_widget = self.query_one("#chat-input", Input)
             input_widget.focus()
@@ -131,7 +249,6 @@ class MimicApp(App):
             event.input.value = ""
             return
 
-        # ユーザーメッセージ表示
         if self._chat_log:
             self._chat_log.add_message(text, role="user")
 
@@ -150,17 +267,79 @@ class MimicApp(App):
             event.input.value = ""
             return
 
-        # Phase 1: エコー応答
-        if self._chat_log:
-            self._chat_log.add_message(
-                f"（ダミー応答）受信: {text}", role="assistant"
-            )
+        if text == "/status":
+            self._show_status()
+            event.input.value = ""
+            return
 
+        if text.startswith("/mode"):
+            self._show_mode_info(text)
+            event.input.value = ""
+            return
+
+        # エージェントが初期化済みか確認
+        if self._agent is None or self._busy:
+            if self._chat_log:
+                self._chat_log.add_message(
+                    "エージェント初期化中または処理中です。お待ちください。",
+                    role="system",
+                )
+            event.input.value = ""
+            return
+
+        # 非同期で agent.run() を実行
+        self._busy = True
+        self._tool_call_count = 0
+        if self._chat_log:
+            self._chat_log.add_message("🤔 考え中...", role="thinking")
+
+        worker = threading.Thread(
+            target=self._run_agent_worker,
+            args=(text,),
+            daemon=True,
+        )
+        worker.start()
         event.input.value = ""
+
+    # ── worker スレッド ──────────────────────────────────────
+
+    def _run_agent_worker(self, user_message: str) -> None:
+        """バックグラウンドスレッドで agent.run() を実行。"""
+        try:
+            result = self._agent.run(user_message)
+            # メインスレッドでUI更新
+            self.call_from_thread(self._on_agent_done, result, None)
+        except Exception as e:
+            self.call_from_thread(self._on_agent_done, None, e)
+
+    def _on_agent_done(self, result: Optional[str], error: Optional[Exception]) -> None:
+        """agent.run() 完了コールバック（メインスレッド）。"""
+        self._busy = False
+        if self._chat_log:
+            # 「考え中...」メッセージを消す（最後の thinking メッセージを削除）
+            # Phase 5 でダイアログ対応するので Phase 3 は暫定的に結果を表示
+            if error:
+                self._chat_log.add_message(
+                    f"エラー: {error}", role="system"
+                )
+            elif result:
+                # 「考え中...」の行を消す: 最後の Static(widget) を特定して削除
+                children = list(self._chat_log.children)
+                if children and hasattr(children[-1], "classes"):
+                    pass  # Phase 5 で精致に対応
+                self._chat_log.add_message(result, role="assistant")
+            else:
+                self._chat_log.add_message(
+                    "（応答なし — 結果が空でした）", role="system"
+                )
+
+    # ── スラッシュコマンド ────────────────────────────────────
 
     def action_clear_chat(self) -> None:
         if self._chat_log:
-            self._chat_log.remove_children()
+            # チャットをクリア（会話履歴もリセットしない — Phase 4 で対応）
+            for child in list(self._chat_log.children):
+                child.remove()
             self._chat_log.add_message("チャットをクリアしました。", role="system")
 
     def action_scroll_up(self) -> None:
@@ -171,16 +350,13 @@ class MimicApp(App):
         if self._chat_log:
             self._chat_log.scroll_page_down(animate=False)
 
-    # Textual ページスクロール用アップデート
-    def action_scroll_up(self) -> None:
-        if self._chat_log:
-            self._chat_log.scroll_page_up(animate=False)
-
     def _show_help(self) -> None:
         help_lines = [
             "📖 コマンド一覧",
             "  /exit, /quit — アプリ終了",
             "  /clear — チャットクリア",
+            "  /status — モデル・設定を表示",
+            "  /mode interactive|plan — モード切替情報",
             "  /help — このヘルプを表示",
             "",
             "⌨️  キーバインド",
@@ -191,6 +367,34 @@ class MimicApp(App):
         if self._chat_log:
             for line in help_lines:
                 self._chat_log.add_message(line, role="system")
+
+    def _show_status(self) -> None:
+        if self._config is None:
+            if self._chat_log:
+                self._chat_log.add_message("エージェントが初期化されていません。", role="system")
+            return
+        if self._chat_log:
+            self._chat_log.add_message(
+                f"プロバイダー: {self._config.name}", role="system"
+            )
+            self._chat_log.add_message(
+                f"モデル: {self._config.model}", role="system"
+            )
+            self._chat_log.add_message(
+                f"APIキー数: {len(self._config.api_keys)}", role="system"
+            )
+
+    def _show_mode_info(self, text: str) -> None:
+        modes = text.split()[1:] if len(text.split()) > 1 else []
+        if modes and modes[0] in ("interactive", "plan"):
+            mode = modes[0]
+            if self._chat_log:
+                self._chat_log.add_message(f"モードを「{mode}」に切り替えました。（Phase 4 で正式対応）", role="system")
+        else:
+            if self._chat_log:
+                self._chat_log.add_message(
+                    "使い方: /mode interactive|plan", role="system"
+                )
 
 
 if __name__ == "__main__":
