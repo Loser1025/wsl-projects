@@ -19,8 +19,9 @@ from datetime import datetime
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import ScrollableContainer
-from textual.widgets import Header, Footer, Input, Static
+from textual.widgets import Header, Footer, Input, Static, OptionList, Button, Label
 from textual.css.query import NoMatches
+from textual.screen import ModalScreen
 
 
 # ──────────────────────────────────────────────────────────────
