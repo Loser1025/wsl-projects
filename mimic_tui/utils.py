@@ -19,26 +19,10 @@ from datetime import datetime, timedelta, timezone
 
 
 _print_lock = threading.Lock()
-_tui_print_fn: "Optional[Any]" = None
-
-
-def set_tui_print_fn(fn) -> None:
-    global _tui_print_fn
-    _tui_print_fn = fn
-
 
 def safe_print(*args, **kwargs):
-    """複数スレッドからの出力が混ざらないようロック制御する print。
-    TUI モード時は _tui_print_fn にリダイレクトする。"""
-    sep = kwargs.get("sep", " ")
-    text = sep.join(str(a) for a in args)
+    """複数スレッドからの出力が混ざらないようロック制御する print"""
     with _print_lock:
-        if _tui_print_fn is not None:
-            try:
-                _tui_print_fn(text)
-                return
-            except Exception:
-                pass
         print(*args, **kwargs)
 
 def _try_read_file_text(path: Path) -> str:
