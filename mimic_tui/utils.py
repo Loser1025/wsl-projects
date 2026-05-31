@@ -266,31 +266,46 @@ def render_markdown_thinker(text: str) -> str:
 
 def get_ascii_art_str(subtitle: str = "") -> str:
     """ASCII アートを ANSI コード付き文字列として返す。TUI の Static ウィジェット用。
-    標準 figlet フォントで "MIMIC" の文字を上から下へ green→aqua グラデーション。
+    pyfiglet の ansi_shadow フォント（ボックス線文字のみ、文字化けなし）を使用。
+    Razer グリーン基調のグラデーション。pyfiglet がなければフォールバック。
     """
-    # 上から下へ green → teal → electric aqua のグラデーション
-    G0 = "\033[38;2;0;255;65m"    # Razer Neon Green
-    G1 = "\033[38;2;0;255;120m"   # Green-Teal
-    G2 = "\033[38;2;0;255;180m"   # Teal
-    G3 = "\033[38;2;0;242;218m"   # Cyan-Green
-    G4 = "\033[38;2;0;230;255m"   # Electric Aqua
-    DIM = "\033[38;2;0;80;80m"    # 暗いティール（セパレーター）
+    try:
+        import pyfiglet
+        raw   = pyfiglet.figlet_format("MIMIC", font="ansi_shadow")
+        body  = [l for l in raw.split("\n") if l.strip()]
+    except ImportError:
+        body = [
+            "███╗   ███╗██╗███╗   ███╗██╗ ██████╗",
+            "████╗ ████║██║████╗ ████║██║██╔════╝",
+            "██╔████╔██║██║██╔████╔██║██║██║     ",
+            "██║╚██╔╝██║██║██║╚██╔╝██║██║██║     ",
+            "██║ ╚═╝ ██║██║██║ ╚═╝ ██║██║╚██████╗",
+            "╚═╝     ╚═╝╚═╝╚═╝     ╚═╝╚═╝ ╚═════╝",
+        ]
+
+    # Razer グリーン → ティール → エレクトリックアクア グラデーション
+    COLORS = [
+        "\033[38;2;0;255;65m",    # Razer Neon Green
+        "\033[38;2;0;255;120m",   # Green-Teal
+        "\033[38;2;0;255;180m",   # Teal
+        "\033[38;2;0;242;218m",   # Cyan-Green
+        "\033[38;2;0;230;255m",   # Electric Aqua
+        "\033[38;2;80;215;255m",  # Sky Aqua
+    ]
+    DIM = "\033[38;2;0;80;80m"
     BLD = "\033[1m"
     R   = C.RESET
 
-    # M=8, I=5, M=8, I=5, C=7 各文字の4行 (標準 figlet フォント)
-    SEP = f"{DIM} {'─' * 43}{R}"
-    sub = f"{BLD}{G4} {subtitle or 'THE HYBRID AI AGENT'}{R}"
+    n = len(COLORS)
+    art_lines = [
+        f"{BLD}{COLORS[min(i, n-1)]}{line}{R}"
+        for i, line in enumerate(body)
+    ]
 
-    return (
-        f"{G0}  __  __  ___  __  __  ___   ___ {R}\n"
-        f"{G1} |  \\/  ||_ _||  \\/  ||_ _| / __|{R}\n"
-        f"{G2} | |\\/| | | | | |\\/| | | | | (__ {R}\n"
-        f"{G3} |_|  |_||___|_|  |_||___|  \\___|{R}\n"
-        f"{SEP}\n"
-        f"{sub}\n"
-        f"{SEP}"
-    )
+    SEP = f"{DIM} {'─' * 50}{R}"
+    sub = f"{BLD}{COLORS[-1]} {subtitle or 'THE HYBRID AI AGENT'}{R}"
+
+    return "\n".join(art_lines) + f"\n{SEP}\n{sub}\n{SEP}"
 
 
 def print_ascii_art():

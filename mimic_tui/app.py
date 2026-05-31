@@ -23,7 +23,7 @@ class MimicApp(App):
 
     CSS = """
     Screen     { layout: vertical; background: #050f05; }
-    #title-art { height: 7; background: #050f05; padding: 0 0; overflow-x: hidden; }
+    #title-art { height: 9; background: #050f05; padding: 0 0; overflow-x: hidden; }
     #chat-log  { height: 1fr; border: solid #00a02d; background: #050f05;
                  scrollbar-color: #00ff41; padding: 0 1; }
     #input-bar { height: 3; border: solid #00ff41; padding: 0 1; }
@@ -151,10 +151,23 @@ class MimicApp(App):
             return
         lines = text.split("\n")
         for i, line in enumerate(lines):
-            # 最後の要素が空文字（末尾の \n）の場合はスキップ
             if i == len(lines) - 1 and line == "":
                 break
             self._log.write(Text.from_ansi(line))
+
+    def _write_user_message(self, text: str) -> None:
+        """ユーザー発言を金色ラベル＋太字でログに書く。AI出力の緑系と対比させる。"""
+        if self._log is None:
+            return
+        # 空行（区切り）
+        self._log.write(Text(""))
+        # ラベル行: 金色の "❯ You" + 太字白のメッセージ
+        t = Text()
+        t.append("  ❯ ", style="bold #ffd700")    # 金色の矢印
+        t.append("You: ", style="bold #ffd700")    # 金色ラベル
+        t.append(text, style="bold #f0f0f0")       # 明るいグレー白
+        self._log.write(t)
+        self._log.write(Text(""))
 
     # ── 書き込み承認（元の mimic_linux と同じテキストベース） ────────────
 
@@ -350,7 +363,7 @@ class MimicApp(App):
             self._write_direct("⚠ エージェント実行中です。Ctrl+C で中断できます。\n")
             return
 
-        self._write_direct(f"\n⚡ ❯ {text}\n")
+        self._write_user_message(text)
         self._start_agent(text)
 
     # ── コマンド処理 ──────────────────────────────────────────────────
