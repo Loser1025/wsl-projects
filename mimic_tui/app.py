@@ -446,6 +446,191 @@ class MimicApp(App):
                 )
 
 
+    # ── Phase 4 コマンド実装 ───────────────────────────────
+
+    def _cmd_status(self) -> None:
+        if self._config is None:
+            self._chat_log.add_message("エージェントが初期化されていません。", role="system") if self._chat_log else None
+            return
+        log = self._chat_log
+        log.add_message("📊 ステータス", role="system")
+        log.add_message(f"  プロバイダー : {self._config.name}", role="system")
+        log.add_message(f"  モデル       : {self._config.model}", role="system")
+        log.add_message(f"  APIキー数    : {len(self._config.api_keys)}", role="system")
+        if self._agent is not None:
+            log.add_message(f"  会話ターン数 : {len(self._agent.conversation)}", role="system")
+
+    def _cmd_stats(self) -> None:
+        if self._config is None:
+            return
+        sessions_dir = Path(__file__).parent / ".mimic" / "sessions"
+        jsonl_files = list(sessions_dir.glob("*.jsonl")) if sessions_dir.exists() else []
+        self._chat_log.add_message(
+            f"📊 ツール統計: セッションログ {len(jsonl_files)} 件",
+            role="system",
+        ) if self._chat_log else None
+
+    def _cmd_model(self, args: str) -> None:
+        if self._agent is None:
+            self._chat_log.add_message("エージェントが初期化されていません。", role="system") if self._chat_log else None
+            return
+        arg = args.strip()
+        if not arg:
+            self._chat_log.add_message(
+                f"現在のモデル: {self._config.model}\n"
+                "変更するには: /model <モデル名>",
+                role="system",
+            ) if self._chat_log else None
+            return
+        old = self._config.model
+        self._config.model = arg
+        self._agent.clear_history()
+        self._chat_log.add_message(
+            f"モデルを変更: {old} → {arg}（会話履歴リセット）",
+            role="system",
+        ) if self._chat_log else None
+
+    def _cmd_cd(self, args: str) -> None:
+        if self._agent is None:
+            self._chat_log.add_message("エージェントが初期化されていません。", role="system") if self._chat_log else None
+            return
+        if not args:
+            self._chat_log.add_message(
+                f"現在の作業フォルダ: {self._agent.cwd}",
+                role="system",
+            ) if self._chat_log else None
+            return
+        from pathlib import Path
+        new_path = args.strip().strip('"').strip("'")
+        expanded = str(Path(new_path).expanduser().resolve())
+        if Path(expanded).exists():
+            self._agent.set_cwd(expanded)
+            self._chat_log.add_message(f"作業フォルダを変更: {expanded}", role="system") if self._chat_log else None
+        else:
+            self._chat_log.add_message(f"フォルダが見つかりません: {expanded}", role="system") if self._chat_log else None
+
+    def _cmd_sessions(self, args: str) -> None:
+        from pathlib import Path
+        sessions_dir = Path(__file__).parent / ".mimic" / "sessions"
+        jsonl_files = sorted(sessions_dir.glob("*.jsonl"), reverse=True) if sessions_dir.exists() else []
+        if not jsonl_files:
+            self._chat_log.add_message("セッションログがまだありません。", role="system") if self._chat_log else None
+            return
+
+        arg = args.strip()
+        if not arg:
+            # 一覧表示
+            lines = ["📋 過去セッション一覧\n"]
+            for i, jf in enumerate(jsonl_files, 1):
+                try:
+                    content = jf.read_text(encoding="utf-8")
+                    turn_count = content.count('"user_input"')
+                    first_q = ""
+                    for line in content.splitlines():
+                        try:
+                            e = json.loads(line)
+                            if e.get("type") == "user_input":
+                                first_q = e.get("content", "")[:60].replace("\n", " ")
+                                break
+                        except Exception:
+                            continue
+                except Exception:
+                    turn_count = 0
+                    first_q = "(読込エラー)"
+                lines.append(f"  [{i:2d}] {jf.stem}  {turn_count}ターン  {first_q}")
+            self._chat_log.add_message("\n".join(lines), role="system") if self._chat_log else None
+        elif arg.isdigit():
+            idx = int(arg) - 1
+            if 0 <= idx < len(jsonl_files):
+                self._show_session_detail(jsonl_files[idx])
+            else:
+                self._chat_log.add_message(f"番号 {arg} は範囲外です（1〜{len(jsonl_files)}）。", role="system") if self._chat_log else None
+
+    def _show_session_detail(self, jf) -> None:
+        import json
+        from pathlib import Path
+        try:
+            lines = jf.read_text(encoding="utf-8").splitlines()
+        except Exception as e:
+            self._chat_log.add_message(f"読込エラー: {e}", role="system") if self._chat_log else None
+            return
+
+        entries = [json.loads(l) for l in lines if l.strip()]
+        out = [f"📋 セッション詳細  {jf.stem}\n"]
+        turn = 0
+        for e in entries:
+            t = e.get("type", "")
+            if t == "user_input":
+                turn += 1
+                out.append(f"── Turn {turn} ({e.get('ts', '')}) ──")
+                out.append(f"User: {e.get('content', '')[:200]}")
+            elif t == "tool_call":
+                out.append(f"  🔧 {e.get('tool', '?')}: {str(e.get('content', ''))[:100]}")
+            elif t == "final_answer":
+                out.append(f"  🤖 {e.get('content', '')[:300]}")
+        self._chat_log.add_message("\n".join(out), role="system") if self._chat_log else None
+
+    def _cmd_search(self, args: str) -> None:
+        if not args:
+            self._chat_log.add_message("使い方: /search <検索ワード>", role="system") if self._chat_log else None
+            return
+        from pathlib import Path
+        import json
+        sessions_dir = Path(__file__).parent / ".mimic" / "sessions"
+        jsonl_files = sorted(sessions_dir.glob("*.jsonl"), reverse=True) if sessions_dir.exists() else []
+        q = args.lower()
+        hits = []
+        for jf in jsonl_files:
+            try:
+                lines = jf.read_text(encoding="utf-8").splitlines()
+                entries = [json.loads(l) for l in lines if l.strip()]
+            except Exception:
+                continue
+            for i, e in enumerate(entries):
+                if e.get("type") == "user_input":
+                    user_text = e.get("content", "")
+                    answer_text = ""
+                    for j in range(i + 1, len(entries)):
+                        if entries[j].get("type") == "final_answer":
+                            answer_text = entries[j].get("content", "")
+                            break
+                    if q in user_text.lower() or q in answer_text.lower():
+                        hits.append((jf.stem, user_text[:100], answer_text[:150]))
+                        break
+            if len(hits) >= 5:
+                break
+        if not hits:
+            self._chat_log.add_message(f"「{args}」に一致するログは見つかりませんでした。", role="system") if self._chat_log else None
+            return
+        out = [f"🔍 「{args}」— {len(hits)}件ヒット\n"]
+        for i, (fname, user, answer) in enumerate(hits, 1):
+            out.append(f"  [{i}] {fname}")
+            out.append(f"      User: {user}")
+            if answer:
+                out.append(f"      Result: {answer}")
+        self._chat_log.add_message("\n".join(out), role="system") if self._chat_log else None
+
+    def _cmd_undo(self) -> None:
+        if self._agent is None:
+            self._chat_log.add_message("エージェントが初期化されていません。", role="system") if self._chat_log else None
+            return
+        conv = self._agent.conversation
+        # 最後の assistant + user ターンを削除
+        removed = 0
+        while conv and conv[-1].get("role") in ("assistant", "tool"):
+            conv.pop()
+            removed += 1
+        if conv and conv[-1].get("role") == "user":
+            conv.pop()
+            removed += 1
+        self._chat_log.add_message(f"直前ターンを undo しまさした（{removed}メッセージ削除）。", role="system") if self._chat_log else None
+
+    def _cmd_scratchpad(self) -> None:
+        from .utils import get_scratchpad
+        content = get_scratchpad()
+        self._chat_log.add_message(f"📝 Scratchpad:\n{content}", role="system") if self._chat_log else None
+
+
 if __name__ == "__main__":
     app = MimicApp()
     app.run()
