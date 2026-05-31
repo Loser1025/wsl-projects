@@ -22,13 +22,13 @@ class MimicApp(App):
     TITLE = "mimic_claude"
 
     CSS = """
-    Screen     { layout: vertical; background: #050f05; }
-    #title-art { height: 9; background: #050f05; padding: 0 0; overflow-x: hidden; }
-    #chat-log  { height: 1fr; border: solid #00a02d; background: #050f05;
+    Screen     { layout: vertical; background: ansi_default; }
+    #title-art { height: 9; background: ansi_default; padding: 0 0; overflow-x: hidden; }
+    #chat-log  { height: 1fr; border: solid #00a02d; background: ansi_default;
                  scrollbar-color: #00ff41; padding: 0 1; }
     #input-bar { height: 3; border: solid #00ff41; padding: 0 1; }
-    Input      { background: #050f05; color: #ffffff; border: none; }
-    Footer     { background: #050f05; color: #00c864; }
+    Input      { background: ansi_default; color: #ffffff; border: none; }
+    Footer     { background: ansi_default; color: #00c864; }
     """
 
     BINDINGS = [
@@ -156,17 +156,18 @@ class MimicApp(App):
             self._log.write(Text.from_ansi(line))
 
     def _write_user_message(self, text: str) -> None:
-        """ユーザー発言を金色ラベル＋太字でログに書く。AI出力の緑系と対比させる。"""
+        """ユーザー発言を最大輝度グリーンで目立たせる。"""
         if self._log is None:
             return
-        # 空行（区切り）
         self._log.write(Text(""))
-        # ラベル行: 金色の "❯ You" + 太字白のメッセージ
-        t = Text()
-        t.append("  ❯ ", style="bold #ffd700")    # 金色の矢印
-        t.append("You: ", style="bold #ffd700")    # 金色ラベル
-        t.append(text, style="bold #f0f0f0")       # 明るいグレー白
-        self._log.write(t)
+        # ラベル行
+        label = Text()
+        label.append("  ❯ You: ", style="bold #00ff41")   # Razer Neon Green
+        self._log.write(label)
+        # メッセージ全文を同色・太字・大きく
+        msg = Text()
+        msg.append(f"  {text}", style="bold #00ff41")
+        self._log.write(msg)
         self._log.write(Text(""))
 
     # ── 書き込み承認（元の mimic_linux と同じテキストベース） ────────────
