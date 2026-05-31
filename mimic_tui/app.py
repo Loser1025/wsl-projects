@@ -267,12 +267,61 @@ class MimicApp(App):
             event.input.value = ""
             return
 
-        if text == "/status":
-            self._show_status()
+        # ── スラッシュコマンド（Phase 4）──────────────────
+        cmd = text.split()[0].lower()
+        cmd_args = text[len(cmd):].strip()
+
+        if cmd == "/status":
+            self._cmd_status()
             event.input.value = ""
             return
 
-        if text.startswith("/mode"):
+        if cmd == "/stats":
+            self._cmd_stats()
+            event.input.value = ""
+            return
+
+        if cmd == "/clear":
+            # チャットクリア + 会話履歴リセット
+            self.action_clear_chat()
+            if self._agent is not None:
+                self._agent.clear_history()
+                if self._chat_log:
+                    self._chat_log.add_message("会話履歴もリセットしました。", role="system")
+            event.input.value = ""
+            return
+
+        if cmd == "/model":
+            self._cmd_model(cmd_args)
+            event.input.value = ""
+            return
+
+        if cmd == "/cd":
+            self._cmd_cd(cmd_args)
+            event.input.value = ""
+            return
+
+        if cmd == "/sessions":
+            self._cmd_sessions(cmd_args)
+            event.input.value = ""
+            return
+
+        if cmd == "/search":
+            self._cmd_search(cmd_args)
+            event.input.value = ""
+            return
+
+        if cmd == "/undo":
+            self._cmd_undo()
+            event.input.value = ""
+            return
+
+        if cmd == "/scratchpad":
+            self._cmd_scratchpad()
+            event.input.value = ""
+            return
+
+        if cmd.startswith("/mode"):
             self._show_mode_info(text)
             event.input.value = ""
             return

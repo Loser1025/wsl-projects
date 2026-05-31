@@ -270,8 +270,8 @@ class MimicApp(App):
         if self._sys_monitor:
             try:
                 snap = self._sys_monitor.snapshot()
-                parts.append(f"CPU:{snap.cpu_pct:.0f}%")
-                parts.append(f"MEM:{snap.mem_pct:.0f}%")
+                parts.append(f"CPU:{snap.cpu_percent:.0f}%")
+                parts.append(f"MEM:{snap.mem_percent:.0f}%")
             except Exception:
                 pass
         if self.tool_log:
