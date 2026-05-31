@@ -1,146 +1,16 @@
 """mimic_claude Textual TUI アプリ本体。"""
 from __future__ import annotations
 
-import asyncio
 import ctypes
-import queue
 import threading
-from typing import Optional
+from typing import Optional, Callable
 
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
-from textual.screen import ModalScreen
-from textual.widgets import Button, Footer, Header, Input, Label, RichLog, Static
-
-
-# ── 承認リクエスト用ヘルパー ──────────────────────────────────────────
-
-class _ApprovalReq:
-    """エージェントスレッドから書き込み承認を要求するためのオブジェクト。"""
-    def __init__(self, tool_name: str, args: dict, preview: str):
-        self.tool_name = tool_name
-        self.args      = args
-        self.preview   = preview
-        self._q: queue.Queue[bool] = queue.Queue(maxsize=1)
-
-    def respond(self, approved: bool) -> None:
-        self._q.put(approved)
-
-    def wait(self, timeout: float = 30.0) -> bool:
-        try:
-            return self._q.get(timeout=timeout)
-        except queue.Empty:
-            return True  # タイムアウト → 自動承認（元の動作と同様）
-
-
-# ── 書き込み承認ダイアログ ────────────────────────────────────────────
-
-class WriteApprovalModal(ModalScreen):
-    """ファイル書き込み確認ダイアログ。Y/n またはボタンで応答する。"""
-
-    DEFAULT_CSS = """
-    WriteApprovalModal { align: center middle; }
-    WriteApprovalModal > Vertical {
-        background: #0a1a0a; border: solid #00ff41;
-        padding: 1 2; width: 72; max-height: 32;
-    }
-    WriteApprovalModal .title  { text-style: bold; color: #00ff41; margin-bottom: 1; }
-    WriteApprovalModal .meta   { color: #00c864; }
-    WriteApprovalModal .preview-box {
-        color: #00c864; background: #050f05; border: solid #00a02d;
-        height: 12; overflow-y: auto; padding: 0 1; margin-top: 1;
-    }
-    WriteApprovalModal .buttons {
-        layout: horizontal; align: center middle; height: 3; margin-top: 1;
-    }
-    WriteApprovalModal Button { width: 14; margin: 0 1; }
-    """
-
-    BINDINGS = [
-        Binding("y",      "approve", "[Y] 承認", show=True),
-        Binding("n",      "reject",  "[n] 却下", show=True),
-        Binding("escape", "reject",  "Esc",       show=False),
-    ]
-
-    def __init__(self, req: _ApprovalReq):
-        super().__init__()
-        self._req = req
-
-    def compose(self) -> ComposeResult:
-        path    = self._req.args.get("path", "?")
-        preview = self._req.preview[:800] if self._req.preview else "(プレビューなし)"
-        with Vertical():
-            yield Label("書き込み確認", classes="title")
-            yield Label(f"ツール : {self._req.tool_name}", classes="meta")
-            yield Label(f"ファイル: {path}", classes="meta")
-            yield Static(preview, classes="preview-box")
-            with Vertical(classes="buttons"):
-                yield Button("承認 [Y]", id="yes", variant="success")
-                yield Button("拒否 [n]", id="no",  variant="error")
-
-    def action_approve(self) -> None:
-        self.dismiss(True)
-
-    def action_reject(self) -> None:
-        self.dismiss(False)
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        self.dismiss(event.button.id == "yes")
-
-
-# ── /search 注入選択ダイアログ ────────────────────────────────────────
-
-class SearchSelectionModal(ModalScreen):
-    """過去セッション検索の注入選択ダイアログ。元の CLI と同じ入力形式。"""
-
-    DEFAULT_CSS = """
-    SearchSelectionModal { align: center middle; }
-    SearchSelectionModal > Vertical {
-        background: #0a1a0a; border: solid #00ff41;
-        padding: 1 2; width: 76; max-height: 36;
-    }
-    SearchSelectionModal .title  { text-style: bold; color: #00ff41; margin-bottom: 1; }
-    SearchSelectionModal .hit    { color: #00c864; }
-    SearchSelectionModal .hint   { color: #00dcb4; margin-top: 1; }
-    SearchSelectionModal Input   { margin-top: 1; }
-    """
-
-    BINDINGS = [Binding("escape", "cancel", "キャンセル", show=True)]
-
-    def __init__(self, query: str, hits: list[dict]):
-        super().__init__()
-        self._query = query
-        self._hits  = hits
-
-    def compose(self) -> ComposeResult:
-        with Vertical():
-            yield Label(
-                f"🔍 「{self._query}」 — {len(self._hits)} 件ヒット",
-                classes="title",
-            )
-            for i, h in enumerate(self._hits, 1):
-                yield Label(f"  [{i}] {h['file']}  {h['ts']}", classes="hit")
-                yield Label(f"    Q: {h['user'][:80]}", classes="hit")
-                if h["result"]:
-                    yield Label(f"    A: {h['result'][:100]}", classes="hit")
-            yield Label(
-                "コンテキストに注入しますか？\n"
-                "  番号をカンマ区切り / all で全件 / Enter か n でキャンセル",
-                classes="hint",
-            )
-            yield Input(placeholder="例: 1,3  /  all  /  n", id="sel-input")
-
-    def on_mount(self) -> None:
-        self.query_one("#sel-input", Input).focus()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value.strip())
-
-    def action_cancel(self) -> None:
-        self.dismiss("")
+from textual.widgets import Footer, Header, Input, Label, RichLog
 
 
 # ── メインアプリ ──────────────────────────────────────────────────────
@@ -180,6 +50,8 @@ class MimicApp(App):
         # 行バッファ: RichLog.write() は1呼び出し=1行のため \n 単位で書く
         self._out_buf      = ""
         self._out_buf_lock = threading.Lock()
+        # 書き込み承認: エージェントスレッドが Y/n を待つためのコールバック
+        self._approval_callback: Optional[Callable[[str], None]] = None
 
     # ── 構成 ──────────────────────────────────────────────────────────
 
@@ -215,6 +87,25 @@ class MimicApp(App):
 
     # ── 出力コールバック ──────────────────────────────────────────────
 
+    def _safe_write_line(self, line: str) -> None:
+        """1行を RichLog に書く。メインスレッド・ワーカースレッド両方から安全に呼べる。
+        Textual 8.x では call_from_thread をメインスレッドから呼ぶと RuntimeError が
+        発生するため、その場合は直接 write() にフォールバックする。
+        """
+        if self._log is None:
+            return
+        rich_text = Text.from_ansi(line)
+        try:
+            self.call_from_thread(self._log.write, rich_text)
+        except RuntimeError:
+            # メインスレッド（イベントループ）からの呼び出し → 直接書く
+            try:
+                self._log.write(rich_text)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     def _output_callback(self, text: str) -> None:
         """safe_print / PipelineTypewriter から呼ばれる。どのスレッドからでも安全。
         RichLog.write() は 1 呼び出し = 1 行扱いなので \n 単位でバッファしてから書く。
@@ -224,24 +115,18 @@ class MimicApp(App):
         with self._out_buf_lock:
             self._out_buf += text
             lines = self._out_buf.split("\n")
-            self._out_buf = lines[-1]          # 末尾の未完行をバッファに残す
+            self._out_buf = lines[-1]  # 末尾の未完行をバッファに残す
             complete = lines[:-1]
         for line in complete:
-            try:
-                self.call_from_thread(self._log.write, Text.from_ansi(line))
-            except Exception:
-                pass
+            self._safe_write_line(line)
 
     def _flush_output_buf(self) -> None:
         """未完行バッファを強制フラッシュする（エージェント完了時に呼ぶ）。"""
         with self._out_buf_lock:
             remaining = self._out_buf
             self._out_buf = ""
-        if remaining and self._log:
-            try:
-                self.call_from_thread(self._log.write, Text.from_ansi(remaining))
-            except Exception:
-                pass
+        if remaining:
+            self._safe_write_line(remaining)
 
     def _write_direct(self, text: str) -> None:
         """メインスレッドから直接 RichLog に書く。複数行を適切に分割する。"""
@@ -254,26 +139,84 @@ class MimicApp(App):
                 break
             self._log.write(Text.from_ansi(line))
 
-    # ── 書き込み承認 ──────────────────────────────────────────────────
+    # ── 書き込み承認（元の mimic_linux と同じテキストベース） ────────────
+
+    _APPROVAL_TIMEOUT = 30  # 秒
 
     def _make_approval_handler(self):
-        """エージェントスレッドから呼ばれる書き込み承認ハンドラを返す。"""
+        """エージェントスレッドから呼ばれる書き込み承認ハンドラを返す。
+        元の interactive_loop の _react_approval_handler と同等の動作。
+        ダイアログの代わりにチャットログにプロンプトを表示し、
+        Input を一時解放して Y/n を受け取る。30秒で自動承認。
+        """
         app = self
 
         def handler(tool_name: str, args: dict, preview: str) -> bool:
-            req = _ApprovalReq(tool_name, args, preview)
-            app.call_from_thread(app._show_approval, req)
-            return req.wait(timeout=30)
+            from .utils import safe_print, C
+
+            path = args.get("path", "?")
+            safe_print(C.yellow(f"\n  ┌─ 書き込み確認 ──────────────────────────────────────"))
+            safe_print(C.yellow(f"  │  ツール : {tool_name}"))
+            safe_print(C.yellow(f"  │  ファイル: {path}"))
+            safe_print(C.yellow(f"  │"))
+            for line in (preview or "").splitlines()[:20]:
+                safe_print(C.gray(f"  │  {line}"))
+            safe_print(C.yellow(f"  └──────────────────────────────────────────────────────"))
+            safe_print(
+                C.bold_green(
+                    f"  実行しますか？ [Y/n] ({app._APPROVAL_TIMEOUT}秒で自動承認): "
+                ),
+                end="",
+            )
+
+            # Input を承認モードで一時解放
+            done   = threading.Event()
+            result = [True]
+
+            def on_response(resp: str) -> None:
+                result[0] = resp.strip().lower() in ("y", "")
+                done.set()
+
+            app.call_from_thread(app._enter_approval_mode, on_response)
+            timed_out = not done.wait(timeout=app._APPROVAL_TIMEOUT)
+
+            if timed_out:
+                safe_print(C.gray(f"\n  ⏱ {app._APPROVAL_TIMEOUT}秒経過 → 自動承認"))
+                result[0] = True
+                # タイムアウト時は承認モードを解除する
+                app.call_from_thread(app._exit_approval_mode)
+
+            if result[0]:
+                safe_print(C.green("  ✓ 承認しました"))
+            else:
+                safe_print(C.red("  ✗ 拒否しました（処理を中断します）"))
+            return result[0]
 
         return handler
 
-    def _show_approval(self, req: _ApprovalReq) -> None:
-        """メインスレッドで承認モーダルを表示し、結果を req に返す。"""
-        async def _push() -> None:
-            result = await self.push_screen_wait(WriteApprovalModal(req))
-            req.respond(bool(result))
+    def _enter_approval_mode(
+        self,
+        callback: Callable[[str], None],
+        placeholder: str = "",
+    ) -> None:
+        """メインスレッドで入力待ちモードに入る。Input を解放してユーザー入力を受け取れるようにする。
+        承認ハンドラ・/search 選択の両方で共用する。
+        """
+        self._approval_callback = callback
+        inp = self.query_one("#user-input", Input)
+        inp.disabled    = False
+        inp.placeholder = placeholder or (
+            f"Y/n を入力（Enter で承認・n で拒否・{self._APPROVAL_TIMEOUT}秒で自動承認）"
+        )
+        inp.focus()
 
-        asyncio.ensure_future(_push())
+    def _exit_approval_mode(self) -> None:
+        """タイムアウト時に承認モードを解除してエージェント実行中の状態に戻す。"""
+        self._approval_callback = None
+        if self._agent_busy:
+            inp = self.query_one("#user-input", Input)
+            inp.disabled    = True
+            inp.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
 
     # ── キーバインド・アクション ──────────────────────────────────────
 
@@ -334,6 +277,22 @@ class MimicApp(App):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         text = event.value.strip()
         event.input.clear()
+
+        # ── 承認 / 選択 入力待ちモード ───────────────────────────────────
+        if self._approval_callback is not None:
+            callback = self._approval_callback
+            self._approval_callback = None
+            callback(text)  # on_response(resp) を呼ぶ
+            # エージェント実行中（承認ハンドラ）→ 再度無効化
+            # エージェント未実行（/search 選択）→ 通常状態に戻す
+            if self._agent_busy:
+                event.input.disabled    = True
+                event.input.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
+            else:
+                event.input.disabled    = False
+                event.input.placeholder = "❯ メッセージを入力  (/help でコマンド一覧)"
+            return
+
         if not text:
             return
 
@@ -342,13 +301,6 @@ class MimicApp(App):
             return
 
         if text.startswith("/"):
-            parts = text.lstrip("/").split(maxsplit=1)
-            cmd   = parts[0].lower() if parts else ""
-            rest  = parts[1].strip() if len(parts) > 1 else ""
-            # /search だけ async worker で処理（push_screen_wait が必要なため）
-            if cmd == "search":
-                self._run_search(rest)
-                return
             self._handle_command(text)
             return
 
@@ -389,6 +341,10 @@ class MimicApp(App):
         if cmd == "undo":
             result = self._ctx["auto_git"].rollback(self._ctx["agent"].cwd)
             self._write_direct(f"  [AutoGit] {result}\n")
+            return
+
+        if cmd == "search":
+            self._cmd_search(rest)
             return
 
         match = cmd_registry.route(text)
@@ -436,11 +392,10 @@ class MimicApp(App):
                 "  変更: /model <モデル名>\n"
             )
 
-    # ── /search (async: push_screen_wait が必要) ─────────────────────
+    # ── /search ──────────────────────────────────────────────────────
 
-    @work(exclusive=False)
-    async def _run_search(self, query: str) -> None:
-        """/search コマンド。元の CLI と同じ選択インタフェースをモーダルで提供する。"""
+    def _cmd_search(self, query: str) -> None:
+        """/search コマンド。元の CLI と同じテキスト入力方式で注入選択を行う。"""
         from .commands import _search_sessions
 
         if not query:
@@ -453,46 +408,52 @@ class MimicApp(App):
             self._write_direct(f"  「{query}」に一致するログが見つかりませんでした。\n")
             return
 
-        # ヒット一覧を表示してからモーダルで選択させる
+        # ヒット一覧を表示
         self._write_direct(f"\n🔍 「{query}」 — {len(hits)} 件ヒット\n")
         for i, h in enumerate(hits, 1):
             self._write_direct(f"  [{i}] {h['file']}  {h['ts']}\n")
             self._write_direct(f"    Q: {h['user'][:100]}\n")
             if h["result"]:
                 self._write_direct(f"    A: {h['result'][:150]}\n")
+        self._write_direct(
+            "  コンテキストに注入しますか？ [番号をカンマ区切り / all / n]: "
+        )
 
-        # 選択ダイアログ（元 CLI の stdin 入力と同等）
-        resp = await self.push_screen_wait(SearchSelectionModal(query, hits))
-        resp = (resp or "").strip().lower()
+        # Input を一時解放して選択を受け取る（元コードの stdin.readline と同等）
+        def on_response(resp: str) -> None:
+            resp = resp.strip().lower()
+            if not resp or resp == "n":
+                return
 
-        if not resp or resp == "n":
-            return
+            if resp == "all":
+                selected = hits
+            else:
+                selected = []
+                for token in resp.split(","):
+                    token = token.strip()
+                    if token.isdigit():
+                        idx = int(token) - 1
+                        if 0 <= idx < len(hits):
+                            selected.append(hits[idx])
 
-        # 元コードと同じ選択ロジック
-        if resp == "all":
-            selected = hits
-        else:
-            selected = []
-            for token in resp.split(","):
-                token = token.strip()
-                if token.isdigit():
-                    idx = int(token) - 1
-                    if 0 <= idx < len(hits):
-                        selected.append(hits[idx])
+            if not selected:
+                return
 
-        if not selected:
-            return
+            inject_lines = [f"[過去セッションの参考情報（/search {query}）]"]
+            for h in selected:
+                inject_lines.append(f"\nUser: {h['full_user']}")
+                if h["full_result"]:
+                    inject_lines.append(f"Result: {h['full_result']}")
+            inject_text = "\n".join(inject_lines)
+            agent = self._ctx["agent"]
+            agent.conversation.append({"role": "user",      "content": inject_text})
+            agent.conversation.append({"role": "assistant", "content": "了解しました。参考情報を確認しました。"})
+            self._write_direct(f"  ✓ {len(selected)} 件をコンテキストに注入しました。\n")
 
-        inject_lines = [f"[過去セッションの参考情報（/search {query}）]"]
-        for h in selected:
-            inject_lines.append(f"\nUser: {h['full_user']}")
-            if h["full_result"]:
-                inject_lines.append(f"Result: {h['full_result']}")
-        inject_text = "\n".join(inject_lines)
-        agent = self._ctx["agent"]
-        agent.conversation.append({"role": "user",      "content": inject_text})
-        agent.conversation.append({"role": "assistant", "content": "了解しました。参考情報を確認しました。"})
-        self._write_direct(f"  ✓ {len(selected)} 件をコンテキストに注入しました。\n")
+        self._enter_approval_mode(
+            on_response,
+            placeholder="番号カンマ区切り / all で全件 / n またはEnterでキャンセル",
+        )
 
     # ── エージェント実行 ──────────────────────────────────────────────
 
