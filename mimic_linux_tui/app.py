@@ -134,7 +134,6 @@ class ModelSelectDialog(ModalScreen[Optional[str]]):
 
     BINDINGS = [
         Binding("escape", "cancel", "キャンセル", show=True),
-        Binding("enter", "select", "選択", show=True),
     ]
 
     def __init__(self, models: list[str], current: str = ""):
@@ -153,7 +152,7 @@ class ModelSelectDialog(ModalScreen[Optional[str]]):
                 id="model-list",
             )
 
-    def action_select(self) -> None:
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
         lv = self.query_one("#model-list", ListView)
         idx = lv.index
         if idx is not None and 0 <= idx < len(self._models):
