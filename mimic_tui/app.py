@@ -10,7 +10,9 @@ mimic_tui — Textual TUI アプリ本体 (Phase 3)
 from __future__ import annotations
 
 import asyncio
+import json
 import threading
+from pathlib import Path
 from typing import Optional
 from datetime import datetime
 

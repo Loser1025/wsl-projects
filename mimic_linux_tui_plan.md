@@ -274,5 +274,8 @@ $ cd mimic_linux_tui && ./run.sh
 ## 6. 確認事項（判断を要するもの）
 
 1. **tmuxダッシュボード廃止の方針**: Phase 8 で `monitor.py` と `tmux_orch.py` を完全に削除しても問題ないか？
+   → **廃止確定**。`mimic_linux_tui/` には含めない。
 2. **同時起動の可能性**: CUI版とTUI版を同じホストで同時使用するか？（ポート競合等）
+   → 未確認（必要時に検討）
 3. **MCP連携**: `mcp_server.py` のTUI版対応は必要か？
+   → **残す**。`mcp_server.py` はコピー済み。
