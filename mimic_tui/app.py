@@ -643,6 +643,98 @@ class MimicApp(App):
         self._chat_log.add_message(f"📝 Scratchpad:\n{content}", role="system") if self._chat_log else None
 
 
+# ── モーダルダイアログ ─────────────────────────────────────
+
+# よく使う OpenRouter モデルプリセット
+_MODEL_PRESETS = [
+    "openrouter/owl-alpha",
+    "openrouter/auto",
+    "anthropic/claude-sonnet-4-20250514",
+    "anthropic/claude-opus-4-20250514",
+    "google/gemini-2.5-pro",
+    "google/gemini-2.5-flash",
+    "openai/gpt-4o",
+    "openai/gpt-4o-mini",
+    "openai/o3",
+    "openai/o4-mini",
+    "deepseek/deepseek-chat",
+    "deepseek/deepseek-r1",
+    "mistralai/mistral-large-latest",
+    "mistralai/mistral-small-latest",
+    "qwen/qwen3-8b",
+    "qwen/qwen3-14b",
+    "meta-llama/llama-4-maverick",
+    "meta-llama/llama-4-scout",
+]
+
+
+class ModelSelectDialog(ModalScreen):
+    """モデル選択モーダルダイアログ。"""
+
+    CSS = """
+    ModelSelectDialog {
+        align: center middle;
+    }
+    #dialog {
+        width: 60;
+        height: auto;
+        max-height: 80%;
+        border: thick #89b4fa;
+        background: #1e1e2e;
+        padding: 1 2;
+    }
+    #dialog-title {
+        text-align: center;
+        width: 100%;
+        margin-bottom: 1;
+    }
+    OptionList {
+        height: auto;
+        max-height: 20;
+    }
+    #dialog-buttons {
+        height: 3;
+        align: right middle;
+        margin-top: 1;
+    }
+    Button {
+        min-width: 10;
+        margin-left: 1;
+    }
+    """
+
+    def __init__(self, current_model: str) -> None:
+        super().__init__()
+        self._current_model = current_model
+
+    def compose(self) -> ComposeResult:
+        with ScrollableContainer(id="dialog"):
+            yield Label("モデル選択", id="dialog-title")
+            opts = OptionList(*_MODEL_PRESETS)
+            # 現在のモデルを選択状態にする
+            opts.highlighted = 0
+            yield opts
+            with ScrollableContainer(id="dialog-buttons"):
+                yield Button("選択 (Enter)", variant="primary", id="select")
+                yield Button("キャンセル (Esc)", variant="default", id="cancel")
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        self.dismiss(str(event.option.prompt))
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "select":
+            opts = self.query_one(OptionList)
+            if opts.highlighted is not None:
+                self.dismiss(_MODEL_PRESETS[opts.highlighted])
+            else:
+                self.dismiss(None)
+        else:
+            self.dismiss(None)
+
+    def key_escape(self) -> None:
+        self.dismiss(None)
+
+
 if __name__ == "__main__":
     app = MimicApp()
     app.run()
