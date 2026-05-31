@@ -14,10 +14,8 @@ mimic_linux の役割: OpenRouter ReAct ループ + AutoGit + 全ツール実行
 """
 
 import asyncio
-import logging
 import os
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -30,50 +28,6 @@ from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
 server = Server("mimic")
-
-# ── ログ監視ウィンドウ管理 ───────────────────────────────────────
-_monitor_launched: bool = False
-_LOG_PATH = str(Path(__file__).parent / "mimic.log")
-
-
-def _ensure_log_monitor():
-    """
-    ログ監視ウィンドウを1回だけ起動する（初回のみ）。
-    tmux が使えるならペインを開く。なければ xterm。どちらもなければスキップ。
-    """
-    global _monitor_launched
-    if _monitor_launched:
-        return
-    try:
-        if shutil.which("tmux"):
-            # 既存の mimic セッションがあればそこに、なければ新規ウィンドウ
-            ret = subprocess.run(
-                ["tmux", "has-session", "-t", "mimic"],
-                capture_output=True,
-            )
-            if ret.returncode == 0:
-                subprocess.Popen([
-                    "tmux", "new-window", "-t", "mimic", "-n", "mimic-log",
-                    f"tail -f {_LOG_PATH}",
-                ])
-            else:
-                subprocess.Popen([
-                    "tmux", "new-session", "-d", "-s", "mimic-log",
-                    f"tail -f {_LOG_PATH}",
-                ])
-        elif shutil.which("xterm"):
-            subprocess.Popen(
-                ["xterm", "-title", "mimic-log", "-e", f"tail -f {_LOG_PATH}"],
-                close_fds=True,
-            )
-        # どちらもなければサイレントスキップ（監視ウィンドウはオプション機能）
-        _monitor_launched = True
-    except Exception:
-        pass
-
-
-# MCP から除外するツール（stdin 必須 / MCP 文脈で不要）
-_EXCLUDE = {"ask_user"}
 
 # ANSI エスケープコード除去
 _ANSI_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
@@ -191,8 +145,6 @@ def _agent_run(task: str, working_dir: str | None,
     """
     mimic_linux を --auto-prompt で起動して結果を返す。
     """
-    _ensure_log_monitor()
-
     cwd  = working_dir or str(V4_DIR)
     py   = sys.executable
     flag = "--auto-prompt"
@@ -261,47 +213,16 @@ def _agent_run(task: str, working_dir: str | None,
 # agent_terminal 実装
 # ════════════════════════════════════════════════════════════════
 def _agent_terminal(task: str, working_dir: str | None) -> str:
-    """新しいターミナルウィンドウで mimic_linux をインタラクティブ起動"""
     cwd = working_dir or str(V4_DIR)
     py  = sys.executable
     task_preview = task[:300].replace('"', "'")
-
-    try:
-        if shutil.which("tmux"):
-            # tmux: 新セッションを detach 状態で起動してユーザーが attach できるようにする
-            session = "mimic-terminal"
-            subprocess.run(
-                ["tmux", "new-session", "-d", "-s", session,
-                 "-c", cwd, f"{py} -m mimic_linux"],
-                check=False,
-            )
-            return (
-                f"mimic_linux ターミナルを tmux セッション '{session}' で起動しました。\n"
-                f"作業フォルダ: {cwd}\n\n"
-                f"アタッチするには: tmux attach -t {session}\n\n"
-                f"以下のタスクをターミナルに貼り付けてください:\n"
-                f"{'─'*50}\n{task_preview}\n{'─'*50}"
-            )
-        elif shutil.which("xterm"):
-            subprocess.Popen(
-                ["xterm", "-title", "mimic-terminal",
-                 "-e", f"cd {cwd} && {py} -m mimic_linux"],
-                close_fds=True,
-            )
-            return (
-                f"mimic_linux ターミナルを xterm で起動しました。\n"
-                f"作業フォルダ: {cwd}\n\n"
-                f"以下のタスクをターミナルに貼り付けてください:\n"
-                f"{'─'*50}\n{task_preview}\n{'─'*50}"
-            )
-        else:
-            return (
-                "ターミナルエミュレータが見つかりません（tmux / xterm が必要）。\n"
-                f"手動で次のコマンドを実行してください:\n"
-                f"  cd {cwd} && {py} -m mimic_linux"
-            )
-    except Exception as e:
-        return f"ターミナル起動エラー: {e}"
+    return (
+        "ターミナル自動起動は無効化されています。\n"
+        f"手動で次のコマンドを実行してください:\n"
+        f"  cd {cwd} && {py} -m mimic_linux\n\n"
+        f"以下のタスクをターミナルに貼り付けてください:\n"
+        f"{'─'*50}\n{task_preview}\n{'─'*50}"
+    )
 
 
 # ════════════════════════════════════════════════════════════════

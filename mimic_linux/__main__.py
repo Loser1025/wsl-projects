@@ -16,7 +16,6 @@ def main():
     if hasattr(sys.stdin, "reconfigure"):
         sys.stdin.reconfigure(encoding="utf-8", errors="replace")
 
-    # readline: 履歴のみ有効化（Tab補完は tmux 内で端末制御が競合するため無効）
     try:
         import readline
         import atexit
@@ -25,7 +24,6 @@ def main():
             readline.read_history_file(str(_hist))
         readline.set_history_length(500)
         atexit.register(readline.write_history_file, str(_hist))
-        # parse_and_bind("tab: complete") は tmux 内で端末崩れを起こすため除去
     except ImportError:
         pass
 
@@ -51,22 +49,9 @@ def main():
 
     active_config = or_config or gemini_config or mistral_config
 
-    _args = sys.argv[1:]
-    use_tmux = "--tmux" in _args
-    _args_clean = [a for a in _args if a != "--tmux"]
+    _args = [a for a in sys.argv[1:] if a != "--tmux"]
 
-    # ── tmux チェックをモデル選択より先に実行 ────────────────────
-    # tmux 外から --tmux で起動した場合は即座に tmux 内に入り直す。
-    # relaunch_inside_tmux は sys.exit() するのでここで処理が終わる。
-    if use_tmux:
-        import shutil
-        if shutil.which("tmux"):
-            from .tmux_orch import inside_tmux, relaunch_inside_tmux
-            if not inside_tmux():
-                relaunch_inside_tmux("mimic")
-                return  # 到達しない
-
-    if not any(a in _args_clean for a in ("--prompt", "--auto-prompt", "--status")):
+    if not any(a in _args for a in ("--prompt", "--auto-prompt", "--status")):
         active_config = select_model_interactively_multi(or_config, gemini_config, mistral_config)
 
     # ── MonitoringToolRegistry を構築 ────────────────────────────
@@ -140,16 +125,8 @@ def main():
 
     safe_print(C.gray(f"  [{active_config.name}] モデル: {active_config.model}"))
 
-    # ── tmux ダッシュボード起動（--tmux フラグ時のみ）────────────
-    if use_tmux:
-        _start_tmux_dashboard(
-            tool_log, active_config, mon_tools,
-            get_cwd     = lambda: agent.cwd,
-            get_history = lambda: len(agent.conversation),
-        )
-
     # ── モード分岐 ────────────────────────────────────────────────
-    args = _args_clean
+    args = _args
     if "--prompt" in args:
         idx = args.index("--prompt")
         pipe_mode(agent, args[idx + 1]) if idx + 1 < len(args) else sys.exit(1)
@@ -167,52 +144,6 @@ def main():
             react_prompt, plan_prompt,
             sessions_dir=sessions_dir,
         )
-
-
-def _start_tmux_dashboard(tool_log, active_config, mon_registry=None,
-                          get_cwd=None, get_history=None):
-    """
-    tmux ダッシュボードペインを起動する。
-
-    tmux 内から起動した場合:
-      現在のウィンドウを縦分割して下部に Monitor ペインを追加する。
-
-    tmux 外から起動した場合:
-      新しい tmux セッションを作り、その中で mimic を再起動して attach する。
-      この場合は現在のプロセスを終了する（relaunch_inside_tmux が sys.exit する）。
-    """
-    import shutil
-    from .utils import safe_print, C
-
-    if not shutil.which("tmux"):
-        safe_print(C.yellow("  ⚠ tmux が見つかりません。通常モードで起動します。"), flush=True)
-        return
-
-    from .tmux_orch import inside_tmux, relaunch_inside_tmux, TmuxSession
-    from .monitor import MonitorDashboard
-    from .proc_observer import SystemMonitor
-
-    if not inside_tmux():
-        # tmux 外から起動 → 新しいセッションに入り直す
-        safe_print(C.green("  tmux セッションを起動してアタッチします..."), flush=True)
-        relaunch_inside_tmux("mimic")  # この関数は return しない
-        return  # 到達しない
-
-    # tmux 内から起動 → 現在のウィンドウを分割
-    try:
-        session      = TmuxSession("mimic")
-        monitor_pane = session.get_or_create_monitor_pane()
-        sys_mon      = SystemMonitor()
-        dashboard    = MonitorDashboard(
-            monitor_pane, tool_log, sys_mon, active_config,
-            mon_registry = mon_registry,
-            get_cwd      = get_cwd,
-            get_history  = get_history,
-        )
-        dashboard.start()
-        safe_print(C.green("  ✓ Monitor ペインを起動しました"), flush=True)
-    except Exception as e:
-        safe_print(C.yellow(f"  ⚠ tmux ダッシュボード起動失敗: {e}"), flush=True)
 
 
 if __name__ == "__main__":

@@ -145,15 +145,12 @@ class MonitoringToolRegistry(ToolRegistry):
         base: ToolRegistry,
         log: ToolCallLog,
         display_fn: Optional[Callable[[ToolCallRecord], None]] = None,
-        dashboard_fn: Optional[Callable[[ToolCallRecord], None]] = None,
     ):
-        # base の内部状態をそのまま借用する（コピーではなく参照）
         self._tools        = base._tools
         self._log          = log
         self._display      = display_fn
-        self._dashboard    = dashboard_fn
         self._lock         = threading.Lock()
-        self.current_tool: Optional[str] = None   # 実行中ツール名（ダッシュボード参照用）
+        self.current_tool: Optional[str] = None
 
     # specs は親クラスに委譲（_tools を参照共有しているため正しく動く）
     def get_specs(self):
@@ -229,12 +226,7 @@ class MonitoringToolRegistry(ToolRegistry):
         )
         self._log.add(record)
 
-        # ── インライン表示（頻度の低いツールのみ）──
         if tool_name not in _SKIP_INLINE and self._display:
             self._display(record)
-
-        # ── tmux ダッシュボード更新 ──
-        if self._dashboard:
-            self._dashboard(record)
 
         return result
