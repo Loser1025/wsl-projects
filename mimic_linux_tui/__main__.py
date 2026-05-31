@@ -38,12 +38,24 @@ def main():
     # モデル選択: 最初に見つかった設定を使う（TUI モデル選択は Phase 5 で実装）
     active_config = or_config or gemini_config or mistral_config
 
-    # MonitoringToolRegistry
+    # MonitoringToolRegistry — safe_print 経由で TUI にツール完了を表示
+    from .utils import safe_print
+    from .config import OpenRouterConfig
+
     tool_log = ToolCallLog()
+
+    def _inline_display(record):
+        from .utils import C
+        icon  = C.green("✓") if record.status == "ok" else C.red("✗")
+        time_ = C.gray(f"{record.elapsed:.2f}s")
+        cpu   = C.gray(f"CPU:max{record.cpu_max_pct:.0f}%")
+        mem   = C.gray(f"MEM:{record.rss_delta_mb:+.0f}MB")
+        safe_print(f"  {icon} {C.gray(record.tool)} {time_} | {cpu} | {mem}", flush=True)
+
     mon_tools = MonitoringToolRegistry(
         base=_base_tools,
         log=tool_log,
-        display_fn=None,  # TUI 側で表示するため display_fn は使わない
+        display_fn=_inline_display,
     )
 
     rotator = AccountRotator(active_config)
