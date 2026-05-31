@@ -26,6 +26,10 @@ class MimicApp(App):
     SUB_TITLE = "THE HYBRID AI AGENT"
 
     CSS = """
+    App {
+        background: transparent;
+    }
+
     Screen {
         background: transparent;
     }
