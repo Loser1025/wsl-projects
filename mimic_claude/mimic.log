@@ -879,3 +879,5 @@
 2026-05-31 15:39:39 [INFO] {'tool_call': 'read_file', 'args': {'path': '/home/loser/wsl-projects/mimic_tui/orchestrator.py', 'offset': 338}}
 2026-05-31 15:39:55 [INFO] {'tool_call': 'grep', 'args': {'pattern': 'def run|def execute|def plan', 'path': '/home/loser/wsl-projects/mimic_tui/orchestrator.py', 'context_lines': 3}}
 2026-05-31 15:40:42 [INFO] {'tool_call': 'grep', 'args': {'pattern': 'def ', 'path': '/home/loser/wsl-projects/mimic_tui/orchestrator.py', 'context_lines': 1}}
+2026-05-31 16:12:49 [INFO] {'tool_call': 'list_directory', 'args': {'path': '/home/luser/wsl-projects'}}
+2026-05-31 16:13:00 [INFO] {'tool_call': 'list_directory', 'args': {'path': '/home/loser/wsl-projects'}}

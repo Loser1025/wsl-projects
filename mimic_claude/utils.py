@@ -558,7 +558,7 @@ class PipelineTypewriter:
     _BUFFER_SIZE   = 200
 
     def __init__(self, auto_mode: bool = False, renderer=None):
-        self._auto_mode        = auto_mode or _tui_mode_global
+        self._auto_mode        = auto_mode           # auto_mode と tui_mode を分離
         self._tui_mode         = _tui_mode_global
         self._renderer         = renderer or render_markdown
         self._raw_buf          = ""
@@ -591,7 +591,6 @@ class PipelineTypewriter:
             rendered = self._renderer(self._strip_think_tags(self._raw_buf))
             if not rendered.endswith("\n"):
                 rendered += "\n"
-            self._disp_q.extend(rendered)
             self._raw_buf = ""
         else:
             complete = self._raw_buf[:last_nl + 1]
@@ -599,11 +598,18 @@ class PipelineTypewriter:
             rendered = self._renderer(self._strip_think_tags(complete))
             if not rendered.endswith("\n"):
                 rendered += "\n"
+        # TUI モード: render_markdown 済みテキストをコールバックへ直接送る
+        if self._tui_mode:
+            self._tui_send(rendered)
+        else:
             self._disp_q.extend(rendered)
 
     def _enter_think(self):
         header = f"\n{C._GRAY}╭─ 💭 思考中 {'─' * 50}{C.RESET}\n"
-        self._disp_q.extend(header)
+        if self._tui_mode:
+            self._tui_send(header)
+        else:
+            self._disp_q.extend(header)
         self._in_think_display = True
 
     def _flush_think_raw(self, force: bool = False):
@@ -622,12 +628,18 @@ class PipelineTypewriter:
         result = ""
         for line in rendered.rstrip("\n").split("\n"):
             result += f"{C._GRAY}│{C.RESET} {line}\n"
-        self._disp_q.extend(result)
+        if self._tui_mode:
+            self._tui_send(result)
+        else:
+            self._disp_q.extend(result)
 
     def _exit_think(self):
         self._flush_think_raw(force=True)
         footer = f"{C._GRAY}╰{'─' * 62}{C.RESET}\n"
-        self._disp_q.extend(footer)
+        if self._tui_mode:
+            self._tui_send(footer)
+        else:
+            self._disp_q.extend(footer)
         self._in_think_display = False
 
     def _run(self):
@@ -641,13 +653,13 @@ class PipelineTypewriter:
                 time.sleep(0.002)
 
     def start(self):
-        if self._auto_mode:
-            return
+        if self._auto_mode or self._tui_mode:
+            return  # TUI/auto モードはスレッド不要
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
     def _tui_send(self, text: str) -> None:
-        """TUI モード用: コールバックにテキストを送る。"""
+        """TUI モード用: render_markdown 済みテキストをコールバックへ送る。"""
         if _tui_output_callback is not None:
             try:
                 _tui_output_callback(text)
@@ -661,14 +673,12 @@ class PipelineTypewriter:
         if not chunk:
             return
         self._full.append(chunk)
-        if self._tui_mode:
-            # TUI モード: チャンクをそのまま TUI コールバックへ（スレッド不要）
-            self._tui_send(chunk)
-            return
         if self._auto_mode:
             sys.stdout.write(chunk)
             sys.stdout.flush()
             return
+        # TUI モードも通常モードも同じバッファ→render_markdown パイプラインを使う。
+        # 出力先だけが _disp_q（通常）か _tui_send（TUI）で異なる。
         with self._lock:
             segments = self._think_aware.push(chunk)
             for is_think, text in segments:
@@ -688,7 +698,7 @@ class PipelineTypewriter:
 
     def finalize(self) -> str:
         full = "".join(self._full)
-        if self._tui_mode or self._auto_mode:
+        if self._auto_mode:
             return full
         with self._lock:
             for is_think, text in self._think_aware.flush():
@@ -705,6 +715,8 @@ class PipelineTypewriter:
                 self._exit_think()
             if self._raw_buf:
                 self._flush_raw(force=True)
+        if self._tui_mode:
+            return full  # TUI: スレッドなし、join 不要
         self._done = True
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=60)

@@ -7,8 +7,11 @@ import logging
 from pathlib import Path
 
 
-def _build_components(base_dir: str):
-    """エージェント・オーケストレーター等の共通コンポーネントを初期化して返す。"""
+def _build_components(base_dir: str, active_config=None):
+    """エージェント・オーケストレーター等の共通コンポーネントを初期化して返す。
+    active_config を渡すと planner/reflector 含む全エージェントがそのモデルを使う。
+    省略時は .env の最初の設定を使用する。
+    """
     from .utils import safe_print, C, set_log_sink
     from .commands import register_search_command, register_sessions_command
     from .tools import set_sessions_dir, tools as _base_tools
@@ -26,7 +29,9 @@ def _build_components(base_dir: str):
         or isinstance(h, logging.FileHandler)]
 
     or_config, gemini_config, mistral_config, system_prompt = load_config(base_dir)
-    active_config = or_config or gemini_config or mistral_config
+    # active_config が渡されていない場合のみ .env の先頭設定を使う
+    if active_config is None:
+        active_config = or_config or gemini_config or mistral_config
 
     tool_log = ToolCallLog()
 
@@ -172,15 +177,9 @@ def main():
     or_config, gemini_config, mistral_config, _ = load_config(base_dir)
     active_config = select_model_interactively_multi(or_config, gemini_config, mistral_config)
 
-    # コンポーネント初期化（選択済み config をグローバルに上書き）
-    import mimic_claude.config as _cfg_mod
-    _cfg_mod._or_config     = or_config
-    _cfg_mod._gemini_config = gemini_config
-
-    ctx = _build_components(base_dir)
-    ctx["active_config"] = active_config
-    ctx["agent"]._config = active_config
-    ctx["agent"].rotator._config = active_config
+    # 選択した config を _build_components に渡す
+    # → rotator を active_config で作るので planner/reflector も同じモデルを使う
+    ctx = _build_components(base_dir, active_config=active_config)
 
     from .app import MimicApp
     app = MimicApp(ctx)
