@@ -265,29 +265,28 @@ def render_markdown_thinker(text: str) -> str:
 
 
 def get_ascii_art_str(subtitle: str = "") -> str:
-    """ASCII アートを ANSI コード付き文字列として返す。TUI の Static ウィジェット用。"""
-    _G = [
-        "\033[38;2;0;255;0m",    # row1: Razer Green
-        "\033[38;2;0;255;80m",   # row2: Green-Teal
-        "\033[38;2;0;255;160m",  # row3: Teal
-        "\033[38;2;160;255;120m",# row4: Pale Lime
-        "\033[38;2;0;255;180m",  # row5: Seafoam
-        "\033[38;2;0;242;218m",  # row6: Cyan-Green
-        "\033[38;2;0;230;255m",  # row7: Electric Aqua
-        "\033[38;2;80;220;255m", # row8: Sky Aqua
-    ]
-    R = C.RESET
-    SEP = f"\033[38;2;0;80;80m ──────────────────────────────────────────────────────────────────────────────────\033[0m"
-    sub = f"{C.BOLD}{_G[7]} {subtitle}{R}" if subtitle else f"{C.BOLD}{_G[7]} MIMIC TUI  ·  THE HYBRID AI AGENT{R}"
+    """ASCII アートを ANSI コード付き文字列として返す。TUI の Static ウィジェット用。
+    標準 figlet フォントで "MIMIC" の文字を上から下へ green→aqua グラデーション。
+    """
+    # 上から下へ green → teal → electric aqua のグラデーション
+    G0 = "\033[38;2;0;255;65m"    # Razer Neon Green
+    G1 = "\033[38;2;0;255;120m"   # Green-Teal
+    G2 = "\033[38;2;0;255;180m"   # Teal
+    G3 = "\033[38;2;0;242;218m"   # Cyan-Green
+    G4 = "\033[38;2;0;230;255m"   # Electric Aqua
+    DIM = "\033[38;2;0;80;80m"    # 暗いティール（セパレーター）
+    BLD = "\033[1m"
+    R   = C.RESET
+
+    # M=8, I=5, M=8, I=5, C=7 各文字の4行 (標準 figlet フォント)
+    SEP = f"{DIM} {'─' * 43}{R}"
+    sub = f"{BLD}{G4} {subtitle or 'THE HYBRID AI AGENT'}{R}"
+
     return (
-        f"{_G[0]}   888     888 888b    888 8888888 888b     d888  .d88888b.   .d8888b.      d8888{R}\n"
-        f"{_G[1]}   888     888 8888b   888   888   8888b   d8888 d88P\" \"Y88b d88P  Y88b    d8P888{R}\n"
-        f"{_G[2]}   888     888 88888b  888   888   88888b.d88888 888     888 888    888   d8P 888{R}\n"
-        f"{_G[3]}   888     888 888Y88b 888   888   888Y88888P888 888     888 888         d8P  888{R}\n"
-        f"{_G[4]}   888     888 888 Y88b888   888   888 Y888P 888 888     888 888  88888 d88   888{R}\n"
-        f"{_G[5]}   888     888 888  Y88888   888   888  Y8P  888 888     888 888    888 8888888888{R}\n"
-        f"{_G[6]}   Y88b. .d88P 888   Y8888   888   888   \"   888 Y88b. .d88P Y88b  d88P       888{R}\n"
-        f"{_G[7]}    \"Y88888P\"  888    Y888 8888888 888       888  \"Y88888P\"   \"Y8888P88       888{R}\n"
+        f"{G0}  __  __  ___  __  __  ___   ___ {R}\n"
+        f"{G1} |  \\/  ||_ _||  \\/  ||_ _| / __|{R}\n"
+        f"{G2} | |\\/| | | | | |\\/| | | | | (__ {R}\n"
+        f"{G3} |_|  |_||___|_|  |_||___|  \\___|{R}\n"
         f"{SEP}\n"
         f"{sub}\n"
         f"{SEP}"

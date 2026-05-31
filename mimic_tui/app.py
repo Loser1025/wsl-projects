@@ -23,7 +23,7 @@ class MimicApp(App):
 
     CSS = """
     Screen      { layout: vertical; background: #050f05; }
-    #title-art  { height: 11; background: #050f05; padding: 0 0; overflow-x: hidden; }
+    #title-art  { height: 7; background: #050f05; padding: 0 0; overflow-x: hidden; }
     #chat-log   { height: 1fr; border: solid #00a02d; background: #050f05;
                   scrollbar-color: #00ff41; padding: 0 1; }
     #ai-stream  { height: auto; min-height: 0; padding: 0 2;
