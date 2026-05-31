@@ -1,17 +1,10 @@
 """
 tui.py — Mimic 4 Textual UI
 入力と出力を完全分離したクリーンなターミナルUI
-
-レイアウト:
-  ┌─────────────────────────────────────┐
-  │  [RichLog — AI出力・ツール結果]      │  ← スクロール可能、上部大半
-  │                                     │
-  ├─────────────────────────────────────┤
-  │  ❯  ユーザー入力欄                  │  ← 常に下部に固定
-  └─────────────────────────────────────┘
 """
 from __future__ import annotations
 
+import re
 import sys
 import threading
 from typing import Optional
@@ -19,9 +12,11 @@ from typing import Optional
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.widgets import Header, Footer, Input, RichLog, Static
+from textual.widgets import Header, Footer, Input, RichLog
 from textual.containers import Vertical
-from textual import work
+
+# ANSI SGR以外の制御シーケンスを除去するパターン（フォールバック用）
+_ANSI_STRIP = re.compile(r'\033\[[^m]*m|\033\[\?[0-9;]*[hl]')
 
 
 class MimicApp(App):
@@ -33,7 +28,6 @@ class MimicApp(App):
     CSS = """
     Screen {
         background: #080808;
-        layers: base;
     }
 
     RichLog {
@@ -58,7 +52,6 @@ class MimicApp(App):
         background: #0d0d0d;
         color: #00ff41;
         border: none;
-        padding: 0 0;
     }
 
     Input:focus {
@@ -91,15 +84,14 @@ class MimicApp(App):
         cwd: str,
     ) -> None:
         super().__init__()
-        self._orch         = interactive_orch
-        self._config_name  = config_name
-        self._model_name   = model_name
-        self._cwd          = cwd
-        self._busy         = False  # エージェント実行中フラグ
+        self._orch        = interactive_orch
+        self._config_name = config_name
+        self._model_name  = model_name
+        self._cwd         = cwd
+        self._busy        = False
+        self._worker: Optional[threading.Thread] = None
 
-    # ────────────────────────────────────────────────────────────────
-    # レイアウト
-    # ────────────────────────────────────────────────────────────────
+    # ── レイアウト ───────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -111,175 +103,169 @@ class MimicApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        log = self.query_one(RichLog)
-        log.write(Text.from_ansi(
-            f"\n\033[1m\033[38;2;0;255;65mMIMIC 4\033[0m"
-            f"  \033[38;2;0;200;100m[{self._config_name}]\033[0m"
-            f"  \033[38;2;0;240;200m{self._model_name}\033[0m\n"
-        ))
-        log.write(Text.from_ansi(
-            f"\033[38;2;0;200;100m  作業フォルダ: {self._cwd}\033[0m\n"
-            f"\033[38;2;0;200;100m  Ctrl+L: クリア  ·  Ctrl+C: 終了\033[0m\n"
-        ))
-        self.query_one(Input).focus()
+        self._log("\n\033[1m\033[38;2;0;255;65mMIMIC 4\033[0m"
+                  f"  \033[38;2;0;200;100m[{self._config_name}]\033[0m"
+                  f"  \033[38;2;0;240;200m{self._model_name}\033[0m\n")
+        self._log(f"\033[38;2;0;200;100m  作業フォルダ: {self._cwd}\033[0m\n"
+                  f"\033[38;2;0;200;100m  Ctrl+L: クリア  ·  Ctrl+C: 終了\033[0m\n")
+        self.query_one("#prompt", Input).focus()
 
-    # ────────────────────────────────────────────────────────────────
-    # 出力ヘルパー
-    # ────────────────────────────────────────────────────────────────
+    # ── 出力 ─────────────────────────────────────────────────────────
 
-    def _write(self, text: str) -> None:
-        """メインスレッドから RichLog に ANSI テキストを書き込む"""
+    def _log(self, text: str) -> None:
+        """メインスレッドから RichLog に書き込む (ANSI対応)"""
         if not text:
             return
+        log = self.query_one("#log", RichLog)
         try:
-            self.query_one(RichLog).write(Text.from_ansi(text), end="")
+            log.write(Text.from_ansi(text.rstrip("\n")))
+        except Exception:
+            plain = _ANSI_STRIP.sub("", text)
+            log.write(plain.rstrip("\n"))
+
+    def _log_from_thread(self, text: str) -> None:
+        """ワーカースレッドから RichLog に書き込む (スレッドセーフ)"""
+        try:
+            self.call_from_thread(self._log, text)
         except Exception:
             pass
 
-    def _write_from_thread(self, text: str) -> None:
-        """ワーカースレッドから RichLog にスレッドセーフに書き込む"""
-        try:
-            self.call_from_thread(self._write, text)
-        except Exception:
-            pass
-
-    # ────────────────────────────────────────────────────────────────
-    # 入力処理
-    # ────────────────────────────────────────────────────────────────
+    # ── 入力 ─────────────────────────────────────────────────────────
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         text = event.value.strip()
-        event.input.clear()
+        self.query_one("#prompt", Input).clear()
+
         if not text:
             return
 
-        # 終了コマンド
         if text.lower() in ("exit", "quit", "q"):
             self.exit()
             return
 
-        # エージェント実行中は受け付けない
         if self._busy:
-            self._write(
-                "\033[38;2;255;230;0m  ⚠ 実行中です。完了をお待ちください...\033[0m\n"
-            )
+            self._log("\033[38;2;255;230;0m  ⚠ 実行中です。完了をお待ちください...\033[0m\n")
             return
 
-        # ユーザー入力をログに表示
-        self._write(
-            f"\n\033[1m\033[38;2;0;255;65m❯\033[0m"
-            f" \033[38;2;255;255;255m{text}\033[0m\n"
-        )
-        self._run_agent(text)
+        # ユーザー入力を表示
+        self._log(f"\n\033[1m\033[38;2;0;255;65m❯\033[0m"
+                  f" \033[38;2;255;255;255m{text}\033[0m\n")
 
-    # ────────────────────────────────────────────────────────────────
-    # アクション
-    # ────────────────────────────────────────────────────────────────
+        # ワーカースレッドを起動
+        self._busy = True
+        self._worker = threading.Thread(
+            target=self._agent_thread,
+            args=(text,),
+            daemon=True,
+        )
+        self._worker.start()
+
+    # ── アクション ───────────────────────────────────────────────────
 
     def action_clear_log(self) -> None:
-        self.query_one(RichLog).clear()
+        self.query_one("#log", RichLog).clear()
 
-    # ────────────────────────────────────────────────────────────────
-    # エージェント実行 (ワーカースレッド)
-    # ────────────────────────────────────────────────────────────────
+    # ── エージェント実行 ─────────────────────────────────────────────
 
-    @work(thread=True, exclusive=True)
-    def _run_agent(self, user_input: str) -> None:
+    def _agent_thread(self, user_input: str) -> None:
         """
-        ワーカースレッドでエージェントを実行する。
+        バックグラウンドスレッドでエージェントを実行する。
 
-        sys.stdout を _TuiLineBuffer に差し替えることで
+        sys.stdout を _TuiLineBuffer に差し替えて
         safe_print / PipelineTypewriter の全出力を RichLog へ転送する。
-
-        _TuiLineBuffer は CR (\\r) をシミュレートし、スピナーのフレームを
-        バッファ破棄で無視しつつ、完全な行のみ TUI へ送る。
+        スピナーの \\r 上書きはバッファを破棄して無視する。
         """
         original_stdout = sys.stdout
-        worker_tid       = threading.current_thread().ident
-        app_ref          = self          # クロージャ用
+        worker_tid      = threading.current_thread().ident
+        app_ref         = self
 
-        # ── CR 対応ラインバッファ ──────────────────────────────────
+        # ── CR対応ラインバッファ ──────────────────────────────────
         class _TuiLineBuffer:
             encoding  = "utf-8"
             errors    = "replace"
             softspace = 0
 
-            def __init__(self_buf) -> None:
-                self_buf._buf = ""
+            def __init__(self_b) -> None:
+                self_b._buf = ""
 
-            def write(self_buf, s: str) -> int:
+            def write(self_b, s: str) -> int:
                 if not s:
                     return 0
-                # ワーカー以外のスレッドはオリジナルへ流す
+                # ワーカー以外はオリジナルへ
                 if threading.current_thread().ident != worker_tid:
-                    original_stdout.write(s)
+                    try:
+                        original_stdout.write(s)
+                    except Exception:
+                        pass
                     return len(s)
 
-                self_buf._buf += s
+                self_b._buf += s
 
-                # CR (\r) 処理: スピナーの上書きを模倣してバッファをリセット
-                while "\r" in self_buf._buf:
-                    cr_pos = self_buf._buf.find("\r")
-                    nl_pos = self_buf._buf.find("\n")
-                    if nl_pos != -1 and nl_pos < cr_pos:
-                        # CR より前に改行あり → まずその行を転送
-                        line, self_buf._buf = (
-                            self_buf._buf[:nl_pos + 1],
-                            self_buf._buf[nl_pos + 1:],
-                        )
-                        app_ref._write_from_thread(line)
+                # CR でバッファをリセット（スピナーフレームを破棄）
+                while "\r" in self_b._buf:
+                    cr = self_b._buf.find("\r")
+                    nl = self_b._buf.find("\n")
+                    if nl != -1 and nl < cr:
+                        # CR より前に改行あり → その行を送出
+                        app_ref._log_from_thread(self_b._buf[:nl + 1])
+                        self_b._buf = self_b._buf[nl + 1:]
                     else:
-                        # CR 以前の内容を捨てる（スピナーフレームを無視）
-                        self_buf._buf = self_buf._buf[cr_pos + 1:]
+                        # CR 以前を破棄
+                        self_b._buf = self_b._buf[cr + 1:]
 
-                # 改行で区切って転送
-                while "\n" in self_buf._buf:
-                    nl_pos = self_buf._buf.find("\n")
-                    line, self_buf._buf = (
-                        self_buf._buf[:nl_pos + 1],
-                        self_buf._buf[nl_pos + 1:],
-                    )
-                    app_ref._write_from_thread(line)
+                # 改行で区切って送出
+                while "\n" in self_b._buf:
+                    nl = self_b._buf.find("\n")
+                    app_ref._log_from_thread(self_b._buf[:nl + 1])
+                    self_b._buf = self_b._buf[nl + 1:]
 
                 return len(s)
 
-            def flush(self_buf) -> None:
-                if self_buf._buf:
-                    app_ref._write_from_thread(self_buf._buf)
-                    self_buf._buf = ""
+            def flush(self_b) -> None:
+                if self_b._buf:
+                    app_ref._log_from_thread(self_b._buf)
+                    self_b._buf = ""
                 try:
                     original_stdout.flush()
                 except Exception:
                     pass
 
-            def fileno(self_buf) -> int:
+            def fileno(self_b) -> int:
                 try:
                     return original_stdout.fileno()
                 except Exception:
                     return -1
 
-            def isatty(self_buf) -> bool:
+            def isatty(self_b) -> bool:
                 return False
 
-        # ── 実行 ─────────────────────────────────────────────────────
-        self.call_from_thread(setattr, self, "_busy", True)
+        # PipelineTypewriter のアニメーション無効 (auto_mode=True → 直接 stdout 書き込み)
+        self._orch._auto_mode = True
         sys.stdout = _TuiLineBuffer()
-        self._orch._auto_mode = True   # PipelineTypewriter アニメーション無効
 
         try:
             self._orch.run_react(user_input)
         except KeyboardInterrupt:
-            self._write_from_thread(
+            self._log_from_thread(
                 "\n\033[38;2;255;230;0m  [割り込み] Ctrl+C\033[0m\n"
             )
         except Exception as e:
-            self._write_from_thread(
+            import traceback
+            self._log_from_thread(
                 f"\n\033[38;2;255;0;60m  ✗ {e}\033[0m\n"
+                f"\033[38;2;0;200;100m{traceback.format_exc()}\033[0m\n"
             )
         finally:
-            sys.stdout.flush()
+            try:
+                sys.stdout.flush()
+            except Exception:
+                pass
             sys.stdout = original_stdout
             self._orch._auto_mode = False
-            self._write_from_thread("\n")
-            self.call_from_thread(setattr, self, "_busy", False)
-            self.call_from_thread(self.query_one(Input).focus)
+            self._log_from_thread("\n")
+            self._busy = False
+            # 入力欄にフォーカスを戻す
+            try:
+                self.call_from_thread(self.query_one("#prompt", Input).focus)
+            except Exception:
+                pass
