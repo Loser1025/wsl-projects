@@ -10,7 +10,7 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Vertical
+from textual.containers import Container, Vertical  # Container: title-bar用
 from textual.reactive import reactive
 from textual.widgets import Footer, Input, RichLog, Static
 
@@ -27,40 +27,44 @@ class MimicApp(App):
         padding: 0;
     }
 
+    /* タイトルバー: ロゴ左 + ステータス右 を横並びに */
+    #title-bar {
+        layout: horizontal;
+        height: auto;
+        background: #161b22;
+        border-bottom: solid #21262d;
+    }
+
     #title-art {
+        width: 1fr;
         height: auto;
         background: #161b22;
         color: #58a6ff;
         padding: 0 2;
-        border-bottom: solid #21262d;
         text-style: bold;
     }
 
-    #workspace-layout {
-        layout: horizontal;
-        height: 1fr;
-        margin: 0 2 0 2;
-    }
-
-    #chat-log {
-        width: 3fr;
-        background: #0d1117;
-        border: round #30363d;
-        padding: 1 2;
-        scrollbar-color: #00ff41;
-    }
-
     #status-panel {
-        width: 1fr;
+        width: 36;
+        height: auto;
         background: #161b22;
-        border: round #30363d;
-        padding: 1 2;
-        margin-left: 2;
+        border-left: solid #30363d;
+        padding: 0 2;
     }
 
     .panel-section {
         height: auto;
-        margin-bottom: 2;
+        margin-bottom: 1;
+    }
+
+    /* チャットログ: 全幅 */
+    #chat-log {
+        height: 1fr;
+        background: #0d1117;
+        border: round #30363d;
+        padding: 1 2;
+        margin: 0 2;
+        scrollbar-color: #00ff41;
     }
 
     #input-bar {
@@ -121,13 +125,13 @@ class MimicApp(App):
     # ── 構成 ──────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
-        yield Static("", id="title-art")
-        with Container(id="workspace-layout"):
-            yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
+        with Container(id="title-bar"):
+            yield Static("", id="title-art")
             with Vertical(id="status-panel"):
                 yield Static("", id="sec-status",  classes="panel-section")
                 yield Static("", id="sec-model",   classes="panel-section")
                 yield Static("", id="sec-system",  classes="panel-section")
+        yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
         with Vertical(id="input-bar"):
             yield Input(
                 placeholder="❯ メッセージを入力  (/help でコマンド一覧)",
