@@ -128,8 +128,8 @@ class MimicApp(App):
         Binding("ctrl+c",    "interrupt",   "中断",       show=True),
         Binding("ctrl+q",    "quit_app",    "終了",       show=True),
         Binding("ctrl+l",    "clear_log",   "画面クリア", show=False),
-        Binding("pageup",    "scroll_up",   "↑",          show=False),
-        Binding("pagedown",  "scroll_down", "↓",          show=False),
+        Binding("pageup",    "scroll_up",   "↑",          show=False, priority=True),
+        Binding("pagedown",  "scroll_down", "↓",          show=False, priority=True),
         Binding("ctrl+home", "scroll_top",  "先頭",       show=False),
         Binding("ctrl+end",  "scroll_end",  "末尾",       show=False),
     ]
