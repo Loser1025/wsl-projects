@@ -1,4 +1,4 @@
-"""mimic_claude Textual TUI アプリ本体。"""
+"""mimic_claude Textual TUI アプリ本体 (2ペイン・サイバー版)。"""
 from __future__ import annotations
 
 import ctypes
@@ -10,55 +10,124 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
-from textual.widgets import Footer, Input, Label, RichLog, Static
+from textual.containers import Container, Vertical
+from textual.reactive import reactive
+from textual.widgets import Footer, Input, RichLog, Static
 
-
-# ── メインアプリ ──────────────────────────────────────────────────────
 
 class MimicApp(App):
-    """mimic_claude Textual TUI アプリ。"""
+    """mimic_claude Textual TUI アプリ (2ペイン仕様)。"""
 
-    TITLE = "mimic_claude"
+    TITLE = "mimic"
 
     CSS = """
-    Screen     { layout: vertical; background: ansi_default; }
-    #title-art { height: 9; background: ansi_default; padding: 0 0; overflow-x: hidden; }
-    #chat-log  { height: 1fr; border: solid #00a02d; background: ansi_default;
-                 scrollbar-color: #00ff41; padding: 0 1; }
-    #input-bar { height: 3; border: solid #00ff41; padding: 0 1; }
-    Input      { background: ansi_default; color: #ffffff; border: none; }
-    Footer     { background: ansi_default; color: #00c864; }
+    Screen {
+        background: #0d1117;
+        layout: vertical;
+        padding: 0;
+    }
+
+    #title-art {
+        height: auto;
+        background: #161b22;
+        color: #58a6ff;
+        padding: 0 2;
+        border-bottom: solid #21262d;
+        text-style: bold;
+    }
+
+    #workspace-layout {
+        layout: horizontal;
+        height: 1fr;
+        margin: 0 2 0 2;
+    }
+
+    #chat-log {
+        width: 3fr;
+        background: #0d1117;
+        border: round #30363d;
+        padding: 1 2;
+        scrollbar-color: #00ff41;
+    }
+
+    #status-panel {
+        width: 1fr;
+        background: #161b22;
+        border: round #30363d;
+        padding: 1 2;
+        margin-left: 2;
+    }
+
+    .panel-section {
+        height: auto;
+        margin-bottom: 2;
+    }
+
+    #input-bar {
+        height: auto;
+        margin: 0 2 1 2;
+        background: #161b22;
+        border: round #30363d;
+        padding: 0 1;
+    }
+
+    #input-bar:focus-within {
+        border: round #00ff41;
+    }
+
+    Input {
+        background: transparent;
+        color: #f0f6fc;
+        border: none;
+        width: 100%;
+    }
+
+    Input:focus {
+        border: none;
+    }
+
+    Footer {
+        background: #161b22;
+        color: #8b949e;
+    }
     """
 
     BINDINGS = [
-        Binding("ctrl+c",    "interrupt",   "中断",     show=True),
-        Binding("ctrl+q",    "quit_app",    "終了",     show=True),
+        Binding("ctrl+c",    "interrupt",   "中断",       show=True),
+        Binding("ctrl+q",    "quit_app",    "終了",       show=True),
         Binding("ctrl+l",    "clear_log",   "画面クリア", show=False),
-        Binding("pageup",    "scroll_up",   "↑",        show=False),
-        Binding("pagedown",  "scroll_down", "↓",        show=False),
-        Binding("ctrl+home", "scroll_top",  "先頭",     show=False),
-        Binding("ctrl+end",  "scroll_end",  "末尾",     show=False),
+        Binding("pageup",    "scroll_up",   "↑",          show=False),
+        Binding("pagedown",  "scroll_down", "↓",          show=False),
+        Binding("ctrl+home", "scroll_top",  "先頭",       show=False),
+        Binding("ctrl+end",  "scroll_end",  "末尾",       show=False),
     ]
+
+    # リアクティブ属性（ワーカースレッドから代入すると watch_* がメインスレッドで発火する）
+    agent_status_text = reactive("IDLE")
+    model_name_text   = reactive("UNKNOWN")
+    token_count_text  = reactive("0")
 
     def __init__(self, ctx: dict):
         super().__init__()
-        self._ctx                         = ctx
-        self._current_mode                = "interactive"
-        self._log: Optional[RichLog]      = None
-        self._agent_busy                  = False
-        self._worker_thread_id: Optional[int] = None  # Ctrl+C 中断用
-        # 行バッファ: RichLog.write() は1呼び出し=1行のため \n 単位で書く
-        self._out_buf      = ""
-        self._out_buf_lock = threading.Lock()
-        # 書き込み承認: エージェントスレッドが Y/n を待つためのコールバック
+        self._ctx                             = ctx
+        self._current_mode                    = "interactive"
+        self._log: Optional[RichLog]          = None
+        self._agent_busy                      = False
+        self._worker_thread_id: Optional[int] = None
+        self._out_buf                         = ""
+        self._out_buf_lock                    = threading.Lock()
         self._approval_callback: Optional[Callable[[str], None]] = None
 
     # ── 構成 ──────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
         yield Static("", id="title-art")
-        yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
+        with Container(id="workspace-layout"):
+            yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
+            with Vertical(id="status-panel"):
+                yield Static("", id="sec-status",  classes="panel-section")
+                yield Static("", id="sec-model",   classes="panel-section")
+                yield Static("", id="sec-system",  classes="panel-section")
         with Vertical(id="input-bar"):
             yield Input(
                 placeholder="❯ メッセージを入力  (/help でコマンド一覧)",
@@ -81,29 +150,62 @@ class MimicApp(App):
         cfg = self._ctx["active_config"]
         cwd = self._ctx["agent"].cwd
 
-        # ASCII アートタイトルを表示（サブタイトルにモデル情報を埋め込む）
+        self.model_name_text = str(cfg.model)
+
         subtitle = f"{cfg.model}  ·  {cwd}"
         art_text = Text.from_ansi(get_ascii_art_str(subtitle))
         self.query_one("#title-art", Static).update(art_text)
 
         self._write_direct(f"作業Dir: {cwd}\n")
         self._write_direct("─" * 60 + "\n")
+
+        self.query_one("#sec-system", Static).update(
+            "[bold #00ff41]■ SYSTEM[/]\n"
+            "  OS: WSL2 Linux\n"
+            "  Git: [bold #00ff41]ACTIVE[/]"
+        )
+
+        self._refresh_status_ui()
         self.query_one("#user-input", Input).focus()
+
+    # ── リアクティブ・ウォッチャー ────────────────────────────────────
+
+    def watch_agent_status_text(self, _: str) -> None:
+        self._refresh_status_ui()
+
+    def watch_token_count_text(self, _: str) -> None:
+        self._refresh_status_ui()
+
+    def watch_model_name_text(self, _: str) -> None:
+        self._refresh_status_ui()
+
+    def _refresh_status_ui(self) -> None:
+        """ステータスパネルを安全に再描画する。マウント前は何もしない。"""
+        try:
+            status = self.agent_status_text
+            style  = "bold #00ff41" if status == "IDLE" else "bold #ffda6a"
+            self.query_one("#sec-status", Static).update(
+                f"[bold #00ff41]■ AGENT[/]\n"
+                f"  Status: [{style}]{status}[/]\n"
+                f"  Mode:   [#58a6ff]{self._current_mode.upper()}[/]"
+            )
+            self.query_one("#sec-model", Static).update(
+                f"[bold #00ff41]■ MODEL[/]\n"
+                f"  [#8b949e]{self.model_name_text}[/]\n"
+                f"  Tokens: [#58a6ff]{self.token_count_text}[/]"
+            )
+        except Exception:
+            pass
 
     # ── 出力コールバック ──────────────────────────────────────────────
 
     def _safe_write_line(self, line: str) -> None:
-        """1行を RichLog に書く。メインスレッド・ワーカースレッド両方から安全に呼べる。
-        Textual 8.x では call_from_thread をメインスレッドから呼ぶと RuntimeError が
-        発生するため、その場合は直接 write() にフォールバックする。
-        """
         if self._log is None:
             return
         rich_text = Text.from_ansi(line)
         try:
             self.call_from_thread(self._log.write, rich_text)
         except RuntimeError:
-            # メインスレッド（イベントループ）からの呼び出し → 直接書く
             try:
                 self._log.write(rich_text)
             except Exception:
@@ -112,21 +214,17 @@ class MimicApp(App):
             pass
 
     def _output_callback(self, text: str) -> None:
-        """safe_print / PipelineTypewriter から呼ばれる。どのスレッドからでも安全。
-        RichLog.write() は 1 呼び出し = 1 行扱いなので \n 単位でバッファしてから書く。
-        """
         if self._log is None:
             return
         with self._out_buf_lock:
             self._out_buf += text
             lines = self._out_buf.split("\n")
-            self._out_buf = lines[-1]  # 末尾の未完行をバッファに残す
+            self._out_buf = lines[-1]
             complete = lines[:-1]
         for line in complete:
             self._safe_write_line(line)
 
     def _flush_output_buf(self) -> None:
-        """未完行バッファを強制フラッシュする（エージェント完了時に呼ぶ）。"""
         with self._out_buf_lock:
             remaining = self._out_buf
             self._out_buf = ""
@@ -134,11 +232,11 @@ class MimicApp(App):
             self._safe_write_line(remaining)
 
     def _update_title(self) -> None:
-        """モデル名・CWD 変更時にアートのサブタイトル行を更新する。"""
         from .utils import get_ascii_art_str
-        cfg     = self._ctx["active_config"]
-        cwd     = self._ctx["agent"].cwd
+        cfg      = self._ctx["active_config"]
+        cwd      = self._ctx["agent"].cwd
         subtitle = f"{cfg.model}  ·  {cwd}"
+        self.model_name_text = str(cfg.model)
         try:
             art_text = Text.from_ansi(get_ascii_art_str(subtitle))
             self.query_one("#title-art", Static).update(art_text)
@@ -146,7 +244,6 @@ class MimicApp(App):
             pass
 
     def _write_direct(self, text: str) -> None:
-        """メインスレッドから直接 RichLog に書く。複数行を適切に分割する。"""
         if self._log is None:
             return
         lines = text.split("\n")
@@ -156,36 +253,30 @@ class MimicApp(App):
             self._log.write(Text.from_ansi(line))
 
     def _write_user_message(self, text: str) -> None:
-        """ユーザー発言を最大輝度グリーンで目立たせる。"""
         if self._log is None:
             return
         self._log.write(Text(""))
-        # ラベル行
         label = Text()
-        label.append("  ❯ You: ", style="bold #00ff41")   # Razer Neon Green
+        label.append("  👤 You: ", style="bold #00ff41")
         self._log.write(label)
-        # メッセージ全文を同色・太字・大きく
         msg = Text()
-        msg.append(f"  {text}", style="bold #00ff41")
+        msg.append(f"  {text}", style="bold #f0f6fc")
         self._log.write(msg)
         self._log.write(Text(""))
 
-    # ── 書き込み承認（元の mimic_linux と同じテキストベース） ────────────
+    # ── 書き込み承認 ──────────────────────────────────────────────────
 
-    _APPROVAL_TIMEOUT = 30  # 秒
+    _APPROVAL_TIMEOUT = 30
 
     def _make_approval_handler(self):
-        """エージェントスレッドから呼ばれる書き込み承認ハンドラを返す。
-        元の interactive_loop の _react_approval_handler と同等の動作。
-        ダイアログの代わりにチャットログにプロンプトを表示し、
-        Input を一時解放して Y/n を受け取る。30秒で自動承認。
-        """
         app = self
 
         def handler(tool_name: str, args: dict, preview: str) -> bool:
             from .utils import safe_print, C
 
             path = args.get("path", "?")
+            app.agent_status_text = "WAIT_APPROVAL"
+
             safe_print(C.yellow(f"\n  ┌─ 書き込み確認 ──────────────────────────────────────"))
             safe_print(C.yellow(f"  │  ツール : {tool_name}"))
             safe_print(C.yellow(f"  │  ファイル: {path}"))
@@ -200,7 +291,6 @@ class MimicApp(App):
                 end="",
             )
 
-            # Input を承認モードで一時解放
             done   = threading.Event()
             result = [True]
 
@@ -214,13 +304,14 @@ class MimicApp(App):
             if timed_out:
                 safe_print(C.gray(f"\n  ⏱ {app._APPROVAL_TIMEOUT}秒経過 → 自動承認"))
                 result[0] = True
-                # タイムアウト時は承認モードを解除する
                 app.call_from_thread(app._exit_approval_mode)
 
             if result[0]:
                 safe_print(C.green("  ✓ 承認しました"))
             else:
                 safe_print(C.red("  ✗ 拒否しました（処理を中断します）"))
+
+            app.agent_status_text = "THINKING"
             return result[0]
 
         return handler
@@ -230,33 +321,24 @@ class MimicApp(App):
         callback: Callable[[str], None],
         placeholder: str = "",
     ) -> None:
-        """メインスレッドで入力待ちモードに入る。Input を解放してユーザー入力を受け取れるようにする。
-        承認ハンドラ・/search 選択の両方で共用する。
-        """
         self._approval_callback = callback
         inp = self.query_one("#user-input", Input)
         inp.disabled    = False
         inp.placeholder = placeholder or (
-            f"Y/n を入力（Enter で承認・n で拒否・{self._APPROVAL_TIMEOUT}秒で自動承認）"
+            f"Y/n を入力（Enter で承認・{self._APPROVAL_TIMEOUT}秒で自動承認）"
         )
         inp.focus()
 
     def _exit_approval_mode(self) -> None:
-        """タイムアウト時に承認モードを解除してエージェント実行中の状態に戻す。"""
         self._approval_callback = None
         if self._agent_busy:
             inp = self.query_one("#user-input", Input)
             inp.disabled    = True
             inp.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
 
-    # ── AI レスポンスストリーム（RichLog に直接書き込む方式） ──────────
+    # ── AI レスポンスストリーム ──────────────────────────────────────
 
     def _stream_callback(self, text: str) -> None:
-        """PipelineTypewriter から生 Markdown テキストが来る（ワーカースレッドから呼ばれる）。
-        _flush_raw() が完結行/ブロック単位でバッファするので、
-        ここでは RichMarkdown として RichLog に直接書く。
-        ツール実行と AI レスポンスが同じログに時系列で流れる。
-        """
         if not text or not text.strip():
             return
         if self._log is None:
@@ -275,25 +357,20 @@ class MimicApp(App):
     # ── キーバインド・アクション ──────────────────────────────────────
 
     def action_interrupt(self) -> None:
-        """Ctrl+C: エージェント実行中なら中断、それ以外は何もしない。
-        元の interactive_loop の KeyboardInterrupt ハンドラと同等の動作。
-        PyThreadState_SetAsyncExc で worker スレッドに KeyboardInterrupt を送出する。
-        agent.py / orchestrator.py の各 except KeyboardInterrupt がそれを受け取る。
-        """
         if not self._agent_busy or self._worker_thread_id is None:
             return
         self._write_direct("\n  [割り込み] Ctrl+C — 中断を要求しました...\n")
+        self.agent_status_text = "INTERRUPTING"
         ctypes.pythonapi.PyThreadState_SetAsyncExc(
             ctypes.c_ulong(self._worker_thread_id),
             ctypes.py_object(KeyboardInterrupt),
         )
 
     def action_quit_app(self) -> None:
-        """終了前にセッションを保存する（元の exit/quit と同じ動作）。"""
-        from .utils import set_tui_output, set_tui_mode
+        from .utils import set_tui_output, set_tui_mode, set_tui_stream
 
-        sessions_dir  = self._ctx.get("sessions_dir")
-        react_log     = self._ctx["interactive_orch"].react_log
+        sessions_dir = self._ctx.get("sessions_dir")
+        react_log    = self._ctx["interactive_orch"].react_log
 
         if sessions_dir and react_log.entries:
             try:
@@ -302,7 +379,6 @@ class MimicApp(App):
             except Exception as e:
                 self._write_direct(f"  [Session] 保存失敗: {e}\n")
 
-        from .utils import set_tui_stream
         set_tui_mode(False)
         set_tui_output(None)
         set_tui_stream(None)
@@ -334,13 +410,10 @@ class MimicApp(App):
         text = event.value.strip()
         event.input.clear()
 
-        # ── 承認 / 選択 入力待ちモード ───────────────────────────────────
         if self._approval_callback is not None:
             callback = self._approval_callback
             self._approval_callback = None
-            callback(text)  # on_response(resp) を呼ぶ
-            # エージェント実行中（承認ハンドラ）→ 再度無効化
-            # エージェント未実行（/search 選択）→ 通常状態に戻す
+            callback(text)
             if self._agent_busy:
                 event.input.disabled    = True
                 event.input.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
@@ -407,7 +480,6 @@ class MimicApp(App):
         if match:
             _, handler, args = match
             handler(self._ctx["agent"], args)
-            # /cd 実行後は CWD が変わるのでタイトルを更新
             if cmd == "cd":
                 self._update_title()
         else:
@@ -417,19 +489,18 @@ class MimicApp(App):
             )
 
     def _cmd_mode(self, arg: str) -> None:
-        """モード切り替え。元の switch_mode() と同様に react_log もクリアする。"""
         arg = arg.strip().lower()
         if arg in ("interactive", "react", "i"):
             self._current_mode = "interactive"
             self._ctx["agent"].set_system_prompt(self._ctx["react_prompt"])
             self._ctx["agent"].clear_history()
-            self._ctx["interactive_orch"].react_log.clear()   # ← 元コードと同じ
+            self._ctx["interactive_orch"].react_log.clear()
             self._write_direct("⚡ モード: Interactive (ReAct)  会話履歴をリセットしました。\n")
         elif arg in ("plan", "p"):
             self._current_mode = "plan"
             self._ctx["agent"].set_system_prompt(self._ctx["plan_prompt"])
             self._ctx["agent"].clear_history()
-            self._ctx["interactive_orch"].react_log.clear()   # ← 元コードと同じ
+            self._ctx["interactive_orch"].react_log.clear()
             self._write_direct("≡  モード: Plan-and-Execute  会話履歴をリセットしました。\n")
         else:
             label = "Interactive (ReAct)" if self._current_mode == "interactive" else "Plan-and-Execute"
@@ -437,6 +508,7 @@ class MimicApp(App):
                 f"  現在: {label}\n"
                 "  切替: /mode interactive  /mode plan\n"
             )
+        self._refresh_status_ui()
 
     def _cmd_model(self, arg: str) -> None:
         if arg:
@@ -454,7 +526,6 @@ class MimicApp(App):
     # ── /search ──────────────────────────────────────────────────────
 
     def _cmd_search(self, query: str) -> None:
-        """/search コマンド。元の CLI と同じテキスト入力方式で注入選択を行う。"""
         from .commands import _search_sessions
 
         if not query:
@@ -467,7 +538,6 @@ class MimicApp(App):
             self._write_direct(f"  「{query}」に一致するログが見つかりませんでした。\n")
             return
 
-        # ヒット一覧を表示
         self._write_direct(f"\n🔍 「{query}」 — {len(hits)} 件ヒット\n")
         for i, h in enumerate(hits, 1):
             self._write_direct(f"  [{i}] {h['file']}  {h['ts']}\n")
@@ -478,7 +548,6 @@ class MimicApp(App):
             "  コンテキストに注入しますか？ [番号をカンマ区切り / all / n]: "
         )
 
-        # Input を一時解放して選択を受け取る（元コードの stdin.readline と同等）
         def on_response(resp: str) -> None:
             resp = resp.strip().lower()
             if not resp or resp == "n":
@@ -517,7 +586,8 @@ class MimicApp(App):
     # ── エージェント実行 ──────────────────────────────────────────────
 
     def _start_agent(self, user_input: str) -> None:
-        self._agent_busy = True
+        self._agent_busy       = True
+        self.agent_status_text = "THINKING"
         inp = self.query_one("#user-input", Input)
         inp.disabled    = True
         inp.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
@@ -529,7 +599,8 @@ class MimicApp(App):
     def _on_agent_done(self) -> None:
         self._agent_busy       = False
         self._worker_thread_id = None
-        self._flush_output_buf()  # 未完行バッファを書き出す
+        self.agent_status_text = "IDLE"
+        self._flush_output_buf()
         inp = self.query_one("#user-input", Input)
         inp.disabled    = False
         inp.placeholder = "❯ メッセージを入力  (/help でコマンド一覧)"
@@ -543,7 +614,6 @@ class MimicApp(App):
         try:
             self._ctx["interactive_orch"].run_react(user_input)
         except KeyboardInterrupt:
-            # 元の interactive_loop と同じメッセージ
             from .utils import C
             if self._log:
                 self.call_from_thread(
