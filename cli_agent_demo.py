@@ -554,11 +554,13 @@ class CLI_Agent_App(App):
             table = self.query_one("#task-table", DataTable)
             row_key = f"T-00{i + 1}"
             status_options = ["✅ Done", "✅ Done", "🔄 Running"]
-            # Check by looking up row; update_cell accepts string keys
+            # update_cell requires a ColumnKey object (not a string label)
             try:
                 table.get_row(row_key)
-                table.update_cell(row_key, "Status", status_options[i % 3])
-                table.update_cell(row_key, "Progress", f"{min(i * 35, 100)}%")
+                if self._status_col_key is not None:
+                    table.update_cell(row_key, self._status_col_key, status_options[i % 3])
+                if self._progress_col_key is not None:
+                    table.update_cell(row_key, self._progress_col_key, f"{min(i * 35, 100)}%")
             except KeyError:
                 pass  # Row doesn't exist yet, skip silently
 
