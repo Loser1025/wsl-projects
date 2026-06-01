@@ -15,27 +15,23 @@
   CBS(ml_cbsfs)       : 翌々月27日
 
 使い方（Google Colab）:
-  1. サービスアカウントJSONをアップロード
-  2. 下記の設定値を必要に応じて変更
-  3. main() を実行
+  1. 以下のセルを順番に実行
+  2. 認証ダイアログが表示されたら Google アカウントでログイン
 """
 import io, sys, calendar
 from datetime import datetime
 from collections import defaultdict
 
-import requests
 import gspread
-from google.oauth2.service_account import Credentials
+from google.colab import auth
+from google.auth import default
 from google.cloud import bigquery
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 # ==================== 設定 ====================
-# ★ Colab でアップロードしたサービスアカウントJSONのパスに変更してください
-SA_FILE     = "service-account.json"
 SHEET_ID    = "1NQU2SGVykYL3n35NgzL78R0fszK0vt5yacNSV151wYI"
 SHEET_NAME  = "2026年5月16日時点未解約データ"
-SCOPES      = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 BQ_PROJECT  = "stream-443709"
 # ==============================================
 
@@ -370,18 +366,18 @@ def main():
     print("スプレッドシート自動補完（Google Colab 用）")
     print("=" * 55)
 
-    # --- Google 認証 ---
-    creds = Credentials.from_service_account_file(SA_FILE, scopes=SCOPES)
-    gc    = gspread.authorize(creds)
-    ws    = gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
+    # --- Google 認証（ブラウザ認証） ---
+    auth.authenticate_user()
+    creds, project = default()
+    print("✅ 認証完了")
+
+    # --- スプレッドシート接続 ---
+    gc = gspread.authorize(creds)
+    ws = gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
     print(f"シート「{SHEET_NAME}」接続完了")
 
     # --- BigQuery クライアント ---
-    bq_creds = Credentials.from_service_account_file(
-        SA_FILE,
-        scopes=["https://www.googleapis.com/auth/bigquery"]
-    )
-    bq_client = bigquery.Client(project=BQ_PROJECT, credentials=bq_creds)
+    bq_client = bigquery.Client(project=BQ_PROJECT, credentials=creds)
     print("BigQuery クライアント初期化完了")
 
     # 処理①
