@@ -10,7 +10,7 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Vertical
+from textual.containers import Container, Horizontal, Vertical
 from textual.reactive import reactive
 from textual.message import Message
 from textual.widgets import Footer, RichLog, Static, TabbedContent, TabPane, TextArea, Tree
@@ -132,10 +132,25 @@ class MimicApp(App):
         padding: 0;
     }
 
+    #files-split {
+        height: 1fr;
+        layout: horizontal;
+    }
+
     #file-tree {
+        width: 1fr;
         height: 1fr;
         background: #0d1117;
         padding: 0 1;
+        scrollbar-color: #00ff41;
+        border-right: solid #30363d;
+    }
+
+    #file-preview {
+        width: 2fr;
+        height: 1fr;
+        background: #0d1117;
+        padding: 0 2;
         scrollbar-color: #00ff41;
     }
 
@@ -188,7 +203,9 @@ class MimicApp(App):
             with TabPane("💬 Chat", id="tab-chat"):
                 yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
             with TabPane("📁 Files", id="tab-files"):
-                yield Tree("", id="file-tree")
+                with Horizontal(id="files-split"):
+                    yield Tree("", id="file-tree")
+                    yield RichLog(id="file-preview", highlight=False, markup=False, wrap=True)
             with TabPane("📝 Scratchpad", id="tab-scratchpad"):
                 yield RichLog(id="scratchpad-log", highlight=False, markup=True, wrap=True)
             with TabPane("📜 Log", id="tab-log"):
@@ -231,6 +248,7 @@ class MimicApp(App):
         self._refresh_status_ui()
         self._set_input_hint("idle")
         self._build_file_tree()
+        self._show_file_preview(None)
         self._refresh_scratchpad_tab()
         self.query_one("#workflow-view", RichLog).write(
             "[dim]Plan モード（/mode plan）で実行すると表示されます。[/dim]"
@@ -323,11 +341,39 @@ class MimicApp(App):
         if not event.node.data:
             return
         path = Path(event.node.data)
-        target = path if path.is_dir() else path.parent
-        self._ctx["agent"].cwd = str(target)
-        self._update_title()
-        self._write_direct(f"  📁 作業Dir → {target}\n")
-        self._build_file_tree()
+        if path.is_dir():
+            self._ctx["agent"].cwd = str(path)
+            self._update_title()
+            self._write_direct(f"  📁 作業Dir → {path}\n")
+            self._build_file_tree()
+            self._show_file_preview(None)
+        else:
+            self._show_file_preview(path)
+
+    def _show_file_preview(self, path) -> None:
+        preview = self.query_one("#file-preview", RichLog)
+        preview.clear()
+        if path is None:
+            preview.write(Text.from_ansi("ファイルを選択してください"))
+            return
+        from pathlib import Path
+        p = Path(path)
+        try:
+            size = p.stat().st_size
+            if size > 200_000:
+                preview.write(Text.from_ansi(
+                    f"ファイルが大きすぎます ({size:,} bytes)\n先頭200行のみ表示します\n{'─'*40}"
+                ))
+            text = p.read_text(encoding="utf-8", errors="replace")
+            lines = text.splitlines()[:200]
+            preview.write(Text.from_ansi(f"📄 {p.name}  ({len(text):,} chars, {len(lines)} lines)\n{'─'*40}"))
+            for i, line in enumerate(lines, 1):
+                preview.write(Text.from_ansi(f"{i:4d}  {line}"))
+            if len(text.splitlines()) > 200:
+                preview.write(Text.from_ansi(f"{'─'*40}\n... 残り {len(text.splitlines()) - 200} 行"))
+        except Exception as e:
+            preview.write(Text.from_ansi(f"読み込みエラー: {e}"))
+        preview.scroll_home()
 
     # ── タブ: Scratchpad ─────────────────────────────────────────────
 
