@@ -19,3 +19,11 @@ mimic_linux/.mimic/sessions/
 .vscode/
 .idea/
 *.swp
+
+# シークレットファイル
+ageless-impulse-488713-m6-03014b3cddad.json
+mimic4/.env
+mimic4/.env.bak
+mimic_claude/.mimic/sessions/
+mimic_tui/.mimic/sessions/
+mimic_tui/mimic.log
