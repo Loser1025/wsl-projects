@@ -35,7 +35,7 @@ except AttributeError:
 
 # ==================== 設定 ====================
 SHEET_ID    = "1NQU2SGVykYL3n35NgzL78R0fszK0vt5yacNSV151wYI"
-SHEET_NAME  = "2026年5月16日時点未解約データ"
+SHEET_NAME  = "未解約データ"
 BQ_PROJECT  = "stream-443709"
 # ==============================================
 
