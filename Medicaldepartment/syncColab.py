@@ -27,7 +27,11 @@ from google.colab import auth
 from google.auth import default
 from google.cloud import bigquery
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+# sys.stdout のエンコーディング設定（Colab では不要、ローカル用）
+try:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+except AttributeError:
+    pass  # Colab の OutStream には buffer 属性がないのでスキップ
 
 # ==================== 設定 ====================
 SHEET_ID    = "1NQU2SGVykYL3n35NgzL78R0fszK0vt5yacNSV151wYI"
