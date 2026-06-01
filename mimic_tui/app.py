@@ -257,7 +257,6 @@ class MimicApp(App):
         self._process_input(text)
 
     def _process_input(self, text: str) -> None:
-        """Ctrl+Enter で確定したテキストを処理する。"""
         if self._approval_callback is not None:
             callback = self._approval_callback
             self._approval_callback = None
