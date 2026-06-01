@@ -26,6 +26,8 @@ mimic4/.env
 mimic4/.env.bak
 mimic_linux/.env.bak
 mimic_tui/.env
+mimic_claude/.env
+mimic_claude/.env.bak
 mimic_claude/.mimic/sessions/
 mimic_tui/.mimic/sessions/
 mimic_tui/mimic.log
