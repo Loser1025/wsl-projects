@@ -544,9 +544,13 @@ class CLI_Agent_App(App):
             table = self.query_one("#task-table", DataTable)
             row_key = f"T-00{i + 1}"
             status_options = ["✅ Done", "✅ Done", "🔄 Running"]
-            if row_key in table.rows:
+            # Check by looking up row; update_cell accepts string keys
+            try:
+                table.get_row(row_key)
                 table.update_cell(row_key, "Status", status_options[i % 3])
                 table.update_cell(row_key, "Progress", f"{min(i * 35, 100)}%")
+            except KeyError:
+                pass  # Row doesn't exist yet, skip silently
 
             # Update reactive counter on the UI thread directly
             counter = self.query_one("#task-counter", TaskCounter)
