@@ -541,7 +541,7 @@ class CLI_Agent_App(App):
                     partial = accumulated.strip()
                     chat.clear()
                     chat.write(partial)
-                    await asyncio.sleep(0.02)
+                    await asyncio.sleep(0.005)
                 chat.write("")  # newline separator
 
                 # Also update the Markdown output tab
