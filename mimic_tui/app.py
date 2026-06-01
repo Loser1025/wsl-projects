@@ -85,9 +85,8 @@ class MimicApp(App):
     #chat-log {
         height: 1fr;
         background: #0d1117;
-        border: round #30363d;
+        border: none;
         padding: 1 2;
-        margin: 0 2;
         scrollbar-color: #00ff41;
     }
 
@@ -122,7 +121,7 @@ class MimicApp(App):
 
     TabbedContent {
         height: 1fr;
-        margin: 0 2;
+        margin: 0 2 0 2;
     }
 
     TabbedContent ContentSwitcher {
@@ -150,13 +149,18 @@ class MimicApp(App):
     """
 
     BINDINGS = [
-        Binding("ctrl+c",    "interrupt",   "中断",       show=True),
-        Binding("ctrl+q",    "quit_app",    "終了",       show=True),
-        Binding("ctrl+l",    "clear_log",   "画面クリア", show=False),
-        Binding("pageup",    "scroll_up",   "↑",          show=False, priority=True),
-        Binding("pagedown",  "scroll_down", "↓",          show=False, priority=True),
-        Binding("ctrl+home", "scroll_top",  "先頭",       show=False),
-        Binding("ctrl+end",  "scroll_end",  "末尾",       show=False),
+        Binding("ctrl+c",    "interrupt",        "中断",         show=True),
+        Binding("ctrl+q",    "quit_app",          "終了",         show=True),
+        Binding("ctrl+l",    "clear_log",         "画面クリア",   show=False),
+        Binding("pageup",    "scroll_up",         "↑",            show=False, priority=True),
+        Binding("pagedown",  "scroll_down",       "↓",            show=False, priority=True),
+        Binding("ctrl+home", "scroll_top",        "先頭",         show=False),
+        Binding("ctrl+end",  "scroll_end",        "末尾",         show=False),
+        Binding("f1", "switch_tab('tab-chat')",       "Chat",       show=True, priority=True),
+        Binding("f2", "switch_tab('tab-files')",      "Files",      show=True, priority=True),
+        Binding("f3", "switch_tab('tab-scratchpad')", "Scratch",    show=True, priority=True),
+        Binding("f4", "switch_tab('tab-log')",        "Log",        show=True, priority=True),
+        Binding("f5", "switch_tab('tab-workflow')",   "Workflow",   show=True, priority=True),
     ]
 
     agent_status_text = reactive("IDLE")
@@ -264,6 +268,122 @@ class MimicApp(App):
             )
         except Exception:
             pass
+
+    # ── タブ: Files ──────────────────────────────────────────────────
+
+    def _build_file_tree(self) -> None:
+        from pathlib import Path
+        tree = self.query_one("#file-tree", Tree)
+        tree.clear()
+        root = Path(self._ctx["agent"].cwd)
+        tree.root.set_label(f"📁 {root}")
+        tree.root.data = str(root)
+        self._populate_tree(tree.root, root)
+        tree.root.expand()
+
+    def _populate_tree(self, node, path, depth: int = 0) -> None:
+        from pathlib import Path
+        if depth > 2:
+            return
+        ignore = {".git", "__pycache__", "node_modules", ".venv", "venv", ".mypy_cache"}
+        try:
+            items = sorted(Path(path).iterdir(), key=lambda p: (p.is_file(), p.name))
+            for item in items:
+                if item.name in ignore or item.name.startswith("."):
+                    continue
+                if item.is_dir():
+                    child = node.add(f"📁 {item.name}", data=str(item))
+                    self._populate_tree(child, item, depth + 1)
+                else:
+                    node.add_leaf(f"📄 {item.name}", data=str(item))
+        except PermissionError:
+            pass
+
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        """タブ切り替え時のフォーカス管理（Ctrl+1-5 以外の経路用）。"""
+        if str(event.tab.id) == "tab-files--content-tab-files":
+            self.query_one("#file-tree", Tree).focus()
+
+    def on_key(self, event) -> None:
+        if event.key == "backspace":
+            focused = self.focused
+            if focused and getattr(focused, "id", None) == "file-tree":
+                from pathlib import Path
+                parent = Path(self._ctx["agent"].cwd).parent
+                if parent != Path(self._ctx["agent"].cwd):
+                    self._ctx["agent"].cwd = str(parent)
+                    self._update_title()
+                    self._build_file_tree()
+                    self.query_one("#file-tree", Tree).focus()
+                event.prevent_default()
+                event.stop()
+
+    def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
+        from pathlib import Path
+        if not event.node.data:
+            return
+        path = Path(event.node.data)
+        target = path if path.is_dir() else path.parent
+        self._ctx["agent"].cwd = str(target)
+        self._update_title()
+        self._write_direct(f"  📁 作業Dir → {target}\n")
+        self._build_file_tree()
+
+    # ── タブ: Scratchpad ─────────────────────────────────────────────
+
+    def _refresh_scratchpad_tab(self) -> None:
+        from .utils import get_scratchpad
+        log = self.query_one("#scratchpad-log", RichLog)
+        log.clear()
+        content = get_scratchpad()
+        if content:
+            log.write(content)
+        else:
+            log.write("[dim]スクラッチパッドはまだ空です。[/dim]")
+
+    # ── タブ: Log ────────────────────────────────────────────────────
+
+    def _refresh_log_tab(self) -> None:
+        log = self.query_one("#log-view", RichLog)
+        log.clear()
+        entries = self._ctx["interactive_orch"].react_log.entries
+        if not entries:
+            log.write("[dim]ログエントリがありません。[/dim]")
+            return
+        for e in entries[-100:]:
+            ev   = e.get("event", "")
+            role = e.get("role", "")
+            if ev == "session_start":
+                log.write(f"[bold #58a6ff]▶ セッション開始  model={e.get('model','')}[/]")
+            elif role == "user":
+                msg = str(e.get("content", ""))[:120]
+                log.write(f"[bold #00ff41]❯ {msg}[/]")
+            elif role == "assistant":
+                log.write(f"[#8b949e]⬡ (assistant response)[/]")
+            elif ev == "tool_call":
+                log.write(f"[#ffda6a]⚙ {e.get('name','')}({str(e.get('args',''))[:60]})[/]")
+            elif ev == "tool_result":
+                res = str(e.get("content",""))[:80]
+                log.write(f"[dim]  → {res}[/]")
+
+    # ── タブ: Workflow ───────────────────────────────────────────────
+
+    def _refresh_workflow_tab(self, steps: list) -> None:
+        log = self.query_one("#workflow-view", RichLog)
+        log.clear()
+        icons = {"pending":"○", "running":"▶", "done":"✓", "failed":"✗",
+                 "retrying":"↻", "skipped":"⏭"}
+        colors = {"pending":"#8b949e", "running":"#ffda6a", "done":"#00ff41",
+                  "failed":"#ff6b6b", "retrying":"#ffda6a", "skipped":"#8b949e"}
+        total = len(steps)
+        done  = sum(1 for s in steps if s.status == "done")
+        log.write(f"[bold #58a6ff]Plan-and-Execute  {done}/{total} ステップ完了[/]\n")
+        for s in steps:
+            icon  = icons.get(s.status, "○")
+            color = colors.get(s.status, "#8b949e")
+            par   = "  [⚡並列]" if getattr(s, "parallel", False) else ""
+            label = f"  [{s.label}]" if s.label else ""
+            log.write(f"[{color}]  {icon} Step {s.index}: {s.description}{par}{label}[/]")
 
     # ── 動的高さ調整 ──────────────────────────────────────────────────
 
@@ -495,6 +615,19 @@ class MimicApp(App):
         set_tui_stream(None)
         self.exit()
 
+    def action_switch_tab(self, tab_id: str) -> None:
+        self.query_one(TabbedContent).active = tab_id
+        if tab_id == "tab-files":
+            self.query_one("#file-tree", Tree).focus()
+        elif tab_id == "tab-scratchpad":
+            self._refresh_scratchpad_tab()
+            self.query_one("#user-input", ChatInput).focus()
+        elif tab_id == "tab-log":
+            self._refresh_log_tab()
+            self.query_one("#user-input", ChatInput).focus()
+        else:
+            self.query_one("#user-input", ChatInput).focus()
+
     def action_clear_log(self) -> None:
         if self._log:
             self._log.clear()
@@ -677,6 +810,8 @@ class MimicApp(App):
         self._set_input_hint("idle")
         if self._log:
             self._log.write(Text.from_ansi("─" * 60))
+        self._refresh_scratchpad_tab()
+        self._refresh_log_tab()
         ta.focus()
 
     @work(thread=True, exclusive=True)
@@ -703,8 +838,13 @@ class MimicApp(App):
     def _run_plan(self, user_input: str) -> None:
         self._worker_thread_id = threading.current_thread().ident
 
+        _all_steps: list = []
+
         def on_plan(steps: list) -> None:
+            _all_steps.clear()
+            _all_steps.extend(steps)
             self.call_from_thread(self._show_plan_header, steps)
+            self.call_from_thread(self._refresh_workflow_tab, list(steps))
 
         def on_step(step) -> None:
             icons = {
@@ -719,6 +859,7 @@ class MimicApp(App):
             msg      = f"  {icon} Step {step.index}: {step.description}{parallel}\n"
             if self._log:
                 self.call_from_thread(self._log.write, Text.from_ansi(msg))
+            self.call_from_thread(self._refresh_workflow_tab, list(_all_steps))
 
         try:
             self._ctx["orchestrator"].run_with_plan(
