@@ -45,7 +45,6 @@ class MimicApp(App):
     """mimic_claude Textual TUI アプリ (2ペイン仕様)。"""
 
     TITLE = "mimic"
-    ENABLE_MOUSE = False  # 端末本来のマウス選択を有効にするため無効化
 
     CSS = """
     Screen {

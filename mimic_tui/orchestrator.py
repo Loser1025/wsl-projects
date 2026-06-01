@@ -227,8 +227,6 @@ BASH_EXECUTOR_GUIDANCE = """\
 [専用ツールへの置き換え（必須）]
 以下のコマンドは run_bash を使わず、必ず専用ツールを呼ぶこと:
 - stat <file> / wc -l <file>  →  file_info(path=<file>)
-- ls / ls -la <dir>           →  list_directory(path=<dir>)
-- find <dir> -type f          →  search_files(pattern="*", directory=<dir>)
 
 [ツール出力の制限（必須遵守）]
 - すべてのツール出力は10000文字を超えると自動的にメモリにキャッシュされ、先頭10000文字と cache_key が返される。
@@ -257,11 +255,11 @@ REVIEWER_SYSTEM_PROMPT = """\
 
 REFLECTOR_SYSTEM_PROMPT = """\
 あなたはタスク完了検証の専門家です。
-read_file や list_directory ツールを使って実際にファイルや結果を確認し、
+read_file や run_bash ツールを使って実際にファイルや結果を確認し、
 クライアントの要望が完全・正確に達成されているか判定してください。
 
 検証手順:
-1. タスクで作成・変更・実行されたはずのファイルやリソースを read_file / list_directory で実際に確認する
+1. タスクで作成・変更・実行されたはずのファイルやリソースを read_file / run_bash("ls ...") で実際に確認する
 2. 期待する内容と一致しているか検証する
 3. 確認結果に基づいて判定する
 
@@ -326,10 +324,10 @@ REACT_SYSTEM_PROMPT = """
 file_info, search_in_file, grep_codebase, run_pipeline, run_bash
 
 ### ファイル操作
-read_file, read_tool_cache, write_file, edit_file, patch_file, delete_file, move_file
+read_file, read_tool_cache, write_file, edit_file, patch_file
 
 ### 探索
-list_directory, search_files, get_repo_map
+get_repo_map, run_bash("ls / find ...")
 
 ### Web
 web_search, fetch_webpage
@@ -366,10 +364,9 @@ class AgentOrchestrator:
         # Executor: 外部から渡されたインスタンスを使う（main の agent と同一にしてセッション履歴を共有）
         self.executor = executor if executor is not None else OpenRouterAgent(rotator, tool_registry)
 
-        # Reflector: 全体タスク完了後の最終検証（read_file・list_directory のみ許可）
+        # Reflector: 全体タスク完了後の最終検証（読み取り系のみ許可）
         verify_registry = ToolRegistry()
-        for spec_name in ("read_file", "list_directory"):
-            # グローバル tools レジストリから読み取り系ツールだけを複製
+        for spec_name in ("read_file", "run_bash", "file_info"):
             verify_registry.copy_tool(spec_name, tool_registry)
         self.reflector = OpenRouterAgent(rotator, verify_registry)
         self.reflector.set_system_prompt(REFLECTOR_SYSTEM_PROMPT)
@@ -524,7 +521,7 @@ class AgentOrchestrator:
         )
         tool_names = ", ".join(
             t["function"]["name"] for t in self.tool_registry.get_specs()
-        ) if self.tool_registry.get_specs() else "run_bash, read_file, write_file, edit_file, search_files, web_search"
+        ) if self.tool_registry.get_specs() else "run_bash, read_file, write_file, edit_file, web_search"
         return (
             f"[全体タスク] {user_message}\n\n"
             f"[完了済みステップ]\n{completed_text}\n\n"
@@ -817,7 +814,7 @@ class AgentOrchestrator:
             f"[作業フォルダ] {self.executor.cwd}\n\n"
             f"[実行ステップ]\n{step_summary}\n"
             f"[Executorの最終報告]\n{final_result[:max_chars]}\n\n"
-            f"1. read_file や list_directory で実際にファイルを確認し、タスクが正確に完了しているか検証してください。\n\n"
+            f"1. read_file や run_bash で実際にファイルを確認し、タスクが正確に完了しているか検証してください。\n\n"
             f"出力形式(JSONのみ):\n"
             f"{{\n"
             f"  \"ok\": true/false,\n"
@@ -875,7 +872,7 @@ class AgentOrchestrator:
 
             tool_names = ", ".join(
                 t["function"]["name"] for t in self.tool_registry.get_specs()
-            ) if self.tool_registry.get_specs() else "run_bash, read_file, write_file, edit_file, search_files, web_search"
+            ) if self.tool_registry.get_specs() else "run_bash, read_file, write_file, edit_file, web_search"
             plan_prompt = (
                 "以下のタスクを実行ステップのJSONに分解してください。\n\n"
                 "【出力ルール・絶対厳守】\n"

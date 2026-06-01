@@ -183,7 +183,7 @@ def main():
 
     from .app import MimicApp
     app = MimicApp(ctx)
-    app.run()
+    app.run(mouse=False)
 
 
 if __name__ == "__main__":

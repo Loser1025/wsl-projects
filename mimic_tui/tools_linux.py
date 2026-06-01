@@ -201,10 +201,7 @@ def run_bash(
 
 @tools.register(
     name="file_info",
-    description=(
-        "ファイルの行数・サイズ・種類を返す。read_file の前に必ず呼んでサイズを確認する。"
-        "5,000文字（約100行）を超えるファイルは search_in_file か grep_codebase を使うこと。"
-    ),
+    description="ファイルの行数・サイズ・種類を返す。read_file 前のサイズ確認に使う。",
     parameters={
         "type": "object",
         "properties": {
@@ -244,11 +241,7 @@ def file_info(path: str) -> str:
 
 @tools.register(
     name="search_in_file",
-    description=(
-        "ファイル内をパターン検索して該当行と前後N行を返す。"
-        "read_file の代わりにまず試すべきツール。コンテキスト消費を大幅に削減できる。"
-        "例: search_in_file(pattern='def process', path='main.py', context_lines=5)"
-    ),
+    description="ファイル内をパターン検索して該当行と前後N行を返す。read_file より先に試すこと。",
     parameters={
         "type": "object",
         "properties": {
@@ -280,11 +273,7 @@ def search_in_file(pattern: str, path: str, context_lines: int = 3, ignore_case:
 
 @tools.register(
     name="grep_codebase",
-    description=(
-        "コードベース全体をキーワード検索する。get_repo_map + read_file の代替として使う。"
-        "ファイルを読まずに「どのファイルの何行目にあるか」を特定できる。"
-        "例: grep_codebase(pattern='def target_func', directory='src', file_type='py')"
-    ),
+    description="コードベース全体をキーワード検索し、ファイル名と行番号を返す。",
     parameters={
         "type": "object",
         "properties": {
@@ -326,11 +315,7 @@ def grep_codebase(
 
 @tools.register(
     name="smart_read",
-    description=(
-        "ファイルを読む。focus キーワードがあれば自動的に grep で絞り込む。"
-        "大きいファイルで focus なしの場合は推奨アクションを案内する。"
-        "通常の read_file より先にこちらを試すこと。"
-    ),
+    description="ファイルを読む。focus 指定で grep 絞り込み、大ファイルは推奨アクションを案内。read_file より先に試すこと。",
     parameters={
         "type": "object",
         "properties": {

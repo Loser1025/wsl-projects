@@ -180,15 +180,7 @@ _browser_registry = ToolRegistry()
 
 @tools.register(
     name="update_scratchpad",
-    description=(
-        "エージェント自身の作業メモ（Scratchpad）を更新する。"
-        "ターンをまたいだ記憶喪失を防ぐため、タスクの節目ごとに必ず呼び出すこと。\n"
-        "以下のフォーマットで書くこと（800字以内）:\n"
-        "【ゴール】ユーザーの最終目標を1行で\n"
-        "【完了済み】✓ やったこと\n"
-        "【次のステップ】→ 次にやること\n"
-        "【発見・注意】⚠ 判明した制約・エラー・重要な変数"
-    ),
+    description="作業メモを更新する（800字以内）。ゴール・完了済み・次のステップ・発見事項を記録し記憶喪失を防ぐ。",
     parameters={
         "type": "object",
         "properties": {
@@ -209,10 +201,8 @@ _READ_FILE_CHAR_CHUNK = _TOOL_CHUNK_SIZE
 @tools.register(
     name="read_file",
     description=(
-        f"ローカルファイルの内容を{_READ_FILE_CHAR_CHUNK}文字単位で読み取る。"
-        f"1回の呼び出しで最大{_READ_FILE_CHAR_CHUNK}文字を返す。"
-        "大きいファイルはoffset=0から始め、末尾に表示される次のoffset値を使って順番に読むこと。"
-        "例: offset=0 で先頭10000字、offset=10000 で次の10000字。"
+        f"ファイルを{_READ_FILE_CHAR_CHUNK}文字単位で読む。offset で続きを読める。"
+        "大きいファイルは先に search_in_file / grep_codebase を試すこと。"
     ),
     parameters={
         "type": "object",
@@ -391,151 +381,6 @@ def write_file(path: str, content: str) -> str:
     
     return f"{warning}書き込み完了: {path} ({len(content)} 文字)"
 
-@tools.register(
-    name="list_directory",
-    description="ディレクトリの内容を一覧表示する",
-    parameters={
-        "type": "object",
-        "properties": {
-            "path": {"type": "string", "description": "一覧表示するディレクトリパス"}
-        },
-        "required": ["path"]
-    }
-)
-def list_directory(path: str) -> str:
-    p = Path(path)
-    if not p.exists():
-        return f"エラー: ディレクトリが見つかりません: {path}"
-    entries = sorted(p.iterdir(), key=lambda x: (x.is_file(), x.name))
-    lines = []
-    for e in entries:
-        kind = "FILE" if e.is_file() else "DIR "
-        size = f"{e.stat().st_size:>10}" if e.is_file() else "          "
-        lines.append(f"{kind}  {size}  {e.name}")
-    return f"--- {path} ({len(lines)} items) ---\n" + "\n".join(lines)
-
-@tools.register(
-    name="glob",
-    description=(
-        "ファイル名のglobパターンで一致するファイル・ディレクトリの一覧を返す。"
-        "拡張子検索・ファイル名パターン検索に使う（内容検索はsearch_filesを使うこと）。"
-        "例: pattern='**/*.py' で全Pythonファイル、'src/**/*.ts' でsrc以下のTypeScriptファイル。"
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "pattern":     {"type": "string",  "description": "globパターン（例: **/*.py, src/**/*.ts, *.json）"},
-            "path":        {"type": "string",  "description": "検索ルートディレクトリ（省略時はカレント）", "default": "."},
-            "max_results": {"type": "integer", "description": "最大件数（デフォルト200）", "default": 200},
-        },
-        "required": ["pattern"]
-    }
-)
-def glob_files(pattern: str, path: str = ".", max_results: int = 200) -> str:
-    root = Path(path)
-    if not root.exists():
-        return f"エラー: ディレクトリが見つかりません: {path}"
-    try:
-        matches = sorted(root.glob(pattern))
-    except Exception as e:
-        return f"globエラー: {e}"
-    if not matches:
-        return f"「{pattern}」にマッチするファイルが見つかりませんでした。（検索: {path}）"
-    lines = []
-    for m in matches[:max_results]:
-        kind = "DIR " if m.is_dir() else "FILE"
-        try:
-            rel = m.relative_to(root)
-        except ValueError:
-            rel = m
-        size = f"{m.stat().st_size:>10}" if m.is_file() else "          "
-        lines.append(f"{kind}  {size}  {rel}")
-    truncated = len(matches) > max_results
-    suffix = f"（先頭{max_results}件を表示、計{len(matches)}件）" if truncated else f"（計{len(matches)}件）"
-    header = f"glob: 「{pattern}」 {suffix}  [{path}]\n"
-    return header + "\n".join(lines)
-
-@tools.register(
-    name="grep",
-    description=(
-        "ripgrep（rg）でファイルをキーワード検索する。search_filesより高速で重いディレクトリも安全。"
-        "正規表現対応。glob_patternでファイル種別を絞り込み可能（例: *.py）。"
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "pattern":       {"type": "string",  "description": "検索する正規表現パターン"},
-            "path":          {"type": "string",  "description": "検索対象ディレクトリまたはファイルパス（省略時はカレント）", "default": "."},
-            "glob_pattern":  {"type": "string",  "description": "対象ファイルのglobフィルタ（例: *.py, **/*.ts）"},
-            "context_lines": {"type": "integer", "description": "マッチ行の前後に表示する行数（grep -C 相当）", "default": 0},
-            "max_results":   {"type": "integer", "description": "最大マッチ行数", "default": 50},
-            "case_sensitive":{"type": "boolean", "description": "大文字小文字を区別する（デフォルトは区別しない）", "default": False}
-        },
-        "required": ["pattern"]
-    }
-)
-def grep(pattern: str, path: str = ".", glob_pattern: str = "",
-         context_lines: int = 0, max_results: int = 50,
-         case_sensitive: bool = False) -> str:
-    import os
-    import re
-    import fnmatch
-    from pathlib import Path
-
-    flags = 0 if case_sensitive else re.IGNORECASE
-    try:
-        regex = re.compile(pattern, flags)
-    except re.error as e:
-        return f"エラー: 不正な正規表現です: {e}"
-
-    results = []
-    search_root = Path(path)
-    if not search_root.exists():
-        return f"エラー: パスが見つかりません: {path}"
-
-    # 検索除外ディレクトリ
-    ignore_dirs = {".git", "__pycache__", "venv", "node_modules", ".idea", ".vscode"}
-
-    for root, dirs, files in os.walk(search_root):
-        # 除外ディレクトリをスキップ
-        dirs[:] = [d for d in dirs if d not in ignore_dirs]
-        
-        for file in files:
-            if glob_pattern and not fnmatch.fnmatch(file, glob_pattern):
-                continue
-            
-            file_path = Path(root) / file
-            try:
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                    all_lines = f.readlines()
-                
-                for i, line in enumerate(all_lines):
-                    if regex.search(line):
-                        # 前後のコンテキスト行を抽出
-                        start = max(0, i - context_lines)
-                        end = min(len(all_lines), i + context_lines + 1)
-                        
-                        for ctx_i in range(start, end):
-                            prefix = ">" if ctx_i == i else " "
-                            results.append(f"{file_path}:{ctx_i + 1}:{prefix}{all_lines[ctx_i].rstrip()}")
-                        
-                        if len(results) >= max_results:
-                            break
-            except Exception:
-                continue # 読み取り不能なファイルはスキップ
-            
-            if len(results) >= max_results:
-                break
-        if len(results) >= max_results:
-            break
-
-    if not results:
-        return f"「{pattern}」にマッチする行が見つかりませんでした。"
-
-    truncated = len(results) > max_results
-    final_results = results[:max_results]
-    header = f"grep (py): 「{pattern}」 — {len(final_results)} 行{'（上限で切り捨て）' if truncated else ''}\n"
-    return header + "\n".join(final_results)
 
 @tools.register(
     name="edit_file",
@@ -865,51 +710,6 @@ def patch_file(path: str, search: str, replace: str) -> str:
         f"ヒント: read_file で現在の内容を確認し、正確な（特にインデントや改行を含む）文字列を指定してください。"
     )
 
-@tools.register(
-    name="delete_file",
-    description=(
-        "ファイルを削除する。**元に戻せない操作**。"
-        "Auto-Git チェックポイントが自動作成されるため /undo で復元可能。"
-        "ディレクトリは削除不可（run_bash で rm -rf を使うこと）。"
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "path": {"type": "string", "description": "削除するファイルパス"}
-        },
-        "required": ["path"]
-    }
-)
-def delete_file(path: str) -> str:
-    p = Path(path)
-    if not p.exists():
-        return f"エラー: ファイルが見つかりません: {path}"
-    if p.is_dir():
-        return f"エラー: ディレクトリは削除できません（run_bash で rm -rf を使うこと）: {path}"
-    size = p.stat().st_size
-    p.unlink()
-    return f"削除完了: {path} ({size:,} バイト)"
-
-@tools.register(
-    name="move_file",
-    description="ファイルまたはディレクトリを移動・リネームする。",
-    parameters={
-        "type": "object",
-        "properties": {
-            "src":  {"type": "string", "description": "移動元のパス"},
-            "dst":  {"type": "string", "description": "移動先のパス（ファイル名変更も可）"}
-        },
-        "required": ["src", "dst"]
-    }
-)
-def move_file(src: str, dst: str) -> str:
-    import shutil
-    s, d = Path(src), Path(dst)
-    if not s.exists():
-        return f"エラー: 移動元が見つかりません: {src}"
-    d.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(s), str(d))
-    return f"移動完了: {src} → {dst}"
 
 # ── search_history ツール ──────────────────────────────────────────
 _sessions_dir_for_tool: "Optional[Path]" = None
