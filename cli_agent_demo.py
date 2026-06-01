@@ -524,7 +524,7 @@ class CLI_Agent_App(App):
 
         for i, (kind, content) in enumerate(self._demo_messages, 1):
             # Stream a small delay
-            await asyncio.sleep(0.6 + random.random() * 0.4)
+            await asyncio.sleep(0.15 + random.random() * 0.1)
 
             if kind == "thinking":
                 chat.write(f"[italic dim]* {content.strip()} *[/italic dim]")
