@@ -591,8 +591,10 @@ class CLI_Agent_App(App):
         for row_key in all_task_ids:
             try:
                 table.get_row(row_key)
-                table.update_cell(row_key, "Status", "✅ Done")
-                table.update_cell(row_key, "Progress", "100%")
+                if self._status_col_key is not None:
+                    table.update_cell(row_key, self._status_col_key, "✅ Done")
+                if self._progress_col_key is not None:
+                    table.update_cell(row_key, self._progress_col_key, "100%")
             except KeyError:
                 pass
         # Final counter update (avoid no-op assignment)
