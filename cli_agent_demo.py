@@ -574,13 +574,19 @@ class CLI_Agent_App(App):
 
         # Reset all task rows to show completion
         table = self.query_one("#task-table", DataTable)
-        for row_key in list(table.rows.keys()):
-            if row_key in table.rows:
+        # Iterate over the known task IDs that were seeded
+        all_task_ids = ["T-001", "T-002", "T-003", "T-004", "T-005"]
+        for row_key in all_task_ids:
+            try:
+                table.get_row(row_key)
                 table.update_cell(row_key, "Status", "✅ Done")
                 table.update_cell(row_key, "Progress", "100%")
-        # Final counter update
+            except KeyError:
+                pass
+        # Final counter update (avoid no-op assignment)
         counter = self.query_one("#task-counter", TaskCounter)
-        counter.done = counter.total
+        if counter.done != counter.total:
+            counter.done = counter.total
 
     def _add_simulated_task(self) -> None:
         """Add a simulated task to the table."""
