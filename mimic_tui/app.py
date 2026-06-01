@@ -12,6 +12,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.reactive import reactive
+from textual.message import Message
 from textual.widgets import Footer, RichLog, Static, TextArea
 
 
@@ -19,6 +20,25 @@ from textual.widgets import Footer, RichLog, Static, TextArea
 _INPUT_MIN_LINES = 1
 _INPUT_MAX_LINES = 5
 _INPUT_BAR_BORDER = 2  # round ボーダー上下
+
+
+class ChatInput(TextArea):
+    """Enter で送信・Shift+Enter で改行するチャット入力欄。"""
+
+    class Submit(Message):
+        """送信トリガー。"""
+
+    def _on_key(self, event) -> None:
+        if event.key == "enter":
+            event.prevent_default()
+            event.stop()
+            self.post_message(ChatInput.Submit())
+        elif event.key == "shift+enter":
+            event.prevent_default()
+            event.stop()
+            self.insert("\n")
+        else:
+            super()._on_key(event)
 
 
 class MimicApp(App):
@@ -86,7 +106,7 @@ class MimicApp(App):
         border: round #00ff41;
     }
 
-    TextArea {
+    #user-input {
         background: transparent;
         color: #f0f6fc;
         border: none;
@@ -94,7 +114,7 @@ class MimicApp(App):
         scrollbar-size: 0 0;
     }
 
-    TextArea:focus {
+    #user-input:focus {
         border: none;
     }
 
@@ -140,7 +160,7 @@ class MimicApp(App):
                 yield Static("", id="sec-system", classes="panel-section")
         yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
         with Vertical(id="input-bar"):
-            yield TextArea(id="user-input", language=None, show_line_numbers=False)
+            yield ChatInput(id="user-input", language=None, show_line_numbers=False)
         yield Footer()
 
     # ── 初期化 ────────────────────────────────────────────────────────
@@ -175,17 +195,17 @@ class MimicApp(App):
 
         self._refresh_status_ui()
         self._set_input_hint("idle")
-        self.query_one("#user-input", TextArea).focus()
+        self.query_one("#user-input", ChatInput).focus()
 
     # ── 入力ヒント管理 ────────────────────────────────────────────────
 
     def _set_input_hint(self, mode: str, custom: str = "") -> None:
         """#input-bar の border_title でヒントを表示する。"""
         hints = {
-            "idle":     "Ctrl+S 送信  ·  Enter 改行  ·  /help でコマンド一覧",
+            "idle":     "Enter 送信  ·  Shift+Enter 改行  ·  /help でコマンド一覧",
             "busy":     "⏳ 実行中... (Ctrl+C で中断)",
-            "approval": f"Y/n を入力  ·  Ctrl+S で確定  ·  {self._APPROVAL_TIMEOUT}秒で自動承認",
-            "search":   "番号カンマ区切り / all で全件 / n でキャンセル  ·  Ctrl+S で確定",
+            "approval": f"Y/n を入力  ·  Enter で確定  ·  {self._APPROVAL_TIMEOUT}秒で自動承認",
+            "search":   "番号カンマ区切り / all で全件 / n でキャンセル  ·  Enter で確定",
         }
         try:
             self.query_one("#input-bar").border_title = custom or hints.get(mode, "")
@@ -227,17 +247,14 @@ class MimicApp(App):
         n = max(_INPUT_MIN_LINES, min(event.text_area.text.count("\n") + 1, _INPUT_MAX_LINES))
         self.query_one("#input-bar").styles.height = n + _INPUT_BAR_BORDER
 
-    # ── Ctrl+S で送信 ────────────────────────────────────────────────
+    # ── Enter 送信（ChatInput.Submit メッセージ受信） ─────────────────
 
-    def on_key(self, event) -> None:
-        if event.key == "ctrl+s":
-            event.prevent_default()
-            event.stop()
-            ta   = self.query_one("#user-input", TextArea)
-            text = ta.text.strip()
-            ta.load_text("")
-            self.query_one("#input-bar").styles.height = _INPUT_MIN_LINES + _INPUT_BAR_BORDER
-            self._process_input(text)
+    def on_chat_input_submit(self, event: ChatInput.Submit) -> None:
+        ta   = self.query_one("#user-input", ChatInput)
+        text = ta.text.strip()
+        ta.load_text("")
+        self.query_one("#input-bar").styles.height = _INPUT_MIN_LINES + _INPUT_BAR_BORDER
+        self._process_input(text)
 
     def _process_input(self, text: str) -> None:
         """Ctrl+Enter で確定したテキストを処理する。"""
@@ -247,10 +264,10 @@ class MimicApp(App):
             callback(text)
             if self._agent_busy:
                 self._set_input_hint("busy")
-                self.query_one("#user-input", TextArea).disabled = True
+                self.query_one("#user-input", ChatInput).disabled = True
             else:
                 self._set_input_hint("idle")
-                self.query_one("#user-input", TextArea).disabled = False
+                self.query_one("#user-input", ChatInput).disabled = False
             return
 
         if not text:
@@ -396,7 +413,7 @@ class MimicApp(App):
         hint_mode: str = "approval",
     ) -> None:
         self._approval_callback = callback
-        ta = self.query_one("#user-input", TextArea)
+        ta = self.query_one("#user-input", ChatInput)
         ta.disabled = False
         self._set_input_hint(hint_mode)
         ta.focus()
@@ -404,7 +421,7 @@ class MimicApp(App):
     def _exit_approval_mode(self) -> None:
         self._approval_callback = None
         if self._agent_busy:
-            self.query_one("#user-input", TextArea).disabled = True
+            self.query_one("#user-input", ChatInput).disabled = True
             self._set_input_hint("busy")
 
     # ── AI レスポンスストリーム ──────────────────────────────────────
@@ -620,7 +637,7 @@ class MimicApp(App):
     def _start_agent(self, user_input: str) -> None:
         self._agent_busy       = True
         self.agent_status_text = "THINKING"
-        self.query_one("#user-input", TextArea).disabled = True
+        self.query_one("#user-input", ChatInput).disabled = True
         self._set_input_hint("busy")
         if self._current_mode == "interactive":
             self._run_react(user_input)
@@ -632,7 +649,7 @@ class MimicApp(App):
         self._worker_thread_id = None
         self.agent_status_text = "IDLE"
         self._flush_output_buf()
-        ta = self.query_one("#user-input", TextArea)
+        ta = self.query_one("#user-input", ChatInput)
         ta.disabled = False
         self._set_input_hint("idle")
         if self._log:
