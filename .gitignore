@@ -24,6 +24,8 @@ mimic_linux/.mimic/sessions/
 ageless-impulse-488713-m6-03014b3cddad.json
 mimic4/.env
 mimic4/.env.bak
+mimic_linux/.env.bak
+mimic_tui/.env
 mimic_claude/.mimic/sessions/
 mimic_tui/.mimic/sessions/
 mimic_tui/mimic.log
