@@ -493,9 +493,14 @@ class CLI_Agent_App(App):
         if self._demo_messages:
             self._run_agent_demo()
 
-    @work(exclusive=True, thread=True)
+    @work(exclusive=True, thread=False)
     async def _run_agent_demo(self) -> None:
-        """Simulate an agent processing tasks with streaming output."""
+        """Simulate an agent processing tasks with streaming output.
+
+        Uses thread=False so all UI calls happen on the asyncio event loop,
+        avoiding cross-thread issues with Textual's reactive system.
+        """
+        # Initialize reactive state (safe on same thread)
         self.agent_status = "WORKING"
         self.active_task_count = 3
         self.log_system("🚀 Demo simulation started", level="success")
@@ -509,7 +514,7 @@ class CLI_Agent_App(App):
 
         for i, (kind, content) in enumerate(self._demo_messages, 1):
             # Stream a small delay
-            await asyncio.sleep(0.8 + random.random() * 0.5)
+            await asyncio.sleep(0.6 + random.random() * 0.4)
 
             if kind == "thinking":
                 chat.write(f"[italic dim]* {content.strip()} *[/italic dim]")
@@ -517,27 +522,25 @@ class CLI_Agent_App(App):
                 chat.write(f"[bold yellow]🔧 Tool Call:[/bold yellow]\n{content}")
             elif kind == "response":
                 chat.write(f"[bold cyan]🦊 Agent:[/bold cyan]")
-                # Stream tokens
+                # Stream tokens one at a time
                 tokens = content.split(" ")
                 accumulated = ""
                 for token in tokens:
                     accumulated += token + " "
-                    chat.update(
-                        accumulated,
-                        HomeWidget=True,
-                    )
+                    # Use call_later to schedule on the main loop
+                    partial = accumulated.strip()
                     chat.clear()
-                    chat.write(accumulated.strip())
-                    await asyncio.sleep(0.03)
+                    chat.write(partial)
+                    await asyncio.sleep(0.02)
                 chat.write("")  # newline separator
 
                 # Also update the Markdown output tab
                 md.update(content)
 
-            # Update progress
+            # Update progress bar
             progress.progress = int((i / len(self._demo_messages)) * 100)
 
-            # Update a task row (only if the row exists)
+            # Update a task row (T-002..T-006; T-001 is already Done)
             table = self.query_one("#task-table", DataTable)
             row_key = f"T-00{i + 1}"
             status_options = ["✅ Done", "✅ Done", "🔄 Running"]
@@ -545,20 +548,35 @@ class CLI_Agent_App(App):
                 table.update_cell(row_key, "Status", status_options[i % 3])
                 table.update_cell(row_key, "Progress", f"{min(i * 35, 100)}%")
 
-            # Update reactive counter from UI thread
+            # Update reactive counter on the UI thread directly
             counter = self.query_one("#task-counter", TaskCounter)
-            new_done = i // 2
-            counter.done = min(new_done, counter.total)
+            new_done = min(i // 2, counter.total)
+            if counter.done != new_done:
+                counter.done = new_done
 
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.3)
+        # Final status
         self.agent_status = "DONE"
         self.active_task_count = 0
         self.completed_tasks += 1
         progress.progress = 100
 
         chat.write("")
-        chat.write("[bold green]✅ Demo complete![/bold green] All tasks processed successfully.")
+        chat.write(
+            "[bold green]✅ Demo complete![/bold green] "
+            "All tasks processed successfully."
+        )
         self.log_system("✅ Demo simulation finished", level="success")
+
+        # Reset all task rows to show completion
+        table = self.query_one("#task-table", DataTable)
+        for row_key in list(table.rows.keys()):
+            if row_key in table.rows:
+                table.update_cell(row_key, "Status", "✅ Done")
+                table.update_cell(row_key, "Progress", "100%")
+        # Final counter update
+        counter = self.query_one("#task-counter", TaskCounter)
+        counter.done = counter.total
 
     def _add_simulated_task(self) -> None:
         """Add a simulated task to the table."""
