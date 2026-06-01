@@ -343,6 +343,16 @@ class CLI_Agent_App(App):
         table.cursor_type = "row"
         table.zebra_stripes = True
 
+        # Cache ColumnKey objects for Status and Progress columns
+        # (DataTable.update_cell requires ColumnKey, not string labels)
+        self._status_col_key = None
+        self._progress_col_key = None
+        for ck, col in table.columns.items():
+            if str(col.label) == "Status":
+                self._status_col_key = ck
+            elif str(col.label) == "Progress":
+                self._progress_col_key = ck
+
         # Seed initial tasks
         seed_tasks = [
             ("T-001", "Initialize project", "✅ Done", "100%", "00:00"),
