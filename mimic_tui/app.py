@@ -13,7 +13,7 @@ from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.reactive import reactive
 from textual.message import Message
-from textual.widgets import Footer, RichLog, Static, TextArea
+from textual.widgets import Footer, RichLog, Static, TabbedContent, TabPane, TextArea, Tree
 
 
 # 入力エリアの行数設定
@@ -53,7 +53,6 @@ class MimicApp(App):
         padding: 0;
     }
 
-    /* タイトルバー: ロゴ左 + ステータス右 を横並びに */
     #title-bar {
         layout: horizontal;
         height: auto;
@@ -83,7 +82,6 @@ class MimicApp(App):
         margin-bottom: 1;
     }
 
-    /* チャットログ: 全幅 */
     #chat-log {
         height: 1fr;
         background: #0d1117;
@@ -93,7 +91,6 @@ class MimicApp(App):
         scrollbar-color: #00ff41;
     }
 
-    /* 入力バー: 動的高さ（デフォルト 1行+ボーダー=3） */
     #input-bar {
         height: 3;
         margin: 0 2 1 2;
@@ -107,7 +104,7 @@ class MimicApp(App):
     }
 
     #user-input {
-        background: transparent;
+        background: #161b22;
         color: #f0f6fc;
         border: none;
         height: 1fr;
@@ -121,6 +118,34 @@ class MimicApp(App):
     Footer {
         background: #161b22;
         color: #8b949e;
+    }
+
+    TabbedContent {
+        height: 1fr;
+        margin: 0 2;
+    }
+
+    TabbedContent ContentSwitcher {
+        height: 1fr;
+    }
+
+    TabPane {
+        padding: 0;
+    }
+
+    #file-tree {
+        height: 1fr;
+        background: #0d1117;
+        padding: 0 1;
+        scrollbar-color: #00ff41;
+    }
+
+    #scratchpad-log, #log-view, #workflow-view {
+        height: 1fr;
+        background: #0d1117;
+        border: none;
+        padding: 1 2;
+        margin: 0;
     }
     """
 
@@ -155,7 +180,17 @@ class MimicApp(App):
             with Vertical(id="status-panel"):
                 yield Static("", id="sec-status", classes="panel-section")
                 yield Static("", id="sec-system", classes="panel-section")
-        yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
+        with TabbedContent(initial="tab-chat"):
+            with TabPane("💬 Chat", id="tab-chat"):
+                yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
+            with TabPane("📁 Files", id="tab-files"):
+                yield Tree("", id="file-tree")
+            with TabPane("📝 Scratchpad", id="tab-scratchpad"):
+                yield RichLog(id="scratchpad-log", highlight=False, markup=True, wrap=True)
+            with TabPane("📜 Log", id="tab-log"):
+                yield RichLog(id="log-view", highlight=False, markup=True, wrap=True)
+            with TabPane("🔄 Workflow", id="tab-workflow"):
+                yield RichLog(id="workflow-view", highlight=False, markup=True, wrap=True)
         with Vertical(id="input-bar"):
             yield ChatInput(id="user-input", language=None, show_line_numbers=False)
         yield Footer()
@@ -191,6 +226,11 @@ class MimicApp(App):
 
         self._refresh_status_ui()
         self._set_input_hint("idle")
+        self._build_file_tree()
+        self._refresh_scratchpad_tab()
+        self.query_one("#workflow-view", RichLog).write(
+            "[dim]Plan モード（/mode plan）で実行すると表示されます。[/dim]"
+        )
         self.query_one("#user-input", ChatInput).focus()
 
     # ── 入力ヒント管理 ────────────────────────────────────────────────
