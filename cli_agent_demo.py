@@ -561,8 +561,9 @@ class CLI_Agent_App(App):
                     table.update_cell(row_key, self._status_col_key, status_options[i % 3])
                 if self._progress_col_key is not None:
                     table.update_cell(row_key, self._progress_col_key, f"{min(i * 35, 100)}%")
-            except KeyError:
-                pass  # Row doesn't exist yet, skip silently
+            except (KeyError, Exception) as e:
+                # Row doesn't exist yet, or RowDoesNotExist from Textual
+                pass
 
             # Update reactive counter on the UI thread directly
             counter = self.query_one("#task-counter", TaskCounter)
