@@ -10,9 +10,15 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Vertical  # Container: title-bar用
+from textual.containers import Container, Vertical
 from textual.reactive import reactive
-from textual.widgets import Footer, Input, RichLog, Static
+from textual.widgets import Footer, RichLog, Static, TextArea
+
+
+# 入力エリアの行数設定
+_INPUT_MIN_LINES = 1
+_INPUT_MAX_LINES = 5
+_INPUT_BAR_BORDER = 2  # round ボーダー上下
 
 
 class MimicApp(App):
@@ -67,26 +73,28 @@ class MimicApp(App):
         scrollbar-color: #00ff41;
     }
 
+    /* 入力バー: 動的高さ（デフォルト 1行+ボーダー=3） */
     #input-bar {
-        height: auto;
+        height: 3;
         margin: 0 2 1 2;
         background: #161b22;
         border: round #30363d;
-        padding: 0 1;
+        padding: 0 0;
     }
 
     #input-bar:focus-within {
         border: round #00ff41;
     }
 
-    Input {
+    TextArea {
         background: transparent;
         color: #f0f6fc;
         border: none;
-        width: 100%;
+        height: 1fr;
+        scrollbar-size: 0 0;
     }
 
-    Input:focus {
+    TextArea:focus {
         border: none;
     }
 
@@ -106,7 +114,6 @@ class MimicApp(App):
         Binding("ctrl+end",  "scroll_end",  "末尾",       show=False),
     ]
 
-    # リアクティブ属性（ワーカースレッドから代入すると watch_* がメインスレッドで発火する）
     agent_status_text = reactive("IDLE")
     model_name_text   = reactive("UNKNOWN")
     token_count_text  = reactive("0")
@@ -128,15 +135,12 @@ class MimicApp(App):
         with Container(id="title-bar"):
             yield Static("", id="title-art")
             with Vertical(id="status-panel"):
-                yield Static("", id="sec-status",  classes="panel-section")
-                yield Static("", id="sec-model",   classes="panel-section")
-                yield Static("", id="sec-system",  classes="panel-section")
+                yield Static("", id="sec-status", classes="panel-section")
+                yield Static("", id="sec-model",  classes="panel-section")
+                yield Static("", id="sec-system", classes="panel-section")
         yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
         with Vertical(id="input-bar"):
-            yield Input(
-                placeholder="❯ メッセージを入力  (/help でコマンド一覧)",
-                id="user-input",
-            )
+            yield TextArea(id="user-input", language=None, show_line_numbers=False)
         yield Footer()
 
     # ── 初期化 ────────────────────────────────────────────────────────
@@ -170,7 +174,23 @@ class MimicApp(App):
         )
 
         self._refresh_status_ui()
-        self.query_one("#user-input", Input).focus()
+        self._set_input_hint("idle")
+        self.query_one("#user-input", TextArea).focus()
+
+    # ── 入力ヒント管理 ────────────────────────────────────────────────
+
+    def _set_input_hint(self, mode: str, custom: str = "") -> None:
+        """#input-bar の border_title でヒントを表示する。"""
+        hints = {
+            "idle":     "Ctrl+S 送信  ·  Enter 改行  ·  /help でコマンド一覧",
+            "busy":     "⏳ 実行中... (Ctrl+C で中断)",
+            "approval": f"Y/n を入力  ·  Ctrl+S で確定  ·  {self._APPROVAL_TIMEOUT}秒で自動承認",
+            "search":   "番号カンマ区切り / all で全件 / n でキャンセル  ·  Ctrl+S で確定",
+        }
+        try:
+            self.query_one("#input-bar").border_title = custom or hints.get(mode, "")
+        except Exception:
+            pass
 
     # ── リアクティブ・ウォッチャー ────────────────────────────────────
 
@@ -184,7 +204,6 @@ class MimicApp(App):
         self._refresh_status_ui()
 
     def _refresh_status_ui(self) -> None:
-        """ステータスパネルを安全に再描画する。マウント前は何もしない。"""
         try:
             status = self.agent_status_text
             style  = "bold #00ff41" if status == "IDLE" else "bold #ffda6a"
@@ -200,6 +219,57 @@ class MimicApp(App):
             )
         except Exception:
             pass
+
+    # ── 動的高さ調整 ──────────────────────────────────────────────────
+
+    def on_text_area_changed(self, event: TextArea.Changed) -> None:
+        """入力行数に応じて #input-bar の高さを動的に変更する。"""
+        n = max(_INPUT_MIN_LINES, min(event.text_area.text.count("\n") + 1, _INPUT_MAX_LINES))
+        self.query_one("#input-bar").styles.height = n + _INPUT_BAR_BORDER
+
+    # ── Ctrl+S で送信 ────────────────────────────────────────────────
+
+    def on_key(self, event) -> None:
+        if event.key == "ctrl+s":
+            event.prevent_default()
+            event.stop()
+            ta   = self.query_one("#user-input", TextArea)
+            text = ta.text.strip()
+            ta.load_text("")
+            self.query_one("#input-bar").styles.height = _INPUT_MIN_LINES + _INPUT_BAR_BORDER
+            self._process_input(text)
+
+    def _process_input(self, text: str) -> None:
+        """Ctrl+Enter で確定したテキストを処理する。"""
+        if self._approval_callback is not None:
+            callback = self._approval_callback
+            self._approval_callback = None
+            callback(text)
+            if self._agent_busy:
+                self._set_input_hint("busy")
+                self.query_one("#user-input", TextArea).disabled = True
+            else:
+                self._set_input_hint("idle")
+                self.query_one("#user-input", TextArea).disabled = False
+            return
+
+        if not text:
+            return
+
+        if text.lower() in ("exit", "quit", "q"):
+            self.action_quit_app()
+            return
+
+        if text.startswith("/"):
+            self._handle_command(text)
+            return
+
+        if self._agent_busy:
+            self._write_direct("⚠ エージェント実行中です。Ctrl+C で中断できます。\n")
+            return
+
+        self._write_user_message(text)
+        self._start_agent(text)
 
     # ── 出力コールバック ──────────────────────────────────────────────
 
@@ -323,22 +393,19 @@ class MimicApp(App):
     def _enter_approval_mode(
         self,
         callback: Callable[[str], None],
-        placeholder: str = "",
+        hint_mode: str = "approval",
     ) -> None:
         self._approval_callback = callback
-        inp = self.query_one("#user-input", Input)
-        inp.disabled    = False
-        inp.placeholder = placeholder or (
-            f"Y/n を入力（Enter で承認・{self._APPROVAL_TIMEOUT}秒で自動承認）"
-        )
-        inp.focus()
+        ta = self.query_one("#user-input", TextArea)
+        ta.disabled = False
+        self._set_input_hint(hint_mode)
+        ta.focus()
 
     def _exit_approval_mode(self) -> None:
         self._approval_callback = None
         if self._agent_busy:
-            inp = self.query_one("#user-input", Input)
-            inp.disabled    = True
-            inp.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
+            self.query_one("#user-input", TextArea).disabled = True
+            self._set_input_hint("busy")
 
     # ── AI レスポンスストリーム ──────────────────────────────────────
 
@@ -407,42 +474,6 @@ class MimicApp(App):
     def action_scroll_end(self) -> None:
         if self._log:
             self._log.scroll_end()
-
-    # ── 入力処理 ──────────────────────────────────────────────────────
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        text = event.value.strip()
-        event.input.clear()
-
-        if self._approval_callback is not None:
-            callback = self._approval_callback
-            self._approval_callback = None
-            callback(text)
-            if self._agent_busy:
-                event.input.disabled    = True
-                event.input.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
-            else:
-                event.input.disabled    = False
-                event.input.placeholder = "❯ メッセージを入力  (/help でコマンド一覧)"
-            return
-
-        if not text:
-            return
-
-        if text.lower() in ("exit", "quit", "q"):
-            self.action_quit_app()
-            return
-
-        if text.startswith("/"):
-            self._handle_command(text)
-            return
-
-        if self._agent_busy:
-            self._write_direct("⚠ エージェント実行中です。Ctrl+C で中断できます。\n")
-            return
-
-        self._write_user_message(text)
-        self._start_agent(text)
 
     # ── コマンド処理 ──────────────────────────────────────────────────
 
@@ -582,19 +613,15 @@ class MimicApp(App):
             agent.conversation.append({"role": "assistant", "content": "了解しました。参考情報を確認しました。"})
             self._write_direct(f"  ✓ {len(selected)} 件をコンテキストに注入しました。\n")
 
-        self._enter_approval_mode(
-            on_response,
-            placeholder="番号カンマ区切り / all で全件 / n またはEnterでキャンセル",
-        )
+        self._enter_approval_mode(on_response, hint_mode="search")
 
     # ── エージェント実行 ──────────────────────────────────────────────
 
     def _start_agent(self, user_input: str) -> None:
         self._agent_busy       = True
         self.agent_status_text = "THINKING"
-        inp = self.query_one("#user-input", Input)
-        inp.disabled    = True
-        inp.placeholder = "⏳ 実行中... (Ctrl+C で中断)"
+        self.query_one("#user-input", TextArea).disabled = True
+        self._set_input_hint("busy")
         if self._current_mode == "interactive":
             self._run_react(user_input)
         else:
@@ -605,12 +632,12 @@ class MimicApp(App):
         self._worker_thread_id = None
         self.agent_status_text = "IDLE"
         self._flush_output_buf()
-        inp = self.query_one("#user-input", Input)
-        inp.disabled    = False
-        inp.placeholder = "❯ メッセージを入力  (/help でコマンド一覧)"
+        ta = self.query_one("#user-input", TextArea)
+        ta.disabled = False
+        self._set_input_hint("idle")
         if self._log:
             self._log.write(Text.from_ansi("─" * 60))
-        inp.focus()
+        ta.focus()
 
     @work(thread=True, exclusive=True)
     def _run_react(self, user_input: str) -> None:
