@@ -537,15 +537,18 @@ class CLI_Agent_App(App):
             # Update progress
             progress.progress = int((i / len(self._demo_messages)) * 100)
 
-            # Update a task row
+            # Update a task row (only if the row exists)
             table = self.query_one("#task-table", DataTable)
             row_key = f"T-00{i + 1}"
             status_options = ["✅ Done", "✅ Done", "🔄 Running"]
-            table.update_cell(row_key, "Status", status_options[i % 3])
-            table.update_cell(row_key, "Progress", f"{min(i * 35, 100)}%")
+            if row_key in table.rows:
+                table.update_cell(row_key, "Status", status_options[i % 3])
+                table.update_cell(row_key, "Progress", f"{min(i * 35, 100)}%")
 
+            # Update reactive counter from UI thread
             counter = self.query_one("#task-counter", TaskCounter)
-            counter.done = min(done + 1, counter.total) if (done := i // 2) else 0
+            new_done = i // 2
+            counter.done = min(new_done, counter.total)
 
         await asyncio.sleep(0.5)
         self.agent_status = "DONE"

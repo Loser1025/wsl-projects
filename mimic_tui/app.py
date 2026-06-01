@@ -135,8 +135,6 @@ class MimicApp(App):
     ]
 
     agent_status_text = reactive("IDLE")
-    model_name_text   = reactive("UNKNOWN")
-    token_count_text  = reactive("0")
 
     def __init__(self, ctx: dict):
         super().__init__()
@@ -156,7 +154,6 @@ class MimicApp(App):
             yield Static("", id="title-art")
             with Vertical(id="status-panel"):
                 yield Static("", id="sec-status", classes="panel-section")
-                yield Static("", id="sec-model",  classes="panel-section")
                 yield Static("", id="sec-system", classes="panel-section")
         yield RichLog(id="chat-log", highlight=False, markup=False, wrap=True)
         with Vertical(id="input-bar"):
@@ -178,7 +175,6 @@ class MimicApp(App):
         cfg = self._ctx["active_config"]
         cwd = self._ctx["agent"].cwd
 
-        self.model_name_text = str(cfg.model)
 
         subtitle = f"{cfg.model}  ·  {cwd}"
         art_text = Text.from_ansi(get_ascii_art_str(subtitle))
@@ -217,12 +213,6 @@ class MimicApp(App):
     def watch_agent_status_text(self, _: str) -> None:
         self._refresh_status_ui()
 
-    def watch_token_count_text(self, _: str) -> None:
-        self._refresh_status_ui()
-
-    def watch_model_name_text(self, _: str) -> None:
-        self._refresh_status_ui()
-
     def _refresh_status_ui(self) -> None:
         try:
             status = self.agent_status_text
@@ -231,11 +221,6 @@ class MimicApp(App):
                 f"[bold #00ff41]■ AGENT[/]\n"
                 f"  Status: [{style}]{status}[/]\n"
                 f"  Mode:   [#58a6ff]{self._current_mode.upper()}[/]"
-            )
-            self.query_one("#sec-model", Static).update(
-                f"[bold #00ff41]■ MODEL[/]\n"
-                f"  [#8b949e]{self.model_name_text}[/]\n"
-                f"  Tokens: [#58a6ff]{self.token_count_text}[/]"
             )
         except Exception:
             pass
@@ -326,7 +311,6 @@ class MimicApp(App):
         cfg      = self._ctx["active_config"]
         cwd      = self._ctx["agent"].cwd
         subtitle = f"{cfg.model}  ·  {cwd}"
-        self.model_name_text = str(cfg.model)
         try:
             art_text = Text.from_ansi(get_ascii_art_str(subtitle))
             self.query_one("#title-art", Static).update(art_text)
