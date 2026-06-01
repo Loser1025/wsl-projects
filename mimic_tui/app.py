@@ -23,28 +23,29 @@ _INPUT_BAR_BORDER = 2  # round ボーダー上下
 
 
 class ChatInput(TextArea):
-    """Enter で送信・Shift+Enter で改行するチャット入力欄。"""
+    """Enter で送信・Ctrl+N で改行するチャット入力欄。"""
 
     class Submit(Message):
         """送信トリガー。"""
 
-    def _on_key(self, event) -> None:
-        if event.key == "enter":
-            event.prevent_default()
-            event.stop()
-            self.post_message(ChatInput.Submit())
-        elif event.key == "shift+enter":
-            event.prevent_default()
-            event.stop()
-            self.insert("\n")
-        else:
-            super()._on_key(event)
+    # priority=True でウィジェット内部の処理より先に評価される
+    BINDINGS = [
+        Binding("enter",  "submit",  "送信", priority=True),
+        Binding("ctrl+n", "newline", "改行", priority=True),
+    ]
+
+    def action_submit(self) -> None:
+        self.post_message(ChatInput.Submit())
+
+    def action_newline(self) -> None:
+        self.insert("\n")
 
 
 class MimicApp(App):
     """mimic_claude Textual TUI アプリ (2ペイン仕様)。"""
 
     TITLE = "mimic"
+    ENABLE_MOUSE = False  # 端末本来のマウス選択を有効にするため無効化
 
     CSS = """
     Screen {
@@ -202,7 +203,7 @@ class MimicApp(App):
     def _set_input_hint(self, mode: str, custom: str = "") -> None:
         """#input-bar の border_title でヒントを表示する。"""
         hints = {
-            "idle":     "Enter 送信  ·  Shift+Enter 改行  ·  /help でコマンド一覧",
+            "idle":     "Enter 送信  ·  Ctrl+N 改行  ·  /help でコマンド一覧",
             "busy":     "⏳ 実行中... (Ctrl+C で中断)",
             "approval": f"Y/n を入力  ·  Enter で確定  ·  {self._APPROVAL_TIMEOUT}秒で自動承認",
             "search":   "番号カンマ区切り / all で全件 / n でキャンセル  ·  Enter で確定",
