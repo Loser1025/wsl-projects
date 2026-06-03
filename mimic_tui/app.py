@@ -146,12 +146,40 @@ class MimicApp(App):
         border-right: solid #30363d;
     }
 
-    #file-preview {
+    #preview-pane {
         width: 2fr;
+        height: 1fr;
+        layout: vertical;
+    }
+
+    #file-preview {
         height: 1fr;
         background: #0d1117;
         padding: 0 2;
         scrollbar-color: #00ff41;
+    }
+
+    #file-search-bar {
+        height: 3;
+        background: #161b22;
+        border-top: solid #30363d;
+        padding: 0 1;
+        display: none;
+    }
+
+    #file-search-bar:focus-within {
+        border-top: solid #00ff41;
+    }
+
+    #file-search-input {
+        background: transparent;
+        border: none;
+        color: #f0f6fc;
+        width: 1fr;
+    }
+
+    #file-search-input:focus {
+        border: none;
     }
 
     #scratchpad-log, #log-view, #workflow-view {
@@ -190,6 +218,10 @@ class MimicApp(App):
         self._out_buf                         = ""
         self._out_buf_lock                    = threading.Lock()
         self._approval_callback: Optional[Callable[[str], None]] = None
+        # Files タブ プレビュー状態
+        self._preview_path: Optional[object]  = None
+        self._preview_all_lines: list[str]     = []
+        self._preview_searching: bool          = False
 
     # ── 構成 ──────────────────────────────────────────────────────────
 
@@ -205,7 +237,10 @@ class MimicApp(App):
             with TabPane("📁 Files", id="tab-files"):
                 with Horizontal(id="files-split"):
                     yield Tree("", id="file-tree")
-                    yield RichLog(id="file-preview", highlight=False, markup=False, wrap=True)
+                    with Vertical(id="preview-pane"):
+                        yield RichLog(id="file-preview", highlight=False, markup=False, wrap=True)
+                        with Vertical(id="file-search-bar"):
+                            yield ChatInput(id="file-search-input", language=None, show_line_numbers=False)
             with TabPane("📝 Scratchpad", id="tab-scratchpad"):
                 yield RichLog(id="scratchpad-log", highlight=False, markup=True, wrap=True)
             with TabPane("📜 Log", id="tab-log"):
@@ -323,8 +358,32 @@ class MimicApp(App):
             self.query_one("#file-tree", Tree).focus()
 
     def on_key(self, event) -> None:
+        focused_id = getattr(self.focused, "id", None)
+
+        # 検索バーの Backspace（空のとき）→ 閉じる
+        if event.key == "backspace" and focused_id == "file-search-input":
+            inp = self.query_one("#file-search-input", ChatInput)
+            if not inp.text:
+                self._close_file_search()
+                event.prevent_default()
+                event.stop()
+                return
+
+        # プレビューの / → 検索バーを開く
+        if event.key == "slash" and focused_id == "file-preview":
+            if self._preview_path:
+                self._open_file_search()
+                event.prevent_default()
+                event.stop()
+                return
+
         if event.key == "backspace":
             focused = self.focused
+            if focused and getattr(focused, "id", None) == "file-preview":
+                self.query_one("#file-tree", Tree).focus()
+                event.prevent_default()
+                event.stop()
+                return
             if focused and getattr(focused, "id", None) == "file-tree":
                 from pathlib import Path
                 parent = Path(self._ctx["agent"].cwd).parent
@@ -350,30 +409,105 @@ class MimicApp(App):
         else:
             self._show_file_preview(path)
 
-    def _show_file_preview(self, path) -> None:
+    def _show_file_preview(self, path, *, load_all: bool = False) -> None:
         preview = self.query_one("#file-preview", RichLog)
         preview.clear()
         if path is None:
-            preview.write(Text.from_ansi("ファイルを選択してください"))
+            self._preview_path       = None
+            self._preview_all_lines  = []
+            self._preview_searching  = False
+            preview.write(Text("ファイルを選択してください"))
             return
         from pathlib import Path
         p = Path(path)
         try:
-            size = p.stat().st_size
-            if size > 200_000:
-                preview.write(Text.from_ansi(
-                    f"ファイルが大きすぎます ({size:,} bytes)\n先頭200行のみ表示します\n{'─'*40}"
-                ))
             text = p.read_text(encoding="utf-8", errors="replace")
-            lines = text.splitlines()[:200]
-            preview.write(Text.from_ansi(f"📄 {p.name}  ({len(text):,} chars, {len(lines)} lines)\n{'─'*40}"))
-            for i, line in enumerate(lines, 1):
-                preview.write(Text.from_ansi(f"{i:4d}  {line}"))
-            if len(text.splitlines()) > 200:
-                preview.write(Text.from_ansi(f"{'─'*40}\n... 残り {len(text.splitlines()) - 200} 行"))
+            self._preview_path      = p
+            self._preview_all_lines = text.splitlines()
+            self._preview_searching = False
         except Exception as e:
-            preview.write(Text.from_ansi(f"読み込みエラー: {e}"))
+            preview.write(Text(f"読み込みエラー: {e}", style="bold red"))
+            preview.focus()
+            return
+        self._render_preview(self._preview_all_lines, load_all=load_all)
         preview.scroll_home()
+        preview.focus()
+
+    def _render_preview(self, lines: list, *, load_all: bool = False,
+                        matches: set = None) -> None:
+        """(lineno, text) のリスト or str リストをプレビューに描画する。"""
+        preview = self.query_one("#file-preview", RichLog)
+        preview.clear()
+        p = self._preview_path
+        if p:
+            header = Text()
+            header.append(f"📄 {p.name}", style="bold #58a6ff")
+            total = len(self._preview_all_lines)
+            header.append(f"  ({total} lines)")
+            if self._preview_searching:
+                header.append(f"  [{len(lines)} マッチ行]", style="#ffda6a")
+            preview.write(header)
+            preview.write(Text("─" * 60, style="#30363d"))
+
+        for idx, item in enumerate(lines):
+            if isinstance(item, tuple):
+                lineno, text = item
+            else:
+                lineno, text = idx, item
+            row = Text()
+            row.append(f"{lineno + 1:4d} ", style="#8b949e")
+            if matches and lineno in matches:
+                row.append(text, style="bold #ffda6a on #2d2800")
+            else:
+                row.append(text)
+            preview.write(row)
+
+
+    # ── Files: 検索 ──────────────────────────────────────────────────
+
+    def _open_file_search(self) -> None:
+        bar = self.query_one("#file-search-bar")
+        bar.display = True
+        inp = self.query_one("#file-search-input", ChatInput)
+        inp.load_text("")
+        self.query_one("#file-search-bar").border_title = "/ 検索  Enter=確定  Escape=閉じる"
+        inp.focus()
+
+    def _close_file_search(self) -> None:
+        self._preview_searching = False
+        bar = self.query_one("#file-search-bar")
+        bar.display = False
+        if self._preview_all_lines:
+            self._render_preview(self._preview_all_lines)
+        self.query_one("#file-preview", RichLog).focus()
+
+    def _run_file_search(self, pattern: str) -> None:
+        import re as _re
+        if not pattern or not self._preview_all_lines:
+            self._close_file_search()
+            return
+        try:
+            regex = _re.compile(pattern, _re.IGNORECASE)
+        except _re.error:
+            regex = _re.compile(_re.escape(pattern), _re.IGNORECASE)
+        results = [(i, line) for i, line in enumerate(self._preview_all_lines)
+                   if regex.search(line)]
+        match_set = {i for i, _ in results}
+        self._preview_searching = True
+        # マッチ前後2行のコンテキストも表示
+        context_indices = set()
+        for i in match_set:
+            for d in range(-2, 3):
+                idx = i + d
+                if 0 <= idx < len(self._preview_all_lines):
+                    context_indices.add(idx)
+        context_lines = [(i, self._preview_all_lines[i])
+                         for i in sorted(context_indices)]
+        self._render_preview(context_lines, matches=match_set)
+        self.query_one("#file-preview", RichLog).scroll_home()
+        self.query_one("#file-search-bar").border_title = (
+            f"/ {pattern}  {len(results)} マッチ  Escape=閉じる"
+        )
 
     # ── タブ: Scratchpad ─────────────────────────────────────────────
 
@@ -441,6 +575,14 @@ class MimicApp(App):
     # ── Enter 送信（ChatInput.Submit メッセージ受信） ─────────────────
 
     def on_chat_input_submit(self, event: ChatInput.Submit) -> None:
+        # 検索バーからの送信
+        if getattr(self.focused, "id", None) == "file-search-input":
+            inp = self.query_one("#file-search-input", ChatInput)
+            query = inp.text.strip()
+            inp.load_text("")
+            self._run_file_search(query)
+            self.query_one("#file-preview", RichLog).focus()
+            return
         ta   = self.query_one("#user-input", ChatInput)
         text = ta.text.strip()
         ta.load_text("")
@@ -678,21 +820,39 @@ class MimicApp(App):
         if self._log:
             self._log.clear()
 
+    def _active_scroll_target(self) -> Optional[RichLog]:
+        tab_map = {
+            "tab-chat":       "#chat-log",
+            "tab-files":      "#file-preview",
+            "tab-scratchpad": "#scratchpad-log",
+            "tab-log":        "#log-view",
+            "tab-workflow":   "#workflow-view",
+        }
+        try:
+            sel = tab_map.get(self.query_one(TabbedContent).active, "#chat-log")
+            return self.query_one(sel, RichLog)
+        except Exception:
+            return self._log
+
     def action_scroll_up(self) -> None:
-        if self._log:
-            self._log.scroll_page_up()
+        w = self._active_scroll_target()
+        if w:
+            w.scroll_page_up()
 
     def action_scroll_down(self) -> None:
-        if self._log:
-            self._log.scroll_page_down()
+        w = self._active_scroll_target()
+        if w:
+            w.scroll_page_down()
 
     def action_scroll_top(self) -> None:
-        if self._log:
-            self._log.scroll_home()
+        w = self._active_scroll_target()
+        if w:
+            w.scroll_home()
 
     def action_scroll_end(self) -> None:
-        if self._log:
-            self._log.scroll_end()
+        w = self._active_scroll_target()
+        if w:
+            w.scroll_end()
 
     # ── コマンド処理 ──────────────────────────────────────────────────
 
