@@ -1,0 +1,134 @@
+{
+  "Owl-Alpha (OpenRouter)": {
+    "Architect": {
+      "score": 4,
+      "max": 4,
+      "elapsed": 20.6,
+      "details": {
+        "bug_identified": true,
+        "edit_format": true,
+        "has_code": true,
+        "concise": true
+      },
+      "response_len": 442,
+      "response_preview": "1. バグの原因  \n平均値を計算する際、不要な `- 1` が含まれているため、結果が本来の平均より1小さくなっている。\n\n2. edit_file での修正  \nold_string: `    return total / len(numbers) - 1  # ← バグあり`  \nnew_string: `    return total / len(numbers)`\n\n3. 修正後の動作確認  \n```python\ndef calculate_average(numbers: list) -> float:\n    if not numbers:\n        return 0\n..."
+    },
+    "Operator": {
+      "score": 5,
+      "max": 5,
+      "elapsed": 21.45,
+      "details": {
+        "has_pytest": true,
+        "has_coverage": true,
+        "has_timing": true,
+        "has_condition": true,
+        "has_bash_code": true
+      },
+      "response_len": 824,
+      "response_preview": "以下に、要件をすべて満たすbashコマンド群を提案します。\n\n```bash\ncd /home/user/myproject && \\\necho \"=== テスト実行開始 ===\" && \\\nSTART_TIME=$(date +%s%3N) && \\\npytest --tb=short --cov=. --cov-report=term-missing --cov-fail-under=80 -v 2>&1 | tee /tmp/test_output.log; \\\nTEST_EXIT_CODE=${PIPESTATUS[0]} && \\\nEND_TIME=$(date +%s%3N) &&..."
+    },
+    "Scribe": {
+      "score": 6,
+      "max": 6,
+      "elapsed": 20.49,
+      "details": {
+        "has_goal": true,
+        "has_done": true,
+        "has_next": true,
+        "has_notice": true,
+        "within_800": true,
+        "all_sections": true
+      },
+      "response_len": 536,
+      "response_preview": "【ゴール】\nmimic_tuiにマルチエージェント機能（Architect/Operator/Scribe）を実装する\n\n【完了済み】\n- multi_agent.py新規作成（BaseRoleAgent基底クラス＋3役割エージェント実装）\n- 各エージェントに役割特化ツールセット割当（Architect:10、Operator:11、Scribe:3）\n- tools.pyにupdate_scratchpad_smart関数追加（800文字超過時は先頭優先保持）\n- __main__.py修正（APIキー3本以上でマルチエージェント有効化）\n- app.pyに/mode multiコマンド追..."
+    }
+  },
+  "Vibe-CLI-Latest (Mistral)": {
+    "Architect": {
+      "score": 3,
+      "max": 4,
+      "elapsed": 2.79,
+      "details": {
+        "bug_identified": true,
+        "edit_format": true,
+        "has_code": false,
+        "concise": true
+      },
+      "response_len": 270,
+      "response_preview": "1. バグの原因:\n   平均値の計算後に不要な `- 1` が行われているため、結果が1少なくなっている。\n\n2. edit_file での修正:\n   old_string: `return total / len(numbers) - 1`\n   new_string: `return total / len(numbers)`\n\n3. 修正後の動作確認:\n   修正後、`calculate_average([10, 20, 30])` は `(10 + 20 + 30) / 3 = 20.0` を返し、期待値通りに動作します。"
+    },
+    "Operator": {
+      "score": 5,
+      "max": 5,
+      "elapsed": 6.1,
+      "details": {
+        "has_pytest": true,
+        "has_coverage": true,
+        "has_timing": true,
+        "has_condition": true,
+        "has_bash_code": true
+      },
+      "response_len": 1586,
+      "response_preview": "以下は、すべての要件を満たすbashコマンド群です。実用性、効率性、エラーハンドリングを重視して設計されています。\n\n```bash\n#!/bin/bash\n\n# 変数定義\nPROJECT_DIR=\"/home/user/myproject\"\nPYTEST_CMD=\"pytest -v --tb=short\"\nCOVERAGE_CMD=\"coverage run -m pytest && coverage report --fail-under=80\"\nTIME_FORMAT=\"%E\"  # 実行時間フォーマット (実時間)\n\n# エラーハンドリング\nset -euo pipefail\n\n# ..."
+    },
+    "Scribe": {
+      "score": 6,
+      "max": 6,
+      "elapsed": 2.04,
+      "details": {
+        "has_goal": true,
+        "has_done": true,
+        "has_next": true,
+        "has_notice": true,
+        "within_800": true,
+        "all_sections": true
+      },
+      "response_len": 449,
+      "response_preview": "```python\nupdate_scratchpad(\n    \"\"\"\n    【ゴール】mimic_tuiのマルチエージェント機能を実装\n    【完了済み】\n    - multi_agent.py: BaseRoleAgent基底クラス、Architect(10ツール)/Operator(11ツール)/Scribe(3ツール)を実装\n    - tools.py: update_scratchpad_smart関数追加(800文字超過時先頭優先保持)\n    - __main__.py: 全プロバイダー合計キー3本以上でマルチエージェント有効化\n    - app.py: /mode ..."
+    }
+  },
+  "Gemma4-31B (Google)": {
+    "Architect": {
+      "score": 3,
+      "max": 4,
+      "elapsed": 13.15,
+      "details": {
+        "bug_identified": true,
+        "edit_format": true,
+        "has_code": false,
+        "concise": true
+      },
+      "response_len": 1142,
+      "response_preview": "<thought>*   Function: `calculate_average(numbers: list) -> float`\n    *   Logic:\n        *   Check if the list is empty (returns 0).\n        *   Sum all numbers in the list.\n        *   Return `total / len(numbers) - 1`.\n    *   Example: `calculate_average([10, 20, 30])`\n        *   `total` = 10 + ..."
+    },
+    "Operator": {
+      "score": 4,
+      "max": 5,
+      "elapsed": 23.21,
+      "details": {
+        "has_pytest": true,
+        "has_coverage": true,
+        "has_timing": true,
+        "has_condition": true,
+        "has_bash_code": false
+      },
+      "response_len": 3000,
+      "response_preview": "<thought>\n*   Role: Command execution and test verification expert agent.\n*   Goal: Write a set of bash commands to run `pytest` on a Python project.\n*   Project Path: `/home/user/myproject`.\n*   Specific Requirements:\n    1.  Run `pytest`.\n    2.  Show detailed output for *failed* tests only.\n    3..."
+    },
+    "Scribe": {
+      "score": 5,
+      "max": 6,
+      "elapsed": 35.06,
+      "details": {
+        "has_goal": true,
+        "has_done": true,
+        "has_next": true,
+        "has_notice": true,
+        "within_800": false,
+        "all_sections": true
+      },
+      "response_len": 2638,
+      "response_preview": "<thought>Working Memory Management Specialist Agent.\nCompress a provided work log into a specific format for `update_scratchpad`.\nUnder 800 characters.\nMust follow 4 sections: 【ゴール】 (Goal), 【完了済み】 (Completed), 【次のステップ】 (Next Steps), 【発見・注意】 (Findings/Notes).\n\n    *   *Task:* Implement multi-agent fu..."
+    }
+  }
+}

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>エージェントシステム・安全リファクタリング計画書</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #e67e22;
+            --danger-color: #e74c3c;
+            --bg-color: #f8f9fa;
+            --text-color: #333333;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", sans-serif;
+            line-height: 1.7;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            border-bottom: 3px solid var(--secondary-color);
+            padding-bottom: 15px;
+            font-size: 2rem;
+            margin-top: 0;
+        }
+
+        h2 {
+            color: var(--primary-color);
+            border-left: 5px solid var(--secondary-color);
+            padding-left: 12px;
+            font-size: 1.5rem;
+            margin-top: 40px;
+            margin-bottom: 20px;
+        }
+
+        h3 {
+            color: #4a5568;
+            font-size: 1.2rem;
+            margin-top: 25px;
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+        }
+
+        ul, ol {
+            margin-bottom: 1.5rem;
+            padding-left: 24px;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* ロードマップの視覚化 */
+        .roadmap {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #edf2f7;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .roadmap-step {
+            flex: 1;
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            font-weight: bold;
+            font-size: 0.9rem;
+            min-width: 160px;
+            margin: 5px;
+            border-top: 4px solid var(--secondary-color);
+        }
+
+        .roadmap-arrow {
+            padding: 0 10px;
+            color: #718096;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .roadmap { flex-direction: column; align-items: stretch; }
+            .roadmap-arrow { text-align: center; margin: 5px 0; transform: rotate(90deg); }
+        }
+
+        /* コードブロックの装飾 */
+        pre {
+            background-color: #1a202c;
+            color: #edf2f7;
+            padding: 18px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.9rem;
+            margin: 20px 0;
+        }
+
+        .code-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #718096;
+            margin-bottom: -15px;
+            padding-left: 5px;
+        }
+
+        .text-success { color: var(--success-color); font-weight: bold; }
+        .text-danger { color: var(--danger-color); font-weight: bold; }
+
+        /* バッジ、ハイライト */
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            border-radius: 4px;
+            color: white;
+            margin-right: 5px;
+        }
+        .badge-info { background-color: var(--secondary-color); }
+        .badge-warning { background-color: var(--warning-color); }
+
+        .highlight-box {
+            background-color: #f0fff4;
+            border-left: 4px solid var(--success-color);
+            padding: 15px;
+            border-radius: 0 8px 8px 0;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🛠️ エージェントシステム・安全リファクタリング計画書</h1>
+
+    <h2>1. 修正の基本方針（ゴール）</h2>
+    <ol>
+        <li><strong>既存機能の完全維持</strong>：<code>update_scratchpad</code> の義務化や、各種 Pipeline-First 検索ツール（<code>smart_read</code> など）の挙動、出力フォーマットは一切変更しない。</li>
+        <li><strong>安全性の根本治療</strong>：自作エスケープによる <code>shell=True</code> (または <code>bash -c</code>) 依存を捨て、引数配列（list）による安全なプロセス起動へ移行する。</li>
+        <li><strong>リソースリークの撲滅</strong>：タイムアウト時の <code>time.sleep</code> によるメインブロッキングを排除し、非同期（<code>asyncio</code>）タスク制御を導入してゾンビプロセスを完全に封じ込める。</li>
+        <li><strong>グローバル状態の解消</strong>：エージェントの並行・マルチスレッド実行に耐えられるよう、状態（ステート）をインスタンス内部にカプセル化する。</li>
+    </ol>
+
+    <h2>2. 段階的リファクタリング・ロードマップ</h2>
+    <p>一気に書き換えるとデバッグが困難になるため、影響度の低い部分から4つのフェーズに分けて安全に適用します。</p>
+
+    <div class="roadmap">
+        <div class="roadmap-step">【Phase 1】<br>グローバル状態の分離<br><small>(tools.py)</small></div>
+        <div class="roadmap-arrow">➔</div>
+        <div class="roadmap-step">【Phase 2】<br>引数配列化による安全化<br><small>(tools_linux.py)</small></div>
+        <div class="roadmap-arrow">➔</div>
+        <div class="roadmap-step">【Phase 3】<br>asyncioによる非同期化<br><small>(run_bash_async)</small></div>
+        <div class="roadmap-arrow">➔</div>
+        <div class="roadmap-step">【Phase 4】<br>責任の分離と単一承認<br><small>(edit_fileクリーン化)</small></div>
+    </div>
+
+    <h3><span class="badge badge-info">Phase 1</span>状態管理の分離（スレッドセーフ化）</h3>
+    <p><strong>【対象】</strong> <code>mimic_tui/tools.py</code><br>
+    <strong>【目的】</strong> マルチスレッドや並行処理が走った際に、履歴データやブラウザが競合してクラッシュするのを防ぐ。</p>
+    <ul>
+        <li><strong>アクション1</strong>：グローバルに置かれている <code>_read_files_registry = set()</code> を、<code>OpenRouterAgent</code> クラスの初期化（<code>__init__</code>）時に <code>self.read_files_registry = set()</code> として持たせるように変更。</li>
+        <li><strong>アクション2</strong>：各ツールの関数（<code>read_file</code> や <code>_check_read_warning</code>）に、現在実行中の <code>agent</code> インスタンス、または <code>session_id</code> をコンテキストとして渡せるようにシグネチャを拡張。</li>
+        <li><strong>アクション3</strong>：<code>_pw_context</code>（Playwright）の lazy init を行う <code>_get_browser_page()</code> 内に <code>threading.Lock()</code> による簡易的なセマフォ（排他制御）を導入。</li>
+    </ul>
+
+    <h3><span class="badge badge-info">Phase 2</span>引数配列（List）化によるセキュリティ強化</h3>
+    <p><strong>【対象】</strong> <code>mimic_tui/tools_linux.py</code><br>
+    <strong>【目的】</strong> 自作エスケープ関数（<code>_shell_quote</code>）に潜むシェルインジェクションやReDoSの脆弱性をロジックレベルで100%消滅させる。</p>
+    <ul>
+        <li><strong>アクション1</strong>：<code>search_in_file</code> および <code>smart_read</code> の <code>subprocess.run</code> 実装を、シェルを介さない配列形式に書き換える。</li>
+    </ul>
+
+    <div class="code-title">ロジックのリファクタリング例</div>
+    <pre><code><span class="text-danger"># ✕ 修正前: shell=True や bash -c に依存（脆弱性リスクあり）</span>
+# subprocess.run(["bash", "-c", f"grep -n ... {_shell_quote(pattern)}"])
+
+<span class="text-success"># ◯ 修正後: 引数を配列に分解（OSが直接バイナリを叩くため100%安全）</span>
+cmd = ["grep", "-n"]
+if ignore_case:
+    cmd.append("-i")
+cmd.extend(["-C", str(context_lines), pattern, str(p.resolve())])
+
+result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)</code></pre>
+    <div class="highlight-box">
+        <strong>効果：</strong> OSレベルで直接 <code>grep</code> バイナリが引数を受け取るため、LLMがどんな悪意ある文字列（<code>'; rm -rf /; '</code> など）を出力しても、単なる「一つの検索文字列」として安全に処理されます。
+    </div>
+
+    <h3><span class="badge badge-info">Phase 3</span><code>run_bash</code> の非同期化（asyncio）とゾンビ撲滅</h3>
+    <p><strong>【対象】</strong> <code>mimic_tui/tools_linux.py</code><br>
+    <strong>【目的】</strong> タイムアウト時にメインスレッドを2秒間フリーズさせるバグを修正し、切り離された孫プロセスのリークを完全に防ぐ。</p>
+    <ul>
+        <li><strong>アクション1</strong>：<code>run_bash</code> を <code>async def run_bash_async</code> へとリファクタリング。</li>
+        <li><strong>アクション2</strong>：<code>time.sleep(2)</code> を廃止し、<code>asyncio.wait_for</code> による非同期ブロッキング（他の並行処理を止めない待機）に差し替え。</li>
+        <li><strong>アクション3</strong>：Linuxの <code>preexec_fn=os.setpgrp</code> を用い、タイムアウト検知時に <code>os.killpg(proc.pid, signal.SIGKILL)</code> を即座に実行するロジックを実装。</li>
+    </ul>
+    <div class="highlight-box">
+        <strong>効果：</strong> タイムアウトが発生してもエージェントのシステム全体はミリ秒単位で動き続け、サーバーのメモリやプロセスを食いつぶすアンデッド（ゾンビ）プロセスが1つも残らなくなります。
+    </div>
+
+    <h3><span class="badge badge-info">Phase 4</span>関数の責任分離とUI/UXの二重承認プロンプト解消</h3>
+    <p><strong>【対象】</strong> <code>mimic_tui/tools.py</code><br>
+    <strong>【目的】</strong> <code>edit_file</code> が失敗した際に勝手に <code>patch_file</code> を呼ぶことで発生する「二重承認（同じ確認ボタンを2回押される）」というUXバグと、コードの意図しない破壊を防ぐ。</p>
+    <ul>
+        <li><strong>アクション1</strong>：<code>edit_file</code> 内で <code>old_string</code> が見つからなかった場合（<code>count == 0</code>）、下層ツールに処理を丸投げするのをやめ、LLMへの<strong>明確なエラー返却</strong>に変更する。</li>
+    </ul>
+
+    <div class="code-title">責任を明確にするロジック修正</div>
+    <pre><code><span class="text-danger"># ✕ 修正前: 勝手に横流しして二重承認プロンプトを発生させる</span>
+# if count == 0: return warning + patch_file(...)
+
+<span class="text-success"># ◯ 修正後: LLMにエラーを突き返し、次のツールの選択権を委ねる</span>
+if count == 0:
+    return (
+        f"エラー: 指定された 'old_string' がファイル内に見つかりません。\n"
+        f"現在のファイル内容を `search_in_file` や `smart_read` で再確認し、正確な文字列でやり直すか、"
+        f"インデントのズレが疑われる場合は、最初から `patch_file` ツールを明示的に指定して実行してください。"
+    )</code></pre>
+    <div class="highlight-box">
+        <strong>効果：</strong> 人間は1回の変更につき1回だけ承認ボタンを押せば良くなり、エージェントが「厳密な置換」に失敗した際に、裏で勝手に「曖昧なパッチ」を当ててコードをバグらせる危険性をゼロにできます。
+    </div>
+
+    <h2>3. リグレッション（機能崩壊）を防ぐためのテスト計画</h2>
+    <p>修正によって「賢さ」や「Pipeline-Firstによるコンテキスト節約」が失われていないかを確認するため、以下の3段階の結合テストを行います。</p>
+    <ol>
+        <li><strong>コンテキスト節約テスト</strong>：大きなファイルをターゲットにしてわざと <code>read_file</code> を実行させ、システムがこれまで通り「5,000文字以上の警告」を出し、LLMが自律的に <code>smart_read</code> や <code>search_in_file</code> へと手数を切り替えられるかを確認する。</li>
+        <li><strong>ファジーパッチテスト</strong>：インデントが少しズレたコードブロックを用意し、最初から <code>patch_file</code> を指定して実行させ、<code>difflib</code> やインデント正規化によって正しくコードが修正されるか（既存のファジー性能が生きているか）を確認する。</li>
+        <li><strong>無限ループ・タイムアウトテスト</strong>：<code>run_bash</code> で <code>yes</code> コマンドや <code>sleep 100</code> などの終わらないコマンドを実行させ、指定秒数でメインシステムを巻き込むことなく確実にプロセスが抹殺され、リソースが解放されるかを実証する。</li>
+    </ol>
+
+    <h2>4. 総括</h2>
+    <p>このリファクタリング計画は、既存の洗練されたツール群や「Pipeline-First」という素晴らしいエージェントの頭脳（ロジック）には一切手を加えず、<strong>それを支える土台（Pythonのプロセス制御・セキュリティ・状態管理）だけを鉄骨からコンクリートへと補強する設計</strong>になっています。</p>
+    <p>これを適用することで、24時間365日、マルチユーザー環境で安全に自動開発をこなし続ける最強のプロダクションシステムへと進化を遂げることができます。</p>
+</div>
+
+</body>
+</html>

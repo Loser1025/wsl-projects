@@ -211,19 +211,30 @@ class MultiAgentOrchestrator:
         for agent in (self.architect, self.operator, self.scribe):
             agent.clear_history()
 
+    # 書き込み系ツール（Architect が実際に変更したか判定に使用）
+    _WRITE_TOOLS = {"write_file", "edit_file", "patch_file"}
+
     def _make_steps(self):
         from .orchestrator import PlanStep
         return [
+            # Step 1: Architect が設計・実装
             PlanStep(index=1, description="Architect: 構造把握・設計・実装",
-                     label="architect", on_failure="abort",  on_success=""),
-            PlanStep(index=2, description="Operator: 検証・テスト実行",
+                     label="architect", on_failure="abort",      on_success=""),
+            # Step 2: Operator がファイル変更を確認（Architect が何もしなかった場合に再設計）
+            PlanStep(index=2, description="Operator: 実装確認（ファイル変更検証）",
+                     label="verify",    on_failure="goto:architect", on_success="",
+                     max_iterations=2),
+            # Step 3: Operator がテスト実行
+            PlanStep(index=3, description="Operator: テスト実行・動作検証",
                      label="operator",  on_failure="goto:replan", on_success="goto:scribe",
                      max_iterations=2),
-            PlanStep(index=3, description="Architect: エラー修正・再設計",
-                     label="replan",    on_failure="abort",  on_success="goto:operator",
+            # Step 4: Architect がエラー修正（失敗アプローチの情報付き）
+            PlanStep(index=4, description="Architect: エラー修正・別アプローチで再設計",
+                     label="replan",    on_failure="abort",      on_success="goto:operator",
                      max_iterations=2),
-            PlanStep(index=4, description="Scribe: 作業記憶圧縮・保存",
-                     label="scribe",    on_failure="skip",   on_success=""),
+            # Step 5: Scribe が作業記憶を圧縮
+            PlanStep(index=5, description="Scribe: 作業記憶圧縮・保存",
+                     label="scribe",    on_failure="skip",       on_success=""),
         ]
 
     # ── メイン実行ループ ──────────────────────────────────────────
@@ -238,11 +249,9 @@ class MultiAgentOrchestrator:
         from .orchestrator import WorkflowGraph
         from .utils import get_scratchpad
 
-        steps   = self._make_steps()
+        steps    = self._make_steps()
         workflow = WorkflowGraph(steps)
-
-        # ステップを label → list-index でルックアップ
-        idx_of = {s.label: i for i, s in enumerate(steps)}
+        idx_of   = {s.label: i for i, s in enumerate(steps)}
 
         if on_plan:
             on_plan(steps)
@@ -253,49 +262,106 @@ class MultiAgentOrchestrator:
                 on_agent_switch(name)
 
         def _tick(step):
-            """ステップ状態変化を Workflow タブに通知する。"""
             if on_step:
                 on_step(step)
 
-        current_memory  = get_scratchpad() or ""
+        def _goto(goto_idx) -> int:
+            label = next((s.label for s in steps if s.index == goto_idx), "")
+            return idx_of.get(label, cur + 1)
+
+        current_memory   = get_scratchpad() or ""
         architect_result = ""
         exec_result      = ""
-
-        cur = 0  # steps リストの現在位置（0-based）
+        cur              = 0
 
         while cur < len(steps):
             step = steps[cur]
             step.status = "running"
             _tick(step)
 
+            # ── 各ステップの実行前ログ長を記録（Architect 変更検出用）
+            arch_log_before = len(self.architect.tool_log.records)
+
             try:
                 # ── ステップ別実行 ──────────────────────────────
+
                 if step.label == "architect":
                     _notify("Architect")
                     result = self.architect.run(
                         f"[タスク]\n{user_prompt}\n\n"
                         f"[作業記憶]\n{current_memory or 'なし'}\n\n"
-                        "リポジトリ構造を把握し、解決策を設計・実装してください。"
+                        "リポジトリ構造を把握し、解決策を設計・実装してください。\n"
+                        "実装後は「変更ファイル: <パス>」「テストコマンド: <コマンド>」を明記すること。"
                     )
                     architect_result = result
+                    # 変更ファイル・テストコマンドを共有ステートに格納
+                    workflow.parse_state_updates(result)
+                    changed = self._extract_changed_files(result)
+                    test_cmd = self._extract_test_command(result)
+                    if changed:
+                        workflow.state_set("changed_files", changed)
+                    if test_cmd:
+                        workflow.state_set("test_command", test_cmd)
+
+                elif step.label == "verify":
+                    changed = workflow.state_get("changed_files")
+
+                    # 読み取り専用タスクは verify をスキップ（架空の「変更なし」にならないよう）
+                    if not changed and any(
+                        kw in architect_result for kw in self._READONLY_INDICATORS
+                    ) and len(architect_result) >= 200:
+                        safe_print(C.cyan("\n  ℹ [verify] 読み取り専用タスクのため確認スキップ\n"), flush=True)
+                        result = "確認完了: 読み取り専用タスク（ファイル変更不要）"
+                    else:
+                        _notify("Operator (実装確認)")
+                        result = self.operator.run(
+                            f"[設計担当の報告]\n{architect_result[:800]}\n\n"
+                            f"[報告された変更ファイル]\n{changed or '（未明記）'}\n\n"
+                            "以下を確認してください:\n"
+                            "1. git diff --name-only または stat で実際にファイルが変更されているか確認\n"
+                            "2. 変更あり → 「確認完了: <ファイル名>」と報告\n"
+                            "3. 変更なし → 「変更なし: 実装されていません」と明確に報告"
+                        )
 
                 elif step.label == "operator":
-                    _notify("Operator")
-                    result = self.operator.run(
-                        f"[設計担当の実装内容]\n{architect_result}\n\n"
-                        f"[元のタスク]\n{user_prompt}\n\n"
-                        "実装を検証し、テストを実行して動作確認してください。"
-                    )
+                    test_cmd = workflow.state_get("test_command")
+                    changed  = workflow.state_get("changed_files")
+
+                    # 読み取り専用タスクはテスト実行スキップ
+                    if not changed and not test_cmd and any(
+                        kw in architect_result for kw in self._READONLY_INDICATORS
+                    ) and len(architect_result) >= 200:
+                        safe_print(C.cyan("\n  ℹ [operator] 読み取り専用タスク → テストスキップ\n"), flush=True)
+                        result = "[SUCCESS] 読み取り専用タスク完了（テスト不要）"
+                    else:
+                        _notify("Operator (テスト)")
+                        result = self.operator.run(
+                            f"[設計担当の実装内容]\n{architect_result[:800]}\n\n"
+                            f"[推奨テストコマンド]\n{test_cmd or '（未指定。適切なテストを実行してください）'}\n\n"
+                            f"[元のタスク]\n{user_prompt}\n\n"
+                            "テストを実行して動作確認してください。"
+                        )
                     exec_result = result
+                    workflow.state_set("last_error", exec_result[-600:])
 
                 elif step.label == "replan":
                     _notify("Architect (再設計)")
+                    failed_approach = workflow.state_get("last_error")
                     result = self.architect.run(
-                        f"[実行エラー]\n{exec_result[-1200:]}\n\n"
+                        f"[★ 失敗したアプローチ（再使用禁止）]\n{architect_result[:500]}\n\n"
+                        f"[実行エラー詳細]\n{failed_approach or exec_result[-800:]}\n\n"
                         f"[元のタスク]\n{user_prompt}\n\n"
-                        "エラーを分析し、修正した実装を行ってください。"
+                        "上記アプローチとは異なる方法で実装してください。\n"
+                        "変更後も「変更ファイル: <パス>」「テストコマンド: <コマンド>」を明記すること。"
                     )
                     architect_result = result
+                    workflow.parse_state_updates(result)
+                    changed = self._extract_changed_files(result)
+                    test_cmd = self._extract_test_command(result)
+                    if changed:
+                        workflow.state_set("changed_files", changed)
+                    if test_cmd:
+                        workflow.state_set("test_command", test_cmd)
 
                 elif step.label == "scribe":
                     _notify("Scribe")
@@ -313,22 +379,15 @@ class MultiAgentOrchestrator:
                 raise
             except Exception as e:
                 log.error({"event": "multi_step_error", "label": step.label, "error": str(e)})
-                result = f"エラー: {e}"
-                step.result = result
+                step.result = f"エラー: {e}"
                 step.status = "failed"
                 _tick(step)
                 action, goto_idx = workflow.resolve_failure(step)
-                cur = self._next_index(action, goto_idx, cur, idx_of, steps)
-                _tick(step)
+                cur = self._route(action, goto_idx, cur, idx_of, steps, step, _tick)
                 continue
 
-            # ── 成功 / 失敗 判定 ──────────────────────────────
-            _SUCCESS = ("成功", "完了", "問題なし", "[SUCCESS]", "テスト合格", "正常動作", "All tests")
-            _FAILURE = ("[FAILURE", "Exception:", "Error:", "Traceback", "失敗", "エラー:")
-
-            is_success = step.label in ("architect", "replan", "scribe") or \
-                         any(kw in result for kw in _SUCCESS) or \
-                         not any(kw in result for kw in _FAILURE)
+            # ── 成否判定（改善版） ──────────────────────────────
+            is_success = self._judge_success(step, result, arch_log_before)
 
             if is_success:
                 step.status = "done"
@@ -337,45 +396,114 @@ class MultiAgentOrchestrator:
                 if action == "abort":
                     break
                 elif action == "goto" and goto_idx is not None:
-                    cur = idx_of.get(
-                        next((s.label for s in steps if s.index == goto_idx), ""),
-                        cur + 1
-                    )
+                    cur = _goto(goto_idx)
                 else:
                     cur += 1
             else:
                 step.status = "failed"
                 _tick(step)
-                safe_print(C.yellow(f"\n  ↻ {step.label} 失敗 → ルーティング中...\n"), flush=True)
+                safe_print(C.yellow(f"\n  ↻ [{step.label}] 失敗 → ルーティング中...\n"), flush=True)
                 action, goto_idx = workflow.resolve_failure(step)
                 if action == "abort":
                     safe_print(C.red("\n  ✗ ワークフロー中断\n"), flush=True)
                     break
-                elif action == "skip":
-                    step.status = "skipped"
-                    _tick(step)
-                    cur += 1
-                elif action == "goto" and goto_idx is not None:
-                    step.status = "retrying"
-                    _tick(step)
-                    cur = idx_of.get(
-                        next((s.label for s in steps if s.index == goto_idx), ""),
-                        cur + 1
-                    )
-                else:
-                    step.status = "retrying"
-                    _tick(step)
-                    # retry: 同ステップ再実行（goto カウンタは WorkflowGraph が管理）
+                cur = self._route(action, goto_idx, cur, idx_of, steps, step, _tick)
 
         return exec_result
 
+    # ── 成否判定ロジック ──────────────────────────────────────────
+
+    # 読み取り専用タスクのキーワード（これがあれば書き込みなしでも成功）
+    _READONLY_INDICATORS = (
+        "分析", "要約", "評価", "考察", "まとめ", "レポート", "調査結果",
+        "結論", "比較", "解説", "説明", "確認結果", "レビュー",
+        "以下の通り", "以下にまとめ", "以下を分析",
+    )
+
+    def _judge_success(self, step, result: str, arch_log_before: int) -> bool:
+        """ステップ種別ごとに適切な成否判定を行う。"""
+        # Scribe は常に成功扱い
+        if step.label == "scribe":
+            return True
+
+        # Architect / replan: 書き込みツールを呼んだか、または読み取り専用タスクか確認
+        if step.label in ("architect", "replan"):
+            new_records = self.architect.tool_log.records[arch_log_before:]
+            did_write = any(r.tool in self._WRITE_TOOLS for r in new_records)
+
+            if did_write:
+                return True
+
+            # 書き込みなし → 読み取り専用タスク（分析・要約）か判定
+            is_readonly = (
+                len(result) >= 200 and
+                any(kw in result for kw in self._READONLY_INDICATORS)
+            )
+            if is_readonly:
+                safe_print(C.cyan(
+                    f"\n  ℹ [{step.label}] 読み取り専用タスク（分析・要約）として処理\n"
+                ), flush=True)
+                return True
+
+            safe_print(C.yellow(
+                f"\n  ⚠ [{step.label}] ファイル変更なし・分析結果なし → 再設計を要求\n"
+            ), flush=True)
+            return False
+
+        # Operator (verify): 「変更なし」パターンで失敗
+        if step.label == "verify":
+            no_change_kw = ("変更なし", "実装されていません", "差分なし", "変更が確認できません")
+            if any(kw in result for kw in no_change_kw):
+                return False
+            confirm_kw = ("確認完了", "変更あり", "ファイルが変更", "差分を確認")
+            return any(kw in result for kw in confirm_kw) or "[SUCCESS]" in result
+
+        # Operator (operator): run_bash 終了コードを最優先で判定
+        has_bash_success = "[SUCCESS]" in result
+        has_bash_failure = "[FAILURE" in result
+        if has_bash_success and not has_bash_failure:
+            return True
+        if has_bash_failure:
+            return False
+        # フォールバック: キーワードマッチ
+        _TEXT_OK = ("成功", "完了", "問題なし", "テスト合格", "正常動作", "All tests passed")
+        _TEXT_NG = ("Exception:", "Traceback", "失敗", "エラー:", "FAILED")
+        has_ok = any(kw in result for kw in _TEXT_OK)
+        has_ng = any(kw in result for kw in _TEXT_NG)
+        return has_ok or not has_ng
+
+    # ── ユーティリティ ────────────────────────────────────────────
+
     @staticmethod
-    def _next_index(action: str, goto_idx, cur: int, idx_of: dict, steps: list) -> int:
+    def _extract_changed_files(text: str) -> str:
+        """Architect の報告から変更ファイル一覧を抽出する。"""
+        import re
+        m = re.search(r'変更ファイル[:：]\s*(.+)', text)
+        return m.group(1).strip() if m else ""
+
+    @staticmethod
+    def _extract_test_command(text: str) -> str:
+        """Architect の報告からテストコマンドを抽出する。"""
+        import re
+        m = re.search(r'テストコマンド[:：]\s*(.+)', text)
+        return m.group(1).strip() if m else ""
+
+    @staticmethod
+    def _route(action: str, goto_idx, cur: int,
+               idx_of: dict, steps: list, step, tick_fn) -> int:
+        """on_failure / on_success のルーティング結果を list-index に変換する。"""
         if action == "abort":
-            return len(steps)  # ループ終了
+            return len(steps)
         if action == "goto" and goto_idx is not None:
             label = next((s.label for s in steps if s.index == goto_idx), "")
+            step.status = "retrying"
+            tick_fn(step)
             return idx_of.get(label, cur + 1)
         if action == "skip":
+            step.status = "skipped"
+            tick_fn(step)
             return cur + 1
-        return cur  # retry: 変えない
+        # retry: 同ステップ再実行
+        step.status = "retrying"
+        tick_fn(step)
+        return cur

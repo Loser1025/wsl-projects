@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>動的ワークフロー刷新＆マルチモード統合 計画書</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-light: #eff6ff;
+            --secondary-color: #1e3a8a;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --text-color: #1f2937;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.7;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.2rem;
+            font-weight: 700;
+        }
+
+        header .meta {
+            font-size: 0.95rem;
+            opacity: 0.9;
+        }
+
+        h2 {
+            color: var(--secondary-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-top: 40px;
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+        }
+
+        h2::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 24px;
+            background-color: var(--primary-color);
+            margin-right: 12px;
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--text-color);
+            font-size: 1.2rem;
+            margin-top: 25px;
+        }
+
+        p {
+            margin: 10px 0 20px 0;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .card.danger { border-left: 5px solid var(--danger-color); }
+        .card.warning { border-left: 5px solid var(--warning-color); }
+        .card.success { border-left: 5px solid var(--success-color); }
+        .card.primary { border-left: 5px solid var(--primary-color); }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .badge.danger { background-color: #fee2e2; color: var(--danger-color); }
+        .badge.warning { background-color: #fef3c7; color: var(--warning-color); }
+        .badge.success { background-color: #d1fae5; color: var(--success-color); }
+        .badge.primary { background-color: var(--primary-light); color: var(--primary-color); }
+
+        .diagram-container {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 25px;
+            border-radius: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.4;
+            margin: 20px 0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        code {
+            background-color: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 0.9em;
+            color: #db2777;
+        }
+
+        .diagram-container code {
+            background-color: transparent;
+            padding: 0;
+            color: inherit;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: var(--card-bg);
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 12px 15px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .timeline-step {
+            position: relative;
+            padding-left: 30px;
+            border-left: 2px solid var(--border-color);
+            margin-bottom: 25px;
+        }
+
+        .timeline-step::before {
+            content: '';
+            position: absolute;
+            left: -7px;
+            top: 5px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            border: 2px solid var(--card-bg);
+        }
+
+        .timeline-step.active::before {
+            background-color: var(--success-color);
+            box-shadow: 0 0 0 4px #d1fae5;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>動的ワークフロー刷新＆マルチモード統合 計画書</h1>
+        <div class="meta">目的：足元バグの完全駆除、および「状態遷移マシーン型イベントループ駆動」への大一元化</div>
+    </header>
+
+    <h2>1. 現状のバグ・設計欠陥の整理</h2>
+    <p>現在のソースコードを再精査した結果、プランモード（固定グラフ型）とマルチモード（対話ReActループ型）の双方に、システムのクラッシュやハングを引き起こす深刻なバグが確認されました。</p>
+
+    <div class="grid">
+        <div class="card danger">
+            <span class="badge danger">重大度：高</span>
+            <h3>【マルチ】並列実行時の UnboundLocalError</h3>
+            <p><code>orchestrator.py</code> の並列実行関数 <code>_par_exec</code> 内で、キャッシュ非対象ツール（<code>run_bash</code>等）が呼ばれた際、キャッシュキー変数 <code>ck</code> が初期化されず通過するため、後半の登録処理で 100% <code>UnboundLocalError</code> が発生しクラッシュします。</p>
+        </div>
+        <div class="card danger">
+            <span class="badge danger">重大度：高</span>
+            <h3>【マルチ】空レスポンス時の不正なメッセージシーケンス</h3>
+            <p>ReActループ内で空レスポンスを検知した際、<code>content=None</code> でかつ <code>tool_calls</code> を持たないアシスタントメッセージを配列に強引に挿入しています。これは OpenRouter/OpenAI API 規格に著しく違反するため、次ターンで <code>400 Bad Request</code> エラーを誘発します。</p>
+        </div>
+        <div class="card danger">
+            <span class="badge danger">重大度：高</span>
+            <h3>【ワークフロー】親スレッドプール枯渇によるデッドロック</h3>
+            <p>ジャンプバック（GOTO）処理関数 <code>_do_goto</code> が、親の <code>with ThreadPoolExecutor as reviewer_pool:</code> のスコープネスト下から再帰的に呼び出され、同じプールにレビュータスクを多重投入（<code>submit</code>）しています。アカウント数（<code>n_accounts</code>）が少ない環境下では高確率でスレッドが枯渇しハングアップします。</p>
+        </div>
+        <div class="card warning">
+            <span class="badge warning">重大度：中</span>
+            <h3>【記憶】ジャンプ・分岐時のコンテキスト汚染</h3>
+            <p><code>WorkflowGraph</code> でステップをジャンプバック・動的変更した際、Executor側の会話履歴（<code>self.conversation</code>）が一切巻き戻されず蓄積され続けます。古い文脈がコンテキスト窓を汚染し、LLMが「すでに作業を終えた」と錯覚して同じ失敗を繰り返す原因になります。</p>
+        </div>
+    </div>
+
+    <h2>2. 動的ワークフロー（Dynamic Workflow）一元化アーキテクチャ</h2>
+    <p>プランモード（Orchestrator）とマルチモード（対話型ReAct）を個別のクラス・別々のループとしてバラバラに管理する現在の設計を廃止し、<strong>「すべての処理を、実行時に組み立て可能な動的ステップとしてイベントループで駆動する」</strong> 状態遷移マシーン（Unified Engine）へと刷新します。</p>
+
+    <h3>新・アーキテクチャ概要図</h3>
+    <div class="diagram-container">
+[ユーザー指示 (User Input)] 
+         │
+         ▼
+[初期プラン生成 (Planner)] ──> 【 動的タスクキュー (Task Queue) 】 <───────┐
+                                      │                                  │
+                                      ▼                                  │
+                     【 状態遷移イベントループ (Event Loop) 】           │ (動的ステップの
+                                      │                                  │  追加・変更)
+                ┌─────────────────────┼─────────────────────┐            │
+                ▼                     ▼                     ▼            │
+         [逐次/並列Executor]    [対話モード(ReAct)]     [検証 (Reviewer)] ───┘
+         (隔離ステート実行)     (記憶のロールバック)    (JITプラン変更判定)
+                │                     │                     │
+                └─────────────────────┴──────────┬──────────┘
+                                                 │
+                                                 ▼
+                                     [一括ステート同期 (Join)]
+                                                 │
+                                                 ▼
+                                      [最終報告 (Reflector)]</div>
+
+    <h3>動的統合による3大コアメリット</h3>
+    <ul>
+        <li><strong>JIT（Just-In-Time）プランニングの実現:</strong> 最初に長大なステップを固定化するのをやめ、各ステップの結果やステート、あるいはエラー内容に応じて、Plannerがその場で「次に最適なステップ」を動的に生成し、キューの先頭に割り込ませることが可能になります。</li>
+        <li><strong>「対話」のステップ化（Human-in-the-Loop）:</strong> マルチモードを独立したループにせず、<code>InteractiveStep</code> という1つの特別なステップとしてキューで扱います。自律解決が難しい状況や、ユーザーの承認が必要な場面では、エンジンが動的に対話ステップへ状態遷移します。</li>
+        <li><strong>安全な並列ステート管理（MapReduce型）:</strong> 並列ステップの実行中は各エージェントに隔離されたローカルステートを持たせ、同期（Join）した瞬間にメインスレッドが一括で共通ステートにマージすることで、レースコンディションを完全に排除します。</li>
+    </ul>
+
+    <h2>3. 段階的実装・修正タイムライン</h2>
+
+    <div class="timeline-step active">
+        <span class="badge success">Day 1</span>
+        <strong>足元の致命的バグ駆除と防護ガードレールの設置</strong>
+        <ul>
+            <li>並列実行関数 <code>_par_exec</code> で <code>ck = None</code> の初期化を行い、<code>UnboundLocalError</code> を完全解消。</li>
+            <li>空レスポンスに対するメッセージシーケンスに <code>"（思考中...）"</code> などのプレースホルダを挿入し、APIエラーを防止。</li>
+            <li><code>pipeline.py</code> の <code>proc = None</code> ガード、および <code>agent.py</code> の <code>[DONE]</code> 到達時の <code>return</code> 脱出を適用。</li>
+        </ul>
+    </div>
+
+    <div class="timeline-step">
+        <span class="badge primary">Day 2</span>
+        <strong>制御シグナルの型安全化とエージェント履歴のチェックポイント化</strong>
+        <ul>
+            <li><code>-1</code> や <code>"replan"</code> などの混在を廃止し、明確な <code>WorkflowSignal(Enum)</code> を導入。</li>
+            <li>ステップ開始時点の <code>executor.conversation</code> のスナップショット（ディープコピー）を保持し、GOTOやルート変更発生時に記憶を過去のチェックポイントまで綺麗に巻き戻す「ロールバック機能」を実装。</li>
+        </ul>
+    </div>
+
+    <div class="timeline-step">
+        <span class="badge warning">Day 3 - 4</span>
+        <strong>状態遷移マシーン型「統一動的グラフエンジン」への全面刷新</strong>
+        <ul>
+            <li>固定の配列バッチ処理（<code>bi = 0</code> から進むループ）を完全撤廃し、<code>TaskQueue</code> の監視によるイベントループ型へ移行。</li>
+            <li>対話型ReActループ（マルチモード）を <code>InteractiveStep</code> としてキューへ統合。</li>
+            <li>並列実行時のローカルステート隔離、および同期完了時の一括マージ処理を実装。</li>
+        </ul>
+    </div>
+
+    <div class="timeline-step">
+        <span class="badge primary">Day 5</span>
+        <strong>統合シナリオテスト＆限界検証</strong>
+        <ul>
+            <li>「プラン実行中に意図的にシェルエラーを発生させ、自律的に原因調査ステップを割り込ませた後、ユーザーに『対話モード』で確認を求め、指示を貰ったら動的に新しいルートを再構築して復帰する」という複合シナリオの結合テストを実施。</li>
+        </ul>
+    </div>
+
+    <h2>4. 制御シグナルとデータ構造の定義案</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>シグナル (Enum)</th>
+                <th>パラメータ</th>
+                <th>ワークフローエンジンの挙動</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>WorkflowSignal.CONTINUE</code></td>
+                <td>なし</td>
+                <td>次のステップをキューから取り出して通常実行する。</td>
+            </tr>
+            <tr>
+                <td><code>WorkflowSignal.GOTO</code></td>
+                <td><code>target_step_id: int</code></td>
+                <td>指定されたステップIDへ移動。会話履歴（記憶）を対象ステップ開始前の状態へロールバック。</td>
+            </tr>
+            <tr>
+                <td><code>WorkflowSignal.INSERT_STEPS</code></td>
+                <td><code>new_steps: list[PlanStep]</code></td>
+                <td>LLM（Planner）がJIT生成したリカバリ/追加ステップを、タスクキューの先頭に動的に Push する。</td>
+            </tr>
+            <tr>
+                <td><code>WorkflowSignal.INTERACTIVE</code></td>
+                <td><code>context_prompt: str</code></td>
+                <td>自律実行を一時停止し、ユーザーの介入を求める <code>InteractiveStep</code> へ状態遷移する。</td>
+            </tr>
+            <tr>
+                <td><code>WorkflowSignal.ABORT</code></td>
+                <td><code>reason: str</code></td>
+                <td>前提条件未達などの致命的失敗として、即座にAutoGitでのロールバックを視野に入れつつ全体を中断。</td>
+            </tr>
+        </tbody>
+    </table>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マルチエージェントアーキテクチャ刷新計画書</title>
+    <style>
+        :root {
+            --primary-color: #1e293b;
+            --secondary-color: #0f766e;
+            --accent-color: #2563eb;
+            --success-color: #16a34a;
+            --warning-color: #d97706;
+            --bg-color: #f8fafc;
+            --text-color: #334155;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", sans-serif;
+            line-height: 1.75;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            border-bottom: 3px solid var(--secondary-color);
+            padding-bottom: 15px;
+            font-size: 2.2rem;
+            margin-top: 0;
+            font-weight: 800;
+        }
+
+        h2 {
+            color: var(--primary-color);
+            border-left: 5px solid var(--secondary-color);
+            padding-left: 12px;
+            font-size: 1.6rem;
+            margin-top: 45px;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        h3 {
+            color: #1e293b;
+            font-size: 1.25rem;
+            margin-top: 30px;
+            font-weight: 600;
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+        }
+
+        ul, ol {
+            margin-bottom: 1.5rem;
+            padding-left: 24px;
+        }
+
+        li {
+            margin-bottom: 0.6rem;
+        }
+
+        /* 協調ワークフローの視覚化 */
+        .workflow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f1f5f9;
+            padding: 24px;
+            border-radius: 8px;
+            margin: 35px 0;
+            flex-wrap: wrap;
+        }
+
+        .agent-node {
+            flex: 1;
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            font-weight: bold;
+            font-size: 0.95rem;
+            min-width: 180px;
+            margin: 8px;
+            border-top: 5px solid var(--secondary-color);
+        }
+
+        .agent-node span {
+            display: block;
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: normal;
+            margin-top: 4px;
+        }
+
+        .arrow {
+            padding: 0 8px;
+            color: #94a3b8;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        @media (max-width: 768px) {
+            .workflow { flex-direction: column; align-items: stretch; }
+            .arrow { text-align: center; margin: 8px 0; transform: rotate(90deg); }
+        }
+
+        /* コード表現 */
+        pre {
+            background-color: #0f172a;
+            color: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.9rem;
+            margin: 20px 0;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .code-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #64748b;
+            margin-bottom: -15px;
+            padding-left: 5px;
+        }
+
+        .text-add { color: #4ade80; font-weight: bold; }
+        .text-del { color: #f87171; font-weight: bold; }
+        .text-comment { color: #64748b; font-style: italic; }
+
+        /* 装飾コンポーネント */
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            border-radius: 6px;
+            color: white;
+            margin-right: 6px;
+        }
+        .badge-role { background-color: var(--secondary-color); }
+        .badge-spec { background-color: var(--accent-color); }
+
+        .callout {
+            background-color: #f0fdf4;
+            border-left: 4px solid var(--success-color);
+            padding: 18px;
+            border-radius: 0 8px 8px 0;
+            margin: 25px 0;
+        }
+
+        .callout-warning {
+            background-color: #fffbec;
+            border-left: 4px solid var(--warning-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🌐 マルチエージェントアーキテクチャ 刷新計画書</h1>
+    <p style="color: #64748b; font-size: 1.1rem; margin-top: -10px;">モデル非依存・低結合な自律チームプレイの実現</p>
+
+    <h2>1. アーキテクチャの基本設計（全体像）</h2>
+    <p>現在のシングルエージェント（<code>OpenRouterAgent</code>）構造を、役割ごとのインテリジェンスに分解します。コード内やシステムプロンプトで特定の商用モデル名を明言せず、構成（<code>Config</code>）から動的に推論プロバイダやパラメータを注入できる<strong>「疎結合マルチエージェント」</strong>へと刷新します。</p>
+    <p>ユーザーが対話するフロントエンド（現在の TUI 画面および <code>main.py</code> のインターフェース）は一切変更せず、既存の「Pipeline-First」による優れたコンテキスト節約機能をそのまま継承します。</p>
+
+    <div class="workflow">
+        <div class="agent-node">1. オーケストレーター<span>タスクの分解とルーティング</span></div>
+        <div class="arrow">➔</div>
+        <div class="agent-node">2. 設計担当 (Architect)<span>ソースコード構造・パッチ作成</span></div>
+        <div class="arrow">➔</div>
+        <div class="agent-node">3. 執行担当 (Operator)<span>非同期実行・テスト・Web探索</span></div>
+        <div class="arrow">➔</div>
+        <div class="agent-node">4. 記憶担当 (Scribe)<span>スクラッチパッドの自動圧縮</span></div>
+    </div>
+
+    <h2>2. エージェントの役割定義とツールカプセル化</h2>
+    <p>すべてのエージェントは抽象クラスを継承し、各自の役割（Role）に最適化された最小限のツールセットのみを所有します。</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>エージェント役割（Role）</th>
+                <th>担当業務</th>
+                <th>割り当てツール</th>
+                <th>モデル要件（抽象定義）</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>設計担当 (Architect)</strong></td>
+                <td>タスクの分解、パッチ作成、リポジトリマップの把握</td>
+                <td><code>get_repo_map</code>, <code>edit_file</code>, <code>patch_file</code></td>
+                <td>高論理推論、長文脈対応モデル</td>
+            </tr>
+            <tr>
+                <td><strong>執行担当 (Operator)</strong></td>
+                <td>環境構築、テスト実行、コードベース検索、Webブラウズ</td>
+                <td><code>run_bash</code>, <code>smart_read</code>, <code>grep_codebase</code>, <code>web_search</code>, <code>fetch_webpage</code></td>
+                <td>低遅延、コード・コマンド生成特化モデル</td>
+            </tr>
+            <tr>
+                <td><strong>記憶担当 (Scribe)</strong></td>
+                <td>コンテキストのリアルタイム状態管理、記憶の圧縮</td>
+                <td><code>update_scratchpad</code>, <code>search_history</code></td>
+                <td>高速処理、格安・構造化出力最適化モデル</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>3. 段階的リファクタリング・実装コード案</h2>
+
+    <h3><span class="badge badge-role">Step 1</span> <code>agent.py</code>: 役割ベースの抽象化とカプセル化</h3>
+    <p>モデル指定を引数で抽象化し、特定のAIベンダー名に依存しない基底クラスを定義します。</p>
+
+    <div class="code-title">mimic_tui/agent.py の刷新案</div>
+    <pre><code><span class="text-comment"># 役割ベースのエージェント共通基底クラス</span>
+class BaseRoleAgent:
+    def __init__(self, config, tools_registry, role_description: str):
+        self.config = config              <span class="text-comment"># モデル名やコンテキスト長を内包する抽象設定</span>
+        self.tools = tools_registry        <span class="text-comment"># 各自に制限されたツールレジストリ</span>
+        self.role_description = role_description
+        self.conversation = []
+
+    def _init_system_prompt(self, base_prompt: str):
+        self.conversation.append({
+            "role": "system",
+            "content": f"You are an expert AI agent specializing in: {self.role_description}.\n{base_prompt}"
+        })
+
+class ArchitectAgent(BaseRoleAgent):
+    """設計・ファイル修正の責任を持つエージェント"""
+    pass
+
+class OperatorAgent(BaseRoleAgent):
+    """非同期プロセス実行とWeb探索の責任を持つエージェント"""
+    pass
+
+class ScribeAgent(BaseRoleAgent):
+    """作業記憶の維持・自動圧縮（コンパクション）の責任を持つエージェント"""
+    pass</code></pre>
+
+    <h3><span class="badge badge-role">Step 2</span> <code>orchestrator.py</code>: 非同期でのAI間協調ループ</h3>
+    <p><code>orchestrator.py</code> は単一の ReAct ループを回すのをやめ、エージェント間のメッセージルーティングとAI間セルフデバッグの制御に特化させます。</p>
+
+    <div class="code-title">mimic_tui/orchestrator.py の刷新案</div>
+    <pre><code>class MultiAgentOrchestrator:
+    def __init__(self, architect: ArchitectAgent, operator: OperatorAgent, scribe: ScribeAgent):
+        self.architect = architect
+        self.operator = operator
+        self.scribe = scribe
+        self.max_auto_retries = 3
+
+    async def execute_task_loop(self, user_prompt: str) -> str:
+        <span class="text-comment"># 1. 記憶担当から現在のコンテキスト（スクラッチパッド）を読み込み</span>
+        current_memory = self.scribe.get_memory()
+        
+        <span class="text-comment"># 2. 設計担当が解決プランを立案</span>
+        plan = await self.architect.plan_solution(user_prompt, current_memory)
+        
+        retry_count = 0
+        while retry_count < self.max_auto_retries:
+            <span class="text-comment"># 3. 執行担当が非同期環境でプランを実行（テスト・検証）</span>
+            result = await self.operator.execute_and_verify(plan)
+            
+            if result.is_success:
+                break
+                
+            <span class="text-comment"># 【AI間セルフデバッグ】失敗時は執行担当のエラーログを設計担当へ直接フィードバック</span>
+            log.warning(f"タスク失敗。設計担当に再プランを要求します。試行: {retry_count + 1}")
+            plan = await self.architect.replan(plan, result.error_output)
+            retry_count += 1
+            
+        if retry_count >= self.max_auto_retries:
+            return f"⚠️ 自律復旧上限に達しました。ユーザーの介入が必要です。最終エラー:\n{result.error_output}"
+
+        <span class="text-comment"># 4. タスク完了後、またはターン毎に記憶担当が動的に記憶圧縮を実行</span>
+        await self.scribe.compact_and_save(result.summary)
+        
+        return result.final_output</code></pre>
+
+    <h3><span class="badge badge-role">Step 3</span> <code>tools.py</code>: 完全書き換え式スクラッチパッドの保護（要約ロジック）</h3>
+    <p>ツールが特定のエージェント（記憶担当）を呼び出せるよう、引数を経由してコンパクションロジックを統合します。文字数オーバー時にデータを機械的に切断（<code>[:800]</code>）して破壊するのを防ぎます。</p>
+
+    <div class="code-title">mimic_tui/tools.py の 3番（自動要約）ロジック統合</div>
+    <pre><code>def update_scratchpad_smart(content: str, scribe_context: Optional[ScribeAgent] = None) -> str:
+    """既存のインターフェースを維持しつつ、文字数超過時は記憶担当に自動圧縮を委譲する"""
+    if len(content) <= 800:
+        set_scratchpad(content)
+        return "✓ スクラッチパッドを更新しました。"
+        
+    if scribe_context is None:
+        <span class="text-comment"># 記憶担当が不在の場合の安全なフォールバック（前方切り捨てによるデータ構造破壊を防止）</span>
+        set_scratchpad(content[:800])
+        return "⚠️ スクラッチパッドの文字数制限（800文字）を超過したため、末尾が切り捨てられました。"
+        
+    log.info("スクラッチパッドの上限超過を検知。記憶担当による自動圧縮を実行します。")
+    
+    <span class="text-comment"># 記憶担当エージェントの軽量モデルに「ゴール、完了、制約」の抽出を非同期で依頼</span>
+    compacted_memory = scribe_context.call_compaction_pipeline(content)
+    
+    set_scratchpad(compacted_memory[:800])
+    return "✓ スクラッチパッドが上限に達したため、重要な制約とゴールを維持したまま高密度に自動要約されました。"</code></pre>
+
+    <h2>4. アーキテクチャ刷新に伴うトレードオフ評価</h2>
+
+    <div class="callout">
+        <strong>🚀 進化するメリット：</strong>
+        <ul>
+            <li><strong>ハルシネーションの劇的な低減</strong>：設計（Architect）とテスト実行（Operator）の脳を分離することで、お互いが「相互レビュー」の関係になり、コードのデプロイ成功率が跳ね上がります。</li>
+            <li><strong>モデル切り替えによるコストの最適化</strong>：記憶の整理（Scribe）やファイル検索（Operator）に安価で高速な軽量モデルを割り当て、真に難しい設計の瞬間だけ最高峰モデル（Architect）にバトンを渡すため、API費用を大幅に削減できます。</li>
+            <li><strong>安全ブレーキの確立</strong>：AI同士のデバッグループが停滞した場合、オーケストレーターが検知して人間の「承認ハンドラー」へ安全に制御権を戻すため、APIの無限ループ消費（破産リスク）を未然に防げます。</li>
+        </ul>
+    </div>
+
+    <div class="callout callout-warning">
+        <strong>⚠️ 発生するデメリットと対策：</strong>
+        <ul>
+            <li><strong>会話オーバーヘッド（遅延）の増加</strong>：エージェント間でメッセージが往復するため、シングルエージェントと比較してターンごとの初期応答にわずかな遅延が発生します。➔ <em>対策：OperatorとScribeには最速クラスのモデルを設定することで体感速度を維持します。</em></li>
+            <li><strong>関数の単一責任性の低下</strong>：ツールがエージェントのコンテキスト（<code>scribe_context</code>など）を一部知る必要があるため、関数の独立性がやや下がります。➔ <em>対策：引数へのデフォルト値 <code>None</code> の設定を徹底し、ツール単体テストの容易性を担保します。</em></li>
+        </ul>
+    </div>
+
+    <h2>5. 次のステップ</h2>
+    <p>まずは、安全リファクタリング計画書のPhase 1に則り、<code>tools.py</code> 内のグローバル変数（<code>_read_files_registry</code>など）のスレッドローカル化・カプセル化から着手します。その後、<code>agent.py</code> へ上記クラス構造をインジェクションすることで、既存のTUI環境を完全に動作させたまま、安全にマルチエージェント構造へ移行することが可能です。</p>
+</div>
+
+</body>
+</html>
