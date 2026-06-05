@@ -1,0 +1,568 @@
+{
+  "nvidia/nemotron-3-super-120b-a12b:free": {
+    "latencies": [
+      49.29570174217224,
+      18.810684204101562,
+      19.129781007766724,
+      22.84213137626648,
+      29.872302532196045,
+      21.525506734848022,
+      10.224868297576904,
+      17.739928245544434,
+      29.801742553710938,
+      47.18205809593201,
+      13.771319389343262,
+      13.317578554153442,
+      1.8769330978393555,
+      9.464131355285645,
+      6.027082443237305,
+      11.100139379501343,
+      3.5111753940582275,
+      19.012975692749023,
+      58.061034202575684,
+      10.503026723861694,
+      3.650702714920044,
+      25.627666473388672,
+      20.467163562774658,
+      22.769189596176147,
+      24.706972360610962,
+      26.771084547042847,
+      3.5972464084625244,
+      9.33726954460144,
+      6.080489158630371,
+      22.70201563835144
+    ],
+    "output_tokens": [
+      910,
+      642,
+      395,
+      439,
+      530,
+      441,
+      178,
+      222,
+      794,
+      856,
+      90,
+      123,
+      67,
+      51,
+      53,
+      52,
+      128,
+      142,
+      760,
+      158,
+      119,
+      338,
+      187,
+      461,
+      156,
+      371,
+      138,
+      125,
+      298,
+      334
+    ],
+    "reasoning_tokens": [
+      581,
+      244,
+      162,
+      139,
+      77,
+      72,
+      88,
+      138,
+      171,
+      157,
+      49,
+      81,
+      27,
+      30,
+      30,
+      30,
+      107,
+      123,
+      35,
+      162,
+      79,
+      305,
+      62,
+      334,
+      61,
+      312,
+      31,
+      19,
+      335,
+      389
+    ],
+    "cases": {
+      "logic_water": {
+        "scores": {
+          "has_numbered_steps": true,
+          "correct_volumes": true,
+          "mentions_pour": true,
+          "concise": true
+        },
+        "avg_elapsed": 34.0531929731369,
+        "content_previews": [
+          "1. 5リットルの容器を水道から満たす。  \n2. 5リットルの容器の水を3リットルの容器に注ぐ。（このとき5リットル容器に2リットル残る）  \n3. 3リットルの容器の水を捨てる。  \n4. 5リットルの容器に残っている2リットルの水を3リットルの容器に移す。（これで5リットル容器は空、3リットル容器に2リットル）  \n5. 5リットルの容器を再び水道から満たす。  \n6. 5リットルの容器の水",
+          "1. 5 Lの容器に水を満タンにする。（5 L：5 L, 3 L：0 L）  \n2. 5 Lの容器から3 Lの容器に水を注ぎ、3 Lが満タンになるまで移す。（5 L：2 L, 3 L：3 L）  \n3. 3 Lの容器の水を全部捨てる。（5 L：2 L, 3 L：0 L）  \n4. 5 Lの容器に残っている2 Lを3 Lの容器に移す。（5 L：0 L, 3 L：2 L）  \n5. 5 Lの容器に水を"
+        ]
+      },
+      "logic_knights": {
+        "scores": {
+          "gives_answer": true,
+          "gives_reason": false,
+          "correct": false
+        },
+        "avg_elapsed": 20.9859561920166,
+        "content_previews": [
+          "**解答**  \n- A が騎士（真実を言う）なら、彼の発言「B は悪人だ」は真である → **B は悪人**。  \n- A が悪人（嘘をつく）なら、彼の発言は偽である → 「B は悪人だ」は偽 → **B は騎士**。\n\nしたがって、与えられた情報だけでは次のいずれかの組み合わせだけが可能です。\n\n| A の身分 | B の身分 |\n|----------|----------|\n| 騎士 (真",
+          "**答え**  \n- A が騎士（真実を言う）・B が悪人（嘘をつく）  \n- または  \n- A が悪人・B が騎士  \n\n**理由**  \n\n1. A の発言は 「B は悪人だ」 です。  \n2. **ケース1：A が騎士**  \n   - 騎士は真実しか言わない → 発言が真である。  \n   - したがって「B は悪人だ」は真 → B は悪人。  \n   - この組み合わせ (A＝騎士, "
+        ]
+      },
+      "math_reason": {
+        "scores": {
+          "correct_answer": true,
+          "mentions_gauss": true,
+          "shows_formula": true,
+          "concise": false
+        },
+        "avg_elapsed": 25.698904633522034,
+        "content_previews": [
+          "**ガウスの方法（ペアリング法）で 1 から 100 までの整数の和を求める手順**\n\n1. **数列を前半と後半に分ける**  \n   \\[\n   1,\\;2,\\;3,\\;\\dots ,\\;98,\\;99,\\;100\n   \\]\n   を\n   \\[\n   (1,\\;2,\\;3,\\;\\dots ,\\;50) \\quad\\text{と}\\quad (51,\\;52,\\;\\dots ,\\;100)\n",
+          "ガウス（カール・フリードリヒ・ガウス）の方法は、数列の両端から同じ数だけ離れた項をペアにして和を求める手法です。\n\n**1. 1 から 100 までの整数を書き出す**  \n\n\\[\n1,\\;2,\\;3,\\;\\dots ,\\;98,\\;99,\\;100\n\\]\n\n**2. 両端からペアを作る**  \n\n\\[\n\\begin{aligned}\n1 + 100 &= 101\\\\\n2 + 99  &= 101"
+        ]
+      },
+      "code_fizzbuzz": {
+        "scores": {
+          "has_code": true,
+          "has_fizzbuzz": true,
+          "no_explanation": true,
+          "correct_range": true
+        },
+        "avg_elapsed": 13.982398271560669,
+        "content_previews": [
+          "for i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)",
+          "```python\nfor i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)\n```"
+        ]
+      },
+      "code_debug": {
+        "scores": {
+          "identifies_index_error": true,
+          "shows_fix": true,
+          "explains_cause": true
+        },
+        "avg_elapsed": 38.49190032482147,
+        "content_previews": [
+          "**バグの指摘**\n\n- `result = [fibonacci(i) for i in range(10)]` は `i = 0 … 9` の 10 要素だけを生成します。  \n- そのため `result` のインデックスは `0 … 9` までしか有効ではありません。  \n- `print(result[10])` とすると **IndexError: list index out of ",
+          "**バグの指摘**\n\n| 行番号 | 内容 | 問題点 |\n|--------|------|--------|\n| 1‑5    | `fibonacci` 関数の実装 | 再帰だけでも正常に動くが、`n` が大きいとスタックオーバーフローになる危険性がある。また、負の入力に対しては無限再帰となる。 |\n| 7‑8    | `result = [fibonacci(i) for i in ra"
+        ]
+      },
+      "code_refactor": {
+        "scores": {
+          "uses_comprehension": true,
+          "uses_fstring": true,
+          "correct_logic": true
+        },
+        "avg_elapsed": 13.544448971748352,
+        "content_previews": [
+          "result = [f'even: {i}' for i in range(1, 11) if i % 2 == 0]",
+          "result = [f'even: {i}' for i in range(1, 11) if i % 2 == 0]"
+        ]
+      },
+      "tool_explicit": {
+        "scores": {
+          "calls_tool": true,
+          "uses_bash_or_search": true,
+          "correct_pattern": true
+        },
+        "avg_elapsed": 5.6705322265625,
+        "content_previews": [
+          "\n[TOOL] run_bash({\"command\": \"ls *.py 2>/dev/null || echo \\\"No .py files\\\"\"})",
+          "\n[TOOL] search_files({\"pattern\": \"*.py\"})"
+        ]
+      },
+      "tool_chain": {
+        "scores": {
+          "calls_tool": true,
+          "searches_first": true,
+          "plans_to_read": false
+        },
+        "avg_elapsed": 8.563610911369324,
+        "content_previews": [
+          "\n[TOOL] search_files({\"pattern\": \"config.py\"})",
+          "\n[TOOL] search_files({\"pattern\": \"config.py\"})"
+        ]
+      },
+      "tool_ambiguous": {
+        "scores": {
+          "calls_tool": true,
+          "reasonable_choice": true,
+          "mentions_log": false
+        },
+        "avg_elapsed": 11.262075543403625,
+        "content_previews": [
+          "\n[TOOL] search_files({\"pattern\": \"*.log\", \"directory\": \".\"})",
+          "\n[TOOL] run_bash({\"command\": \"ls -la\", \"timeout\": 5})"
+        ]
+      },
+      "tool_no_call": {
+        "scores": {
+          "no_tool_call": false,
+          "answers_directly": false,
+          "mentions_mutable": false
+        },
+        "avg_elapsed": 34.28203046321869,
+        "content_previews": [
+          "Pythonのリスト（`list`）とタプル（`tuple`）はどちらも複数の要素を順序通りに格納できるシーケンス型ですが、いくつか重要な違いがあります。\n\n| 項目 | リスト (`list`) | タプル (`tuple`) |\n|------|----------------|-----------------|\n| **可変性（Mutable / Immutable）** | 変更可能。要",
+          "\n[TOOL] web_search({\"query\": \"Python list vs tuple differences\"})"
+        ]
+      },
+      "format_json": {
+        "scores": {
+          "valid_json": true,
+          "has_name": true,
+          "has_skills": true,
+          "no_extra_text": true
+        },
+        "avg_elapsed": 14.639184594154358,
+        "content_previews": [
+          "{\"名前\": \"田中太郎\", \"年齢\": 30, \"スキル\": [\"Python\", \"Go\", \"SQL\"]}",
+          "{\n  \"名前\": \"田中太郎\",\n  \"年齢\": 30,\n  \"スキル\": [\"Python\", \"Go\", \"SQL\"]\n}"
+        ]
+      },
+      "format_strict": {
+        "scores": {
+          "has_table": true,
+          "has_all_langs": true,
+          "has_correct_cols": true,
+          "table_rows": true
+        },
+        "avg_elapsed": 21.618176579475403,
+        "content_previews": [
+          "| 言語   | 型システム               | 主な用途                                 |\n|--------|--------------------------|------------------------------------------|\n| Python | 動的型付け（ダックタイピング） | Web開発、データサイエンス、スクリプト",
+          "| 言語 | 型システム | 主な用途 |\n|------|------------|----------|\n| Python | 動的型付け（ダックタイピング） | Web開発、データサイエンス、スクリプト、AI・機械学習 |\n| Go | 静的型付け、型推論、構造体ベース | バックエンドサーバー、マイクロサービス、CLIツール、ネットワークプログラミング |\n| Rust | 静的型付け、所"
+        ]
+      },
+      "japanese_quality": {
+        "scores": {
+          "in_japanese": true,
+          "within_3sentences": true,
+          "mentions_attention": true,
+          "approachable": false
+        },
+        "avg_elapsed": 25.739028453826904,
+        "content_previews": [
+          "自己注意機構は、入力列の各単語が他のすべての単語とどれだけ関連しているかをスコアで測り、そのスコアに応じて重み付けした情報をまとめる仕組みです。これにより、遠く離れた単語同士でも重要な関係を捉えることができます。最終的に得られた重み付け和が、次の層への入力として使われます。",
+          "自己注意は、入力文の各単語が他のすべての単語との関係性を調べて、「どれだけ重要か」を数値（注意重み）で表す仕組みです。これらの重みに従って、各単語は他の単語の情報を重み付き平均で取り込み、文脈を反映した新しい表現を作ります。その結果、同じ単語でも前後の文脈によって意味が変わる表現が得られます。"
+        ]
+      },
+      "summarize": {
+        "scores": {
+          "exactly_2sentences": true,
+          "covers_ml": true,
+          "covers_types": true,
+          "shorter_than_original": true
+        },
+        "avg_elapsed": 6.467257976531982,
+        "content_previews": [
+          "機械学習は、コンピュータがデータからパターンを自動的に学習し、予測や分類などのタスクを実行できる技術であり、教師あり学習、教師なし学習、強化学習の3種類に分類される。近年のディープラーニングの進展により、画像認識や自然言語処理など多くの分野で人間を超える性能が達成されている。",
+          "機械学習は、コンピュータがデータからパターンを自動的に学習し、予測や分類などのタスクを実行できる技術であり、教師あり・教師なし・強化学習の3種類に大別される。近年、ディープラーニングの進展により、画像認識や自然言語処理など多くの分野で人間を超える性能が達成されている。"
+        ]
+      },
+      "context_retain": {
+        "scores": {
+          "recalls_name": true,
+          "recalls_lang": true,
+          "doesnt_hallucinate": true
+        },
+        "avg_elapsed": 14.391252398490906,
+        "content_previews": [
+          "あなたの名前はアキラで、好きな言語はRustです。",
+          "名前はアキラで、好きな言語はRustです。"
+        ]
+      }
+    }
+  },
+  "openrouter/owl-alpha": {
+    "latencies": [
+      12.942217826843262,
+      13.321611404418945,
+      18.00964856147766,
+      18.246089220046997,
+      12.237343311309814,
+      10.264315843582153,
+      14.329980373382568,
+      50.65541315078735,
+      5.508740663528442,
+      2.2636985778808594,
+      2.6758759021759033,
+      2.3288164138793945,
+      2.1780107021331787,
+      2.4073469638824463,
+      4.980848789215088,
+      6.296709299087524,
+      13.377185583114624,
+      16.196090698242188,
+      19.053650379180908,
+      14.412314414978027,
+      60.15543055534363,
+      5.086588144302368,
+      3.8322296142578125,
+      33.2295081615448,
+      60.66827392578125,
+      23.450450897216797,
+      2.0795745849609375,
+      4.663997173309326
+    ],
+    "output_tokens": [
+      263,
+      388,
+      526,
+      549,
+      398,
+      81,
+      74,
+      320,
+      35,
+      35,
+      24,
+      38,
+      16,
+      16,
+      112,
+      64,
+      420,
+      506,
+      38,
+      38,
+      82,
+      106,
+      47,
+      108,
+      73,
+      71,
+      16,
+      56
+    ],
+    "reasoning_tokens": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "cases": {
+      "logic_water": {
+        "scores": {
+          "has_numbered_steps": true,
+          "correct_volumes": true,
+          "mentions_pour": true,
+          "concise": true
+        },
+        "avg_elapsed": 6.471108913421631,
+        "content_previews": [
+          "**5リットルの容器（5L）と3リットルの容器（3L）を使って、ちょうど4リットルを計る最短手順は以下の通りです：**\n\n1. **5Lの容器を満たす。**（5L：5、3L：0）  \n2. **5Lの容器から3Lの容器に水を注ぎ、3Lの容器が満杯になるまで注ぐ。**（5L：2、3L：3）  \n3. **3Lの容器を空にする。**（5L：2、3L：0）  \n4. **5Lの容器に残っている2リットル"
+        ]
+      },
+      "logic_knights": {
+        "scores": {
+          "gives_answer": true,
+          "gives_reason": true,
+          "correct": true
+        },
+        "avg_elapsed": 15.665629982948303,
+        "content_previews": [
+          "# AとBの正体を推理する\n\n## 結論\n\n**Aは悪人、Bは騎士**\n\n## 理由\n\n背理法で考えます。\n\n### 仮にAが騎士（常に真実を言う）だと仮定する\n\n- Aが騎士なら、Aの言葉は真実である。\n- Aは「Bは悪人だ」と言ったので、Bは悪人である。\n- Bが悪人なら、Bは常に嘘をつく。\n\nこの時点では矛盾は見えません。しかし、もう一つのケースも検証します。\n\n### 仮にAが悪人（常に嘘",
+          "# AとBの正体を推理する\n\n## 結論\n\n**Aは悪人、Bは騎士**\n\n## 理由\n\n背理法で考えます。\n\n### 仮定1：Aが騎士であると仮定する\n\n- 騎士は常に真実を言うので、Aの発言「Bは悪人だ」は**真実**になる。\n- つまりBは悪人である。\n- この場合、矛盾は生じないように見えます。\n\n### 仮定2：Aが悪人であると仮定する\n\n- 悪人は常に嘘をつくので、Aの発言「Bは悪人だ」"
+        ]
+      },
+      "math_reason": {
+        "scores": {
+          "correct_answer": false,
+          "mentions_gauss": true,
+          "shows_formula": true,
+          "concise": false
+        },
+        "avg_elapsed": 15.241716265678406,
+        "content_previews": [
+          "ガウスを使って1から100までの整数の和を求めます。ガウスの方法とは、数列の最初と最後の項を組み合わせて同じ和になるペアを作り、そのペアの数をかけるというものです。\n\n与えられた数列は、1から100までの整数です。\n\n1.  **数列を逆順に並べる:**\n    +---+---+---+---+---+---+---+---+---+---+\n    | 1 | 2 | 3 | 4 | 5 |.",
+          "# 1から100までの整数の和（ガウスの方法）\n\n## ガウスの方法とは\n\n1からnまでの整数の和は、数列を**順番に並べたものと逆順に並べたものを足し合わせる**ことで簡単に求められます。\n\n## 計算過程\n\n数列を順番と逆順に並べて足し合わせます。\n\n| 順番 | 1 | 2 | 3 | 4 | … | 97 | 98 | 99 | 100 |\n|------|---|---|---|---|"
+        ]
+      },
+      "code_fizzbuzz": {
+        "scores": {
+          "has_code": true,
+          "has_fizzbuzz": true,
+          "no_explanation": true,
+          "correct_range": true
+        },
+        "avg_elapsed": 12.29714810848236,
+        "content_previews": [
+          "```python\nfor i in range(1, 31):\n    if i % 3 == 0 and i % 5 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        pri",
+          "```python\nfor i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)\n```"
+        ]
+      },
+      "code_debug": {
+        "scores": {
+          "identifies_index_error": true,
+          "shows_fix": true,
+          "explains_cause": true
+        },
+        "avg_elapsed": 25.327706575393677,
+        "content_previews": [
+          "## バグの指摘\n\nこのコードには**インデックスエラー（IndexError）**があります。\n\n### 問題点\n\n```python\nresult = [fibonacci(i) for i in range(10)]  # index 0〜9（10個の要素）\nprint(result[10])  # index 10 を参照 → IndexError！\n```\n\n- `range(10)` "
+        ]
+      },
+      "code_refactor": {
+        "scores": {
+          "uses_comprehension": true,
+          "uses_fstring": true,
+          "correct_logic": true
+        },
+        "avg_elapsed": 3.886219620704651,
+        "content_previews": [
+          "```python\nresult = [f'even: {i}' for i in range(1, 11) if i % 2 == 0]\n```",
+          "```python\nresult = [f'even: {i}' for i in range(1, 11) if i % 2 == 0]\n```"
+        ]
+      },
+      "tool_explicit": {
+        "scores": {
+          "calls_tool": true,
+          "uses_bash_or_search": true,
+          "correct_pattern": true
+        },
+        "avg_elapsed": 2.502346158027649,
+        "content_previews": [
+          "\n[TOOL] search_files({\"pattern\": \"*.py\", \"directory\": \".\"})",
+          "カレントディレクトリのPythonファイル一覧を取得します。\n[TOOL] search_files({\"pattern\": \"*.py\", \"directory\": \".\"})"
+        ]
+      },
+      "tool_chain": {
+        "scores": {
+          "calls_tool": true,
+          "searches_first": true,
+          "plans_to_read": false
+        },
+        "avg_elapsed": 2.2926788330078125,
+        "content_previews": [
+          "\n[TOOL] search_files({\"pattern\": \"config.py\"})",
+          "\n[TOOL] search_files({\"pattern\": \"config.py\"})"
+        ]
+      },
+      "tool_ambiguous": {
+        "scores": {
+          "calls_tool": false,
+          "reasonable_choice": false,
+          "mentions_log": true
+        },
+        "avg_elapsed": 5.638779044151306,
+        "content_previews": [
+          "エラーログを確認するには、エラーログのファイル名や場所を教えていただけますか？もしくは、まずシステムの一般的なエラーログを確認してみましょうか？\n\n例えば：\n\n1. 特定のファイルがある場合は、ファイル名やパスを教えてください。\n2. 特定のアプリケーションやサービスのログを確認したい場合は、その名前を教えてください。\n3. 特に指定がなければ、システムの主要なエラーログを探してみます。",
+          "エラーログを確認するため、まずシステム上のログファイルを探します。\n[TOOL] search_files({\"pattern\": \"*.log\"})\n[TOOL] run_bash({\"command\": \"ls -la /var/log/ 2>/dev/null | head -30\"})"
+        ]
+      },
+      "tool_no_call": {
+        "scores": {
+          "no_tool_call": true,
+          "answers_directly": true,
+          "mentions_mutable": true
+        },
+        "avg_elapsed": 14.786638140678406,
+        "content_previews": [
+          "Pythonのリストとタプルの主な違いは以下の通りです：\n\n## 1. 可変性（Mutability）\n- **リスト**: 変更可能（mutable）\n  - 要素の追加・削除・変更が可能\n- **タプル**: 変更不可（immutable）\n  - 一度作成すると要素の変更ができない\n\n## 2. 構文\n- **リスト**: 角括弧 `[]` を使用\n  ```python\n  my_list",
+          "\n\nPythonのリストとタプルの主な違いは以下の通りです。\n\n---\n\n## 1. 可変性（Mutability）\n\n| | リスト（list） | タプル（tuple） |\n|---|---|---|\n| 変更可能か | **可変（mutable）** | **不変（immutable）** |\n\n```python\n# リスト → 変更可能\nmy_list = [1, 2, 3]\nmy_li"
+        ]
+      },
+      "format_json": {
+        "scores": {
+          "valid_json": true,
+          "has_name": true,
+          "has_skills": true,
+          "no_extra_text": true
+        },
+        "avg_elapsed": 16.732982397079468,
+        "content_previews": [
+          "```json\n{\n  \"名前\": \"田中太郎\",\n  \"年齢\": 30,\n  \"スキル\": [\"Python\", \"Go\", \"SQL\"]\n}\n```",
+          "```json\n{\n  \"名前\": \"田中太郎\",\n  \"年齢\": 30,\n  \"スキル\": [\"Python\", \"Go\", \"SQL\"]\n}\n```"
+        ]
+      },
+      "format_strict": {
+        "scores": {
+          "has_table": true,
+          "has_all_langs": true,
+          "has_correct_cols": false,
+          "table_rows": true
+        },
+        "avg_elapsed": 32.621009349823,
+        "content_previews": [
+          "| 言語 | 型システム | 主な目的 |\n|------|------------|----------|\n| Python | 動的型付け | 汎用（Web開発、データ分析、AI/ML） |\n| Go    | 静的型付け | システムプログラミング、マイクロサービス |\n| Rust  | 静的型付け | システムプログラミング、安全重視のソフトウェア |",
+          "| 言語 | 型システム | 主な用途 |\n|------|-----------|----------|\n| Python | 動的型付け | AI/ML, Web開発, サイエンティフィックコンピュテーション |\n| Go | 静的型付け | サイバーバックエンド, クラウドインフラ, マイクロサービス |\n| Rust | 静的型付け（所有権システム付き） | システムプログラミング, We"
+        ]
+      },
+      "japanese_quality": {
+        "scores": {
+          "in_japanese": true,
+          "within_3sentences": true,
+          "mentions_attention": false,
+          "approachable": true
+        },
+        "avg_elapsed": 18.530868887901306,
+        "content_previews": [
+          "自分自身の文中で、どの言葉が他の言葉と最も関連しているかを、それぞれの点をチェックして注目する仕組みです。これにより、文全体の意味を正確に理解できるようになります。",
+          "トランスフォーマーでは、文中の各単語が他のすべての単語との関係を直接計算することで、文中の意味のつながりを自在に理解します。これにより、「彼が公園に行った」という文で、「彼」と「公園」の関連性を、距離に関係なく即座に捉えることができます。RNNのように単語を順番に処理するのではなく、一度にすべての単語を並列で処理するため、高速かつ高精度な分析が可能です。"
+        ]
+      },
+      "summarize": {
+        "scores": {
+          "exactly_2sentences": true,
+          "covers_ml": true,
+          "covers_types": true,
+          "shorter_than_original": true
+        },
+        "avg_elapsed": 42.05936241149902,
+        "content_previews": [
+          "機械学習はコンピュータがデータからパターンを学習し、予測や分類を可能にする技術であり、教師あり学習・教師なし学習・強化学習の3種類に分かれる。近年ではディープラーニングの進歩により、画像認識や自然言語処理において人間を超える性能を実現している。",
+          "機械学習は、コンピュータがデータからパターンを学習し予測や分類を行う技術であり、教師あり学習・教師なし学習・強化学習の3種類に分かれる。近年はディープラーニングの進歩により、画像認識や自然言語処理などで人間を超える性能を実現している。"
+        ]
+      },
+      "context_retain": {
+        "scores": {
+          "recalls_name": false,
+          "recalls_lang": true,
+          "doesnt_hallucinate": true
+        },
+        "avg_elapsed": 3.371785879135132,
+        "content_previews": [
+          "私の名前はOWLです。好きな言語はRustです。",
+          "私の名前はOWLです。ZOO社が開発しました。好きなプログラミング言語についてですが、特にRustには強みを感じます。Rustは安全性とパフォーマンスの両立に優れた素晴らしい言語ですね。"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,331 @@
+{
+  "mistral-vibe-cli-latest": {
+    "latencies": [
+      6.181782960891724,
+      1.6920406818389893,
+      0.7051167488098145,
+      0.5730941295623779,
+      2.2218525409698486,
+      2.3218464851379395,
+      1.4713428020477295
+    ],
+    "token_counts": [
+      702,
+      74,
+      40,
+      12,
+      178,
+      150,
+      46
+    ],
+    "cases": {
+      "reasoning": {
+        "elapsed": 6.181782960891724,
+        "scores": {
+          "has_steps": true,
+          "mentions_fill": false,
+          "mentions_pour": true
+        },
+        "tool_calls": [],
+        "content_preview": "以下は、5リットルのバケツAと3リットルのバケツBを使って、ちょうど4リットルを測る手順です。\n\n### 手順：\n1. **バケツBを満タンにする**\n   - Bに3リットルの水を汲む。\n   - 状態：A = 0リットル、B = 3リットル\n\n2. **Bの水をAに移す**\n   - Bの3リットルをAに注ぐ。\n   - 状態：A = 3リットル、B = 0リットル\n\n3. **バケツBを再び満タンにする**\n   - Bに3リットルの水を汲む。\n   - 状態：A = 3リットル、B = 3リットル\n\n4. **Bの水をAに注ぎ、Aが満タンになるまで移す**\n   - Aにはすでに3リッ"
+      },
+      "code_gen": {
+        "elapsed": 1.6920406818389893,
+        "scores": {
+          "has_code_block": true,
+          "has_fizzbuzz": true,
+          "has_range": true,
+          "length": 195
+        },
+        "tool_calls": [],
+        "content_preview": "```python\nfor i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)\n```"
+      },
+      "tool_call": {
+        "elapsed": 0.7051167488098145,
+        "scores": {
+          "has_tool_call": true,
+          "mentions_ls_or_bash": true,
+          "mentions_read": false
+        },
+        "tool_calls": [
+          {
+            "name": "run_bash",
+            "args": "{\"command\": \"ls -la\"}"
+          }
+        ],
+        "content_preview": "カレントディレクトリのファイル一覧を表示し、その後 README.md の内容を読みます。\n[TOOL_CALL] run_bash({\"command\": \"ls -la\"})"
+      },
+      "tool_selection": {
+        "elapsed": 0.5730941295623779,
+        "scores": {
+          "has_tool_call": true,
+          "selects_search": true,
+          "selects_read": false,
+          "avoids_bash_first": true
+        },
+        "tool_calls": [
+          {
+            "name": "search_files",
+            "args": "{\"pattern\": \"config.py\"}"
+          }
+        ],
+        "content_preview": "\n[TOOL_CALL] search_files({\"pattern\": \"config.py\"})"
+      },
+      "instruction_follow": {
+        "elapsed": 2.2218525409698486,
+        "scores": {
+          "has_bullets": true,
+          "covers_all_3": 3,
+          "not_too_long": true
+        },
+        "tool_calls": [],
+        "content_preview": "- **Pythonのリストとタプルの違い**\n  - リスト: 可変（要素の追加・削除・変更可能）、`[]`で定義\n  - タプル: 不変（要素の変更不可）、`()`で定義、リストより高速\n\n- **Pythonのジェネレータとは**\n  - イテレータを生成する関数（`yield`を使用）\n  - 遅延評価（必要な時に要素を生成）、メモリ効率が良い\n\n- **デコレータとは**\n  - 関数をラップして機能を拡張する高階関数\n  - `@decorator`のシンタックスで使用、コードの再利用性向上"
+      },
+      "japanese": {
+        "elapsed": 2.3218464851379395,
+        "scores": {
+          "in_japanese": true,
+          "mentions_react": true,
+          "mentions_act": true,
+          "concise": true
+        },
+        "tool_calls": [],
+        "content_preview": "ReActフレームワークは、エージェントが**思考（Reasoning）**と**行動（Acting）**を交互に繰り返すことで、問題解決や意思決定を行う手法です。具体的には、エージェントが内的な推論を文字化し（思考）、その結果に基づいて外部ツールを呼び出す（行動）ことで、透明性と柔軟性を高めます。主に大規模言語モデル（LLM）を活用し、複雑なタスクを段階的に処理するのに用いられます。"
+      },
+      "ambiguous_tool": {
+        "elapsed": 1.4713428020477295,
+        "scores": {
+          "has_tool_call": true,
+          "reasonable_tool": true,
+          "no_hallucination": true
+        },
+        "tool_calls": [
+          {
+            "name": "run_bash",
+            "args": "{\"command\": \"pwd && ls -la\"}"
+          }
+        ],
+        "content_preview": "プロジェクトの状態を確認するために、まず現在のディレクトリ構造とファイルを確認します。\n[TOOL_CALL] run_bash({\"command\": \"pwd && ls -la\"})"
+      }
+    }
+  },
+  "mistral-vibe-cli-with-tools": {
+    "latencies": [
+      6.365556240081787,
+      1.4186837673187256,
+      0.5925593376159668,
+      1.6116337776184082,
+      7.921509504318237,
+      3.835292339324951,
+      0.6256773471832275
+    ],
+    "token_counts": [
+      500,
+      74,
+      12,
+      12,
+      503,
+      165,
+      14
+    ],
+    "cases": {
+      "reasoning": {
+        "elapsed": 6.365556240081787,
+        "scores": {
+          "has_steps": true,
+          "mentions_fill": true,
+          "mentions_pour": true
+        },
+        "tool_calls": [],
+        "content_preview": "5リットルバケツ（A）と3リットルバケツ（B）を使って、ちょうど4リットルを測る手順は以下の通りです。\n\n1. **バケツAを満タンにする**\n   - 水道からバケツAに水を5リットル入れる。\n   - 状態：A = 5リットル、B = 0リットル\n\n2. **バケツAからバケツBに水を移す**\n   - バケツAの水をバケツBに注ぎ、バケツBが満タンになるまで移す。\n   - バケツBは3リットルまで入るので、バケツAには2リットル残る。\n   - 状態：A = 2リットル、B = 3リットル\n\n3. **バケツBの水を捨てる**\n   - バケツBの水を全て捨てる。\n   - 状態：A "
+      },
+      "code_gen": {
+        "elapsed": 1.4186837673187256,
+        "scores": {
+          "has_code_block": true,
+          "has_fizzbuzz": true,
+          "has_range": true,
+          "length": 195
+        },
+        "tool_calls": [],
+        "content_preview": "```python\nfor i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)\n```"
+      },
+      "tool_call": {
+        "elapsed": 0.5925593376159668,
+        "scores": {
+          "has_tool_call": true,
+          "mentions_ls_or_bash": true,
+          "mentions_read": false
+        },
+        "tool_calls": [
+          {
+            "name": "run_bash",
+            "args": "{\"command\": \"ls\"}"
+          }
+        ],
+        "content_preview": "\n[TOOL_CALL] run_bash({\"command\": \"ls\"})"
+      },
+      "tool_selection": {
+        "elapsed": 1.6116337776184082,
+        "scores": {
+          "has_tool_call": true,
+          "selects_search": true,
+          "selects_read": false,
+          "avoids_bash_first": true
+        },
+        "tool_calls": [
+          {
+            "name": "search_files",
+            "args": "{\"pattern\": \"config.py\"}"
+          }
+        ],
+        "content_preview": "\n[TOOL_CALL] search_files({\"pattern\": \"config.py\"})"
+      },
+      "instruction_follow": {
+        "elapsed": 7.921509504318237,
+        "scores": {
+          "has_bullets": true,
+          "covers_all_3": 3,
+          "not_too_long": true
+        },
+        "tool_calls": [],
+        "content_preview": "- **Pythonのリストとタプルの違い**\n  - **変更可能性**: リストはミュータブル（要素の追加・削除・変更可能）、タプルはイミュータブル（作成後は変更不可）。\n  - **使用目的**: リストは動的なデータ操作に、タプルは固定データ（例: 座標、設定値）や辞書のキーに適する。\n  - **パフォーマンス**: タプルはリストよりメモリ効率が良く、アクセス速度が速い。\n  - **メソッド**: リストは`append()`, `pop()`などのメソッドを持つが、タプルは`count()`, `index()`のみ。\n\n- **Pythonのジェネレータとは**\n  - **"
+      },
+      "japanese": {
+        "elapsed": 3.835292339324951,
+        "scores": {
+          "in_japanese": true,
+          "mentions_react": true,
+          "mentions_act": true,
+          "concise": true
+        },
+        "tool_calls": [],
+        "content_preview": "**ReAct（Reasoning and Acting）**は、エージェントが**推論（Reasoning）**と**行動（Acting）**を交互に繰り返すことで、複雑なタスクを段階的に解決するフレームワークです。エージェントは内部の思考過程（例：質問への回答や計画立案）を明示的に示しながら、外部ツール（APIやデータベースなど）を活用して行動し、その結果をフィードバックして次のステップを決定します。これにより、透明性と柔軟性が高まり、人間の意思決定プロセスに近い動作が可能になります。"
+      },
+      "ambiguous_tool": {
+        "elapsed": 0.6256773471832275,
+        "scores": {
+          "has_tool_call": true,
+          "reasonable_tool": true,
+          "no_hallucination": true
+        },
+        "tool_calls": [
+          {
+            "name": "run_bash",
+            "args": "{\"command\": \"ls -la\"}"
+          }
+        ],
+        "content_preview": "\n[TOOL_CALL] run_bash({\"command\": \"ls -la\"})"
+      }
+    }
+  },
+  "mistral-large-latest": {
+    "latencies": [
+      7.3475799560546875,
+      1.4966230392456055,
+      0.9816989898681641,
+      0.7407200336456299,
+      4.834270238876343,
+      3.125422716140747,
+      6.6048736572265625
+    ],
+    "token_counts": [
+      439,
+      74,
+      25,
+      12,
+      202,
+      131,
+      301
+    ],
+    "cases": {
+      "reasoning": {
+        "elapsed": 7.3475799560546875,
+        "scores": {
+          "has_steps": true,
+          "mentions_fill": true,
+          "mentions_pour": true
+        },
+        "tool_calls": [],
+        "content_preview": "A（5リットル）とB（3リットル）のバケツを使って、ちょうど4リットルを測る手順は以下の通りです。\n\n### **手順**\n1. **Aを満タンにする**\n   - A（5リットル）に水をいっぱいまで入れる。\n   - **状態**：A = 5リットル、B = 0リットル\n\n2. **AからBに水を移す**\n   - Aの水をB（3リットル）に移し、Bを満タンにする。\n   - **状態**：A = 2リットル、B = 3リットル\n\n3. **Bを空にする**\n   - Bの水をすべて捨てる。\n   - **状態**：A = 2リットル、B = 0リットル\n\n4. **Aの残りをBに移す**\n"
+      },
+      "code_gen": {
+        "elapsed": 1.4966230392456055,
+        "scores": {
+          "has_code_block": true,
+          "has_fizzbuzz": true,
+          "has_range": true,
+          "length": 195
+        },
+        "tool_calls": [],
+        "content_preview": "```python\nfor i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)\n```"
+      },
+      "tool_call": {
+        "elapsed": 0.9816989898681641,
+        "scores": {
+          "has_tool_call": true,
+          "mentions_ls_or_bash": true,
+          "mentions_read": true
+        },
+        "tool_calls": [
+          {
+            "name": "run_bash",
+            "args": "{\"command\": \"ls -la\"}"
+          },
+          {
+            "name": "read_file",
+            "args": "{\"path\": \"README.md\"}"
+          }
+        ],
+        "content_preview": "\n[TOOL_CALL] run_bash({\"command\": \"ls -la\"})\n[TOOL_CALL] read_file({\"path\": \"README.md\"})"
+      },
+      "tool_selection": {
+        "elapsed": 0.7407200336456299,
+        "scores": {
+          "has_tool_call": true,
+          "selects_search": true,
+          "selects_read": false,
+          "avoids_bash_first": true
+        },
+        "tool_calls": [
+          {
+            "name": "search_files",
+            "args": "{\"pattern\": \"config.py\"}"
+          }
+        ],
+        "content_preview": "\n[TOOL_CALL] search_files({\"pattern\": \"config.py\"})"
+      },
+      "instruction_follow": {
+        "elapsed": 4.834270238876343,
+        "scores": {
+          "has_bullets": true,
+          "covers_all_3": 3,
+          "not_too_long": true
+        },
+        "tool_calls": [],
+        "content_preview": "- **Pythonのリストとタプルの違い**\n  - リスト: 変更可能（ミュータブル）、`[]`で定義\n  - タプル: 変更不可（イミュータブル）、`()`で定義（要素が1つの場合は末尾に`,`が必要）\n\n- **Pythonのジェネレータとは**\n  - イテレータを生成する関数や式、`yield`キーワードで値を逐次返す\n  - メモリ効率が良く、大量データを扱う際に有用\n\n- **デコレータとは**\n  - 関数やクラスを修飾して機能を拡張する仕組み、`@decorator`構文で使用\n  - 元の関数をラップし、前処理・後処理を追加可能"
+      },
+      "japanese": {
+        "elapsed": 3.125422716140747,
+        "scores": {
+          "in_japanese": true,
+          "mentions_react": true,
+          "mentions_act": true,
+          "concise": true
+        },
+        "tool_calls": [],
+        "content_preview": "**ReActフレームワーク**は、エージェントシステムにおいて「**推論（Reasoning）**」「**行動（Acting）**」「**観察（Observation）**」を繰り返すことで、タスクを効率的に解決する手法です。LLMなどの推論能力と外部ツールの実行を組み合わせ、動的な環境に適応しながら段階的に問題を解決します。これにより、複雑なタスクでも柔軟かつ正確な意思決定が可能になります。"
+      },
+      "ambiguous_tool": {
+        "elapsed": 6.6048736572265625,
+        "scores": {
+          "has_tool_call": false,
+          "reasonable_tool": false,
+          "no_hallucination": true
+        },
+        "tool_calls": [],
+        "content_preview": "プロジェクトの状態を確認するために、以下の情報をチェックします。どのようなプロジェクトかを教えてください。\n\n### 確認したい項目（例）\n1. **ディレクトリ構造**: プロジェクトのファイルやディレクトリ構造を確認。\n2. **Gitの状態**: Gitリポジトリがある場合、変更されたファイルやコミット状態を確認。\n3. **依存関係**: `package.json`（Node.js）、`requirements.txt`（Python）、`Gemfile`（Ruby）などの依存ファイルがあるか確認。\n4. **実行中のプロセス**: プロジェクトに関連するプロセスが動いているか確認。"
+      }
+    }
+  }
+}
