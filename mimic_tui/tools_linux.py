@@ -160,16 +160,20 @@ def run_bash(
             pass
 
         if timed_out or proc.poll() is None:
-            # SIGTERM → 2秒待機 → SIGKILL（プロセスグループ全体）
+            # SIGTERM → 2秒以内に終了しなければ SIGKILL（プロセスグループ全体）
             try:
                 pgid = os.getpgid(proc.pid)
                 os.killpg(pgid, signal.SIGTERM)
-                time.sleep(2)
-                if proc.poll() is None:
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
                     os.killpg(pgid, signal.SIGKILL)
             except (ProcessLookupError, PermissionError):
                 pass
-            proc.wait()
+            try:
+                proc.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
 
     # ── 出力を文字列に変換 ──
     raw = b"".join(output_chunks)
@@ -257,9 +261,12 @@ def search_in_file(pattern: str, path: str, context_lines: int = 3, ignore_case:
     p = Path(path)
     if not p.exists():
         return f"エラー: ファイルが見つかりません: {path}"
-    flag = "-i " if ignore_case else ""
+    cmd = ["grep", "-n", "-C", str(context_lines)]
+    if ignore_case:
+        cmd.append("-i")
+    cmd.extend([pattern, str(p.resolve())])
     result = subprocess.run(
-        ["bash", "-c", f"grep -n {flag}-C {context_lines} {_shell_quote(pattern)} {_shell_quote(str(p.resolve()))}"],
+        cmd,
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
     )
     if result.returncode == 1:  # grep: no match
@@ -338,8 +345,9 @@ def smart_read(path: str, focus: Optional[str] = None, context_lines: int = 5) -
 
     # focus があれば grep で絞り込む
     if focus:
+        cmd = ["grep", "-n", "-C", str(context_lines), focus, str(p.resolve())]
         result = subprocess.run(
-            ["bash", "-c", f"grep -n -C {context_lines} {_shell_quote(focus)} {_shell_quote(str(p.resolve()))}"],
+            cmd,
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
         )
         if result.returncode == 0 and result.stdout.strip():

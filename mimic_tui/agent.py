@@ -73,14 +73,31 @@ class AccountRotator:
     def record(self, account):
         pass
 
+    def _key_manager(self):
+        """config の _key_manager を安全に返す。なければ None。"""
+        return getattr(self._config, "_key_manager", None)
+
     def can_afford_reviewer(self) -> bool:
-        return True
+        """Reviewer を動かすトークンが 2 枚以上残っているか確認する。"""
+        km = self._key_manager()
+        if km is None:
+            return True
+        return km.total_tokens_available() >= 2.0
 
     def wait_to_start(self, step_count: int) -> float:
-        return 0.0
+        """step_count 本のキーが使えるようになるまでの待ち時間（秒）を返す。"""
+        km = self._key_manager()
+        if km is None:
+            return 0.0
+        return km.wait_for_n_keys(max(1, step_count))
 
     def status(self) -> list[dict]:
-        return [{"name": self._config.name, "keys": len(self._config.api_keys)}]
+        km = self._key_manager()
+        base = {"name": self._config.name, "keys": len(self._config.api_keys)}
+        if km:
+            base["tokens"] = round(km.total_tokens_available(), 2)
+            base["ready_keys"] = km.n_ready_keys()
+        return [base]
 
     @property
     def accounts(self) -> list[OpenRouterConfig]:
@@ -88,7 +105,8 @@ class AccountRotator:
 
     @property
     def total_tokens(self) -> float:
-        return 999.0
+        km = self._key_manager()
+        return km.total_tokens_available() if km else 999.0
 
 
 def _msg_char_count(m: dict) -> int:

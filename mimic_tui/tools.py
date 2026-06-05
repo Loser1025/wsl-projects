@@ -55,17 +55,23 @@ from .utils import (safe_print, C, log, _try_read_file_text,
                     get_scratchpad, set_scratchpad)
 from .config import OpenRouterConfig
 
-# ── 精度改善用レジストリ ──────────────────────────────────────────
-_read_files_registry: set[str] = set()
+# ── 精度改善用レジストリ（スレッドローカル） ─────────────────────
+_tls = threading.local()
+
+def _get_registry() -> set:
+    """現在スレッドの読み取り履歴 set を返す（未初期化なら空 set を生成）。"""
+    if not hasattr(_tls, "registry"):
+        _tls.registry = set()
+    return _tls.registry
 
 def clear_read_files_registry():
-    """ターンの開始時に読み取り履歴をリセットする"""
-    _read_files_registry.clear()
+    """ターンの開始時に読み取り履歴をリセットする。"""
+    _get_registry().clear()
 
 def _check_read_warning(path: str) -> str:
-    """ファイルが現在のターンで読み取られたか確認し、警告を返す"""
+    """ファイルが現在のターンで read_file されたか確認し、警告を返す。"""
     resolved = str(Path(path).resolve())
-    if resolved not in _read_files_registry:
+    if resolved not in _get_registry():
         return "⚠ 警告: このファイルは現在のターンで read_file されていません。内容を確認せずに編集しています。\n"
     return ""
 
@@ -218,8 +224,8 @@ def read_file(path: str, offset: int = 0) -> str:
     if not p.exists():
         return f"エラー: ファイルが見つかりません: {path}"
 
-    # 読み取り履歴に登録
-    _read_files_registry.add(str(p.resolve()))
+    # 読み取り履歴に登録（スレッドローカル）
+    _get_registry().add(str(p.resolve()))
 
     content = _try_read_file_text(p)
     total = len(content)
@@ -421,9 +427,15 @@ def edit_file(path: str, old_string: str, new_string: str) -> str:
             f"エラー: 指定した文字列が {count} 箇所に存在します（一意に特定できません）。\n"
             f"前後の文脈をより多く含めた文字列を指定してください。"
         )
-    # ── 完全一致なし → patch_file の類似マッチに委譲 ────────────
-    # patch_file 側でも warning/diff/syntax が処理されるため、ここではそのまま返す
-    return warning + patch_file(path, old_string, new_string)
+    # 完全一致なし → LLM にエラーを返す（patch_file への横流しは二重承認を生むため廃止）
+    preview = old_string[:120].replace("\n", "↵")
+    return (
+        f"{warning}エラー: 指定された 'old_string' がファイル内に見つかりません: {path}\n"
+        f"検索対象（先頭120文字）: {preview}\n"
+        f"対処法:\n"
+        f"  ① search_in_file や smart_read で現在のファイル内容を確認し、正確な文字列で再実行してください。\n"
+        f"  ② インデントのズレが疑われる場合は patch_file を明示的に指定してください。"
+    )
 
 @tools.register(
     name="web_search",
@@ -752,23 +764,25 @@ def search_history(query: str, max_results: int = 3) -> str:
 
 
 _pw_context: dict = {}  # {"playwright": ..., "browser": ..., "page": ...}
+_pw_lock = threading.Lock()
 
 def _get_browser_page():
     """Playwright ページを lazy init で返す。未インストール時は RuntimeError。"""
-    if "page" not in _pw_context or _pw_context["page"].is_closed():
-        try:
-            from playwright.sync_api import sync_playwright
-        except ImportError:
-            raise RuntimeError(
-                "Playwright が未インストールです。\n"
-                "pip install playwright && playwright install chromium を実行してください。"
-            )
-        if "playwright" not in _pw_context:
-            _pw_context["playwright"] = sync_playwright().start()
-        if "browser" not in _pw_context or not _pw_context["browser"].is_connected():
-            _pw_context["browser"] = _pw_context["playwright"].chromium.launch(headless=False)
-        _pw_context["page"] = _pw_context["browser"].new_page()
-    return _pw_context["page"]
+    with _pw_lock:
+        if "page" not in _pw_context or _pw_context["page"].is_closed():
+            try:
+                from playwright.sync_api import sync_playwright
+            except ImportError:
+                raise RuntimeError(
+                    "Playwright が未インストールです。\n"
+                    "pip install playwright && playwright install chromium を実行してください。"
+                )
+            if "playwright" not in _pw_context:
+                _pw_context["playwright"] = sync_playwright().start()
+            if "browser" not in _pw_context or not _pw_context["browser"].is_connected():
+                _pw_context["browser"] = _pw_context["playwright"].chromium.launch(headless=False)
+            _pw_context["page"] = _pw_context["browser"].new_page()
+        return _pw_context["page"]
 
 @_browser_registry.register(
     name="browser_navigate",

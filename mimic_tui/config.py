@@ -133,6 +133,29 @@ class KeyManager:
                 for i in range(len(self._keys))
             ]
 
+    def n_ready_keys(self) -> int:
+        """現在すぐ使えるキー数（トークン >= 1 かつクールダウン外）を返す。"""
+        now = time.monotonic()
+        return sum(
+            1 for i in range(len(self._keys))
+            if now >= self._cooldown_until[i] and self._buckets[i].tokens_available >= 1.0
+        )
+
+    def wait_for_n_keys(self, n: int) -> float:
+        """n 本のキーが使えるようになるまでの推定待ち時間（秒）を返す。"""
+        n = min(n, len(self._keys))
+        now = time.monotonic()
+        wait_times = sorted(
+            max(0.0, self._cooldown_until[i] - now, self._buckets[i].wait_time())
+            for i in range(len(self._keys))
+        )
+        # n 番目に速いキーが準備完了するまでの時間
+        return wait_times[n - 1] if wait_times else 0.0
+
+    def total_tokens_available(self) -> float:
+        """全キーのトークン残量合計を返す。"""
+        return sum(b.tokens_available for b in self._buckets)
+
 
 @dataclass
 class OpenRouterConfig:
