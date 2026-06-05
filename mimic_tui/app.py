@@ -211,7 +211,7 @@ class MimicApp(App):
     def __init__(self, ctx: dict):
         super().__init__()
         self._ctx                             = ctx
-        self._current_mode                    = "interactive"
+        self._agent_mode                    = "interactive"
         self._log: Optional[RichLog]          = None
         self._agent_busy                      = False
         self._worker_thread_id: Optional[int] = None
@@ -317,7 +317,7 @@ class MimicApp(App):
             self.query_one("#sec-status", Static).update(
                 f"[bold #00ff41]■ AGENT[/]\n"
                 f"  Status: [{style}]{status}[/]\n"
-                f"  Mode:   [#58a6ff]{self._current_mode.upper()}[/]"
+                f"  Mode:   [#58a6ff]{self._agent_mode.upper()}[/]"
             )
         except Exception:
             pass
@@ -905,22 +905,36 @@ class MimicApp(App):
     def _cmd_mode(self, arg: str) -> None:
         arg = arg.strip().lower()
         if arg in ("interactive", "react", "i"):
-            self._current_mode = "interactive"
+            self._agent_mode = "interactive"
             self._ctx["agent"].set_system_prompt(self._ctx["react_prompt"])
             self._ctx["agent"].clear_history()
             self._ctx["interactive_orch"].react_log.clear()
             self._write_direct("⚡ モード: Interactive (ReAct)  会話履歴をリセットしました。\n")
         elif arg in ("plan", "p"):
-            self._current_mode = "plan"
+            self._agent_mode = "plan"
             self._ctx["agent"].set_system_prompt(self._ctx["plan_prompt"])
             self._ctx["agent"].clear_history()
             self._ctx["interactive_orch"].react_log.clear()
             self._write_direct("≡  モード: Plan-and-Execute  会話履歴をリセットしました。\n")
+        elif arg in ("multi", "m"):
+            if not self._ctx.get("multi_orch"):
+                self._write_direct(
+                    "  ✗ マルチエージェントの初期化に失敗しています。再起動してください。\n"
+                )
+                return
+            self._agent_mode = "multi"
+            self._ctx["multi_orch"].clear_all_history()
+            self._write_direct("🌐 モード: Multi-Agent (Architect + Operator + Scribe)\n")
         else:
-            label = "Interactive (ReAct)" if self._current_mode == "interactive" else "Plan-and-Execute"
+            mode_labels = {
+                "interactive": "Interactive (ReAct)",
+                "plan": "Plan-and-Execute",
+                "multi": "Multi-Agent",
+            }
+            label = mode_labels.get(self._agent_mode, self._agent_mode)
             self._write_direct(
                 f"  現在: {label}\n"
-                "  切替: /mode interactive  /mode plan\n"
+                "  切替: /mode interactive  /mode plan  /mode multi\n"
             )
         self._refresh_status_ui()
 
@@ -1001,7 +1015,9 @@ class MimicApp(App):
         self.agent_status_text = "THINKING"
         self.query_one("#user-input", ChatInput).disabled = True
         self._set_input_hint("busy")
-        if self._current_mode == "interactive":
+        if self._agent_mode == "multi":
+            self._run_multi(user_input)
+        elif self._agent_mode == "interactive":
             self._run_react(user_input)
         else:
             self._run_plan(user_input)
@@ -1084,6 +1100,66 @@ class MimicApp(App):
             if self._log:
                 self.call_from_thread(
                     self._log.write, Text.from_ansi(f"\nプランエラー: {e}\n")
+                )
+        finally:
+            self.call_from_thread(self._on_agent_done)
+
+    @work(thread=True, exclusive=True)
+    def _run_multi(self, user_input: str) -> None:
+        """WorkflowGraph ベースのマルチエージェント実行。Workflow タブをリアルタイム更新する。"""
+        self._worker_thread_id = threading.current_thread().ident
+        multi_orch = self._ctx.get("multi_orch")
+        if multi_orch is None:
+            self.call_from_thread(
+                self._log.write,
+                Text.from_ansi("  ✗ multi_orch が初期化されていません。\n")
+            )
+            self.call_from_thread(self._on_agent_done)
+            return
+
+        multi_orch.set_cwd(self._ctx["agent"].cwd)
+
+        # 実行開始時に Workflow タブへ自動切り替え
+        self.call_from_thread(self.action_switch_tab, "tab-workflow")
+
+        _all_steps: list = []
+
+        def _on_plan(steps: list) -> None:
+            _all_steps.clear()
+            _all_steps.extend(steps)
+            self.call_from_thread(self._refresh_workflow_tab, list(steps))
+
+        def _on_step(step) -> None:
+            self.call_from_thread(self._refresh_workflow_tab, list(_all_steps))
+
+        def _on_agent_switch(name: str) -> None:
+            if self._log:
+                self.call_from_thread(
+                    self._log.write,
+                    Text.from_ansi(f"\n  🤖 [{name}] ────────────────────────────\n"),
+                )
+            self.call_from_thread(
+                lambda n=name: setattr(self, "agent_status_text", n)
+            )
+
+        try:
+            multi_orch.execute_task(
+                user_input,
+                on_plan         = _on_plan,
+                on_step         = _on_step,
+                on_agent_switch = _on_agent_switch,
+            )
+        except KeyboardInterrupt:
+            from .utils import C
+            if self._log:
+                self.call_from_thread(
+                    self._log.write,
+                    Text.from_ansi(C.yellow("\n\n  [割り込み] Ctrl+C — マルチエージェントを中断しました。\n")),
+                )
+        except Exception as e:
+            if self._log:
+                self.call_from_thread(
+                    self._log.write, Text.from_ansi(f"\nマルチエージェントエラー: {e}\n")
                 )
         finally:
             self.call_from_thread(self._on_agent_done)

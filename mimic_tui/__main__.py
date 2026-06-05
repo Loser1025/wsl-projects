@@ -12,7 +12,7 @@ def _build_components(base_dir: str, active_config=None):
     active_config を渡すと planner/reflector 含む全エージェントがそのモデルを使う。
     省略時は .env の最初の設定を使用する。
     """
-    from .utils import safe_print, C, set_log_sink
+    from .utils import safe_print, C, set_log_sink, log
     from .commands import register_search_command, register_sessions_command
     from .tools import set_sessions_dir, tools as _base_tools
     from . import config as _cfg
@@ -97,17 +97,37 @@ def _build_components(base_dir: str, active_config=None):
         safe_print(tool_log.recent_text(10))
         safe_print()
 
+    # ── マルチエージェントコンポーネント（全プロバイダー合計 3 キー以上で有効化）──
+    _total_keys = (
+        len(or_config.api_keys      if or_config      else []) +
+        len(gemini_config.api_keys  if gemini_config  else []) +
+        len(mistral_config.api_keys if mistral_config else [])
+    )
+    multi_orch = None
+    if _total_keys >= 3:
+        try:
+            from .multi_agent import ArchitectAgent, OperatorAgent, ScribeAgent, MultiAgentOrchestrator
+            multi_orch = MultiAgentOrchestrator(
+                architect = ArchitectAgent(rotator, display_fn=_inline_display),
+                operator  = OperatorAgent(rotator, display_fn=_inline_display),
+                scribe    = ScribeAgent(rotator, display_fn=_inline_display),
+            )
+            multi_orch.set_cwd(agent.cwd)
+        except Exception as e:
+            log.warning({"event": "multi_agent_init_failed", "error": str(e)})
+
     return dict(
-        active_config   = active_config,
-        agent           = agent,
-        orchestrator    = orchestrator,
+        active_config    = active_config,
+        agent            = agent,
+        orchestrator     = orchestrator,
         interactive_orch = interactive_orch,
-        auto_git        = auto_git,
-        tool_log        = tool_log,
-        mon_tools       = mon_tools,
-        react_prompt    = react_prompt,
-        plan_prompt     = plan_prompt,
-        sessions_dir    = sessions_dir,
+        auto_git         = auto_git,
+        tool_log         = tool_log,
+        mon_tools        = mon_tools,
+        react_prompt     = react_prompt,
+        plan_prompt      = plan_prompt,
+        sessions_dir     = sessions_dir,
+        multi_orch       = multi_orch,   # None の場合はシングルエージェントのみ
     )
 
 

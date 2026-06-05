@@ -201,6 +201,24 @@ def update_scratchpad(content: str) -> str:
     set_scratchpad(content)
     return "✓ スクラッチパッドを更新しました。"
 
+
+def update_scratchpad_smart(content: str) -> str:
+    """
+    計画書 Step 3: 上限超過時に機械的切り捨てを防ぐスマート版。
+    ScribeAgent が利用可能な場合は呼び出し元で圧縮を依頼すること。
+    単体で使う場合は先頭優先で 800 文字を保持する。
+    """
+    if len(content) <= 800:
+        set_scratchpad(content)
+        return "✓ スクラッチパッドを更新しました。"
+    # 末尾ではなく先頭（ゴール・完了済み）を優先して保持
+    safe_content = content[:797] + "…"
+    set_scratchpad(safe_content)
+    return (
+        "⚠️ 800文字を超えたため先頭 800 文字を保持しました。\n"
+        "記憶担当（Scribe）による圧縮を推奨します: /mode multi を使用してください。"
+    )
+
 # utils._TOOL_CHUNK_SIZE と統一（どちらも 10000 文字チャンク）
 _READ_FILE_CHAR_CHUNK = _TOOL_CHUNK_SIZE
 
