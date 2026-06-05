@@ -325,6 +325,7 @@ def _stream_openrouter_api(
                         if not had_content and accumulated_reasoning:
                             yield accumulated_reasoning, [], ""
                         config.report_success(api_key)
+                        return  # ストリーム終了 — 後続データを処理せず即脱出
                     continue
                 try:
                     chunk = json.loads(data_str)

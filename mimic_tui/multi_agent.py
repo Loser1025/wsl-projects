@@ -100,6 +100,9 @@ class RoleAgentBase:
     def run(self, prompt: str) -> str:
         return self._agent.run_stream(prompt)
 
+    def run_stream(self, prompt: str, callback=None) -> str:
+        return self._agent.run_stream(prompt, callback=callback)
+
     def clear_history(self):
         self._agent.clear_history()
 
@@ -410,6 +413,38 @@ class MultiAgentOrchestrator:
                 cur = self._route(action, goto_idx, cur, idx_of, steps, step, _tick)
 
         return exec_result
+
+    # ── 動的ワークフロー実行 ──────────────────────────────────────
+
+    def run_dynamic(
+        self,
+        user_prompt: str,
+        on_plan:         Optional[Callable] = None,
+        on_step:         Optional[Callable] = None,
+        on_interactive:  Optional[Callable] = None,
+    ) -> str:
+        """
+        AgentOrchestrator.run_with_plan() を使った動的ワークフロー実行。
+        Planner がステップを生成し、各ステップの label に応じて
+        Architect / Operator / Scribe を自動ディスパッチする。
+        """
+        from .orchestrator import AgentOrchestrator
+        rotator  = self.architect._agent.rotator
+        registry = self.architect._registry
+        orch = AgentOrchestrator(rotator, registry, executor=self.architect._agent)
+        orch.executor.cwd = self.architect.cwd
+        role_agents = {
+            "architect": self.architect,
+            "operator":  self.operator,
+            "scribe":    self.scribe,
+        }
+        return orch.run_with_plan(
+            user_prompt,
+            on_plan        = on_plan,
+            on_step        = on_step,
+            on_interactive = on_interactive,
+            role_agents    = role_agents,
+        )
 
     # ── 成否判定ロジック ──────────────────────────────────────────
 

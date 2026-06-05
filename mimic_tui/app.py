@@ -910,12 +910,6 @@ class MimicApp(App):
             self._ctx["agent"].clear_history()
             self._ctx["interactive_orch"].react_log.clear()
             self._write_direct("⚡ モード: Interactive (ReAct)  会話履歴をリセットしました。\n")
-        elif arg in ("plan", "p"):
-            self._agent_mode = "plan"
-            self._ctx["agent"].set_system_prompt(self._ctx["plan_prompt"])
-            self._ctx["agent"].clear_history()
-            self._ctx["interactive_orch"].react_log.clear()
-            self._write_direct("≡  モード: Plan-and-Execute  会話履歴をリセットしました。\n")
         elif arg in ("multi", "m"):
             if not self._ctx.get("multi_orch"):
                 self._write_direct(
@@ -924,17 +918,16 @@ class MimicApp(App):
                 return
             self._agent_mode = "multi"
             self._ctx["multi_orch"].clear_all_history()
-            self._write_direct("🌐 モード: Multi-Agent (Architect + Operator + Scribe)\n")
+            self._write_direct("🌐 モード: Multi-Agent (動的ワークフロー + 役割特化エージェント)\n")
         else:
             mode_labels = {
                 "interactive": "Interactive (ReAct)",
-                "plan": "Plan-and-Execute",
-                "multi": "Multi-Agent",
+                "multi": "Multi-Agent (動的ワークフロー)",
             }
             label = mode_labels.get(self._agent_mode, self._agent_mode)
             self._write_direct(
                 f"  現在: {label}\n"
-                "  切替: /mode interactive  /mode plan  /mode multi\n"
+                "  切替: /mode interactive  /mode multi\n"
             )
         self._refresh_status_ui()
 
@@ -1017,10 +1010,8 @@ class MimicApp(App):
         self._set_input_hint("busy")
         if self._agent_mode == "multi":
             self._run_multi(user_input)
-        elif self._agent_mode == "interactive":
-            self._run_react(user_input)
         else:
-            self._run_plan(user_input)
+            self._run_react(user_input)
 
     def _on_agent_done(self) -> None:
         self._agent_busy       = False
@@ -1057,54 +1048,6 @@ class MimicApp(App):
             self.call_from_thread(self._on_agent_done)
 
     @work(thread=True, exclusive=True)
-    def _run_plan(self, user_input: str) -> None:
-        self._worker_thread_id = threading.current_thread().ident
-
-        _all_steps: list = []
-
-        def on_plan(steps: list) -> None:
-            _all_steps.clear()
-            _all_steps.extend(steps)
-            self.call_from_thread(self._show_plan_header, steps)
-            self.call_from_thread(self._refresh_workflow_tab, list(steps))
-
-        def on_step(step) -> None:
-            icons = {
-                "running":  "▶",
-                "done":     "✓",
-                "failed":   "✗",
-                "retrying": "↻",
-                "skipped":  "⏭",
-            }
-            icon     = icons.get(step.status, " ")
-            parallel = " ⚡" if getattr(step, "parallel", False) else ""
-            msg      = f"  {icon} Step {step.index}: {step.description}{parallel}\n"
-            if self._log:
-                self.call_from_thread(self._log.write, Text.from_ansi(msg))
-            self.call_from_thread(self._refresh_workflow_tab, list(_all_steps))
-
-        try:
-            self._ctx["orchestrator"].run_with_plan(
-                user_input,
-                on_plan = on_plan,
-                on_step = on_step,
-            )
-        except KeyboardInterrupt:
-            from .utils import C
-            if self._log:
-                self.call_from_thread(
-                    self._log.write,
-                    Text.from_ansi(C.yellow("\n\n  [割り込み] Ctrl+C — プランを中断しました。\n")),
-                )
-        except Exception as e:
-            if self._log:
-                self.call_from_thread(
-                    self._log.write, Text.from_ansi(f"\nプランエラー: {e}\n")
-                )
-        finally:
-            self.call_from_thread(self._on_agent_done)
-
-    @work(thread=True, exclusive=True)
     def _run_multi(self, user_input: str) -> None:
         """WorkflowGraph ベースのマルチエージェント実行。Workflow タブをリアルタイム更新する。"""
         self._worker_thread_id = threading.current_thread().ident
@@ -1127,27 +1070,38 @@ class MimicApp(App):
         def _on_plan(steps: list) -> None:
             _all_steps.clear()
             _all_steps.extend(steps)
+            self.call_from_thread(self._show_plan_header, steps)
             self.call_from_thread(self._refresh_workflow_tab, list(steps))
 
         def _on_step(step) -> None:
+            if step.label and step.status == "running":
+                self.call_from_thread(
+                    lambda n=step.label: setattr(self, "agent_status_text", n.upper())
+                )
+                if self._log:
+                    self.call_from_thread(
+                        self._log.write,
+                        Text.from_ansi(f"\n  🤖 [{step.label}] ────────────────────────────\n"),
+                    )
             self.call_from_thread(self._refresh_workflow_tab, list(_all_steps))
 
-        def _on_agent_switch(name: str) -> None:
+        def _on_interactive(question: str) -> str:
+            from .utils import C
             if self._log:
                 self.call_from_thread(
                     self._log.write,
-                    Text.from_ansi(f"\n  🤖 [{name}] ────────────────────────────\n"),
+                    Text.from_ansi(C.orange(
+                        f"\n  🤝 [INTERACTIVE] {question[:120]}\n"
+                    )),
                 )
-            self.call_from_thread(
-                lambda n=name: setattr(self, "agent_status_text", n)
-            )
+            return f"[ユーザー確認待ち] {question[:200]}"
 
         try:
-            multi_orch.execute_task(
+            multi_orch.run_dynamic(
                 user_input,
-                on_plan         = _on_plan,
-                on_step         = _on_step,
-                on_agent_switch = _on_agent_switch,
+                on_plan        = _on_plan,
+                on_step        = _on_step,
+                on_interactive = _on_interactive,
             )
         except KeyboardInterrupt:
             from .utils import C

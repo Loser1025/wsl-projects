@@ -65,6 +65,7 @@ def run_pipeline(
     cwd      = working_directory or str(Path.cwd())
     max_lines = min(max(0, max_lines), _MAX_LINES) or _MAX_LINES
 
+    proc = None  # KeyboardInterrupt 等で Popen が途中終了しても finally で安全に参照できるよう初期化
     try:
         proc = subprocess.Popen(
             command,
@@ -103,17 +104,18 @@ def run_pipeline(
                 truncated = True
                 break
     finally:
-        # プロセスグループを kill（子プロセスも含む）
-        if proc.poll() is None or timed_out:
-            try:
-                pgid = os.getpgid(proc.pid)
-                os.killpg(pgid, signal.SIGTERM)
-                time.sleep(1)
-                if proc.poll() is None:
-                    os.killpg(pgid, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                pass
-        proc.wait()
+        if proc is not None:
+            # プロセスグループを kill（子プロセスも含む）
+            if proc.poll() is None or timed_out:
+                try:
+                    pgid = os.getpgid(proc.pid)
+                    os.killpg(pgid, signal.SIGTERM)
+                    time.sleep(1)
+                    if proc.poll() is None:
+                        os.killpg(pgid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+            proc.wait()
 
     if timed_out:
         partial = "\n".join(lines)
