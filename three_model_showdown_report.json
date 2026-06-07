@@ -1,0 +1,518 @@
+{
+  "owl-alpha": {
+    "model": "openrouter/owl-alpha",
+    "provider": "openrouter",
+    "latencies": [
+      8.277152299880981,
+      11.146918058395386,
+      7.058358907699585,
+      3.4095072746276855,
+      10.832327127456665,
+      9.830261707305908,
+      2.6819534301757812,
+      2.3533215522766113,
+      2.7471253871917725,
+      2.6112422943115234,
+      1.6825566291809082,
+      1.6149382591247559,
+      19.00365376472473,
+      18.64790987968445,
+      2.8481338024139404,
+      2.6685292720794678,
+      9.407621622085571,
+      4.959755897521973,
+      2.03322696685791,
+      3.815716505050659
+    ],
+    "output_tokens": [
+      234,
+      423,
+      74,
+      74,
+      307,
+      298,
+      35,
+      35,
+      24,
+      24,
+      16,
+      16,
+      648,
+      684,
+      38,
+      38,
+      107,
+      97,
+      22,
+      44
+    ],
+    "cases": {
+      "logic_water": {
+        "scores": {
+          "has_numbered_steps": true,
+          "correct_volumes": true,
+          "mentions_pour": false,
+          "concise": true
+        },
+        "avg_elapsed": 9.712035179138184,
+        "content_previews": [
+          "5リットルの容器を容器A、3リットルの容器を容器Bとして、ちょうど4リットルを計る最短手順は以下のとおりです。\n\n1. 容器A（5L）を満たす。（A: 5L, B: 0L）\n2. 容器B（3L）に水を注ぎ、満たす。（A: 5L, B: 3L）\n3. 容器Bの3リットルの水を全て捨てる。（A: 5L, B: 0L）\n4. 容器Aの水を全て容器Bに注ぐ。（A: 2L, B: 3L）\n5. 容器A（5L",
+          "これは有名な「ジョウロ問題」ですね。ステップごとの手順を以下に示します。\n\n**最短手順：**\n\n1. **ステップ①**：3リットルの容器に水を満杯にします。\n2. **ステップ②**：3リットルの容器から、5リットルの容器に水を注ぎます。（→3リットルの容器は空、5リットルの容器には3リットル入っています。）\n3. **ステップ③**：3リットルの容器にもう一度満杯にします。（→3リットルの容"
+        ]
+      },
+      "code_fizzbuzz": {
+        "scores": {
+          "has_code": true,
+          "has_fizzbuzz": true,
+          "no_explanation": true
+        },
+        "avg_elapsed": 5.233933091163635,
+        "content_previews": [
+          "```python\nfor i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)\n```",
+          "```python\nfor i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)\n```"
+        ]
+      },
+      "code_debug": {
+        "scores": {
+          "identifies_index_error": true,
+          "shows_fix": true,
+          "explains_cause": true
+        },
+        "avg_elapsed": 10.331294417381287,
+        "content_previews": [
+          "このコードには**インデックスのオフバイワンエラー**があります。\n\n## バグの原因\n\n`range(10)` はインデックス 0 から 9 までのリストを生成するので、resultには要素が 10個（インデックス0〜9）しかありません。`result[10]` にアクセスしようとするため、**IndexError**が発生します。\n\n## 修正版\n\n```python\ndef fibonacc",
+          "このコードには、**インデックスエラー（IndexError）** があります。\n\n### バグの原因\n\n`result` は `range(10)` を使って生成されているため、要素はインデックス `0` から `9` までの **10個** しかありません。しかし、`print(result[10])` は **11番目の要素**（インデックス10）を指定しており、これは存在しないため `In"
+        ]
+      },
+      "code_refactor": {
+        "scores": {
+          "uses_comprehension": true,
+          "uses_fstring": true,
+          "correct_logic": true
+        },
+        "avg_elapsed": 2.5176374912261963,
+        "content_previews": [
+          "```python\nresult = [f'even: {i}' for i in range(1, 11) if i % 2 == 0]\n```",
+          "```python\nresult = [f'even: {i}' for i in range(1, 11) if i % 2 == 0]\n```"
+        ]
+      },
+      "tool_explicit": {
+        "scores": {
+          "calls_tool": true,
+          "uses_bash_or_search": true,
+          "correct_pattern": true
+        },
+        "avg_elapsed": 2.679183840751648,
+        "content_previews": [
+          "\n[TOOL] search_files({\"pattern\": \"*.py\", \"directory\": \".\"})",
+          "\n[TOOL] search_files({\"pattern\": \"*.py\", \"directory\": \".\"})"
+        ]
+      },
+      "tool_chain": {
+        "scores": {
+          "calls_tool": true,
+          "searches_first": true,
+          "plans_to_read": false
+        },
+        "avg_elapsed": 1.648747444152832,
+        "content_previews": [
+          "\n[TOOL] search_files({\"pattern\": \"config.py\"})",
+          "\n[TOOL] search_files({\"pattern\": \"config.py\"})"
+        ]
+      },
+      "tool_no_call": {
+        "scores": {
+          "no_tool_call": true,
+          "answers_directly": true,
+          "mentions_mutable": true
+        },
+        "avg_elapsed": 18.82578182220459,
+        "content_previews": [
+          "# Pythonのリストとタプルの違い\n\n## 概要\n\n| 特徴 | リスト (list) | タプル (tuple) |\n|---|---|---|\n| 定義方法 | `[1, 2, 3]` | `(1, 2, 3)` |\n| ミュータブル | ✅ 変更可能 | ❌ 不変 (immutable) |\n| パフォーマンス | やや遅い | やや高速 |\n| 辞書のキーに使える | ❌ | ✅ |\n",
+          "# Pythonのリストとタプルの違い\n\nリストとタプルはどの方にでも出てくるデータ構造ですが、いくつか重要な違いがあります。整理しましたのでご覧ください。\n\n---\n\n## 1. 基本的な比較\n\n| 特徴 | リスト (list) | タプル (tuple) |\n|---|---|---|\n| 記法 | `[1, 2, 3]` | `(1, 2, 3)` |\n| 変更可能性 | **ミューテブル"
+        ]
+      },
+      "format_json": {
+        "scores": {
+          "valid_json": true,
+          "has_name": true,
+          "has_skills": true,
+          "no_extra_text": true
+        },
+        "avg_elapsed": 2.758331537246704,
+        "content_previews": [
+          "```json\n{\n  \"名前\": \"田中太郎\",\n  \"年齢\": 30,\n  \"スキル\": [\"Python\", \"Go\", \"SQL\"]\n}\n```",
+          "```json\n{\n  \"名前\": \"田中太郎\",\n  \"年齢\": 30,\n  \"スキル\": [\"Python\", \"Go\", \"SQL\"]\n}\n```"
+        ]
+      },
+      "japanese_quality": {
+        "scores": {
+          "in_japanese": true,
+          "within_3sentences": true,
+          "mentions_attention": true
+        },
+        "avg_elapsed": 7.183688759803772,
+        "content_previews": [
+          "自己注意機構とは、文章の中の各単語が他のすべての単語とどれだけ関係が深いかを計算し、その関係性を考慮して意味を理解する仕組みです。例えば「彼は公園で犬を散歩させた」という文では、「彼」と「散歩」が強く関連していることを自動的に見つけ出します。これにより、文脈全体を一度に処理できるため、従来の方法よりも自然な言語理解が可能になります。",
+          "トランスフォーマーの自己注意機構とは、文章の中の各単語が他のすべての単語とどれだけ関係が深いかを計算し、重要な情報に注目する仕組みです。例えば「彼は公園で犬を散歩させた」という文なら、「彼」と「散歩」や「犬」とのつながりを自動的に見つけます。これにより、文の意味を正確に理解できるようになります。"
+        ]
+      },
+      "context_retain": {
+        "scores": {
+          "recalls_name": true,
+          "recalls_lang": true,
+          "doesnt_hallucinate": true
+        },
+        "avg_elapsed": 2.9244717359542847,
+        "content_previews": [
+          "はい、アキラさんですね。そして、お好きなプログラミング言語はRustですね。",
+          "アキラさん、Rustですね。記憶しておりますよ。Rustは所有権システムが面白い言語ですね。何かRust関連の質問があれば、いつでもどうぞ。"
+        ]
+      }
+    }
+  },
+  "code-agent": {
+    "model": "mistral-code-agent-latest",
+    "provider": "mistral",
+    "latencies": [
+      5.196611642837524,
+      5.5074052810668945,
+      1.5896661281585693,
+      1.938138484954834,
+      6.711752891540527,
+      20.497631072998047,
+      1.2021913528442383,
+      4.514890670776367,
+      1.3173940181732178,
+      1.055624008178711,
+      0.6591713428497314,
+      0.6327776908874512,
+      16.526991605758667,
+      9.9542715549469,
+      1.1427233219146729,
+      0.9139144420623779,
+      3.090284824371338,
+      1.6128556728363037,
+      6.160202980041504,
+      0.6644008159637451
+    ],
+    "output_tokens": [
+      373,
+      390,
+      74,
+      74,
+      444,
+      654,
+      35,
+      35,
+      27,
+      27,
+      12,
+      12,
+      718,
+      599,
+      40,
+      40,
+      102,
+      89,
+      15,
+      15
+    ],
+    "cases": {
+      "logic_water": {
+        "scores": {
+          "has_numbered_steps": true,
+          "correct_volumes": true,
+          "mentions_pour": true,
+          "concise": true
+        },
+        "avg_elapsed": 5.3520084619522095,
+        "content_previews": [
+          "以下は、5リットルと3リットルの容器を使ってちょうど4リットルを計る最短手順です。\n\n1. **5リットルの容器をいっぱいにする**\n   - 5リットル容器: 5L\n   - 3リットル容器: 0L\n\n2. **5リットル容器から3リットル容器に水を移す**\n   - 5リットル容器: 2L\n   - 3リットル容器: 3L\n\n3. **3リットル容器の水を捨てる**\n   - 5リットル容器:",
+          "以下は、5リットルと3リットルの容器を使ってちょうど4リットルを計る最短手順です。\n\n1. **5リットルの容器をいっぱいに水を入れる。**\n   - 5リットル容器: 5L\n   - 3リットル容器: 0L\n\n2. **5リットル容器から3リットル容器に水を移す。**\n   - 5リットル容器: 2L\n   - 3リットル容器: 3L\n\n3. **3リットル容器の水をすべて捨てる。**\n   -"
+        ]
+      },
+      "code_fizzbuzz": {
+        "scores": {
+          "has_code": true,
+          "has_fizzbuzz": true,
+          "no_explanation": true
+        },
+        "avg_elapsed": 1.7639023065567017,
+        "content_previews": [
+          "```python\nfor i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)\n```",
+          "```python\nfor i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)\n```"
+        ]
+      },
+      "code_debug": {
+        "scores": {
+          "identifies_index_error": true,
+          "shows_fix": true,
+          "explains_cause": true
+        },
+        "avg_elapsed": 13.604691982269287,
+        "content_previews": [
+          "このコードには以下の2つのバグがあります：\n\n1. **インデックスエラー**: `range(10)`は0から9までの数値を生成するため、リスト`result`の長さは10です。しかし、`result[10]`は存在しないインデックス（10番目はインデックス9）を参照しようとしています。\n\n2. **非効率な再帰**: フィボナッチ数列の計算に単純な再帰を使用しているため、計算量が指数時間（O(",
+          "このコードには以下の2つのバグがあります：\n\n1. **インデックスエラー**：`result`リストは`range(10)`で生成されるため、要素数は10個（インデックス0〜9）です。しかし、`result[10]`で10番目の要素にアクセスしようとしています。これはインデックス範囲外エラー（IndexError）を引き起こします。\n\n2. **効率の問題**：フィボナッチ数列を再帰で計算してい"
+        ]
+      },
+      "code_refactor": {
+        "scores": {
+          "uses_comprehension": true,
+          "uses_fstring": true,
+          "correct_logic": true
+        },
+        "avg_elapsed": 2.8585410118103027,
+        "content_previews": [
+          "```python\nresult = [f'even: {i}' for i in range(1, 11) if i % 2 == 0]\n```",
+          "```python\nresult = [f'even: {i}' for i in range(1, 11) if i % 2 == 0]\n```"
+        ]
+      },
+      "tool_explicit": {
+        "scores": {
+          "calls_tool": true,
+          "uses_bash_or_search": true,
+          "correct_pattern": true
+        },
+        "avg_elapsed": 1.1865090131759644,
+        "content_previews": [
+          "\n[TOOL] run_bash({\"command\": \"find . -maxdepth 1 -name \\\"*.py\\\" -type f\"})",
+          "\n[TOOL] run_bash({\"command\": \"find . -maxdepth 1 -name \\\"*.py\\\" -type f\"})"
+        ]
+      },
+      "tool_chain": {
+        "scores": {
+          "calls_tool": true,
+          "searches_first": true,
+          "plans_to_read": false
+        },
+        "avg_elapsed": 0.6459745168685913,
+        "content_previews": [
+          "\n[TOOL] search_files({\"pattern\": \"config.py\"})",
+          "\n[TOOL] search_files({\"pattern\": \"config.py\"})"
+        ]
+      },
+      "tool_no_call": {
+        "scores": {
+          "no_tool_call": true,
+          "answers_directly": true,
+          "mentions_mutable": true
+        },
+        "avg_elapsed": 13.240631580352783,
+        "content_previews": [
+          "Pythonのリストとタプルは、どちらも複数の要素を格納するためのデータ構造ですが、以下のような違いがあります：\n\n### 1. **変更可能性（ミュータビリティ）**\n   - **リスト（List）**：変更可能（ミュータブル）です。要素の追加、削除、変更が可能です。\n     ```python\n     my_list = [1, 2, 3]\n     my_list[0] = 10  #",
+          "Pythonのリスト（`list`）とタプル（`tuple`）は、どちらも複数の要素を格納できるデータ構造ですが、以下のような違いがあります：\n\n### 1. **変更可能性（ミュータビリティ）**\n- **リスト**：変更可能（ミュータブル）です。要素の追加、削除、変更が可能です。\n  ```python\n  my_list = [1, 2, 3]\n  my_list[0] = 10  # 要素"
+        ]
+      },
+      "format_json": {
+        "scores": {
+          "valid_json": true,
+          "has_name": true,
+          "has_skills": true,
+          "no_extra_text": true
+        },
+        "avg_elapsed": 1.0283188819885254,
+        "content_previews": [
+          "```json\n{\n  \"名前\": \"田中太郎\",\n  \"年齢\": 30,\n  \"スキル\": [\"Python\", \"Go\", \"SQL\"]\n}\n```",
+          "```json\n{\n  \"名前\": \"田中太郎\",\n  \"年齢\": 30,\n  \"スキル\": [\"Python\", \"Go\", \"SQL\"]\n}\n```"
+        ]
+      },
+      "japanese_quality": {
+        "scores": {
+          "in_japanese": true,
+          "within_3sentences": true,
+          "mentions_attention": true
+        },
+        "avg_elapsed": 2.351570248603821,
+        "content_previews": [
+          "自己注意機構は、文章の中の単語が「他の単語とどれだけ関係があるか」を自動で計算する仕組みです。例えば、「犬が骨を噛む」という文では、「噛む」という動詞が「犬」と「骨」の両方と強く関連していると判断します。これにより、文の意味をより正確に理解できるようになります。",
+          "自己注意機構は、文章の中の単語が「他の単語とどれだけ関係があるか」を自動で計算する仕組みです。例えば、「犬が公園で走っている」という文では、「犬」と「走っている」の関係が強いと判断します。これにより、文の意味をより正確に理解できるようになります。"
+        ]
+      },
+      "context_retain": {
+        "scores": {
+          "recalls_name": true,
+          "recalls_lang": true,
+          "doesnt_hallucinate": true
+        },
+        "avg_elapsed": 3.4123018980026245,
+        "content_previews": [
+          "アキラさん、好きな言語はRustですね。",
+          "アキラさん、好きな言語はRustですね。"
+        ]
+      }
+    }
+  },
+  "vibe-fast": {
+    "model": "mistral-vibe-cli-fast",
+    "provider": "mistral",
+    "latencies": [
+      2.618884325027466,
+      3.8687236309051514,
+      0.747469425201416,
+      1.0166504383087158,
+      3.037991523742676,
+      3.6051342487335205,
+      0.5999550819396973,
+      0.640932559967041,
+      1.0382862091064453,
+      0.7116811275482178,
+      0.7446486949920654,
+      0.6665871143341064,
+      7.503074645996094,
+      6.316480875015259,
+      0.7787418365478516,
+      0.6056807041168213,
+      1.6790447235107422,
+      1.5155367851257324,
+      0.6599977016448975,
+      0.6609289646148682
+    ],
+    "output_tokens": [
+      486,
+      540,
+      74,
+      74,
+      312,
+      424,
+      35,
+      35,
+      55,
+      35,
+      33,
+      33,
+      1000,
+      720,
+      40,
+      40,
+      90,
+      82,
+      24,
+      24
+    ],
+    "cases": {
+      "logic_water": {
+        "scores": {
+          "has_numbered_steps": true,
+          "correct_volumes": true,
+          "mentions_pour": true,
+          "concise": true
+        },
+        "avg_elapsed": 3.2438039779663086,
+        "content_previews": [
+          "以下に、5リットルと3リットルの容器を使って**ちょうど4リットル**の水を計る最短手順を示します。\n\n---\n\n### **手順（ステップ）:**\n\n1. **5リットル容器**を空にする。\n   - 5L容器: 0L / 3L容器: 0L\n\n2. **3リットル容器**を満たす。\n   - 5L容器: 0L / 3L容器: 3L\n\n3. **3リットル容器**の水を**5リットル容器**に移す",
+          "以下に、5リットルと3リットルの容器を使って正確に4リットルの水を計る最短手順を示します。\n\n---\n\n### **手順（最短6ステップ）**\n\n1. **5リットル容器を満杯にする**\n   - 5リットル容器に水を入れ、5リットルにする。\n   - 状態：5L=5, 3L=0\n\n2. **5リットル容器から3リットル容器に水を移す**\n   - 5リットル容器の水を3リットル容器に移す（3リッ"
+        ]
+      },
+      "code_fizzbuzz": {
+        "scores": {
+          "has_code": true,
+          "has_fizzbuzz": true,
+          "no_explanation": true
+        },
+        "avg_elapsed": 0.8820599317550659,
+        "content_previews": [
+          "```python\nfor i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)\n```",
+          "```python\nfor i in range(1, 31):\n    if i % 15 == 0:\n        print(\"FizzBuzz\")\n    elif i % 3 == 0:\n        print(\"Fizz\")\n    elif i % 5 == 0:\n        print(\"Buzz\")\n    else:\n        print(i)\n```"
+        ]
+      },
+      "code_debug": {
+        "scores": {
+          "identifies_index_error": true,
+          "shows_fix": true,
+          "explains_cause": true
+        },
+        "avg_elapsed": 3.321562886238098,
+        "content_previews": [
+          "## バグの指摘\n\n1. **インデックスエラー**: リスト `result` は0から9までの10個の要素（`range(10)`）を持っていますが、`result[10]` にアクセスしようとしています。Pythonのリストは0から始まるため、有効なインデックスは0から9までです。\n\n2. **意図との不一致**: `range(10)` は0,1,2,...,9の10個の要素を生成します。",
+          "## バグの指摘\n\nこのコードには以下の問題があります：\n\n1. **配列のインデックスエラー**: `range(10)`は0から9までの値を生成するため、リストには10個の要素（インデックス0-9）しかありません。しかし、`result[10]`で10番目の要素（インデックス10）にアクセスしようとしています。\n\n2. **フィボナッチ数列の定義**: フィボナッチ数列は通常 `F(0)=0,"
+        ]
+      },
+      "code_refactor": {
+        "scores": {
+          "uses_comprehension": true,
+          "uses_fstring": true,
+          "correct_logic": true
+        },
+        "avg_elapsed": 0.6204438209533691,
+        "content_previews": [
+          "```python\nresult = [f'even: {i}' for i in range(1, 11) if i % 2 == 0]\n```",
+          "```python\nresult = [f'even: {i}' for i in range(1, 11) if i % 2 == 0]\n```"
+        ]
+      },
+      "tool_explicit": {
+        "scores": {
+          "calls_tool": true,
+          "uses_bash_or_search": true,
+          "correct_pattern": true
+        },
+        "avg_elapsed": 0.8749836683273315,
+        "content_previews": [
+          "カレントディレクトリのPythonファイル一覧を取得します。\n[TOOL] run_bash({\"command\": \"find . -maxdepth 1 -type f -name \\\"*.py\\\" -printf \\\"%f\\\\n\\\" | sort\"})",
+          "\n[TOOL] run_bash({\"command\": \"ls -la *.py 2>/dev/null || echo \\\"Pythonファイルは見つかりませんでした\\\"\"})"
+        ]
+      },
+      "tool_chain": {
+        "scores": {
+          "calls_tool": true,
+          "searches_first": true,
+          "plans_to_read": false
+        },
+        "avg_elapsed": 0.7056179046630859,
+        "content_previews": [
+          "config.py というファイルを検索して、その中身を読み込みます。\n[TOOL] search_files({\"pattern\": \"config.py\"})",
+          "config.py というファイルを検索して、その中身を読み込みます。\n[TOOL] search_files({\"pattern\": \"config.py\"})"
+        ]
+      },
+      "tool_no_call": {
+        "scores": {
+          "no_tool_call": true,
+          "answers_directly": true,
+          "mentions_mutable": true
+        },
+        "avg_elapsed": 6.909777760505676,
+        "content_previews": [
+          "Pythonの**リスト**と**タプル**はどちらも複数の要素を格納できるデータ構造ですが、主な違いは以下の通りです：\n\n---\n\n### 🔹 **1. ミュータビリティ（変更可能性）**\n| 項目 | リスト | タプル |\n|------|--------|--------|\n| **変更可能か** | ✅ **可** | ❌ **不可** |\n| **要素の追加/削除/変更** | 可能 ",
+          "Pythonの**リスト**と**タプル**はどちらも複数の要素を格納できるコレクション型ですが、いくつか重要な違いがあります。\n\n---\n\n### 🔹 **主な違い**\n\n| 特徴 | **リスト** (`list`) | **タプル** (`tuple`) |\n|------|---------------------|----------------------|\n| **ミュータブル（変更"
+        ]
+      },
+      "format_json": {
+        "scores": {
+          "valid_json": true,
+          "has_name": true,
+          "has_skills": true,
+          "no_extra_text": true
+        },
+        "avg_elapsed": 0.6922112703323364,
+        "content_previews": [
+          "```json\n{\n  \"名前\": \"田中太郎\",\n  \"年齢\": 30,\n  \"スキル\": [\"Python\", \"Go\", \"SQL\"]\n}\n```",
+          "```json\n{\n  \"名前\": \"田中太郎\",\n  \"年齢\": 30,\n  \"スキル\": [\"Python\", \"Go\", \"SQL\"]\n}\n```"
+        ]
+      },
+      "japanese_quality": {
+        "scores": {
+          "in_japanese": true,
+          "within_3sentences": true,
+          "mentions_attention": true
+        },
+        "avg_elapsed": 1.5972907543182373,
+        "content_previews": [
+          "トランスフォーマーの自己注意機構は、文章中の単語同士が互いに「関係性」を学ぶ仕組みです。例えば「彼」と「彼の」が同じ対象を指す場合、その関連性を強めるように数学的に計算します。これにより、文の意味をより正確に捉えることができるのです。",
+          "トランスフォーマーの自己注意機構は、文章中の単語同士が互いにどれだけ関係しているかを計算する仕組みです。例えば「彼」が「走った」を修飾しているかを判断するのに使われます。これにより、文の意味をより正確に捉えることができます。"
+        ]
+      },
+      "context_retain": {
+        "scores": {
+          "recalls_name": true,
+          "recalls_lang": true,
+          "doesnt_hallucinate": true
+        },
+        "avg_elapsed": 0.6604633331298828,
+        "content_previews": [
+          "あなたの名前は**アキラ**さんで、好きな言語は**Rust**です。",
+          "あなたの名前は**アキラ**さんで、好きな言語は**Rust**です。"
+        ]
+      }
+    }
+  }
+}

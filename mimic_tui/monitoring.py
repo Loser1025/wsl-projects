@@ -21,7 +21,8 @@ from .utils import safe_print, C
 @dataclass
 class ToolCallRecord:
     tool:         str
-    args_preview: str       # 引数の短い文字列表現
+    args_preview:   str     # 引数の短い文字列表現
+    result_preview: str     # 戻り値の短いプレビュー（[SUCCESS]/[FAILURE] 等の判定用）
     elapsed:      float     # 実行時間 (秒)
     status:       str       # "ok" | "error"
     cpu_max_pct:  float
@@ -219,8 +220,9 @@ class MonitoringToolRegistry(ToolRegistry):
 
         # ── ToolCallRecord を生成・記録 ──
         record = ToolCallRecord(
-            tool         = tool_name,
-            args_preview = args_preview,
+            tool           = tool_name,
+            args_preview   = args_preview,
+            result_preview = str(result)[:200],
             elapsed      = elapsed,
             status       = status,
             cpu_max_pct  = summary.cpu_max_pct,

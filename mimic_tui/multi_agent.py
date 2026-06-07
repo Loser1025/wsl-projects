@@ -34,7 +34,7 @@ _OPERATOR_TOOLS = [
     "run_bash", "run_pipeline",
     "read_file", "read_tool_cache", "file_info",
     "smart_read", "search_in_file", "grep_codebase",
-    "web_search", "fetch_webpage",
+    "web_search", "fetch_webpage", "search_history",
     "update_scratchpad",
 ]
 
@@ -187,10 +187,11 @@ class ScribeAgent(RoleAgentBase):
 
 @dataclass
 class TaskRecord:
-    goal:    str
-    files:   list[str] = field(default_factory=list)
-    summary: str = ""
-    status:  str = "done"
+    goal:     str
+    files:    list[str] = field(default_factory=list)
+    commands: list[str] = field(default_factory=list)  # 実行コマンドと成否（"[ok] pytest ..." 等）
+    summary:  str = ""
+    status:   str = "done"
 
 
 # ── マルチエージェントオーケストレーター ──────────────────────────
@@ -544,6 +545,8 @@ class MultiAgentOrchestrator:
     _FAIL_KEYWORDS = ("失敗", "エラー:", "Exception", "Traceback", "中断", "[FAILURE")
     _OK_KEYWORDS   = ("成功", "完了", "[SUCCESS")
 
+    _COMMAND_TOOLS = {"run_bash", "run_pipeline"}
+
     @staticmethod
     def _extract_touched_files(records: list, before: int) -> list[str]:
         """ツール呼び出しログから書き込み系ツールが触れたファイルパスを抽出する。"""
@@ -556,6 +559,33 @@ class MultiAgentOrchestrator:
             if m and m.group(1) not in paths:
                 paths.append(m.group(1))
         return paths
+
+    @staticmethod
+    def _extract_commands(records: list, before: int) -> list[str]:
+        """run_bash/run_pipeline の呼び出しからコマンド文字列と成否を抽出する。
+        args_preview には実行コマンド、result_preview には [SUCCESS]/[FAILURE]
+        マーカーが含まれるため、両方を突き合わせて記録する。"""
+        entries: list[str] = []
+        for r in records[before:]:
+            if r.tool not in MultiAgentOrchestrator._COMMAND_TOOLS:
+                continue
+            cmd = ""
+            for part in r.args_preview.split(", "):
+                if part.startswith("command="):
+                    cmd = part[len("command="):].strip("'\"")
+                    break
+            if not cmd:
+                continue
+            if "[SUCCESS]" in r.result_preview:
+                tag = "ok"
+            elif "[FAILURE" in r.result_preview or r.status == "error":
+                tag = "ng"
+            else:
+                tag = "?"
+            entry = f"[{tag}] {cmd}"
+            if entry not in entries:
+                entries.append(entry)
+        return entries
 
     def _derive_status(self, text: str) -> str:
         if any(kw in text for kw in self._FAIL_KEYWORDS):
@@ -571,11 +601,13 @@ class MultiAgentOrchestrator:
         for f in self._extract_touched_files(self.operator.tool_log.records, op_log_before):
             if f not in files:
                 files.append(f)
+        commands = self._extract_commands(self.operator.tool_log.records, op_log_before)
         self._task_history.append(TaskRecord(
-            goal    = user_prompt[:100],
-            files   = files,
-            summary = result[:200].replace("\n", " "),
-            status  = self._derive_status(result),
+            goal     = user_prompt[:100],
+            files    = files,
+            commands = commands,
+            summary  = result[:200].replace("\n", " "),
+            status   = self._derive_status(result),
         ))
         if len(self._task_history) > 20:
             self._task_history = self._task_history[-20:]
@@ -588,6 +620,8 @@ class MultiAgentOrchestrator:
         for i, rec in enumerate(self._task_history[-n:], 1):
             files_str = ", ".join(rec.files[:6]) if rec.files else "（ファイル変更なし）"
             lines.append(f"{i}. [{rec.status}] {rec.goal} → 変更/作成: {files_str}")
+            if rec.commands:
+                lines.append(f"   実行コマンド: {' / '.join(rec.commands[:5])}")
             if rec.summary:
                 lines.append(f"   結果概要: {rec.summary}")
         return "\n".join(lines)

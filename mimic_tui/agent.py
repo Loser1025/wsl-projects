@@ -595,6 +595,9 @@ class OpenRouterAgent:
         if isinstance(e, RateLimitError):
             msg = e.message
             backoff = min(BASE_BACKOFF * (2 ** attempt) + random.uniform(0, 1), MAX_BACKOFF)
+            log.warning({"event": "rate_limited", "status": 429,
+                         "attempt": attempt, "backoff_sec": round(backoff, 1),
+                         "message": msg[:200]})
             safe_print(C.yellow(
                 f"  ⚠ 429 レート制限 → {backoff:.0f}秒待機してリトライ ({msg[:80]})"
             ), flush=True)
@@ -606,16 +609,23 @@ class OpenRouterAgent:
             # コンテキスト超過チェック
             is_ctx = _is_context_exceeded(msg) and e.status in (400, 429)
             if is_ctx and len(working_messages) > 4 and trim_count < 5:
+                log.warning({"event": "context_exceeded", "status": e.status,
+                             "trim_count": trim_count + 1, "message": msg[:200]})
                 safe_print(C.yellow(
                     f"  ✂ {e.status} コンテキスト超過 → メッセージを削減してリトライ"
                 ), flush=True)
                 return attempt + 1, trim_count + 1, _trim_messages_smart(working_messages)
             # 認証・権限エラーはリトライ不可
             if e.status in (401, 403):
+                log.error({"event": "api_auth_error", "status": e.status, "message": msg[:200]})
                 safe_print(C.red(f"  ✗ APIエラー({e.status}): {msg}"), flush=True)
                 raise e
             backoff = min(BASE_BACKOFF * (2 ** attempt) + random.uniform(0, 2), MAX_BACKOFF)
             label = "サーバーエラー" if isinstance(e, ServerError) else f"APIエラー({e.status})"
+            log.warning({"event": "api_error", "status": e.status,
+                         "is_server_error": isinstance(e, ServerError),
+                         "attempt": attempt, "backoff_sec": round(backoff, 1),
+                         "message": msg[:200]})
             safe_print(C.yellow(
                 f"  ⚠ {label}: {msg[:100]} → {backoff:.0f}秒待機してリトライ"
             ), flush=True)
@@ -628,6 +638,8 @@ class OpenRouterAgent:
 
         # 接続エラー系
         backoff = min(BASE_BACKOFF * (2 ** attempt) + random.uniform(0, 2), MAX_BACKOFF)
+        log.warning({"event": "connection_error", "error_type": type(e).__name__,
+                     "attempt": attempt, "backoff_sec": round(backoff, 1)})
         safe_print(C.yellow(
             f"  ⚠ 接続エラー → {backoff:.0f}秒待機 ({type(e).__name__})"
         ), flush=True)
