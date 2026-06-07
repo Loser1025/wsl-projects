@@ -12,6 +12,7 @@ multi_agent.py — 役割特化マルチエージェントシステム
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass, field
 from typing import Optional, Callable
 
 from .agent import OpenRouterAgent, AccountRotator
@@ -180,6 +181,18 @@ class ScribeAgent(RoleAgentBase):
         return self.run(prompt)
 
 
+# ── セッション内タスク履歴台帳 ────────────────────────────────────
+# LLM の要約に頼らず機械的に「何を・どこに・どうした」を記録する。
+# 要約は圧縮のたびに劣化するが、ファイルパス等の事実情報はここに残る。
+
+@dataclass
+class TaskRecord:
+    goal:    str
+    files:   list[str] = field(default_factory=list)
+    summary: str = ""
+    status:  str = "done"
+
+
 # ── マルチエージェントオーケストレーター ──────────────────────────
 
 class MultiAgentOrchestrator:
@@ -206,6 +219,7 @@ class MultiAgentOrchestrator:
         self.operator  = operator
         self.scribe    = scribe
         self._orch     = None  # AgentOrchestrator キャッシュ（Planner 会話履歴を保持）
+        self._task_history: list[TaskRecord] = []  # セッション内タスク台帳
 
     def set_cwd(self, cwd: str) -> None:
         for agent in (self.architect, self.operator, self.scribe):
@@ -214,6 +228,7 @@ class MultiAgentOrchestrator:
     def clear_all_history(self) -> None:
         for agent in (self.architect, self.operator, self.scribe):
             agent.clear_history()
+        self._task_history.clear()
 
     # 書き込み系ツール（Architect が実際に変更したか判定に使用）
     _WRITE_TOOLS = {"write_file", "edit_file", "patch_file"}
@@ -442,13 +457,24 @@ class MultiAgentOrchestrator:
             "operator":  self.operator,
             "scribe":    self.scribe,
         }
-        return self._orch.run_with_plan(
-            user_prompt,
+
+        arch_log_before = len(self.architect.tool_log.records)
+        op_log_before   = len(self.operator.tool_log.records)
+
+        ledger = self._render_task_history()
+        prompt_for_orch = (
+            f"{ledger}\n\n[今回の依頼]\n{user_prompt}" if ledger else user_prompt
+        )
+
+        result = self._orch.run_with_plan(
+            prompt_for_orch,
             on_plan        = on_plan,
             on_step        = on_step,
             on_interactive = on_interactive,
             role_agents    = role_agents,
         )
+        self._record_task(user_prompt, result, arch_log_before, op_log_before)
+        return result
 
     # ── 成否判定ロジック ──────────────────────────────────────────
 
@@ -512,6 +538,59 @@ class MultiAgentOrchestrator:
         return has_ok or not has_ng
 
     # ── ユーティリティ ────────────────────────────────────────────
+
+    # ── タスク履歴台帳の記録・整形 ────────────────────────────────
+
+    _FAIL_KEYWORDS = ("失敗", "エラー:", "Exception", "Traceback", "中断", "[FAILURE")
+    _OK_KEYWORDS   = ("成功", "完了", "[SUCCESS")
+
+    @staticmethod
+    def _extract_touched_files(records: list, before: int) -> list[str]:
+        """ツール呼び出しログから書き込み系ツールが触れたファイルパスを抽出する。"""
+        import re
+        paths: list[str] = []
+        for r in records[before:]:
+            if r.tool not in MultiAgentOrchestrator._WRITE_TOOLS:
+                continue
+            m = re.search(r"path=['\"]([^'\"]+)['\"]", r.args_preview)
+            if m and m.group(1) not in paths:
+                paths.append(m.group(1))
+        return paths
+
+    def _derive_status(self, text: str) -> str:
+        if any(kw in text for kw in self._FAIL_KEYWORDS):
+            return "failed"
+        if any(kw in text for kw in self._OK_KEYWORDS):
+            return "success"
+        return "done"
+
+    def _record_task(self, user_prompt: str, result: str,
+                      arch_log_before: int, op_log_before: int) -> None:
+        """完了したタスクを台帳に記録する（要約に頼らず機械的に保持）。"""
+        files = self._extract_touched_files(self.architect.tool_log.records, arch_log_before)
+        for f in self._extract_touched_files(self.operator.tool_log.records, op_log_before):
+            if f not in files:
+                files.append(f)
+        self._task_history.append(TaskRecord(
+            goal    = user_prompt[:100],
+            files   = files,
+            summary = result[:200].replace("\n", " "),
+            status  = self._derive_status(result),
+        ))
+        if len(self._task_history) > 20:
+            self._task_history = self._task_history[-20:]
+
+    def _render_task_history(self, n: int = 8) -> str:
+        """直近 n 件のタスク履歴を Planner/実行担当への注入用テキストに整形する。"""
+        if not self._task_history:
+            return ""
+        lines = ["【このセッションでの作業履歴（事実ベース・要約より優先して信頼すること）】"]
+        for i, rec in enumerate(self._task_history[-n:], 1):
+            files_str = ", ".join(rec.files[:6]) if rec.files else "（ファイル変更なし）"
+            lines.append(f"{i}. [{rec.status}] {rec.goal} → 変更/作成: {files_str}")
+            if rec.summary:
+                lines.append(f"   結果概要: {rec.summary}")
+        return "\n".join(lines)
 
     @staticmethod
     def _extract_changed_files(text: str) -> str:
