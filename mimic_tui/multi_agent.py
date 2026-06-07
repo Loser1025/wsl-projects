@@ -205,6 +205,7 @@ class MultiAgentOrchestrator:
         self.architect = architect
         self.operator  = operator
         self.scribe    = scribe
+        self._orch     = None  # AgentOrchestrator キャッシュ（Planner 会話履歴を保持）
 
     def set_cwd(self, cwd: str) -> None:
         for agent in (self.architect, self.operator, self.scribe):
@@ -429,16 +430,17 @@ class MultiAgentOrchestrator:
         Architect / Operator / Scribe を自動ディスパッチする。
         """
         from .orchestrator import AgentOrchestrator
-        rotator  = self.architect._agent.rotator
-        registry = self.architect._registry
-        orch = AgentOrchestrator(rotator, registry, executor=self.architect._agent)
-        orch.executor.cwd = self.architect.cwd
+        if self._orch is None:
+            rotator  = self.architect._agent.rotator
+            registry = self.architect._registry
+            self._orch = AgentOrchestrator(rotator, registry, executor=self.architect._agent)
+        self._orch.executor.cwd = self.architect.cwd
         role_agents = {
             "architect": self.architect,
             "operator":  self.operator,
             "scribe":    self.scribe,
         }
-        return orch.run_with_plan(
+        return self._orch.run_with_plan(
             user_prompt,
             on_plan        = on_plan,
             on_step        = on_step,

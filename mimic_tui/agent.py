@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections
 import http.client
 import json
 import queue
@@ -448,9 +449,11 @@ class OpenRouterAgent:
         self.system_prompt: Optional[str] = self._config.system_prompt or None
         self.cwd: str = str(Path.cwd().resolve())
         self._task_goal: Optional[str] = None
-        self._tool_cache: dict[str, str] = {}
+        self._tool_cache: collections.OrderedDict[str, str] = collections.OrderedDict()
         self._tool_cache_lock = threading.Lock()
+        self._tool_cache_max = 128  # LRU 上限
         self.json_mode: bool = False
+        self._overhead_cache: tuple[float, int] = (0.0, 0)  # (timestamp, value)
         self._update_compaction_threshold()
 
     def set_system_prompt(self, prompt: str):
@@ -480,11 +483,17 @@ class OpenRouterAgent:
         平均メッセージサイズ 2000文字 × 2 バッファを想定。"""
         return max(4, min(20, self.compaction_threshold_chars // 4000))
 
+    _OVERHEAD_CACHE_TTL = 1.0  # scratchpad は 1 秒以内の変化を無視
+
     def _effective_threshold(self) -> int:
         """system_prompt と context_header のオーバーヘッドを差し引いた
-        実際に会話履歴に使える文字数上限を返す。"""
-        overhead = len(self.system_prompt or "") + len(self._build_context_header())
-        return max(1000, self.compaction_threshold_chars - overhead)
+        実際に会話履歴に使える文字数上限を返す。
+        scratchpad 読み取り（I/O）を 1 秒 TTL でキャッシュしてコスト削減。"""
+        now = time.monotonic()
+        if now - self._overhead_cache[0] > self._OVERHEAD_CACHE_TTL:
+            overhead = len(self.system_prompt or "") + len(self._build_context_header())
+            self._overhead_cache = (now, overhead)
+        return max(1000, self.compaction_threshold_chars - self._overhead_cache[1])
 
     def _trim_to_fit(self, messages: list[dict]) -> list[dict]:
         """送信前にペイロードがコンテキスト窓の 90% を超えていたら
@@ -853,6 +862,9 @@ class OpenRouterAgent:
         if fn_name in _CACHEABLE_TOOLS:
             with self._tool_cache_lock:
                 self._tool_cache[cache_key] = result
+                self._tool_cache.move_to_end(cache_key)
+                while len(self._tool_cache) > self._tool_cache_max:
+                    self._tool_cache.popitem(last=False)  # LRU 退避
 
         return result, call_id
 
@@ -973,7 +985,11 @@ class OpenRouterAgent:
                         result_str = cache_tool_output(fn_name, str(result))
                         if fn_name in _CACHEABLE_TOOLS:
                             cache_key = self._make_cache_key(fn_name, fn_args)
-                            self._tool_cache[cache_key] = result_str
+                            with self._tool_cache_lock:
+                                self._tool_cache[cache_key] = result_str
+                                self._tool_cache.move_to_end(cache_key)
+                                while len(self._tool_cache) > self._tool_cache_max:
+                                    self._tool_cache.popitem(last=False)
                         elif fn_name in write_tools:
                             self._invalidate_cache_for_path(fn_args.get("path", ""))
                     except UserRejectedWriteError:

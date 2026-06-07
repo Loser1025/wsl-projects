@@ -125,6 +125,17 @@ class WorkflowGraph:
         with self._state_lock:
             self.state.update(local_state)
 
+    def isolated_copy(self) -> "WorkflowGraph":
+        """並列実行用: 共有ステートを持たない隔離コピーを返す。
+        各並列ステップがローカルに state を更新し、完了後に state_merge() でメインへ書き戻す。"""
+        clone = WorkflowGraph.__new__(WorkflowGraph)
+        clone.steps = self.steps
+        clone.state = self.state_snapshot()   # スナップショットで隔離開始
+        clone._state_lock = threading.Lock()
+        clone._label_map = self._label_map
+        clone._goto_counts = {}
+        return clone
+
     # ── エッジ解決（共通ロジック） ──────────────────────────────
 
     def _resolve_directive(self, directive: str, step: PlanStep) -> tuple[str, Optional[int]]:
@@ -758,7 +769,25 @@ class AgentOrchestrator:
         """
         n = len(parallel_steps)
         join_policy = parallel_steps[0].join_policy if parallel_steps else "all"
-        safe_print(C.orange(f"  ⚡ {n} ステップを並列実行 [join={join_policy}]"), flush=True)
+
+        # ── RPM 予約: 並列バッチ開始前にキーが揃うまで待機 ──────────
+        km = self.rotator._key_manager()
+        if km is not None:
+            par_wait = self.rotator.wait_to_start(n)
+            if par_wait > 0.5:
+                safe_print(C.gray(
+                    f"  [Parallel] RPM 待機: {par_wait:.1f}s ({n} キー必要)"
+                ), flush=True)
+                time.sleep(par_wait)
+            # 実際に使えるキー数に合わせて並列数を制限
+            ready = km.n_ready_keys()
+            actual_workers = max(1, min(n, ready if ready > 0 else n))
+        else:
+            actual_workers = n
+
+        safe_print(C.orange(
+            f"  ⚡ {n} ステップを並列実行 [join={join_policy}, workers={actual_workers}]"
+        ), flush=True)
         log.info({"event": "parallel_start",
                   "steps": [s.index for s in parallel_steps], "join_policy": join_policy})
 
@@ -767,16 +796,28 @@ class AgentOrchestrator:
         else:
             agents = [self._make_executor_agent() for _ in range(n)]
         done_event = threading.Event()  # "any"/"first" 用: 条件達成を通知
+        _ki_event = threading.Event()   # KeyboardInterrupt 伝搬用
 
-        def _run_one(step: "PlanStep", agent: "OpenRouterAgent") -> None:
-            if done_event.is_set():
+        def _run_one(step: "PlanStep", agent: "OpenRouterAgent",
+                     local_wf: "WorkflowGraph") -> None:
+            if done_event.is_set() or _ki_event.is_set():
                 step.status = "skipped"
                 if on_step:
                     on_step(step)
                 return
             try:
+                # ── MapReduce 型ステート隔離: 隔離コピーに書き込み ──
                 self._execute_step(step, all_steps, user_message, agent, on_step,
-                                   None, None, workflow=workflow, role_agents=role_agents)
+                                   None, None, workflow=local_wf, role_agents=role_agents)
+                # 完了後にメインステートへマージ
+                if workflow is not None:
+                    workflow.state_merge(local_wf.state)
+            except KeyboardInterrupt:
+                _ki_event.set()
+                step.status = "failed"
+                if on_step:
+                    on_step(step)
+                raise
             except Exception as e:
                 step.status = "failed"
                 step.result = f"並列実行エラー: {e}"
@@ -785,10 +826,16 @@ class AgentOrchestrator:
                 if on_step:
                     on_step(step)
 
-        with ThreadPoolExecutor(max_workers=n) as pool:
+        # 各ステップに隔離された WorkflowGraph コピーを渡す
+        local_wfs = [
+            workflow.isolated_copy() if workflow is not None else None
+            for _ in parallel_steps
+        ]
+
+        with ThreadPoolExecutor(max_workers=actual_workers) as pool:
             futures = {
-                pool.submit(_run_one, step, agent): step
-                for step, agent in zip(parallel_steps, agents)
+                pool.submit(_run_one, step, agent, local_wf): step
+                for step, agent, local_wf in zip(parallel_steps, agents, local_wfs)
             }
 
             if join_policy == "all":
@@ -817,6 +864,9 @@ class AgentOrchestrator:
                         log.info({"event": "parallel_join_triggered",
                                   "policy": join_policy, "winner": step.index})
                 # done_event 未設定のまま全完了した場合はそのまま（全て失敗など）
+
+        if _ki_event.is_set():
+            raise KeyboardInterrupt
 
     @staticmethod
     def _group_into_batches(steps: list["PlanStep"]) -> list[list["PlanStep"]]:
@@ -1013,8 +1063,26 @@ class AgentOrchestrator:
 
             n_accounts = len(self.rotator.accounts)
             workflow_aborted = False
-            # ステップ開始直前の会話履歴スナップショット（step.index → conversation copy）
-            conv_checkpoints: dict[int, list] = {}
+            total_iterations = 0
+            _TOTAL_ITER_LIMIT = 50  # 無限ループ防止: ワークフロー全体の上限反復数
+
+            # ── GOTO ターゲットになりうるラベルを事前収集 ────────────────
+            # goto が指定されたステップのみ checkpoint を保存して無駄なメモリを節約
+            _goto_target_labels: set[str] = set()
+            for _s in steps:
+                for _field in (_s.on_failure, _s.on_success):
+                    if _field.startswith("goto:"):
+                        _goto_target_labels.add(_field[5:].strip())
+
+            # ラベル → step.index に変換（数値指定 or ラベル名どちらにも対応）
+            _goto_target_indices: set[int] = set()
+            for _s in steps:
+                if str(_s.index) in _goto_target_labels or _s.label in _goto_target_labels:
+                    _goto_target_indices.add(_s.index)
+
+            # ステップ開始直前の会話履歴スナップショット
+            # 形式: { step.index: {"_executor": [...], "architect": [...], ...} }
+            conv_checkpoints: dict[int, dict] = {}
 
             # ── ヘルパー: PlanStep リスト → タスクキュー再構築 ──────
             def _make_queue(plan_steps: list["PlanStep"]) -> deque:
@@ -1105,18 +1173,28 @@ class AgentOrchestrator:
                 return WorkflowSignal.CONTINUE, None
 
             # ── メインイベントループ ──────────────────────────────────
-            with ThreadPoolExecutor(max_workers=max(1, n_accounts)) as reviewer_pool:
-                pending: Optional[tuple["PlanStep", Any]] = None
+            _REVIEWER_TIMEOUT = 90  # Reviewer future の最大待ち時間 (秒)
+            _MAX_PENDING = 2        # 同時保留できる Reviewer 数の上限
+            with ThreadPoolExecutor(max_workers=max(2, n_accounts)) as reviewer_pool:
+                pending_reviews: deque = deque()  # deque[tuple[PlanStep, Future]]
                 replan_count = 0
                 insert_count = 0
                 MAX_INSERT = 3  # INSERT_STEPS の連続上限
 
                 while task_queue and not workflow_aborted:
 
-                    # ── 前ステップの Reviewer 結果を処理 ──────────────
-                    if pending is not None:
-                        prev_step, prev_future = pending
-                        pending = None
+                    total_iterations += 1
+                    if total_iterations > _TOTAL_ITER_LIMIT:
+                        safe_print(C.red(
+                            f"  ✗ ワークフロー総反復回数が上限 ({_TOTAL_ITER_LIMIT}) に達しました。中断します。"
+                        ), flush=True)
+                        log.warning({"event": "workflow_iter_limit", "limit": _TOTAL_ITER_LIMIT})
+                        workflow_aborted = True
+                        break
+
+                    # ── 完了した Reviewer 結果を順番に処理（non-blocking）──
+                    while pending_reviews and pending_reviews[0][1].done():
+                        prev_step, prev_future = pending_reviews.popleft()
                         try:
                             ok, reason = prev_future.result()
                             sig, sig_target = _handle_reviewer_result(prev_step, ok, reason)
@@ -1127,82 +1205,117 @@ class AgentOrchestrator:
                         if sig == WorkflowSignal.ABORT:
                             workflow_aborted = True
                             break
+                        if sig != WorkflowSignal.CONTINUE:
+                            # GOTO / INSERT_STEPS / REPLAN: 残 pending を全て drain してから処理
+                            while pending_reviews:
+                                _ps, _pf = pending_reviews.popleft()
+                                try:
+                                    _pf.result(timeout=_REVIEWER_TIMEOUT)
+                                except Exception:
+                                    pass
+                            # 以降の処理は従来どおり sig / sig_target を使う
+                            break
 
-                        elif sig == WorkflowSignal.GOTO and sig_target is not None:
-                            # 会話履歴ロールバック
-                            if sig_target in conv_checkpoints:
-                                self.executor.conversation = copy.deepcopy(conv_checkpoints[sig_target])
-                                safe_print(C.gray(
-                                    f"  [Rollback] Step {sig_target} 開始前の会話履歴に巻き戻し"
-                                ), flush=True)
-                            # 対象ステップ以降でキューを再構築
-                            remaining = [s for s in steps if s.index >= sig_target]
-                            for s in remaining:
-                                s.status = "pending"
-                                s.result = ""
-                            task_queue = _make_queue(remaining)
-                            continue
+                    if workflow_aborted:
+                        break
 
-                        elif sig == WorkflowSignal.INSERT_STEPS and insert_count < MAX_INSERT:
-                            insert_count += 1
-                            recovery_descs = self._generate_recovery_steps(
-                                prev_step, reason if 'reason' in dir() else "", user_message
-                            )
-                            if recovery_descs:
-                                start_idx = max((s.index for s in steps), default=0) + 1
-                                recovery_steps = [
-                                    PlanStep(
-                                        index=start_idx + i,
-                                        description=d["description"],
-                                        parallel=d.get("parallel", False),
-                                        label=d.get("label", ""),
-                                        on_failure=d.get("on_failure", "retry"),
-                                        on_success=d.get("on_success", ""),
-                                        max_iterations=int(d.get("max_iterations", 0)),
-                                    )
-                                    for i, d in enumerate(recovery_descs)
-                                ]
-                                steps.extend(recovery_steps)
-                                new_batches = self._group_into_batches(recovery_steps)
-                                # キュー先頭に割り込み挿入
-                                for b in reversed(new_batches):
-                                    task_queue.appendleft(b)
-                                if on_plan:
-                                    on_plan(steps)
-                            else:
-                                # INSERT_STEPS 生成失敗 → REPLAN にフォールバック
-                                sig = WorkflowSignal.REPLAN
+                    # ── バックプレッシャー: 保留数が上限なら最古を同期待機 ──
+                    if len(pending_reviews) >= _MAX_PENDING:
+                        prev_step, prev_future = pending_reviews.popleft()
+                        try:
+                            ok, reason = prev_future.result(timeout=_REVIEWER_TIMEOUT)
+                            sig, sig_target = _handle_reviewer_result(prev_step, ok, reason)
+                        except Exception as e:
+                            log.warning({"event": "reviewer_backpressure_error", "error": str(e)})
+                            sig, sig_target = WorkflowSignal.CONTINUE, None
+                    else:
+                        sig, sig_target = WorkflowSignal.CONTINUE, None
 
-                        if sig == WorkflowSignal.REPLAN and replan_count < self.MAX_REPLAN_COUNT:
-                            replan_count += 1
-                            remaining_descs = [s.description for b in task_queue for s in b
-                                               if s.status == "pending"]
-                            fail_reason_val = reason if 'reason' in dir() else ""
-                            new_descs = self._replan_remaining(
-                                user_message, prev_step, fail_reason_val,
-                                [s for s in steps if s.status == "done"],
-                                remaining_descs,
-                            )
-                            if new_descs:
-                                start_idx = max((s.index for s in steps), default=0) + 1
-                                new_plan_steps = [
-                                    PlanStep(
-                                        index=start_idx + i,
-                                        description=d["description"],
-                                        parallel=d.get("parallel", False),
-                                        label=d.get("label", ""),
-                                        on_failure=d.get("on_failure", "retry"),
-                                        on_success=d.get("on_success", ""),
-                                        max_iterations=int(d.get("max_iterations", 0)),
-                                        join_policy=d.get("join_policy", "all"),
-                                    )
-                                    for i, d in enumerate(new_descs)
-                                ]
-                                steps.extend(new_plan_steps)
-                                task_queue = _make_queue(new_plan_steps)
-                                if on_plan:
-                                    on_plan(steps)
-                            continue
+                    if sig == WorkflowSignal.ABORT:
+                        workflow_aborted = True
+                        break
+
+                    if sig == WorkflowSignal.GOTO and sig_target is not None:
+                        # 会話履歴ロールバック
+                        if sig_target in conv_checkpoints:
+                            ckpt = conv_checkpoints[sig_target]
+                            self.executor.conversation = copy.deepcopy(ckpt["_executor"])
+                            if role_agents:
+                                for _role, _ra in role_agents.items():
+                                    if _role in ckpt and hasattr(_ra, "_agent"):
+                                        _ra._agent.conversation = copy.deepcopy(ckpt[_role])
+                            self.executor._compact_if_needed()
+                            safe_print(C.gray(
+                                f"  [Rollback] Step {sig_target} 開始前の会話履歴に巻き戻し"
+                            ), flush=True)
+                        # 対象ステップ以降でキューを再構築
+                        remaining = [s for s in steps if s.index >= sig_target]
+                        for s in remaining:
+                            s.status = "pending"
+                            s.result = ""
+                        task_queue = _make_queue(remaining)
+                        continue
+
+                    elif sig == WorkflowSignal.INSERT_STEPS and insert_count < MAX_INSERT:
+                        insert_count += 1
+                        recovery_descs = self._generate_recovery_steps(
+                            prev_step, reason if 'reason' in locals() else "", user_message
+                        )
+                        if recovery_descs:
+                            start_idx = max((s.index for s in steps), default=0) + 1
+                            recovery_steps = [
+                                PlanStep(
+                                    index=start_idx + i,
+                                    description=d["description"],
+                                    parallel=d.get("parallel", False),
+                                    label=d.get("label", ""),
+                                    on_failure=d.get("on_failure", "retry"),
+                                    on_success=d.get("on_success", ""),
+                                    max_iterations=int(d.get("max_iterations", 0)),
+                                )
+                                for i, d in enumerate(recovery_descs)
+                            ]
+                            steps.extend(recovery_steps)
+                            new_batches = self._group_into_batches(recovery_steps)
+                            # キュー先頭に割り込み挿入
+                            for b in reversed(new_batches):
+                                task_queue.appendleft(b)
+                            if on_plan:
+                                on_plan(steps)
+                        else:
+                            # INSERT_STEPS 生成失敗 → REPLAN にフォールバック
+                            sig = WorkflowSignal.REPLAN
+
+                    if sig == WorkflowSignal.REPLAN and replan_count < self.MAX_REPLAN_COUNT:
+                        replan_count += 1
+                        remaining_descs = [s.description for b in task_queue for s in b
+                                           if s.status == "pending"]
+                        fail_reason_val = reason if 'reason' in locals() else ""
+                        new_descs = self._replan_remaining(
+                            user_message, prev_step, fail_reason_val,
+                            [s for s in steps if s.status == "done"],
+                            remaining_descs,
+                        )
+                        if new_descs:
+                            start_idx = max((s.index for s in steps), default=0) + 1
+                            new_plan_steps = [
+                                PlanStep(
+                                    index=start_idx + i,
+                                    description=d["description"],
+                                    parallel=d.get("parallel", False),
+                                    label=d.get("label", ""),
+                                    on_failure=d.get("on_failure", "retry"),
+                                    on_success=d.get("on_success", ""),
+                                    max_iterations=int(d.get("max_iterations", 0)),
+                                    join_policy=d.get("join_policy", "all"),
+                                )
+                                for i, d in enumerate(new_descs)
+                            ]
+                            steps.extend(new_plan_steps)
+                            task_queue = _make_queue(new_plan_steps)
+                            if on_plan:
+                                on_plan(steps)
+                        continue
 
                     if not task_queue or workflow_aborted:
                         break
@@ -1274,7 +1387,13 @@ class AgentOrchestrator:
                             continue
 
                         # ── 通常の逐次ステップ ────────────────────────
-                        conv_checkpoints[step.index] = copy.deepcopy(self.executor.conversation)
+                        if step.index in _goto_target_indices:
+                            _ckpt: dict = {"_executor": copy.deepcopy(self.executor.conversation)}
+                            if role_agents:
+                                for _role, _ra in role_agents.items():
+                                    if hasattr(_ra, "_agent"):
+                                        _ckpt[_role] = copy.deepcopy(_ra._agent.conversation)
+                            conv_checkpoints[step.index] = _ckpt
                         future = self._execute_step(
                             step, steps, user_message,
                             self.executor, on_step,
@@ -1284,7 +1403,7 @@ class AgentOrchestrator:
                             role_agents=role_agents,
                         )
                         if future is not None:
-                            pending = (step, future)
+                            pending_reviews.append((step, future))
 
                     else:
                         # ── 並列バッチ（MapReduce 型ステート隔離） ────
@@ -1304,11 +1423,11 @@ class AgentOrchestrator:
                                 f"  [Parallel] マージ完了: 更新キー = {new_keys}"
                             ), flush=True)
 
-                # ── 最後の pending Reviewer を処理 ──────────────────
-                if pending is not None and not workflow_aborted:
-                    prev_step, prev_future = pending
+                # ── ループ後: 残 pending_reviews を全て drain ──────────
+                while pending_reviews and not workflow_aborted:
+                    prev_step, prev_future = pending_reviews.popleft()
                     try:
-                        ok, reason = prev_future.result()
+                        ok, reason = prev_future.result(timeout=_REVIEWER_TIMEOUT)
                         if not ok and reason:
                             safe_print(C.yellow(
                                 f"  ↻ Reviewer(Step {prev_step.index}): {reason[:80]}"
@@ -1345,30 +1464,19 @@ class AgentOrchestrator:
                                 ), flush=True)
                                 # GOTO: 会話ロールバック + キュー再構築
                                 if s_jump in conv_checkpoints:
-                                    self.executor.conversation = copy.deepcopy(conv_checkpoints[s_jump])
+                                    ckpt = conv_checkpoints[s_jump]
+                                    self.executor.conversation = copy.deepcopy(ckpt["_executor"])
+                                    if role_agents:
+                                        for _role, _ra in role_agents.items():
+                                            if _role in ckpt and hasattr(_ra, "_agent"):
+                                                _ra._agent.conversation = copy.deepcopy(ckpt[_role])
+                                    self.executor._compact_if_needed()
                                 remaining = [s for s in steps if s.index >= s_jump]
                                 for s in remaining:
                                     s.status = "pending"
                                     s.result = ""
                                 task_queue = _make_queue(remaining)
-                                # キューが再構築されたので再度ループに入る必要があるが
-                                # ここではシンプルに同期実行でドレイン
-                                while task_queue and not workflow_aborted:
-                                    b = task_queue.popleft()
-                                    if len(b) == 1:
-                                        self._execute_step(
-                                            b[0], steps, user_message,
-                                            self.executor, on_step,
-                                            reviewer_pool=None,
-                                            on_token=on_token,
-                                            workflow=workflow,
-                                            role_agents=role_agents,
-                                        )
-                                    else:
-                                        self._execute_steps_parallel(
-                                            b, steps, user_message, on_step, on_token, workflow,
-                                            role_agents=role_agents,
-                                        )
+                                # キューが再構築されたので drain は続く while ループで処理
                     except Exception as e:
                         log.warning({"event": "reviewer_last_error", "error": str(e)})
 
@@ -1385,10 +1493,12 @@ class AgentOrchestrator:
             self.executor.end_task()
 
             # ── 5. 最終まとめ ───────────────────────────────────────────
+            # 最新 5 ステップ × 500 文字でトリミングしてトークン節約
+            _trimmed_results = [r[:500] for r in results[-5:]]
             summary_prompt = (
                 f"以下のタスクが完了しました。結果を簡潔にまとめてください。\n\n"
                 f"タスク: {user_message}\n\n"
-                + "\n\n".join(results)
+                + "\n\n".join(_trimmed_results)
             )
             final_result = self.executor.run_stream(summary_prompt, callback=on_token)
 

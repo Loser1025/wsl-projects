@@ -755,13 +755,16 @@ class PipelineTypewriter:
 # ── スクラッチパッド共有ステート ──────────────────────────────────────
 # agent.py / tools.py / commands.py が遅延インポートなしで参照できる中央管理変数
 _current_scratchpad: str = "【現在の進捗】タスクを開始しました。"
+_scratchpad_lock = threading.Lock()
 
 def get_scratchpad() -> str:
-    return _current_scratchpad
+    with _scratchpad_lock:
+        return _current_scratchpad
 
 def set_scratchpad(text: str) -> None:
     global _current_scratchpad
-    _current_scratchpad = text
+    with _scratchpad_lock:
+        _current_scratchpad = text
 
 
 # ── ツール出力メモリキャッシュ ─────────────────────────────────────

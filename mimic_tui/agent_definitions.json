@@ -1,0 +1,218 @@
+{
+  "ArchitectAgent": {
+    "role_name": "Architect",
+    "role_description": "コード設計・ファイル修正・リポジトリ構造の把握",
+    "role_category": "Design & Implementation",
+    "allowed_tools": [
+      "get_repo_map",
+      "read_file",
+      "read_tool_cache",
+      "smart_read",
+      "search_in_file",
+      "file_info",
+      "write_file",
+      "edit_file",
+      "patch_file",
+      "update_scratchpad"
+    ],
+    "forbidden_tools": [
+      "run_bash",
+      "run_pipeline",
+      "web_search",
+      "fetch_webpage",
+      "search_history"
+    ],
+    "action_guidelines": [
+      "1. まず get_repo_map または smart_read でコード構造を把握する",
+      "2. 必要なファイルを read_file / search_in_file で確認してから編集する",
+      "3. 編集完了後は必ず以下の形式で報告する:",
+      "   - 変更ファイル: <パス1>, <パス2>",
+      "   - テストコマンド: <pytest/npm test 等の具体的コマンド>",
+      "4. 実装後に update_scratchpad で進捗を記録する",
+      "5. bash コマンドの実行は行わない（それは執行担当の責務）"
+    ],
+    "collaboration_steps": [
+      {
+        "step": 1,
+        "label": "architect",
+        "description": "リポジトリ構造把握・設計・実装",
+        "on_failure": "abort",
+        "on_success": "goto:verify"
+      },
+      {
+        "step": 4,
+        "label": "replan",
+        "description": "エラー修正・別アプローチで再設計",
+        "on_failure": "abort",
+        "on_success": "goto:operator"
+      }
+    ],
+    "success_criteria": {
+      "primary": "書き込みツール（write_file/edit_file/patch_file）を呼び出したか",
+      "secondary": "分析・要約・評価などの読み取り専用タスクか（キーワード: 分析, 要約, 評価, 考察, まとめ, レポート, 調査結果, 結論, 比較, 解説, 説明, 確認結果, レビュー）",
+      "failure": "ファイル変更なしかつ分析結果なし"
+    },
+    "shared_state_items": [
+      "changed_files",
+      "test_command"
+    ],
+    "specialization": "Code Design & Implementation",
+    "exclusive_tools": [
+      "get_repo_map",
+      "write_file",
+      "edit_file",
+      "patch_file"
+    ],
+    "shared_tools_count": 5,
+    "restrictions_count": 2,
+    "collaboration_role": "Design & Fix Implementation",
+    "workflow_steps": [1, 4],
+    "dependency": "OperatorAgent (for testing), ScribeAgent (for memory management)"
+  },
+  "OperatorAgent": {
+    "role_name": "Operator",
+    "role_description": "コマンド実行・テスト・コードベース探索・Web 調査",
+    "role_category": "Execution & Validation",
+    "allowed_tools": [
+      "run_bash",
+      "run_pipeline",
+      "read_file",
+      "read_tool_cache",
+      "file_info",
+      "smart_read",
+      "search_in_file",
+      "grep_codebase",
+      "web_search",
+      "fetch_webpage",
+      "update_scratchpad"
+    ],
+    "forbidden_tools": [
+      "write_file",
+      "edit_file",
+      "patch_file",
+      "search_history"
+    ],
+    "action_guidelines": [
+      "1. 設計担当の実装を run_bash でテスト・検証する",
+      "2. エラーが出た場合は完全なスタックトレースを出力する",
+      "3. 最終的に成功 / 失敗を明確に報告する",
+      "4. ファイルの直接編集は行わない（それは設計担当の責務）"
+    ],
+    "collaboration_steps": [
+      {
+        "step": 2,
+        "label": "verify",
+        "description": "実装確認（ファイル変更検証）",
+        "on_failure": "goto:architect",
+        "on_success": ""
+      },
+      {
+        "step": 3,
+        "label": "operator",
+        "description": "テスト実行・動作検証",
+        "on_failure": "goto:replan",
+        "on_success": "goto:scribe"
+      }
+    ],
+    "success_criteria": {
+      "verify": "ファイル変更の確認（確認完了、変更あり、差分を確認などのキーワード）",
+      "operator": "テスト成功（[SUCCESS]、成功、完了、問題なし、テスト合格、正常動作、All tests passedなどのキーワード）",
+      "failure": "テスト失敗（[FAILURE、Exception:、Traceback、失敗、エラー:、FAILEDなどのキーワード）"
+    },
+    "shared_state_items": [
+      "changed_files",
+      "test_command",
+      "last_error"
+    ],
+    "specialization": "Command Execution & Testing",
+    "exclusive_tools": [
+      "run_bash",
+      "run_pipeline",
+      "web_search",
+      "fetch_webpage"
+    ],
+    "shared_tools_count": 5,
+    "restrictions_count": 1,
+    "collaboration_role": "Validation & Testing",
+    "workflow_steps": [2, 3],
+    "dependency": "ArchitectAgent (for implementation), ScribeAgent (for memory management)"
+  },
+  "ScribeAgent": {
+    "role_name": "Scribe",
+    "role_description": "作業記憶の管理・要約・コンテキスト圧縮",
+    "role_category": "Memory Management",
+    "allowed_tools": [
+      "update_scratchpad",
+      "search_history",
+      "read_file"
+    ],
+    "forbidden_tools": [
+      "run_bash",
+      "run_pipeline",
+      "write_file",
+      "edit_file",
+      "patch_file",
+      "web_search",
+      "fetch_webpage",
+      "get_repo_map",
+      "smart_read",
+      "search_in_file",
+      "grep_codebase"
+    ],
+    "action_guidelines": [
+      "1. update_scratchpad で常に以下の形式で保存する:",
+      "   【ゴール】【完了済み】【次のステップ】【発見・注意】",
+      "2. 必ず 800 文字以内に収める",
+      "3. 重要な制約・エラー・発見事項を優先的に残す"
+    ],
+    "collaboration_steps": [
+      {
+        "step": 5,
+        "label": "scribe",
+        "description": "作業記憶圧縮・保存",
+        "on_failure": "skip",
+        "on_success": ""
+      }
+    ],
+    "success_criteria": {
+      "primary": "常に成功（記憶圧縮は失敗してもスキップ）"
+    },
+    "shared_state_items": [
+      "current_memory"
+    ],
+    "specialization": "Memory Compression & Management",
+    "exclusive_tools": [
+      "compact_memory"
+    ],
+    "shared_tools_count": 2,
+    "restrictions_count": 3,
+    "collaboration_role": "Memory Compression",
+    "workflow_steps": [5],
+    "dependency": "ArchitectAgent & OperatorAgent (for task results)"
+  },
+  "OpenRouterAgent": {
+    "role_name": "OpenRouterAgent",
+    "role_description": "汎用 ReAct ループエージェント（OpenRouter API 経由）",
+    "role_category": "General Purpose",
+    "allowed_tools": ["*"],
+    "forbidden_tools": [],
+    "action_guidelines": [
+      "1. ストリーミング/非ストリーミングの ReAct ループを実行",
+      "2. ツール呼び出しの並列/逐次実行（書き込みツールは逐次）",
+      "3. コンテキスト管理（自動トリム、圧縮、キャッシュ）",
+      "4. エラーハンドリング（リトライ、バックオフ、コンテキスト超過対応）"
+    ],
+    "collaboration_steps": [],
+    "success_criteria": {
+      "primary": "ツール実行結果に基づく成否判定"
+    },
+    "shared_state_items": [],
+    "specialization": "General Purpose ReAct Agent",
+    "exclusive_tools": [],
+    "shared_tools_count": 0,
+    "restrictions_count": 0,
+    "collaboration_role": "Standalone Operation",
+    "workflow_steps": [],
+    "dependency": "None (self-contained)"
+  }
+}
