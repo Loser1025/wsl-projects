@@ -431,9 +431,11 @@ class MultiAgentOrchestrator:
         """
         from .orchestrator import AgentOrchestrator
         if self._orch is None:
-            rotator  = self.architect._agent.rotator
-            registry = self.architect._registry
-            self._orch = AgentOrchestrator(rotator, registry, executor=self.architect._agent)
+            rotator = self.architect._agent.rotator
+            # Architect 用の制限付きレジストリではなく全ツールを渡す。
+            # Reflector の verify_registry や _make_executor_agent のフォールバックが
+            # run_bash / run_pipeline 等を解決できなくなるため。
+            self._orch = AgentOrchestrator(rotator, _global_tools, executor=self.architect._agent)
         self._orch.executor.cwd = self.architect.cwd
         role_agents = {
             "architect": self.architect,
