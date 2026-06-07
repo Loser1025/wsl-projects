@@ -165,17 +165,17 @@ class ScribeAgent(RoleAgentBase):
             "\n\n[行動指針]\n"
             "1. update_scratchpad で常に以下の形式で保存する:\n"
             "   【ゴール】【完了済み】【次のステップ】【発見・注意】\n"
-            "2. 必ず 800 文字以内に収める\n"
+            "2. 必ず 2000 文字以内に収める\n"
             "3. 重要な制約・エラー・発見事項を優先的に残す"
         )
 
     def compact_memory(self, current_memory: str, task_summary: str) -> str:
-        """現在の記憶とタスク結果を 800 文字以内に圧縮して保存する。"""
+        """現在の記憶とタスク結果を 2000 文字以内に圧縮して保存する。"""
         prompt = (
-            "以下の作業記録を 800 文字以内に圧縮し、update_scratchpad で保存してください。\n"
+            "以下の作業記録を 2000 文字以内に圧縮し、update_scratchpad で保存してください。\n"
             "【ゴール】【完了済み】【次のステップ】【発見・注意】の形式を必ず守ること。\n\n"
-            f"[直前のタスク結果（要約）]\n{task_summary[:400]}\n\n"
-            f"[現在の作業記憶]\n{current_memory[:600] if current_memory else 'なし'}"
+            f"[直前のタスク結果（要約）]\n{task_summary[:600]}\n\n"
+            f"[現在の作業記憶]\n{current_memory[:1500] if current_memory else 'なし'}"
         )
         return self.run(prompt)
 

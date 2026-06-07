@@ -529,7 +529,7 @@ class OpenRouterAgent:
             #  忘れてしまう問題への対処）
             set_scratchpad(
                 f"【ゴール】{goal}\n"
-                f"【前タスクまでの記憶】\n{prev[:800]}\n"
+                f"【前タスクまでの記憶】\n{prev[:2000]}\n"
                 f"【次のステップ】→ タスク分析中"
             )
         else:

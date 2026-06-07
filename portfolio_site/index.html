@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポートフォリオサイト</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="bg-gray-800 text-white p-4">
+        <nav class="flex justify-center">
+            <ul class="flex space-x-4">
+                <li><a href="index.html" class="hover:text-gray-300">トップ</a></li>
+                <li><a href="projects.html" class="hover:text-gray-300">プロジェクト</a></li>
+                <li><a href="contact.html" class="hover:text-gray-300">コンタクト</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <section class="hero text-center py-16">
+            <h1 class="text-4xl font-bold">こんにちは、私はデザイナーです</h1>
+            <p class="text-xl mt-4">ウェブデザインと開発が得意です。</p>
+            <button id="contactButton" class="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                お問い合わせ
+            </button>
+        </section>
+        <section class="skills bg-gray-100 py-8">
+            <div class="container mx-auto px-4">
+                <h2 class="text-2xl font-bold text-center mb-4">スキル</h2>
+                <ul class="list-disc pl-6">
+                    <li>HTML/CSS</li>
+                    <li>JavaScript</li>
+                    <li>UI/UXデザイン</li>
+                </ul>
+            </div>
+        </section>
+        <section class="projects py-8">
+            <div class="container mx-auto px-4">
+                <h2 class="text-2xl font-bold text-center mb-4">プロジェクト</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="project border p-4">
+                        <h3 class="text-xl font-bold">プロジェクト1</h3>
+                        <p>プロジェクトの説明</p>
+                        <button class="mt-2 bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded">
+                            詳細
+                        </button>
+                    </div>
+                    <div class="project border p-4">
+                        <h3 class="text-xl font-bold">プロジェクト2</h3>
+                        <p>プロジェクトの説明</p>
+                        <button class="mt-2 bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded">
+                            詳細
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer class="bg-gray-800 text-white text-center py-4">
+        <p>&copy; 2024 ポートフォリオサイト</p>
+    </footer>
+    <script src="js/script.js"></script>
+</body>
+</html>
