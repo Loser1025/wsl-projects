@@ -522,12 +522,23 @@ class OpenRouterAgent:
 
     def start_task(self, goal: str):
         self._task_goal = goal
-        set_scratchpad(
-            f"【ゴール】{goal}\n"
-            f"【完了済み】（なし）\n"
-            f"【次のステップ】→ タスク分析中\n"
-            f"【発見・注意】（なし）"
-        )
+        prev = (get_scratchpad() or "").strip()
+        if prev:
+            # 前タスクの作業記憶を空テンプレで上書きせず引き継ぐ
+            # （同一セッション内で連続タスクを実行すると前回の内容を
+            #  忘れてしまう問題への対処）
+            set_scratchpad(
+                f"【ゴール】{goal}\n"
+                f"【前タスクまでの記憶】\n{prev[:800]}\n"
+                f"【次のステップ】→ タスク分析中"
+            )
+        else:
+            set_scratchpad(
+                f"【ゴール】{goal}\n"
+                f"【完了済み】（なし）\n"
+                f"【次のステップ】→ タスク分析中\n"
+                f"【発見・注意】（なし）"
+            )
 
     def end_task(self):
         self._task_goal = None

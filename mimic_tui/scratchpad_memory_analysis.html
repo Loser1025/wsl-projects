@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mimic TUI: セッション内の記憶維持・コンテキスト管理ロジック</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            color: #333;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mimic TUI: セッション内の記憶維持・コンテキスト管理ロジック</h1>
+
+    <h2>概要</h2>
+    <p>
+        Mimic TUI は、セッション内でエージェントの記憶やコンテキストを維持するために、<strong>スクラッチパッド</strong>と呼ばれる仕組みを使用しています。
+        この仕組みは、主に <code>utils.py</code> で定義され、スレッドセーフな方法で情報を保持・更新します。
+    </p>
+
+    <h2>スクラッチパッドの仕組み</h2>
+    <h3>1. スクラッチパッドの定義</h3>
+    <p>
+        スクラッチパッドは、グローバル変数 <code>_current_scratchpad</code> として定義され、初期値は「【現在の進捗】タスクを開始しました。」です。
+        スレッドセーフな操作を保証するために、<code>threading.Lock</code> が使用されます。
+    </p>
+    <pre>
+_current_scratchpad: str = "【現在の進捗】タスクを開始しました。"
+_scratchpad_lock = threading.Lock()
+    </pre>
+
+    <h3>2. スクラッチパッドの操作関数</h3>
+    <p>
+        スクラッチパッドの内容を取得・更新するための関数が提供されています。
+    </p>
+    <table>
+        <tr>
+            <th>関数名</th>
+            <th>説明</th>
+            <th>コード</th>
+        </tr>
+        <tr>
+            <td><code>get_scratchpad()</code></td>
+            <td>スクラッチパッドの内容を取得します。</td>
+            <td>
+                <pre>
+def get_scratchpad() -> str:
+    with _scratchpad_lock:
+        return _current_scratchpad
+</pre>
+            </td>
+        </tr>
+        <tr>
+            <td><code>set_scratchpad(text: str)</code></td>
+            <td>スクラッチパッドの内容を更新します。</td>
+            <td>
+                <pre>
+def set_scratchpad(text: str) -> None:
+    global _current_scratchpad
+    with _scratchpad_lock:
+        _current_scratchpad = text
+</pre>
+            </td>
+        </tr>
+    </table>
+
+    <h2>スクラッチパッドの利用例</h2>
+    <h3>1. エージェントの自己記憶</h3>
+    <p>
+        エージェントは、セッション内でスクラッチパッドを使用して自己記憶を維持します。
+        例えば、<code>agent.py</code> では、スクラッチパッドの内容を表示するために <code>get_scratchpad()</code> が使用されています。
+    </p>
+    <pre>
+--- [エージェントの自己記憶（Scratchpad）] ---
+{get_scratchpad()}
+--- [Scratchpad ここまで] ---
+    </pre>
+
+    <h3>2. コマンドによる操作</h3>
+    <p>
+        <code>commands.py</code> では、<code>scratchpad</code> コマンドが定義されており、ユーザーがスクラッチパッドの内容を表示できます。
+    </p>
+    <pre>
+@cmd_registry.register("scratchpad", "スクラッチパッドの現在の内容を表示")
+def cmd_scratchpad(agent: OpenRouterAgent, args: str):
+    safe_print(C.yellow("  ┌─ Scratchpad ──────────────────────────────────────"))
+    for line in get_scratchpad().splitlines():
+        safe_print(f"  │ {line}")
+    </pre>
+
+    <h3>3. ツールによる更新</h3>
+    <p>
+        <code>tools.py</code> では、<code>update_scratchpad</code> というツールが定義されており、エージェントがスクラッチパッドの内容を更新できます。
+    </p>
+    <pre>
+def update_scratchpad(content: str) -> str:
+    set_scratchpad(content)
+    return "Scratchpad updated."
+    </pre>
+
+    <h2>まとめ</h2>
+    <p>
+        Mimic TUI のセッション内の記憶維持・コンテキスト管理は、スクラッチパッドを中心に構築されています。
+        スレッドセーフな操作が保証され、エージェントやユーザーが自由に内容を取得・更新できます。
+    </p>
+
+    <h2>関連ファイル</h2>
+    <ul>
+        <li><code>utils.py</code>: スクラッチパッドの定義と操作関数</li>
+        <li><code>agent.py</code>: エージェントの自己記憶表示</li>
+        <li><code>commands.py</code>: スクラッチパッド表示コマンド</li>
+        <li><code>tools.py</code>: スクラッチパッド更新ツール</li>
+    </ul>
+</body>
+</html>
