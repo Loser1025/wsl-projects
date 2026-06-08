@@ -1,0 +1,375 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLI Agent Demo Analysis Report</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2980b9;
+            border-bottom: 1px solid #3498db;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #3498db;
+        }
+        pre {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        code {
+            background-color: #f0f0f0;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        hr {
+            border: 0;
+            height: 1px;
+            background: #ddd;
+            margin: 20px 0;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🦊 cli_agent_demo.py 詳細分析レポート</h1>
+<p>
+<h2>概要</h2></p>
+<p>
+<code>cli_agent_demo.py</code> は <strong>Textual</strong> フレームワークを用いて構築された、CLI（Command Line Interface）エージェントの <strong>TUI（Text User Interface）デモアプリケーション</strong> です。ターミナル上で動作するモダンなAIアシスタント風UIを実現しており、マルチエージェントのシミュレーション、リアルタイムログストリーミング、タスク管理、ファイルエクスプローラなどの機能を備えています。</p>
+<p>
+<hr></p>
+<p>
+<h2>1. プログラムの構造と主要なコンポーネント</h2></p>
+<p>
+<h3>1.1 全体構造（646行）</h3></p>
+<p>
+<table><thead><tr> セクション </td><td> 行範囲 </td><td> 内容 </tr></thead><tbody></td><td> モジュール docstring </td><td> 1–15 </td><td> 機能一覧の概要 </td><td></p>
+</td><td> インポート </td><td> 17–47 </td><td> 標準ライブラリ + Textual 関連 </td><td>
+</td><td> カスタムウィジェット </td><td> 53–97 </td><td> <code>AgentStatusBadge</code>, <code>TaskCounter</code>, <code>LogPanel</code> </td><td>
+</td><td> メインアプリ </td><td> 100–638 </td><td> <code>CLI_Agent_App</code> クラス </td><td>
+</td><td> エントリポイント </td><td> 643–645 </td><td> <code>if __name__ == "__main__"</code> </td><td>
+</tbody></table>
+<h3>1.2 カスタムウィジェット（3つ）</h3>
+<p>
+<h4>① <code>AgentStatusBadge(Static)</code> — 行53〜75</h4></p>
+<p>- <strong>役割</strong>: エージェントのステータス（IDLE / WORKING / DONE / ERROR）とアクティブタスク数をリアルタイム表示</p>
+<p>- <strong>リアクティブプロパティ</strong>: <code>status</code>, <code>active_tasks</code></p>
+<p>- <strong>カラーマッピング</strong>: IDLE→grey, WORKING→yellow, DONE→green, ERROR→red</p>
+<p>- <code>watch_status()</code> / <code>watch_active_tasks()</code> で変更を監視し <code>refresh()</code> を呼び出す</p>
+<p>
+<h4>② <code>TaskCounter(Static)</code> — 行78〜85</h4></p>
+<p>- <strong>役割</strong>: 完了タスク数 / 全タスク数を表示（例: <code>✅ 3 / 5 tasks completed</code>）</p>
+<p>- <strong>リアクティブプロパティ</strong>: <code>done</code>, <code>total</code></p>
+<p>
+<h4>③ <code>LogPanel(RichLog)</code> — 行88〜97</h4></p>
+<p>- <strong>役割</strong>: システムログ表示用の <code>RichLog</code> サブクラス</p>
+<p>- <code>border_subtitle = "SYSTEM LOG"</code> を設定</p>
+<p>
+<h3>1.3 メインアプリケーション <code>CLI_Agent_App(App)</code> — 行100〜638</h3></p>
+<p>
+<table><thead><tr> 要素 </td><td> 詳細 </tr></thead><tbody></td><td> <strong>TITLE / SUB_TITLE</strong> </td><td> <code>"◉ OWL CLI Agent"</code> / <code>"Terminal AI Assistant"</code> </td><td></p>
+</td><td> <strong>CSS</strong> </td><td> 106〜208行: ダークテーマのスタイル定義 </td><td>
+</td><td> <strong>BINDINGS</strong> </td><td> 6つのキーバインド（q, t, r, s, c, ctrl+l） </td><td>
+</td><td> <strong>リアクティブ状態</strong> </td><td> <code>agent_status</code>, <code>active_task_count</code>, <code>completed_tasks</code> </td><td>
+</td><td> <strong>デモメッセージ</strong> </td><td> <code>_demo_messages</code>: 5つのプリセットメッセージ（thinking, tool, response） </td><td>
+</tbody></table>
+<hr>
+<p>
+<h2>2. マルチエージェントの動作メカニズム</h2></p>
+<p>
+<h3>2.1 エージェントの定義</h3></p>
+<p>
+プログラム内では <strong>3つのエージェント</strong> がサイドバーに静的表示されています：</p>
+<p>
+<pre><code></p>
+<p>🦊 1. OWL Agent</p>
+<p>⚡ 2. Fast Runner</p>
+<p>🔍 3. Code Reviewer</p>
+</code></pre>
+<p>
+> <strong>注意</strong>: 現在の実装ではこれらは表示のみで、実際に個別のエージェントが独立して動作するわけではありません。デモシミュレーションは単一エージェント（OWL Agent）として動作します。</p>
+<p>
+<h3>2.2 エージェントの状態遷移</h3></p>
+<p>
+<pre><code></p>
+<p>IDLE ──→ WORKING ──→ DONE</p>
+<p>  ↑         │          │</p>
+<p>  └─────────┴──────────┘</p>
+<p>       (Reset / Stop)</p>
+</code></pre>
+<p>
+- <strong>IDLE</strong>: 初期状態、タスク待機中</p>
+<p>- <strong>WORKING</strong>: デモシミュレーション実行中</p>
+<p>- <strong>DONE</strong>: 全タスク完了</p>
+<p>- <strong>ERROR</strong>: エラー発生時（UI上は定義済みだが、デモ内では未使用）</p>
+<p>
+<h3>2.3 デモシミュレーションの動作（<code>_run_agent_demo</code>）</h3></p>
+<p>
+<code>@work(exclusive=True, thread=False)</code> デコレータ付きの非同期メソッドで、以下のフローで動作します：</p>
+<p>
+<pre><code></p>
+<p>1. agent_status = "WORKING", active_task_count = 3</p>
+<p>2. _demo_messages を順次処理:</p>
+<p>   a. "thinking" → 斜体で思考プロセスを表示</p>
+<p>   b. "tool" → ツール呼び出しをJSON形式で表示</p>
+<p>   c. "response" → トークン単位でストリーミング表示 + Markdown更新</p>
+<p>3. プログレスバー更新</p>
+<p>4. DataTable の該当行を更新（Status, Progress列）</p>
+<p>5. TaskCounter の done を更新</p>
+<p>6. agent_status = "DONE", active_task_count = 0</p>
+<p>7. 全タスク行を "✅ Done" / "100%" に更新</p>
+</code></pre>
+<p>
+<h3>2.4 タスク管理</h3></p>
+<p>
+- <strong>初期タスク</strong>: 5件（T-001〜T-005）が <code>on_mount</code> でシード</p>
+<p>- <strong>新規タスク追加</strong>: <code>action_simulate_task</code> でランダムなタスクを追加</p>
+<p>- <strong>タスク選択</strong>: DataTable の行クリックで詳細をログに出力</p>
+<p>
+<hr></p>
+<p>
+<h2>3. TUIのインターフェースと機能</h2></p>
+<p>
+<h3>3.1 レイアウト構造</h3></p>
+<p>
+<pre><code></p>
+<p>┌─────────────────────────────────────────────┐</p>
+<p>│  Header (show_clock=True)                    │</p>
+<p>├─────────────────────────────────────────────┤</p>
+<p>│  Status Bar: [AgentStatusBadge] [TaskCounter]│</p>
+<p>├──────────┬──────────────────────────────────┤</p>
+<p>│ Sidebar  │  TabbedContent                    │</p>
+<p>│          │  ┌────┬─────┬──────┬─────┬──────┐ │</p>
+<p>│ 📁 AGENTS│  │Chat│Tasks│Files │Logs │Output│ │</p>
+<p>│ 🦊 OWL   │  ├────┴─────┴──────┴─────┴──────┤ │</p>
+<p>│ ⚡ Fast  │  │  Tab Content                  │ │</p>
+<p>│ 🔍 Review│  │                               │ │</p>
+<p>│          │  │                               │ │</p>
+<p>│ ⚙️ ACTION│  │                               │ │</p>
+<p>│ [Run All]│  │                               │ │</p>
+<p>│ [Stop]   │  │                               │ │</p>
+<p>│ [Reset]  │  │                               │ │</p>
+<p>├──────────┴──────────────────────────────────┤</p>
+<p>│  Overall Progress: [████████░░░░░░░░]        │</p>
+<p>├─────────────────────────────────────────────┤</p>
+<p>│  💬 Command: [________________________]      │</p>
+<p>├─────────────────────────────────────────────┤</p>
+<p>│  Footer (key bindings)                       │</p>
+<p>└─────────────────────────────────────────────┘</p>
+</code></pre>
+<p>
+<h3>3.2 タブ構成（5つ）</h3></p>
+<p>
+<table><thead><tr> タブ </td><td> ID </td><td> 内容 </tr></thead><tbody></td><td> 💬 Chat </td><td> <code>chat-tab</code> </td><td> RichLog: エージェントとの対話 </td><td></p>
+</td><td> 📋 Tasks </td><td> <code>tasks-tab</code> </td><td> DataTable: タスク一覧（ID, Task, Status, Progress, Started） </td><td>
+</td><td> 📂 Files </td><td> <code>files-tab</code> </td><td> Tree: ファイルエクスプローラ </td><td>
+</td><td> 📜 Logs </td><td> <code>logs-tab</code> </td><td> RichLog: システムログ（タイムスタンプ付き） </td><td>
+</td><td> 📄 Output </td><td> <code>output-tab</code> </td><td> Markdown: 最終的なAI応答の整形表示 </td><td>
+</tbody></table>
+<h3>3.3 キーバインド</h3>
+<p>
+<table><thead><tr> キー </td><td> アクション </td><td> 説明 </tr></thead><tbody></td><td> <code>q</code> </td><td> <code>quit</code> </td><td> アプリ終了 </td><td></p>
+</td><td> <code>t</code> </td><td> <code>toggle_dark</code> </td><td> ダーク/ライト切替 </td><td>
+</td><td> <code>r</code> </td><td> <code>run_demo</code> </td><td> デモシミュレーション実行 </td><td>
+</td><td> <code>s</code> </td><td> <code>simulate_task</code> </td><td> 新規タスク追加 </td><td>
+</td><td> <code>c</code> </td><td> <code>clear_chat</code> </td><td> チャットログクリア </td><td>
+</td><td> <code>ctrl+l</code> </td><td> <code>clear_logs</code> </td><td> システムログクリア </td><td>
+</tbody></table>
+<h3>3.4 インタラクティブコマンド（入力欄）</h3>
+<p>
+<table><thead><tr> コマンド </td><td> 動作 </tr></thead><tbody></td><td> <code>help</code> </td><td> 利用可能なコマンド一覧を表示 </td><td></p>
+</td><td> <code>status</code> </td><td> 現在のエージェント状態を表示 </td><td>
+</td><td> <code>tasks</code> </td><td> タスク数を表示 </td><td>
+</td><td> <code>clear</code> / <code>cls</code> </td><td> チャットをクリア </td><td>
+</td><td> <code>demo</code> </td><td> デモシミュレーションを実行 </td><td>
+</td><td> <code>exit</code> / <code>quit</code> </td><td> アプリを終了 </td><td>
+</td><td> その他 </td><td> エコー表示（デモ用） </td><td>
+</tbody></table>
+<h3>3.5 ボタン操作</h3>
+<p>
+- <strong>▶ Run All</strong> (<code>#run-all-btn</code>): デモシミュレーションを開始</p>
+<p>- <strong>⏹ Stop</strong> (<code>#stop-btn</code>): エージェントをIDLEに戻す</p>
+<p>- <strong>🔄 Reset</strong> (<code>#reset-btn</code>): 全状態を初期化</p>
+<p>
+<h3>3.6 ファイルツリー</h3></p>
+<p>
+<pre><code></p>
+<p>📁 root (/home/loser/wsl-projects)</p>
+<p>├── 📁 src</p>
+<p>│   ├── 📄 app.py</p>
+<p>│   ├── 📄 utils.py</p>
+<p>│   └── 📄 config.yaml</p>
+<p>├── 📁 tests</p>
+<p>│   ├── 📄 test_app.py</p>
+<p>│   └── 📄 test_utils.py</p>
+<p>├── 📄 README.md</p>
+<p>├── 📄 LICENSE</p>
+<p>└── 📄 .gitignore</p>
+</code></pre>
+<p>
+<hr></p>
+<p>
+<h2>4. プログラムの実行フロー</h2></p>
+<p>
+<h3>4.1 起動フロー</h3></p>
+<p>
+<pre><code></p>
+<p>1. CLI_Agent_App().run()</p>
+<p>2. compose() でUI構築</p>
+<p>   ├── Header</p>
+<p>   ├── Status Bar (AgentStatusBadge + TaskCounter)</p>
+<p>   ├── Main Body</p>
+<p>   │   ├── Sidebar (エージェント一覧 + アクションボタン)</p>
+<p>   │   └── Right Panel (TabbedContent: 5タブ)</p>
+<p>   ├── Progress Bar</p>
+<p>   ├── Input Area</p>
+<p>   └── Footer</p>
+<p>3. on_mount() で初期化</p>
+<p>   ├── システムログ出力</p>
+<p>   ├── DataTable に5件のシードタスク追加</p>
+<p>   ├── File Tree 構築</p>
+<p>   ├── TaskCounter 初期値設定</p>
+<p>   └── ウェルカムメッセージ表示</p>
+</code></pre>
+<p>
+<h3>4.2 デモシミュレーションフロー</h3></p>
+<p>
+<pre><code></p>
+<p>ユーザー操作 (rキー / "demo"コマンド / Run Allボタン)</p>
+<p>  ↓</p>
+<p>run_demo_simulation()</p>
+<p>  ↓</p>
+<p>_run_agent_demo()  [@work 非同期開始]</p>
+<p>  ↓</p>
+<p>agent_status = "WORKING"</p>
+<p>active_task_count = 3</p>
+<p>  ↓</p>
+<p>_demo_messages をループ:</p>
+<p>  ├─ thinking → チャットに斜体表示</p>
+<p>  ├─ tool → チャットにJSON表示</p>
+<p>  └─ response → トークン単位ストリーミング + Markdown更新</p>
+<p>  ↓</p>
+<p>progress_bar 更新</p>
+<p>DataTable 行更新</p>
+<p>TaskCounter 更新</p>
+<p>  ↓</p>
+<p>agent_status = "DONE"</p>
+<p>全タスク → "✅ Done" / "100%"</p>
+<p>完了メッセージ表示</p>
+</code></pre>
+<p>
+<h3>4.3 リアクティブ更新フロー</h3></p>
+<p>
+<pre><code></p>
+<p>agent_status 変更</p>
+<p>  ↓</p>
+<p>watch_agent_status() 発火</p>
+<p>  ↓</p>
+<p>AgentStatusBadge.status 更新 → バッジ再描画</p>
+<p>システムログ出力</p>
+<p>
+active_task_count 変更</p>
+<p>  ↓</p>
+<p>watch_active_task_count() 発火</p>
+<p>  ↓</p>
+<p>AgentStatusBadge.active_tasks 更新 → バッジ再描画</p>
+</code></pre>
+<p>
+<hr></p>
+<p>
+<h2>5. 可能な改善点や拡張機能</h2></p>
+<p>
+<h3>5.1 アーキテクチャ面</h3></p>
+<p>
+<table><thead><tr> 改善点 </td><td> 説明 </tr></thead><tbody></td><td> <strong>実際のLLM連携</strong> </td><td> 現在はプリセットメッセージの再生。OpenAI/Anthropic等のAPIと接続し、実際のAI応答をストリーミングする </td><td></p>
+</td><td> <strong>真のマルチエージェント化</strong> </td><td> 3つのエージェントを実際に独立したワーカーとして実装し、タスクを分散処理する </td><td>
+</td><td> <strong>プラグインシステム</strong> </td><td> ツール呼び出しをプラグイン形式で拡張可能にする（<code>file_search</code>, <code>run_tests</code> 等） </td><td>
+</td><td> <strong>状態永続化</strong> </td><td> タスク状態やチャット履歴をSQLite等で保存し、再起動時に復元する </td><td>
+</td><td> <strong>設定ファイル</strong> </td><td> エージェント設定、APIキー、テーマ等をYAML/JSONで外部設定化する </td><td>
+</tbody></table>
+<h3>5.2 UI/UX面</h3>
+<p>
+<table><thead><tr> 改善点 </td><td> 説明 </tr></thead><tbody></td><td> <strong>通知システム</strong> </td><td> タスク完了時にデスクトップ通知を送信する </td><td></p>
+</td><td> <strong>検索機能</strong> </td><td> チャットログ・システムログに検索フィルタを追加する </td><td>
+</td><td> <strong>タスク詳細パネル</strong> </td><td> 選択したタスクの詳細（ログ、出力等）を表示するパネルを追加する </td><td>
+</td><td> <strong>ダーク/ライトテーマ切替</strong> </td><td> <code>t</code> キーの切替を実際に機能させる（現在はTextual標準の <code>action_toggle_dark</code> を呼んでいるが、CSSが固定） </td><td>
+</td><td> <strong>レスポンシブ対応</strong> </td><td> ターミナルサイズ変更時のレイアウト最適化 </td><td>
+</td><td> <strong>タブの動的追加</strong> </td><td> エージェントごとにチャットタブを動的に生成する </td><td>
+</tbody></table>
+<h3>5.3 機能面</h3>
+<p>
+<table><thead><tr> 改善点 </td><td> 説明 </tr></thead><tbody></td><td> <strong>タスクの並列実行</strong> </td><td> <code>asyncio.gather()</code> で複数タスクを並列処理する </td><td></p>
+</td><td> <strong>タスクの優先度付け</strong> </td><td> 優先度列を追加し、ソート・フィルタを可能にする </td><td>
+</td><td> <strong>エラーハンドリング強化</strong> </td><td> タスク失敗時のリトライ機構、エラーログの詳細化 </td><td>
+</td><td> <strong>履歴管理</strong> </td><td> 過去のセッション履歴を閲覧・再開できる機能 </td><td>
+</td><td> <strong>エクスポート機能</strong> </td><td> チャットログやタスク一覧をCSV/Markdownでエクスポートする </td><td>
+</td><td> <strong>MCP連携</strong> </td><td> Model Context Protocol (MCP) サーバーとの連携でツールを拡張する </td><td>
+</tbody></table>
+<h3>5.4 コード品質面</h3>
+<p>
+<table><thead><tr> 改善点 </td><td> 説明 </tr></thead><tbody></td><td> <strong>型ヒントの強化</strong> </td><td> <code>Message</code> クラスが未定義（<code>from textual.message import Message</code> はインポートされているがクラス未使用）。カスタムメッセージ型を定義する </td><td></p>
+</td><td> <strong>テスト追加</strong> </td><td> pytest + Textual のテストユニットで自動テストを構築する </td><td>
+</td><td> <strong>ログレベルの外部化</strong> </td><td> <code>log_system</code> のレベル定義を enum 化する </td><td>
+</td><td> <strong>定数の抽出</strong> </td><td> マジックナンバー（<code>0.15</code>, <code>0.005</code>, <code>35</code> 等）を定数として抽出する </td><td>
+</td><td> <strong>国際化 (i18n)</strong> </td><td> 日本語・英語等の多言語対応 </td><td>
+</tbody></table>
+<hr>
+<p>
+<h2>6. 技術スタック</h2></p>
+<p>
+<table><thead><tr> 技術 </td><td> 用途 </tr></thead><tbody></td><td> <strong>Python 3.11+</strong> </td><td> 型ヒント、async/await </td><td></p>
+</td><td> <strong>Textual</strong> </td><td> TUIフレームワーク（Richベース） </td><td>
+</td><td> <strong>asyncio</strong> </td><td> 非同期処理（デモシミュレーション） </td><td>
+</td><td> <strong>Rich</strong> </td><td> リッチテキスト表示（Textual経由） </td><td>
+</tbody></table>
+<hr>
+<p>
+<h2>7. まとめ</h2></p>
+<p>
+<code>cli_agent_demo.py</code> は、Textual フレームワークの機能をフルに活用した見事なTUIデモアプリケーションです。<strong>リアクティブシステム</strong>による状態管理、<strong>非同期バックグラウンドワーカー</strong>によるストリーミング表示、<strong>CSS ベースのスタイリング</strong>など、モダンなTUI開発のベストプラクティスが凝縮されています。</p>
+<p>
+現在の実装はデモ用途に留まりますが、アーキテクチャは十分に拡張可能であり、実際のLLM API連携や真のマルチエージェント化を施すことで、実用的なCLI AIアシスタントへと発展させることができます。</p>
+    </div>
+</body>
+</html>
