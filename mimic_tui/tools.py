@@ -737,6 +737,83 @@ def patch_file(path: str, search: str, replace: str) -> str:
     )
 
 
+# ── delegate_to_subagent / delegate_to_subagent_parallel ツール ───────
+@tools.register(
+    name="delegate_to_subagent",
+    description=(
+        "サブエージェントにタスクを丸ごと委任し、完了まで同期的に待機する。"
+        "サブエージェントは OverlayFS で隔離された専用の作業部屋（ディレクトリの完全コピーではなく仮想合成ビュー）"
+        "の中で動作し、Git には一切触れない。完了後、変更されたファイルの差分サマリが返る。"
+        "あなたはその差分を確認し、採用するかどうか・どう統合するかを判断したうえで、"
+        "自分自身で（read_file/write_file/edit_file や run_bash の git 操作で）変更を反映してコミットすること。"
+        "重い調査・大規模リファクタ・独立したサブタスクの切り出しに向く。"
+        "失敗してもプロジェクトには一切影響しない（作業部屋ごと自動的に破棄される＝ロールバック不要）。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "task": {
+                "type": "string",
+                "description": "サブエージェントに与える具体的かつ自己完結したタスク内容（背景情報も含めること）",
+            },
+            "project_dir": {
+                "type": "string",
+                "description": "作業対象のプロジェクトディレクトリのフルパス（通常は現在の作業フォルダ）",
+                "default": ".",
+            },
+        },
+        "required": ["task"],
+    },
+)
+def delegate_to_subagent(task: str, project_dir: str = ".") -> str:
+    from .subagent import run_subagent
+    result = run_subagent(task, project_dir)
+    status = "✓ 完了" if result.ok else "⚠ 異常終了"
+    return (
+        f"[delegate_to_subagent: {status}]\n"
+        f"タスク: {task}\n"
+        f"{result.summary}"
+    )
+
+
+@tools.register(
+    name="delegate_to_subagent_parallel",
+    description=(
+        "互いに依存しない複数のタスクを、それぞれ独立したサブエージェントに同時委任し、"
+        "全員の完了を待ってまとめて結果を受け取る（同期的並列実行）。"
+        "各サブエージェントは完全に独立した OverlayFS 作業部屋を持ち Git にも触れないため、"
+        "ファイル競合やコミット競合は構造的に発生しない。"
+        "「並列化できるか」を見極めたうえで、依存関係のない複数のサブタスクに分割できる場合に使うこと。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "tasks": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "サブエージェントに与えるタスク一覧（各要素が独立した自己完結タスクであること）",
+            },
+            "project_dir": {
+                "type": "string",
+                "description": "作業対象のプロジェクトディレクトリのフルパス（通常は現在の作業フォルダ）",
+                "default": ".",
+            },
+        },
+        "required": ["tasks"],
+    },
+)
+def delegate_to_subagent_parallel(tasks: list[str], project_dir: str = ".") -> str:
+    from .subagent import run_subagents_parallel
+    if not tasks:
+        return "エラー: tasks が空です。"
+    results = run_subagents_parallel(tasks, project_dir)
+    blocks = []
+    for i, r in enumerate(results, 1):
+        status = "✓ 完了" if r.ok else "⚠ 異常終了"
+        blocks.append(f"── サブエージェント {i}/{len(results)}: {status} ──\nタスク: {r.task}\n{r.summary}")
+    return f"[delegate_to_subagent_parallel: {len(results)} 件完了]\n\n" + "\n\n".join(blocks)
+
+
 # ── search_history ツール ──────────────────────────────────────────
 _sessions_dir_for_tool: "Optional[Path]" = None
 
