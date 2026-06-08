@@ -308,13 +308,27 @@ class MimicApp(App):
         try:
             status = self.agent_status_text
             style  = "bold #00ff41" if status == "IDLE" else "bold #ffda6a"
-            self.query_one("#sec-status", Static).update(
-                f"[bold #00ff41]■ AGENT[/]\n"
-                f"  Status: [{style}]{status}[/]\n"
-                f"  Mode:   [#58a6ff]{self._agent_mode.upper()}[/]"
-            )
+            lines = [
+                "[bold #00ff41]■ AGENT[/]",
+                f"  Status: [{style}]{status}[/]",
+                f"  Mode:   [#58a6ff]{self._agent_mode.upper()}[/]",
+            ]
+            if self._agent_mode == "extreme":
+                profile = self._current_profile_label()
+                if profile:
+                    lines.append(f"  Role:   [#ff8c42]{profile}[/]")
+            self.query_one("#sec-status", Static).update("\n".join(lines))
         except Exception:
             pass
+
+    def _current_profile_label(self) -> "Optional[str]":
+        """スクラッチパッドから【現在の脳内プロファイル】行を抽出する。"""
+        from .utils import get_scratchpad
+        for line in (get_scratchpad() or "").splitlines():
+            line = line.strip()
+            if line.startswith("【現在の脳内プロファイル】"):
+                return line[len("【現在の脳内プロファイル】"):].strip() or None
+        return None
 
     # ── タブ: Files ──────────────────────────────────────────────────
 
@@ -514,6 +528,7 @@ class MimicApp(App):
             log.write(content)
         else:
             log.write("[dim]スクラッチパッドはまだ空です。[/dim]")
+        self._refresh_status_ui()
 
     # ── タブ: Log ────────────────────────────────────────────────────
 
