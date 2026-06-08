@@ -305,66 +305,6 @@ class MistralConfig:
         pass
 
 
-# ── PortContext (orchestrator.py が使用) ────────────────────────
-
-@dataclass(frozen=True)
-class PortContext:
-    cwd: Path
-    py_file_count: int
-    has_tests: bool
-    has_config: bool
-    top_files: tuple
-    py_files: tuple
-    cfg_files: tuple
-
-
-def build_port_context(cwd: Path) -> PortContext:
-    try:
-        top_files = tuple(
-            e.name + ("/" if e.is_dir() else "")
-            for e in sorted(cwd.iterdir(), key=lambda x: (x.is_file(), x.name))[:10]
-        )
-    except Exception:
-        top_files = ()
-    try:
-        py_files = tuple(f.name for f in cwd.glob("*.py"))[:5]
-        cfg_files = tuple(
-            f.name for f in list(cwd.glob("*.json")) + list(cwd.glob("*.env*"))
-        )[:5]
-        py_file_count = sum(1 for p in cwd.rglob("*.py") if p.is_file())
-        has_tests = (cwd / "tests").is_dir() or any(
-            f.name.startswith("test_") for f in cwd.glob("*.py")
-        )
-    except Exception:
-        py_files = cfg_files = ()
-        py_file_count = 0
-        has_tests = False
-    return PortContext(
-        cwd=cwd,
-        py_file_count=py_file_count,
-        has_tests=has_tests,
-        has_config=bool(cfg_files),
-        top_files=top_files,
-        py_files=py_files,
-        cfg_files=cfg_files,
-    )
-
-
-def render_port_context(ctx: PortContext) -> str:
-    lines = ["[実行コンテキスト]", f"作業フォルダ: {ctx.cwd}"]
-    if ctx.py_file_count:
-        lines.append(f"Pythonファイル数: {ctx.py_file_count}（再帰）")
-    if ctx.top_files:
-        lines.append(f"フォルダ内容: {', '.join(ctx.top_files)}")
-    if ctx.py_files:
-        lines.append(f"Pythonファイル: {', '.join(ctx.py_files)}")
-    if ctx.cfg_files:
-        lines.append(f"設定ファイル: {', '.join(ctx.cfg_files)}")
-    if ctx.has_tests:
-        lines.append("テスト: あり（tests/ または test_*.py）")
-    return "\n".join(lines)
-
-
 # ── 無料モデル取得・選択 ─────────────────────────────────────────
 
 def fetch_free_models(api_key: str) -> list[dict]:

@@ -1,7 +1,6 @@
 """
-proc_observer.py — Linux /proc を使ったプロセス・システム監視
+proc_observer.py — Linux /proc を使ったプロセス監視
 ProcessMonitor: バックグラウンドスレッドで /proc/{pid} をポーリング
-SystemMonitor:  /proc/stat, /proc/meminfo からシステム全体の状態を取得
 """
 from __future__ import annotations
 
@@ -211,80 +210,3 @@ class ProcessMonitor:
             samples       = len(s),
         )
 
-
-# ── SystemMonitor ─────────────────────────────────────────────────
-
-@dataclass
-class SystemSnapshot:
-    cpu_percent: float     # システム全体のCPU使用率 (0〜100)
-    mem_used_mb: float
-    mem_total_mb: float
-    mem_percent: float
-    load_avg_1m: float
-
-    def short(self) -> str:
-        return (
-            f"CPU:{self.cpu_percent:.0f}% "
-            f"MEM:{self.mem_percent:.0f}%({self.mem_used_mb:.0f}/{self.mem_total_mb:.0f}MB) "
-            f"Load:{self.load_avg_1m:.2f}"
-        )
-
-
-class SystemMonitor:
-    """
-    /proc/stat と /proc/meminfo からシステム全体の状態を取得する。
-    インスタンスを使い回して差分CPU計算を行う。
-    """
-
-    def __init__(self):
-        self._prev_stat: Optional[tuple[int, int]] = None  # (total, idle)
-
-    def snapshot(self) -> SystemSnapshot:
-        cpu_pct   = self._cpu_percent()
-        mem_used, mem_total = self._memory_mb()
-        load = self._load_avg()
-        return SystemSnapshot(
-            cpu_percent  = cpu_pct,
-            mem_used_mb  = mem_used,
-            mem_total_mb = mem_total,
-            mem_percent  = (mem_used / mem_total * 100) if mem_total > 0 else 0.0,
-            load_avg_1m  = load,
-        )
-
-    def _cpu_percent(self) -> float:
-        try:
-            line = Path("/proc/stat").read_text().splitlines()[0]
-            vals = list(map(int, line.split()[1:]))
-            total = sum(vals)
-            idle  = vals[3] + (vals[4] if len(vals) > 4 else 0)  # idle + iowait
-            if self._prev_stat:
-                d_total = total - self._prev_stat[0]
-                d_idle  = idle  - self._prev_stat[1]
-                pct = (1 - d_idle / d_total) * 100 if d_total > 0 else 0.0
-            else:
-                pct = 0.0
-            self._prev_stat = (total, idle)
-            return max(0.0, min(100.0, pct))
-        except Exception:
-            return 0.0
-
-    def _memory_mb(self) -> tuple[float, float]:
-        try:
-            info: dict[str, int] = {}
-            for line in Path("/proc/meminfo").read_text().splitlines():
-                k, _, v = line.partition(":")
-                info[k.strip()] = int(v.strip().split()[0])
-            total   = info.get("MemTotal", 0)
-            free    = info.get("MemFree",  0)
-            buffers = info.get("Buffers",  0)
-            cached  = info.get("Cached",   0)
-            used    = total - free - buffers - cached
-            return used / 1024.0, total / 1024.0
-        except Exception:
-            return 0.0, 0.0
-
-    def _load_avg(self) -> float:
-        try:
-            return float(Path("/proc/loadavg").read_text().split()[0])
-        except Exception:
-            return 0.0

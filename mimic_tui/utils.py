@@ -11,7 +11,6 @@ import re
 import logging
 import json
 import traceback
-import math
 from pathlib import Path
 from typing import Optional, Any
 from dataclasses import dataclass, field
@@ -107,15 +106,7 @@ class C:
     @staticmethod
     def bold_mem(s):   return f"{C.BOLD}{C._MEM}{s}{C.RESET}"
     @staticmethod
-    def dim(s):        return f"{C.DIM}{s}{C.RESET}"
-    @staticmethod
-    def bold(s):       return f"{C.BOLD}{s}{C.RESET}"
-    @staticmethod
     def bold_green(s): return f"{C.BOLD}{C._RG}{s}{C.RESET}"
-    @staticmethod
-    def bold_cyan(s):  return f"{C.BOLD}{C._CYAN}{s}{C.RESET}"
-    @staticmethod
-    def bold_purple(s):return f"{C.BOLD}{C._PURPLE}{s}{C.RESET}"
 
 def render_markdown(text: str) -> str:
     """
@@ -308,9 +299,6 @@ def get_ascii_art_str(subtitle: str = "") -> str:
     return "\n".join(art_lines) + f"\n{SEP}\n{sub}\n{SEP}"
 
 
-def print_ascii_art():
-    safe_print(get_ascii_art_str(), flush=True)
-
 # ── ログシンク（ReactLog への転送用）──────────────────────────────
 _log_sink = None  # callable(level: str, message: str) | None
 
@@ -454,15 +442,6 @@ class TokenBucket:
             if projected >= 1.0:
                 return 0.0
             return (1.0 - projected) / self._refill_rate
-
-    @property
-    def rpd_remaining(self) -> int:
-        with self._lock:
-            now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
-            self._check_rpd_reset(now_utc)
-            if self.rpd_unlimited:
-                return -1  # -1 = 無制限を示す
-            return max(0, self.rpd_limit - self._rpd_count)
 
     @property
     def tokens_available(self) -> float:

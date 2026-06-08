@@ -145,11 +145,6 @@ class ReactLog:
         # JSONL 逐次書き込み用
         self._jsonl_path: Optional[Path] = None
         self._jsonl_lock  = threading.Lock()
-        # 定期エクスポート用（None = 無効）
-        self._auto_export_path: Optional[str] = None
-        self._auto_export_interval: int = 0    # 秒
-        self._auto_export_timer: Optional[threading.Timer] = None
-        self._auto_export_lock = threading.Lock()
 
     def set_jsonl_path(self, path: Path) -> None:
         """JSONL 逐次書き込み先を設定する。既存ファイルがあれば読み込んで復元する。"""
@@ -164,63 +159,10 @@ class ReactLog:
             except Exception as e:
                 log.warning({"event": "jsonl_load_error", "error": str(e)})
 
-    # ── 定期エクスポート制御 ──────────────────────────────────────
-
-    def start_auto_export(self, path: str, interval_sec: int):
-        """定期エクスポートを開始する。既に動いていれば再スケジュール。"""
-        self.stop_auto_export()
-        with self._auto_export_lock:
-            self._auto_export_path     = path
-            self._auto_export_interval = interval_sec
-        self._schedule_next()
-        log.info({"event": "auto_export_start",
-                  "path": path, "interval_sec": interval_sec})
-
-    def stop_auto_export(self):
-        """定期エクスポートを停止する。"""
-        with self._auto_export_lock:
-            if self._auto_export_timer:
-                self._auto_export_timer.cancel()
-                self._auto_export_timer = None
-
-    def _schedule_next(self):
-        """次回タイマーをセットする（内部用）。"""
-        with self._auto_export_lock:
-            if not self._auto_export_path or self._auto_export_interval <= 0:
-                return
-            t = threading.Timer(
-                self._auto_export_interval, self._fire_export
-            )
-            t.daemon = True   # プロセス終了時に自動停止
-            t.start()
-            self._auto_export_timer = t
-
-    def _fire_export(self):
-        """タイマーコールバック: エクスポートして次回をスケジュール。"""
-        try:
-            path = self._auto_export_path
-            if path:
-                self.export_markdown(path)
-                safe_print(
-                    C.gray(f"\n  [AutoExport] {Path(path).name} に保存しました "
-                           f"({len(self.entries)} エントリ)"),
-                    flush=True
-                )
-        except Exception as e:
-            log.warning({"event": "auto_export_error", "error": str(e)})
-        self._schedule_next()   # 次回をスケジュール
-
-    @property
-    def auto_export_enabled(self) -> bool:
-        return bool(self._auto_export_path and self._auto_export_interval > 0)
-
     def clear(self):
-        self.stop_auto_export()
         self.entries = []
         self.session_start = datetime.now()
         # _jsonl_path は保持する（モード切り替え後も同じファイルに書き続ける）
-        self._auto_export_path     = None
-        self._auto_export_interval = 0
 
     def add(self, type_: str, **kwargs):
         entry = {
@@ -236,28 +178,6 @@ class ReactLog:
                         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
             except Exception as e:
                 log.warning({"event": "jsonl_write_error", "error": str(e)})
-
-    def display(self):
-        if not self.entries:
-            safe_print(C.gray("  (ログなし)"))
-            return
-        safe_print(f"\n{C.green_dim('─' * 52)}")
-        safe_print(C.bold_green("  ReAct Log  ") + C.gray(f"({len(self.entries)} エントリ)"))
-        safe_print(C.green_dim("─" * 52))
-        for e in self.entries:
-            t    = e.get("type", "?")
-            step = e.get("step", "?")
-            if t == "thought":
-                safe_print(f"  {C.purple('💭')} [{step}] {C.purple(e.get('content', ''))}")
-            elif t == "action":
-                args_str = ", ".join(
-                    f"{k}={repr(v)[:30]}" for k, v in e.get("args", {}).items()
-                )
-                safe_print(f"  {C.bold_green('⚙')}  [{step}] {C.green(e.get('tool', '?'))}{C.cyan(f'({args_str})')}")
-            elif t == "observation":
-                obs = e.get("result", "")[:150].replace("\n", " ")
-                safe_print(f"  {C.cyan('👁')}  [{step}] → {C.cyan(obs)}")
-        safe_print(C.green_dim("─" * 52) + "\n")
 
     def save_session(self, sessions_dir: Path) -> str:
         """タイムスタンプ付きセッションファイルに自動保存する。"""

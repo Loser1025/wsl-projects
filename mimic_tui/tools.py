@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import subprocess
-import tempfile
 import re
 import os
 import ast
 import difflib
-import shutil
 import json
 import time
 import threading
 import traceback
-import math
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -420,7 +417,6 @@ def write_file(path: str, content: str) -> str:
     }
 )
 def edit_file(path: str, old_string: str, new_string: str) -> str:
-    import difflib as _difflib
     warning = _check_read_warning(path)
     p = Path(path)
     old_preview = "\n".join(old_string.splitlines()[:15])

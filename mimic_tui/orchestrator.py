@@ -31,7 +31,6 @@ class WorkflowSignal(Enum):
     ABORT        = "abort"         # ワークフロー全体を即中断
     GOTO         = "goto"          # 指定ステップ index へジャンプ（会話ロールバック付き）
     REPLAN       = "replan"        # 残りステップを全て再生成
-    SKIP         = "skip"          # 現ステップをスキップして次へ
     INSERT_STEPS = "insert_steps"  # リカバリステップをキュー先頭に割り込み挿入（JIT）
 
 
@@ -55,7 +54,9 @@ class PlanStep:
     status: str = "pending"       # pending / running / done / failed / retrying / skipped
     result: str = ""
     parallel: bool = False        # True: 前後の parallel=True ステップと並列実行可能
-    label: str = ""               # ステップの名前ラベル（goto の参照先に使用）
+    label: str = ""               # ステップの名前ラベル（goto の参照先に使用。役割名とは無関係）
+    role: str = ""                # 担当ロール（"architect" | "operator" | "scribe"。role_agents 解決キー）
+    agent_name: str = ""          # 実際に割り当てられたエージェントの ROLE_NAME（表示用）
     on_failure: str = "retry"     # 失敗時: "retry" | "skip" | "abort" | "goto:<label>"
     on_success: str = ""          # 成功時: "" (次へ) | "goto:<label>" | "abort"
     max_iterations: int = 0       # goto ループの最大回数（0=無制限だが安全上限 10 を適用）
@@ -268,9 +269,6 @@ BASH_EXECUTOR_GUIDANCE = """\
 - ファイル読み取りは read_file の offset で10000文字ずつ分割して読むこと。
 """
 
-# 後方互換エイリアス
-POWERSHELL_EXECUTOR_GUIDANCE = BASH_EXECUTOR_GUIDANCE
-
 REVIEWER_SYSTEM_PROMPT = """\
 あなたはタスク検証専門のAIです。
 「ステップの目標」と「実行結果」を比較し、目標が達成されたか判定してください。
@@ -471,6 +469,7 @@ class AgentOrchestrator:
                                 "description":  str(s.get("description", s)),
                                 "parallel":     bool(s.get("parallel", False)),
                                 "label":        str(s.get("label", "")),
+                                "role":         str(s.get("role", "")),
                                 "on_failure":   str(s.get("on_failure", "retry")),
                                 "on_success":   str(s.get("on_success", "")),
                                 "max_iterations": int(s.get("max_iterations", 0)),
@@ -641,6 +640,26 @@ class AgentOrchestrator:
                   "recovery_count": len(recovery)})
         return recovery
 
+    @staticmethod
+    def _resolve_agent(step: "PlanStep", role_agents: Optional[dict], default_agent):
+        """
+        ステップの担当エージェントを解決する。
+
+        role（プランナーが明示した担当ロール名）を最優先のキーとして使用する。
+        label は goto ジャンプ先の識別名としても使われるため、ロール解決には用いない
+        （両者を同じフィールドで扱うと "verify"/"web_search" のような記述的ラベルが
+        役割名と衝突せず、権限制限なしの既定エージェントへ無警告でフォールバックしてしまう）。
+        """
+        if role_agents:
+            agent = role_agents.get(step.role)
+            if agent:
+                return agent
+            if step.role:
+                log.warning({"event": "role_lookup_miss", "role": step.role,
+                             "label": step.label, "step": step.index,
+                             "fallback": "unrestricted_executor"})
+        return default_agent
+
     def _execute_step(
         self,
         step: "PlanStep",
@@ -667,6 +686,8 @@ class AgentOrchestrator:
             共有ステートをプロンプトに注入し、結果から [STATE: key=value] を自動パースする。
         """
         step.status = "running"
+        actual_agent = self._resolve_agent(step, role_agents, agent)
+        step.agent_name = getattr(actual_agent, "ROLE_NAME", "")
         if on_step:
             on_step(step)
 
@@ -696,7 +717,6 @@ class AgentOrchestrator:
             f"[現在のステップ {step.index}/{len(all_steps)}] {step.description}\n"
             f"このステップのみを実行してください。{state_hint}"
         )
-        actual_agent = (role_agents or {}).get(step.label) or agent
         step.result = actual_agent.run_stream(exec_prompt, callback=on_token)
 
         # 共有ステートを結果からパース・更新
@@ -792,7 +812,7 @@ class AgentOrchestrator:
                   "steps": [s.index for s in parallel_steps], "join_policy": join_policy})
 
         if role_agents:
-            agents = [(role_agents.get(s.label) or self._make_executor_agent()) for s in parallel_steps]
+            agents = [self._resolve_agent(s, role_agents, self._make_executor_agent()) for s in parallel_steps]
         else:
             agents = [self._make_executor_agent() for _ in range(n)]
         done_event = threading.Event()  # "any"/"first" 用: 条件達成を通知
@@ -998,18 +1018,28 @@ class AgentOrchestrator:
             ) if self.tool_registry.get_specs() else "run_bash, read_file, write_file, edit_file, web_search"
             role_hint = ""
             if role_agents:
-                role_names = ", ".join(f'"{k}"' for k in role_agents)
+                role_lines = []
+                for k, ra in role_agents.items():
+                    allowed = ", ".join(getattr(ra, "ALLOWED_TOOLS", [])) or "(なし)"
+                    desc = getattr(ra, "ROLE_DESCRIPTION", "")
+                    role_lines.append(f'  - "{k}"（{desc}）\n      使用可能ツール: {allowed}')
                 role_hint = (
-                    f"[エージェントロール] 各ステップに label を設定: {role_names}\n"
-                    "- architect: ファイル設計・編集  "
-                    "- operator: コマンド実行・テスト  "
-                    "- scribe: 記憶整理\n\n"
+                    "[エージェントロール]\n"
+                    "各ステップに role フィールドを設定すること。"
+                    "ロールは下記ツールしか使えないため、そのロールが実際に使えるツールだけで\n"
+                    "完結する作業を割り当てること（例: Web検索が必要な作業は web_search を持つ "
+                    "ロールにのみ割り当てる）:\n"
+                    + "\n".join(role_lines) + "\n"
+                    "- role を割り当てられたツールで実行不可能な作業に設定すると、"
+                    "そのステップは失敗するか権限制限のない既定エージェントにフォールバックする\n"
+                    "- role と label は別物: label は goto のジャンプ先名（任意の説明的な文字列）、"
+                    "role は上記ロール名のいずれか一つを指定する\n\n"
                 )
             plan_prompt = (
                 "以下のタスクを実行ステップのJSONに分解してください。\n\n"
                 "【出力ルール・絶対厳守】\n"
                 "1. 出力の1文字目は { でなければならない\n"
-                '2. 形式: {"steps":[{"description":"操作内容","parallel":false,"label":""}, ...]}\n'
+                '2. 形式: {"steps":[{"description":"操作内容","parallel":false,"label":"","role":""}, ...]}\n'
                 "3. descriptionには分析・説明を書かず、実行する操作だけを書く\n"
                 "4. parallel: true=前後のtrue同士を並列 / false=逐次\n"
                 "5. JSON以外のテキスト・コードブロック・説明は一切出力禁止\n\n"
@@ -1035,6 +1065,7 @@ class AgentOrchestrator:
                     description=d["description"],
                     parallel=d["parallel"],
                     label=d.get("label", ""),
+                    role=d.get("role", ""),
                     on_failure=d.get("on_failure", "retry"),
                     on_success=d.get("on_success", ""),
                     max_iterations=int(d.get("max_iterations", 0)),
@@ -1125,7 +1156,7 @@ class AgentOrchestrator:
                     else:
                         # retry → 失敗なら INSERT_STEPS でリカバリを試みる
                         retry_ok = False
-                        _retry_agent = (role_agents or {}).get(prev_step.label) or self.executor
+                        _retry_agent = self._resolve_agent(prev_step, role_agents, self.executor)
                         for _ in range(self.MAX_STEP_RETRY):
                             prev_step.status = "retrying"
                             if on_step:
@@ -1269,6 +1300,7 @@ class AgentOrchestrator:
                                     description=d["description"],
                                     parallel=d.get("parallel", False),
                                     label=d.get("label", ""),
+                                    role=d.get("role", ""),
                                     on_failure=d.get("on_failure", "retry"),
                                     on_success=d.get("on_success", ""),
                                     max_iterations=int(d.get("max_iterations", 0)),
@@ -1304,6 +1336,7 @@ class AgentOrchestrator:
                                     description=d["description"],
                                     parallel=d.get("parallel", False),
                                     label=d.get("label", ""),
+                                    role=d.get("role", ""),
                                     on_failure=d.get("on_failure", "retry"),
                                     on_success=d.get("on_success", ""),
                                     max_iterations=int(d.get("max_iterations", 0)),
@@ -1372,6 +1405,7 @@ class AgentOrchestrator:
                                             description=d["description"],
                                             parallel=d.get("parallel", False),
                                             label=d.get("label", ""),
+                                            role=d.get("role", ""),
                                             on_failure=d.get("on_failure", "retry"),
                                             on_success=d.get("on_success", ""),
                                             max_iterations=int(d.get("max_iterations", 0)),
@@ -1438,7 +1472,7 @@ class AgentOrchestrator:
                                 if on_step:
                                     on_step(prev_step)
                             elif action not in ("abort",):
-                                _corr_agent = (role_agents or {}).get(prev_step.label) or self.executor
+                                _corr_agent = self._resolve_agent(prev_step, role_agents, self.executor)
                                 correction_result = _corr_agent.run_stream(
                                     f"[Reviewer からの修正指示]\n{reason}\n\n"
                                     f"[全体タスク] {user_message}\n"
@@ -1518,12 +1552,10 @@ class InteractiveOrchestrator:
       1. Auto-Git バックアップ
       2. AI が Thought をストリーミング出力（中間ターンのみ端末表示）
       3. Tool call (Action) を実行 → 結果 (Observation) を AI に戻す
-      4. エラーが MAX_AUTO_RETRY 回続いたらユーザー介入を求める
-      5. 書き込み系ツール成功後に Auto-Git チェックポイント
-      6. ツールなし応答 = 最終回答を返す（Markdown レンダリングして表示）
+      4. 書き込み系ツール成功後に Auto-Git チェックポイント
+      5. ツールなし応答 = 最終回答を返す（Markdown レンダリングして表示）
     """
 
-    MAX_AUTO_RETRY   = 2   # エラー自動リトライ上限（超えたらユーザー介入）
     MAX_REACT_STEPS  = 120 # ReActループ上限
     MAX_EMPTY_RETRIES = 2  # 空レスポンス検知による再試行の上限
 

@@ -71,9 +71,6 @@ class AccountRotator:
     def pick(self) -> tuple[OpenRouterConfig, float]:
         return self._config, 0.0
 
-    def record(self, account):
-        pass
-
     def _key_manager(self):
         """config の _key_manager を安全に返す。なければ None。"""
         return getattr(self._config, "_key_manager", None)
@@ -92,22 +89,9 @@ class AccountRotator:
             return 0.0
         return km.wait_for_n_keys(max(1, step_count))
 
-    def status(self) -> list[dict]:
-        km = self._key_manager()
-        base = {"name": self._config.name, "keys": len(self._config.api_keys)}
-        if km:
-            base["tokens"] = round(km.total_tokens_available(), 2)
-            base["ready_keys"] = km.n_ready_keys()
-        return [base]
-
     @property
     def accounts(self) -> list[OpenRouterConfig]:
         return [self._config]
-
-    @property
-    def total_tokens(self) -> float:
-        km = self._key_manager()
-        return km.total_tokens_available() if km else 999.0
 
 
 def _msg_char_count(m: dict) -> int:

@@ -79,10 +79,14 @@ class RoleAgentBase:
         self._agent.set_system_prompt(self._build_system_prompt(base_prompt))
 
     def _build_system_prompt(self, extra: str) -> str:
+        tools_text = ", ".join(self.ALLOWED_TOOLS) or "(なし)"
         lines = [
             f"あなたは「{self.ROLE_NAME}」として動作する AI エージェントです。",
             f"専門領域: {self.ROLE_DESCRIPTION}",
-            "自分の責任範囲のみに集中し、割り当てられたツールだけを使用してください。",
+            f"使用可能なツール（これ以外は呼び出せません）: {tools_text}",
+            "自分の責任範囲・使用可能ツールの範囲内で完結する作業のみ引き受けてください。",
+            "範囲外の作業（例: 自分にないツールが必要な調査・実行）を依頼された場合は、"
+            "実行したふりをせず「このロールでは対応できません」と明確に報告してください。",
         ]
         if extra:
             lines.append(extra)
@@ -233,203 +237,6 @@ class MultiAgentOrchestrator:
 
     # 書き込み系ツール（Architect が実際に変更したか判定に使用）
     _WRITE_TOOLS = {"write_file", "edit_file", "patch_file"}
-
-    def _make_steps(self):
-        from .orchestrator import PlanStep
-        return [
-            # Step 1: Architect が設計・実装
-            PlanStep(index=1, description="Architect: 構造把握・設計・実装",
-                     label="architect", on_failure="abort",      on_success=""),
-            # Step 2: Operator がファイル変更を確認（Architect が何もしなかった場合に再設計）
-            PlanStep(index=2, description="Operator: 実装確認（ファイル変更検証）",
-                     label="verify",    on_failure="goto:architect", on_success="",
-                     max_iterations=2),
-            # Step 3: Operator がテスト実行
-            PlanStep(index=3, description="Operator: テスト実行・動作検証",
-                     label="operator",  on_failure="goto:replan", on_success="goto:scribe",
-                     max_iterations=2),
-            # Step 4: Architect がエラー修正（失敗アプローチの情報付き）
-            PlanStep(index=4, description="Architect: エラー修正・別アプローチで再設計",
-                     label="replan",    on_failure="abort",      on_success="goto:operator",
-                     max_iterations=2),
-            # Step 5: Scribe が作業記憶を圧縮
-            PlanStep(index=5, description="Scribe: 作業記憶圧縮・保存",
-                     label="scribe",    on_failure="skip",       on_success=""),
-        ]
-
-    # ── メイン実行ループ ──────────────────────────────────────────
-
-    def execute_task(
-        self,
-        user_prompt: str,
-        on_plan:         Optional[Callable] = None,
-        on_step:         Optional[Callable] = None,
-        on_agent_switch: Optional[Callable[[str], None]] = None,
-    ) -> str:
-        from .orchestrator import WorkflowGraph
-        from .utils import get_scratchpad
-
-        steps    = self._make_steps()
-        workflow = WorkflowGraph(steps)
-        idx_of   = {s.label: i for i, s in enumerate(steps)}
-
-        if on_plan:
-            on_plan(steps)
-
-        def _notify(name: str):
-            safe_print(C.cyan(f"\n  🤖 [{name}] ────────────────────────────\n"), flush=True)
-            if on_agent_switch:
-                on_agent_switch(name)
-
-        def _tick(step):
-            if on_step:
-                on_step(step)
-
-        def _goto(goto_idx) -> int:
-            label = next((s.label for s in steps if s.index == goto_idx), "")
-            return idx_of.get(label, cur + 1)
-
-        current_memory   = get_scratchpad() or ""
-        architect_result = ""
-        exec_result      = ""
-        cur              = 0
-
-        while cur < len(steps):
-            step = steps[cur]
-            step.status = "running"
-            _tick(step)
-
-            # ── 各ステップの実行前ログ長を記録（Architect 変更検出用）
-            arch_log_before = len(self.architect.tool_log.records)
-
-            try:
-                # ── ステップ別実行 ──────────────────────────────
-
-                if step.label == "architect":
-                    _notify("Architect")
-                    result = self.architect.run(
-                        f"[タスク]\n{user_prompt}\n\n"
-                        f"[作業記憶]\n{current_memory or 'なし'}\n\n"
-                        "リポジトリ構造を把握し、解決策を設計・実装してください。\n"
-                        "実装後は「変更ファイル: <パス>」「テストコマンド: <コマンド>」を明記すること。"
-                    )
-                    architect_result = result
-                    # 変更ファイル・テストコマンドを共有ステートに格納
-                    workflow.parse_state_updates(result)
-                    changed = self._extract_changed_files(result)
-                    test_cmd = self._extract_test_command(result)
-                    if changed:
-                        workflow.state_set("changed_files", changed)
-                    if test_cmd:
-                        workflow.state_set("test_command", test_cmd)
-
-                elif step.label == "verify":
-                    changed = workflow.state_get("changed_files")
-
-                    # 読み取り専用タスクは verify をスキップ（架空の「変更なし」にならないよう）
-                    if not changed and any(
-                        kw in architect_result for kw in self._READONLY_INDICATORS
-                    ) and len(architect_result) >= 200:
-                        safe_print(C.cyan("\n  ℹ [verify] 読み取り専用タスクのため確認スキップ\n"), flush=True)
-                        result = "確認完了: 読み取り専用タスク（ファイル変更不要）"
-                    else:
-                        _notify("Operator (実装確認)")
-                        result = self.operator.run(
-                            f"[設計担当の報告]\n{architect_result[:800]}\n\n"
-                            f"[報告された変更ファイル]\n{changed or '（未明記）'}\n\n"
-                            "以下を確認してください:\n"
-                            "1. git diff --name-only または stat で実際にファイルが変更されているか確認\n"
-                            "2. 変更あり → 「確認完了: <ファイル名>」と報告\n"
-                            "3. 変更なし → 「変更なし: 実装されていません」と明確に報告"
-                        )
-
-                elif step.label == "operator":
-                    test_cmd = workflow.state_get("test_command")
-                    changed  = workflow.state_get("changed_files")
-
-                    # 読み取り専用タスクはテスト実行スキップ
-                    if not changed and not test_cmd and any(
-                        kw in architect_result for kw in self._READONLY_INDICATORS
-                    ) and len(architect_result) >= 200:
-                        safe_print(C.cyan("\n  ℹ [operator] 読み取り専用タスク → テストスキップ\n"), flush=True)
-                        result = "[SUCCESS] 読み取り専用タスク完了（テスト不要）"
-                    else:
-                        _notify("Operator (テスト)")
-                        result = self.operator.run(
-                            f"[設計担当の実装内容]\n{architect_result[:800]}\n\n"
-                            f"[推奨テストコマンド]\n{test_cmd or '（未指定。適切なテストを実行してください）'}\n\n"
-                            f"[元のタスク]\n{user_prompt}\n\n"
-                            "テストを実行して動作確認してください。"
-                        )
-                    exec_result = result
-                    workflow.state_set("last_error", exec_result[-600:])
-
-                elif step.label == "replan":
-                    _notify("Architect (再設計)")
-                    failed_approach = workflow.state_get("last_error")
-                    result = self.architect.run(
-                        f"[★ 失敗したアプローチ（再使用禁止）]\n{architect_result[:500]}\n\n"
-                        f"[実行エラー詳細]\n{failed_approach or exec_result[-800:]}\n\n"
-                        f"[元のタスク]\n{user_prompt}\n\n"
-                        "上記アプローチとは異なる方法で実装してください。\n"
-                        "変更後も「変更ファイル: <パス>」「テストコマンド: <コマンド>」を明記すること。"
-                    )
-                    architect_result = result
-                    workflow.parse_state_updates(result)
-                    changed = self._extract_changed_files(result)
-                    test_cmd = self._extract_test_command(result)
-                    if changed:
-                        workflow.state_set("changed_files", changed)
-                    if test_cmd:
-                        workflow.state_set("test_command", test_cmd)
-
-                elif step.label == "scribe":
-                    _notify("Scribe")
-                    task_summary = f"タスク: {user_prompt[:200]}\n結果: {exec_result[:400]}"
-                    result = self.scribe.compact_memory(current_memory, task_summary)
-
-                else:
-                    result = ""
-
-                step.result = result[:500] if result else ""
-
-            except KeyboardInterrupt:
-                step.status = "failed"
-                _tick(step)
-                raise
-            except Exception as e:
-                log.error({"event": "multi_step_error", "label": step.label, "error": str(e)})
-                step.result = f"エラー: {e}"
-                step.status = "failed"
-                _tick(step)
-                action, goto_idx = workflow.resolve_failure(step)
-                cur = self._route(action, goto_idx, cur, idx_of, steps, step, _tick)
-                continue
-
-            # ── 成否判定（改善版） ──────────────────────────────
-            is_success = self._judge_success(step, result, arch_log_before)
-
-            if is_success:
-                step.status = "done"
-                _tick(step)
-                action, goto_idx = workflow.resolve_success(step)
-                if action == "abort":
-                    break
-                elif action == "goto" and goto_idx is not None:
-                    cur = _goto(goto_idx)
-                else:
-                    cur += 1
-            else:
-                step.status = "failed"
-                _tick(step)
-                safe_print(C.yellow(f"\n  ↻ [{step.label}] 失敗 → ルーティング中...\n"), flush=True)
-                action, goto_idx = workflow.resolve_failure(step)
-                if action == "abort":
-                    safe_print(C.red("\n  ✗ ワークフロー中断\n"), flush=True)
-                    break
-                cur = self._route(action, goto_idx, cur, idx_of, steps, step, _tick)
-
-        return exec_result
 
     # ── 動的ワークフロー実行 ──────────────────────────────────────
 

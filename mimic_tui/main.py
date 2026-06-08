@@ -19,7 +19,7 @@ _ANSI_RE = re.compile(r'\033\[[^m]*m')
 def _rl(s: str) -> str:
     """readline 向けに ANSI コードを \001...\002 で囲み幅ゼロと認識させる。"""
     return _ANSI_RE.sub(r'\001\g<0>\002', s)
-from .utils import safe_print, C, log, print_ascii_art, render_markdown
+from .utils import safe_print, C, log, render_markdown
 from .config import load_config, OpenRouterConfig
 from .agent import OpenRouterAgent
 from .tools import ToolRegistry, tools, set_write_approval_handler

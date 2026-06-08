@@ -562,7 +562,10 @@ class MimicApp(App):
             icon  = icons.get(s.status, "○")
             color = colors.get(s.status, "#8b949e")
             par   = "  [⚡並列]" if getattr(s, "parallel", False) else ""
-            label = f"  [{s.label}]" if s.label else ""
+            # agent_name = 実行時に解決された担当ロール（実行前は空のため、
+            # プランナーが指定した role → label の順でフォールバック表示する）
+            agent_name = getattr(s, "agent_name", "") or getattr(s, "role", "")
+            label = f"  〔{agent_name}〕" if agent_name else (f"  [{s.label}]" if s.label else "")
             log.write(f"[{color}]  {icon} Step {s.index}: {s.description}{par}{label}[/]")
 
     # ── 動的高さ調整 ──────────────────────────────────────────────────
@@ -1074,14 +1077,17 @@ class MimicApp(App):
             self.call_from_thread(self._refresh_workflow_tab, list(steps))
 
         def _on_step(step) -> None:
-            if step.label and step.status == "running":
+            # agent_name = 実行時に解決された担当ロール名。role/label が空でも
+            # agent_name さえ分かれば表示する価値があるため、いずれかがあれば表示する
+            display_name = getattr(step, "agent_name", "") or getattr(step, "role", "") or step.label
+            if display_name and step.status == "running":
                 self.call_from_thread(
-                    lambda n=step.label: setattr(self, "agent_status_text", n.upper())
+                    lambda n=display_name: setattr(self, "agent_status_text", n.upper())
                 )
                 if self._log:
                     self.call_from_thread(
                         self._log.write,
-                        Text.from_ansi(f"\n  🤖 [{step.label}] ────────────────────────────\n"),
+                        Text.from_ansi(f"\n  🤖 [{display_name}] ────────────────────────────\n"),
                     )
             self.call_from_thread(self._refresh_workflow_tab, list(_all_steps))
 
@@ -1122,5 +1128,8 @@ class MimicApp(App):
         self._write_direct("\n実行計画\n" + "─" * 40 + "\n")
         for s in steps:
             parallel = " [並列]" if s.parallel else ""
-            self._write_direct(f"  Step {s.index}: {s.description}{parallel}\n")
+            # role = プランナーが明示した担当ロール名（label は goto ジャンプ先名で別物）
+            role = getattr(s, "role", "")
+            agent = f" 〔{role}〕" if role else ""
+            self._write_direct(f"  Step {s.index}: {s.description}{parallel}{agent}\n")
         self._write_direct("─" * 40 + "\n\n")
