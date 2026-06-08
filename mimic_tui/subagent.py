@@ -49,6 +49,17 @@ class SubagentResult:
     raw_tail: str = ""   # デバッグ用: サブエージェント標準出力の末尾
 
 
+def _force_rmtree(path: Path) -> None:
+    """overlay 内部の work ディレクトリ（mode 0000 で生成される）も含めて確実に削除する。"""
+    for root, dirs, _files in os.walk(path):
+        for name in dirs:
+            try:
+                os.chmod(os.path.join(root, name), 0o700)
+            except OSError:
+                pass
+    shutil.rmtree(path, ignore_errors=True)
+
+
 def _changed_files(upper: Path) -> list[str]:
     """upperdir を走査し、変更/新規ファイルの相対パス一覧を返す（削除マーカーは除外）。"""
     changed = []
@@ -128,11 +139,13 @@ def _run_overlay_subagent(task: str, project_dir: str, label: str) -> SubagentRe
             f"workdir={shlex.quote(str(work))} "
             f"{shlex.quote(str(merged))}"
         )
-        # python3 -m mimic_tui の起点は実体ディレクトリ（モジュール解決のため）。
-        # MIMIC_CWD で実際の作業ビュー（overlay の merged）をエージェントに渡す。
+        # --auto-prompt は _build_components を経由しないため MIMIC_CWD は効かない
+        # （agent.cwd は単に起動時の OS cwd になる）。そこで cwd 自体を merged にし、
+        # モジュール解決だけ PYTHONPATH で実体ディレクトリを指す。
         inner_cmd = (
-            f"cd {shlex.quote(str(_LAUNCHER_DIR))} && "
-            f"MIMIC_CWD={shlex.quote(str(merged))} "
+            f"cd {shlex.quote(str(merged))} && "
+            f"PYTHONPATH={shlex.quote(str(_LAUNCHER_DIR))}:$PYTHONPATH "
+            f"MIMIC_NO_AUTOGIT=1 "
             f"python3 -m mimic_tui --auto-prompt {shlex.quote(task)}"
         )
         script = f"{mount_cmd} && {inner_cmd}"
@@ -170,7 +183,7 @@ def _run_overlay_subagent(task: str, project_dir: str, label: str) -> SubagentRe
     finally:
         # ロールバック/後始末 = 一時ディレクトリの削除のみ
         # （overlay マウントは unshare の名前空間終了時に自動解除される）
-        shutil.rmtree(base, ignore_errors=True)
+        _force_rmtree(base)
 
 
 def run_subagent(task: str, project_dir: str) -> SubagentResult:

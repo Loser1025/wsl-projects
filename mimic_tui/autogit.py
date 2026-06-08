@@ -136,6 +136,21 @@ class AutoGit:
         )
         return out if rc == 0 else f"diff 取得失敗: {err}"
 
+class NullAutoGit(AutoGit):
+    """Git に一切触れない AutoGit 代替（サブエージェント用）。
+
+    OverlayFS で隔離されたサブエージェントは Git 操作を行わない設計のため、
+    backup/checkpoint を no-op にして余計なコミット・git init を防ぐ。
+    upperdir に .git/ が紛れ込むと差分サマリが汚染されるのを避ける目的もある。
+    """
+
+    def backup(self, cwd: str) -> str:
+        return "(サブエージェントのため AutoGit は無効化されています)"
+
+    def checkpoint(self, cwd: str, tool: str, path: str = "") -> None:
+        pass
+
+
 class ReactLog:
     """ReActループの Thought / Action / Observation を蓄積・表示・エクスポートする"""
 

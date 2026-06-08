@@ -139,7 +139,7 @@ def main():
     if "--auto-prompt" in args:
         from .config import load_config
         from .agent import OpenRouterAgent, AccountRotator
-        from .autogit import AutoGit
+        from .autogit import AutoGit, NullAutoGit
         from .tools import tools as _base_tools
         from .monitoring import MonitoringToolRegistry, ToolCallLog
         from .orchestrator import InteractiveOrchestrator, BASH_EXECUTOR_GUIDANCE, REACT_SYSTEM_PROMPT
@@ -153,7 +153,9 @@ def main():
         plan_prompt  = (system_prompt or "") + BASH_EXECUTOR_GUIDANCE
         react_prompt = plan_prompt + REACT_SYSTEM_PROMPT
         agent.set_system_prompt(react_prompt)
-        interactive_orch = InteractiveOrchestrator(agent, AutoGit())
+        # サブエージェント（delegate_to_subagent）として起動された場合は Git に触れない
+        auto_git = NullAutoGit() if os.environ.get("MIMIC_NO_AUTOGIT") else AutoGit()
+        interactive_orch = InteractiveOrchestrator(agent, auto_git)
         idx = args.index("--auto-prompt")
         auto_mode(interactive_orch, args[idx + 1]) if idx + 1 < len(args) else sys.exit(1)
         return
