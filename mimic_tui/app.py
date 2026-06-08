@@ -278,6 +278,7 @@ class MimicApp(App):
         )
 
         self._refresh_status_ui()
+        self.set_interval(2.0, self._tick_role_refresh)
         self._set_input_hint("idle")
         self._build_file_tree()
         self._show_file_preview(None)
@@ -320,6 +321,11 @@ class MimicApp(App):
             self.query_one("#sec-status", Static).update("\n".join(lines))
         except Exception:
             pass
+
+    def _tick_role_refresh(self) -> None:
+        """Extreme React 実行中、脳内プロファイルの変化をリアルタイムに反映する。"""
+        if self._agent_busy and self._agent_mode == "extreme":
+            self._refresh_status_ui()
 
     def _current_profile_label(self) -> "Optional[str]":
         """スクラッチパッドから【現在の脳内プロファイル】行を抽出する。"""
