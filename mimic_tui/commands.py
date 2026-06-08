@@ -57,6 +57,12 @@ def cmd_model(agent: OpenRouterAgent, args: str):
     safe_print(C.green(f"  ✓ モデルを変更しました: {arg}"))
     safe_print(C.gray("  会話履歴をリセットしました。"))
 
+@cmd_registry.register("mode", "エージェントモードの確認・切替 (/mode interactive|extreme)")
+def cmd_mode(agent: OpenRouterAgent, args: str):
+    safe_print(C.gray(
+        "  切替: /mode interactive（通常のReAct）  /mode extreme（脳内マルチプロファイル）"
+    ))
+
 @cmd_registry.register("cd", "作業フォルダの確認・変更 (/cd <パス>)")
 def cmd_cd(agent: OpenRouterAgent, args: str):
     if not args:

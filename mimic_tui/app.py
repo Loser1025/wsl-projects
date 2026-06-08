@@ -182,7 +182,7 @@ class MimicApp(App):
         border: none;
     }
 
-    #scratchpad-log, #log-view, #workflow-view {
+    #scratchpad-log, #log-view {
         height: 1fr;
         background: #0d1117;
         border: none;
@@ -203,7 +203,6 @@ class MimicApp(App):
         Binding("f2", "switch_tab('tab-files')",      "Files",      show=True, priority=True),
         Binding("f3", "switch_tab('tab-scratchpad')", "Scratch",    show=True, priority=True),
         Binding("f4", "switch_tab('tab-log')",        "Log",        show=True, priority=True),
-        Binding("f5", "switch_tab('tab-workflow')",   "Workflow",   show=True, priority=True),
     ]
 
     agent_status_text = reactive("IDLE")
@@ -245,8 +244,6 @@ class MimicApp(App):
                 yield RichLog(id="scratchpad-log", highlight=False, markup=True, wrap=True)
             with TabPane("📜 Log", id="tab-log"):
                 yield RichLog(id="log-view", highlight=False, markup=True, wrap=True)
-            with TabPane("🔄 Workflow", id="tab-workflow"):
-                yield RichLog(id="workflow-view", highlight=False, markup=True, wrap=True)
         with Vertical(id="input-bar"):
             yield ChatInput(id="user-input", language=None, show_line_numbers=False)
         yield Footer()
@@ -285,9 +282,6 @@ class MimicApp(App):
         self._build_file_tree()
         self._show_file_preview(None)
         self._refresh_scratchpad_tab()
-        self.query_one("#workflow-view", RichLog).write(
-            "[dim]Plan モード（/mode plan）で実行すると表示されます。[/dim]"
-        )
         self.query_one("#user-input", ChatInput).focus()
 
     # ── 入力ヒント管理 ────────────────────────────────────────────────
@@ -545,28 +539,6 @@ class MimicApp(App):
             elif ev == "tool_result":
                 res = str(e.get("content",""))[:80]
                 log.write(f"[dim]  → {res}[/]")
-
-    # ── タブ: Workflow ───────────────────────────────────────────────
-
-    def _refresh_workflow_tab(self, steps: list) -> None:
-        log = self.query_one("#workflow-view", RichLog)
-        log.clear()
-        icons = {"pending":"○", "running":"▶", "done":"✓", "failed":"✗",
-                 "retrying":"↻", "skipped":"⏭"}
-        colors = {"pending":"#8b949e", "running":"#ffda6a", "done":"#00ff41",
-                  "failed":"#ff6b6b", "retrying":"#ffda6a", "skipped":"#8b949e"}
-        total = len(steps)
-        done  = sum(1 for s in steps if s.status == "done")
-        log.write(f"[bold #58a6ff]Plan-and-Execute  {done}/{total} ステップ完了[/]\n")
-        for s in steps:
-            icon  = icons.get(s.status, "○")
-            color = colors.get(s.status, "#8b949e")
-            par   = "  [⚡並列]" if getattr(s, "parallel", False) else ""
-            # agent_name = 実行時に解決された担当ロール（実行前は空のため、
-            # プランナーが指定した role → label の順でフォールバック表示する）
-            agent_name = getattr(s, "agent_name", "") or getattr(s, "role", "")
-            label = f"  〔{agent_name}〕" if agent_name else (f"  [{s.label}]" if s.label else "")
-            log.write(f"[{color}]  {icon} Step {s.index}: {s.description}{par}{label}[/]")
 
     # ── 動的高さ調整 ──────────────────────────────────────────────────
 
@@ -829,7 +801,6 @@ class MimicApp(App):
             "tab-files":      "#file-preview",
             "tab-scratchpad": "#scratchpad-log",
             "tab-log":        "#log-view",
-            "tab-workflow":   "#workflow-view",
         }
         try:
             sel = tab_map.get(self.query_one(TabbedContent).active, "#chat-log")
@@ -906,6 +877,7 @@ class MimicApp(App):
             )
 
     def _cmd_mode(self, arg: str) -> None:
+        from .orchestrator import EXTREME_REACT_SYSTEM_PROMPT
         arg = arg.strip().lower()
         if arg in ("interactive", "react", "i"):
             self._agent_mode = "interactive"
@@ -913,24 +885,23 @@ class MimicApp(App):
             self._ctx["agent"].clear_history()
             self._ctx["interactive_orch"].react_log.clear()
             self._write_direct("⚡ モード: Interactive (ReAct)  会話履歴をリセットしました。\n")
-        elif arg in ("multi", "m"):
-            if not self._ctx.get("multi_orch"):
-                self._write_direct(
-                    "  ✗ マルチエージェントの初期化に失敗しています。再起動してください。\n"
-                )
-                return
-            self._agent_mode = "multi"
-            self._ctx["multi_orch"].clear_all_history()
-            self._write_direct("🌐 モード: Multi-Agent (動的ワークフロー + 役割特化エージェント)\n")
+        elif arg in ("extreme", "extreme-react", "x"):
+            self._agent_mode = "extreme"
+            self._ctx["agent"].set_system_prompt(
+                self._ctx["plan_prompt"] + EXTREME_REACT_SYSTEM_PROMPT
+            )
+            self._ctx["agent"].clear_history()
+            self._ctx["interactive_orch"].react_log.clear()
+            self._write_direct("🔥 モード: Extreme React (脳内マルチプロファイル)  会話履歴をリセットしました。\n")
         else:
             mode_labels = {
                 "interactive": "Interactive (ReAct)",
-                "multi": "Multi-Agent (動的ワークフロー)",
+                "extreme": "Extreme React (脳内マルチプロファイル)",
             }
             label = mode_labels.get(self._agent_mode, self._agent_mode)
             self._write_direct(
                 f"  現在: {label}\n"
-                "  切替: /mode interactive  /mode multi\n"
+                "  切替: /mode interactive  /mode extreme\n"
             )
         self._refresh_status_ui()
 
@@ -1011,10 +982,7 @@ class MimicApp(App):
         self.agent_status_text = "THINKING"
         self.query_one("#user-input", ChatInput).disabled = True
         self._set_input_hint("busy")
-        if self._agent_mode == "multi":
-            self._run_multi(user_input)
-        else:
-            self._run_react(user_input)
+        self._run_react(user_input)
 
     def _on_agent_done(self) -> None:
         self._agent_busy       = False
@@ -1050,86 +1018,3 @@ class MimicApp(App):
         finally:
             self.call_from_thread(self._on_agent_done)
 
-    @work(thread=True, exclusive=True)
-    def _run_multi(self, user_input: str) -> None:
-        """WorkflowGraph ベースのマルチエージェント実行。Workflow タブをリアルタイム更新する。"""
-        self._worker_thread_id = threading.current_thread().ident
-        multi_orch = self._ctx.get("multi_orch")
-        if multi_orch is None:
-            self.call_from_thread(
-                self._log.write,
-                Text.from_ansi("  ✗ multi_orch が初期化されていません。\n")
-            )
-            self.call_from_thread(self._on_agent_done)
-            return
-
-        multi_orch.set_cwd(self._ctx["agent"].cwd)
-
-        # 実行開始時に Workflow タブへ自動切り替え
-        self.call_from_thread(self.action_switch_tab, "tab-workflow")
-
-        _all_steps: list = []
-
-        def _on_plan(steps: list) -> None:
-            _all_steps.clear()
-            _all_steps.extend(steps)
-            self.call_from_thread(self._show_plan_header, steps)
-            self.call_from_thread(self._refresh_workflow_tab, list(steps))
-
-        def _on_step(step) -> None:
-            # agent_name = 実行時に解決された担当ロール名。role/label が空でも
-            # agent_name さえ分かれば表示する価値があるため、いずれかがあれば表示する
-            display_name = getattr(step, "agent_name", "") or getattr(step, "role", "") or step.label
-            if display_name and step.status == "running":
-                self.call_from_thread(
-                    lambda n=display_name: setattr(self, "agent_status_text", n.upper())
-                )
-                if self._log:
-                    self.call_from_thread(
-                        self._log.write,
-                        Text.from_ansi(f"\n  🤖 [{display_name}] ────────────────────────────\n"),
-                    )
-            self.call_from_thread(self._refresh_workflow_tab, list(_all_steps))
-
-        def _on_interactive(question: str) -> str:
-            from .utils import C
-            if self._log:
-                self.call_from_thread(
-                    self._log.write,
-                    Text.from_ansi(C.orange(
-                        f"\n  🤝 [INTERACTIVE] {question[:120]}\n"
-                    )),
-                )
-            return f"[ユーザー確認待ち] {question[:200]}"
-
-        try:
-            multi_orch.run_dynamic(
-                user_input,
-                on_plan        = _on_plan,
-                on_step        = _on_step,
-                on_interactive = _on_interactive,
-            )
-        except KeyboardInterrupt:
-            from .utils import C
-            if self._log:
-                self.call_from_thread(
-                    self._log.write,
-                    Text.from_ansi(C.yellow("\n\n  [割り込み] Ctrl+C — マルチエージェントを中断しました。\n")),
-                )
-        except Exception as e:
-            if self._log:
-                self.call_from_thread(
-                    self._log.write, Text.from_ansi(f"\nマルチエージェントエラー: {e}\n")
-                )
-        finally:
-            self.call_from_thread(self._on_agent_done)
-
-    def _show_plan_header(self, steps: list) -> None:
-        self._write_direct("\n実行計画\n" + "─" * 40 + "\n")
-        for s in steps:
-            parallel = " [並列]" if s.parallel else ""
-            # role = プランナーが明示した担当ロール名（label は goto ジャンプ先名で別物）
-            role = getattr(s, "role", "")
-            agent = f" 〔{role}〕" if role else ""
-            self._write_direct(f"  Step {s.index}: {s.description}{parallel}{agent}\n")
-        self._write_direct("─" * 40 + "\n\n")

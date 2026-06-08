@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>極限Reactマルチプロファイル・アーキテクチャ移行計画書</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm 15mm;
+            @bottom-right {
+                content: counter(page) " / " counter(pages);
+                font-size: 9pt;
+                font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+                color: #888888;
+            }
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            margin: 0;
+            padding: 0;
+            font-size: 10.5pt;
+            background-color: #ffffff;
+        }
+        
+        .header-container {
+            border-bottom: 3px solid #2c3e50;
+            padding-bottom: 10px;
+            margin-bottom: 25px;
+        }
+        h1 {
+            font-size: 18pt;
+            color: #2c3e50;
+            margin: 0 0 5px 0;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .subtitle {
+            font-size: 11pt;
+            color: #7f8c8d;
+            margin: 0;
+        }
+        
+        h2 {
+            font-size: 13.5pt;
+            color: #2980b9;
+            border-left: 5px solid #2980b9;
+            padding-left: 10px;
+            margin-top: 30px;
+            margin-bottom: 12px;
+            page-break-after: avoid;
+        }
+        h3 {
+            font-size: 11pt;
+            color: #2c3e50;
+            margin-top: 20px;
+            margin-bottom: 8px;
+            page-break-after: avoid;
+        }
+        
+        p {
+            margin-top: 0;
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0 25px 0;
+            font-size: 10pt;
+            page-break-inside: avoid;
+        }
+        th {
+            background-color: #f4f6f7;
+            color: #2c3e50;
+            font-weight: bold;
+            border-top: 2px solid #2c3e50;
+            border-bottom: 2px solid #bdc3c7;
+            padding: 10px 12px;
+            text-align: left;
+        }
+        td {
+            border-bottom: 1px solid #ecf0f1;
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        tr:nth-child(even) td {
+            background-color: #fafbfc;
+        }
+        
+        ul, ol {
+            margin-top: 0;
+            margin-bottom: 15px;
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 6px;
+        }
+        
+        .callout {
+            background-color: #f4f9fd;
+            border-left: 4px solid #2980b9;
+            padding: 12px 15px;
+            margin: 15px 0;
+            font-size: 10pt;
+            color: #2c3e50;
+            page-break-inside: avoid;
+        }
+        .callout-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #2980b9;
+        }
+        
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 9pt;
+            overflow: hidden;
+            margin: 12px 0;
+            white-space: pre-wrap;
+            page-break-inside: avoid;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 8.5pt;
+            font-weight: bold;
+            border-radius: 3px;
+            color: #ffffff;
+        }
+        .badge-safe { background-color: #27ae60; }
+        .badge-caution { background-color: #e67e22; }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <h1>極限Reactマルチプロファイル・アーキテクチャ移行計画書</h1>
+        <div class="subtitle">管理オーバーヘッドを根絶し、スクラッチパッドと動的プロファイルに最適化された超堅牢Reactモードへの移行</div>
+    </div>
+
+    <h2>1. 背景と基本方針</h2>
+    <p>
+        現在の <code>multi_agent.py</code> および <code>orchestrator.py</code> に実装されているワークフロー（計画生成・ジャンプ・非同期検証）は、予測不可能な開発現場の現実と衝突し、計画の修正そのもののバグによるスタックや、不要なトークン消費を招いていました。
+    </p>
+    <p>
+        本計画は、複雑なPythonコード側の状態遷移ロジックをすべて排し、実績のある純粋な対話型Reactループ（<code>agent.py</code> 内の <code>run_stream</code>）を主軸に据えます。AI自身がコンテキストに応じて脳内の役割（プロファイル）を自律的に切り替え、かつスクラッチパッドを毎ターン自己更新する「極限Reactマルチプロファイルモード」を安全に追加実装するための手順です。
+    </p>
+
+    <h2>2. コアシステムプロンプト (EXTREME_REACT_SYSTEM_PROMPT)</h2>
+    <div class="callout">
+        <div class="callout-title">💡 脳内プロファイルの自己制御</div>
+        外部インスタンスを分けるのではなく、単一の強力なReactコンテキスト内でAIに以下のマインドセットとスクラッチパッドの絶対遵守を義務付けます。
+    </div>
+    <pre># 役割と行動指針
+あなたは、ソフトウェア開発におけるすべての工程（設計・実行・検証・記憶管理）を単独で臨機応変にこなす、超強力な自律型Reactエージェントです。
+あなたはタスクの状況に応じて、自身の「マインドセット（プロファイル）」を脳内で動的に切り替えて行動してください。
+
+## 脳内プロファイル
+1. 【Architectモード】（設計・編集フェーズ）
+   - コード設計やパッチ適用時。edit_fileやpatch_fileを主に使用。bash実行は極力避ける。
+2. 【Operatorモード】（実行・テスト・検索フェーズ）
+   - テストの実行やログ確認、外部検索時。run_bashやweb_search、run_pipelineを主に使用。
+3. 【Scribeモード】（自己監査・記憶管理フェーズ）
+   - ツール実行結果（Observation）を受けた直後、必ず進捗を整理し、update_scratchpadを実行する。
+
+# 【最重要】スクラッチパッド（作業記憶）の絶対遵守ルール
+あなたはツールを実行する前、または実行した直後に、必ず「update_scratchpad」ツールを呼び出して、自身の記憶を最新状態に同期しなければなりません。
+
+スクラッチパッドは常に以下のフォーマットを厳持してください：
+【現在の脳内プロファイル】（例：Operatorモード - テスト検証中）
+【ゴール】全体の目標
+【完了済み】これまでに確定した事実、書き換えたファイル、通ったテスト
+【直面している課題・エラー】（スタックトレースの要約やコンフリクトの原因を克明に残す）
+【次の具体的一歩】次に呼び出すべきツールとその目的</pre>
+
+    <h2>3. 安全な実装・リファクタリング手順</h2>
+    <p>既存システム（TUIアプリ等）への影響をゼロにするため、破壊的な書き換えではなく「並行追加・動的選択」のステップを踏みます。</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 20%;">ステップ</th>
+                <th style="width: 30%;">作業対象・配置</th>
+                <th style="width: 35%;">実装内容・安全策</th>
+                <th style="width: 15%;">リスク状態</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Step 1</strong><br>プロンプト定義</td>
+                <td><code>orchestrator.py</code><br>(または定数モジュール)</td>
+                <td>上記 <code>EXTREME_REACT_SYSTEM_PROMPT</code> を定数として新規追加。既存ロジックへの干渉は一切なし。</td>
+                <td><span class="badge badge-safe">安全</span></td>
+            </tr>
+            <tr>
+                <td><strong>Step 2</strong><br>クラスの並行追加</td>
+                <td><code>orchestrator.py</code></td>
+                <td>
+                    既存の <code>AgentOrchestrator</code> は削除せず残したまま、新規クラス <code>ExtremeReactOrchestrator</code> を追加定義。
+                </td>
+                <td><span class="badge badge-safe">安全</span></td>
+            </tr>
+            <tr>
+                <td><strong>Step 3</strong><br>TUI / CLI 結合</td>
+                <td><code>app.py</code> / <code>main.py</code></td>
+                <td>
+                    ユーザーのモード選択（例: --mode extreme-react）を新設し、新クラスを呼び出すルートを1本追加する。
+                </td>
+                <td><span class="badge badge-caution">要テスト</span></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>4. ExtremeReactOrchestrator の実装コード設計</h2>
+    <p>状態管理ロジックを極限まで削ぎ落とした、バグの入り込む余地のないクラス設計です。</p>
+    <pre>class ExtremeReactOrchestrator:
+    def __init__(self, agent: OpenRouterAgent, auto_git: AutoGit):
+        self.agent = agent
+        self.auto_git = auto_git
+        
+    def run(self, user_prompt: str) -> str:
+        # 1. 安全対策としてのディスク事前バックアップ
+        backup_res = self.auto_git.backup(self.agent.cwd)
+        
+        # 2. システムプロンプトを「極限Reactマルチプロファイル用」へ上書き
+        self.agent.set_system_prompt(EXTREME_REACT_SYSTEM_PROMPT)
+        
+        # 3. タスクの開始（Scratchpadの初期設定）
+        self.agent.start_task(user_prompt)
+        
+        # 4. 全ツールを解放した実績のある純粋Reactループに制御を全面委譲
+        final_answer = self.agent.run_stream(user_prompt)
+        
+        self.agent.end_task()
+        return final_answer</pre>
+
+    <h2>5. 移行後のメリット・検証</h2>
+    <ul>
+        <li><strong>状態遷移バグの根絶</strong>: 複雑な分岐やGOTO、REPLANのPython実装を通らないため、制御側のバグによるハングアップやスタックが物理的に消失します。</li>
+        <li><strong>生コンテキストの維持</strong>: 伝言ゲームによる文脈劣化がなくなり、エラーログのスタックトレースを同じコンテキスト（脳内）で直接処理するため、バグ修正の命中率が劇的に向上します。</li>
+    </ul>
+
+</body>
+</html>

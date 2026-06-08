@@ -19,7 +19,7 @@ def _build_components(base_dir: str, active_config=None):
     from .config import load_config
     from .agent import OpenRouterAgent, AccountRotator
     from .autogit import AutoGit
-    from .orchestrator import (InteractiveOrchestrator, AgentOrchestrator,
+    from .orchestrator import (InteractiveOrchestrator,
                                 BASH_EXECUTOR_GUIDANCE, REACT_SYSTEM_PROMPT)
     from .monitoring import MonitoringToolRegistry, ToolCallLog
 
@@ -50,7 +50,6 @@ def _build_components(base_dir: str, active_config=None):
 
     rotator      = AccountRotator(active_config)
     agent        = OpenRouterAgent(rotator, mon_tools)
-    orchestrator = AgentOrchestrator(rotator, mon_tools, executor=agent)
     auto_git     = AutoGit()
 
     def _on_sigterm(signum, frame):
@@ -68,7 +67,6 @@ def _build_components(base_dir: str, active_config=None):
     plan_prompt  = (system_prompt or "") + BASH_EXECUTOR_GUIDANCE
     react_prompt = plan_prompt + REACT_SYSTEM_PROMPT
     agent.set_system_prompt(react_prompt)
-    orchestrator.set_executor_system_prompt(plan_prompt)
     interactive_orch = InteractiveOrchestrator(agent, auto_git)
 
     sessions_dir = Path(__file__).parent / ".mimic" / "sessions"
@@ -97,29 +95,9 @@ def _build_components(base_dir: str, active_config=None):
         safe_print(tool_log.recent_text(10))
         safe_print()
 
-    # ── マルチエージェントコンポーネント（全プロバイダー合計 3 キー以上で有効化）──
-    _total_keys = (
-        len(or_config.api_keys      if or_config      else []) +
-        len(gemini_config.api_keys  if gemini_config  else []) +
-        len(mistral_config.api_keys if mistral_config else [])
-    )
-    multi_orch = None
-    if _total_keys >= 3:
-        try:
-            from .multi_agent import ArchitectAgent, OperatorAgent, ScribeAgent, MultiAgentOrchestrator
-            multi_orch = MultiAgentOrchestrator(
-                architect = ArchitectAgent(rotator, display_fn=_inline_display),
-                operator  = OperatorAgent(rotator, display_fn=_inline_display),
-                scribe    = ScribeAgent(rotator, display_fn=_inline_display),
-            )
-            multi_orch.set_cwd(agent.cwd)
-        except Exception as e:
-            log.warning({"event": "multi_agent_init_failed", "error": str(e)})
-
     return dict(
         active_config    = active_config,
         agent            = agent,
-        orchestrator     = orchestrator,
         interactive_orch = interactive_orch,
         auto_git         = auto_git,
         tool_log         = tool_log,
@@ -127,7 +105,6 @@ def _build_components(base_dir: str, active_config=None):
         react_prompt     = react_prompt,
         plan_prompt      = plan_prompt,
         sessions_dir     = sessions_dir,
-        multi_orch       = multi_orch,   # None の場合はシングルエージェントのみ
     )
 
 
@@ -165,7 +142,7 @@ def main():
         from .autogit import AutoGit
         from .tools import tools as _base_tools
         from .monitoring import MonitoringToolRegistry, ToolCallLog
-        from .orchestrator import InteractiveOrchestrator, AgentOrchestrator, BASH_EXECUTOR_GUIDANCE, REACT_SYSTEM_PROMPT
+        from .orchestrator import InteractiveOrchestrator, BASH_EXECUTOR_GUIDANCE, REACT_SYSTEM_PROMPT
         from .main import auto_mode
 
         or_config, gemini_config, mistral_config, system_prompt = load_config(base_dir)
@@ -176,10 +153,9 @@ def main():
         plan_prompt  = (system_prompt or "") + BASH_EXECUTOR_GUIDANCE
         react_prompt = plan_prompt + REACT_SYSTEM_PROMPT
         agent.set_system_prompt(react_prompt)
-        orchestrator    = AgentOrchestrator(rotator, mon_tools, executor=agent)
         interactive_orch = InteractiveOrchestrator(agent, AutoGit())
         idx = args.index("--auto-prompt")
-        auto_mode(interactive_orch, args[idx + 1], orchestrator) if idx + 1 < len(args) else sys.exit(1)
+        auto_mode(interactive_orch, args[idx + 1]) if idx + 1 < len(args) else sys.exit(1)
         return
 
     if "--status" in args:
