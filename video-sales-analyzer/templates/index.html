@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商談動画アナライザー - AI表情・声トーン分析</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- ヘッダー -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1><i class="fas fa-video"></i> 商談動画アナライザー</h1>
+                <p class="subtitle">AIが表情と声のトーンを100点満点でスコア化</p>
+            </div>
+            <div class="api-status" id="apiStatus">
+                <span class="status-dot"></span>
+                <span class="status-text">接続確認中...</span>
+            </div>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <main class="main-content">
+            <!-- 入力セクション -->
+            <section class="input-section">
+                <div class="input-tabs">
+                    <button class="tab-btn active" data-tab="upload">
+                        <i class="fas fa-upload"></i> ファイルアップロード
+                    </button>
+                    <button class="tab-btn" data-tab="drive">
+                        <i class="fab fa-google-drive"></i> Google Drive
+                    </button>
+                </div>
+
+                <!-- アップロードタブ -->
+                <div class="tab-content active" id="upload-tab">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <p class="upload-text">動画ファイルをドラッグ＆ドロップ</p>
+                        <p class="upload-hint">またはクリックしてファイルを選択</p>
+                        <p class="upload-formats">対応形式: MP4, AVI, MOV, MKV, WebM (最大500MB)</p>
+                        <input type="file" id="fileInput" accept="video/*" hidden>
+                    </div>
+                    <div class="file-info" id="fileInfo" style="display: none;">
+                        <i class="fas fa-file-video"></i>
+                        <span class="file-name"></span>
+                        <span class="file-size"></span>
+                        <button class="remove-file" id="removeFile"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+
+                <!-- Google Driveタブ -->
+                <div class="tab-content" id="drive-tab">
+                    <div class="drive-input">
+                        <div class="input-group">
+                            <label for="driveUrl">
+                                <i class="fab fa-google-drive"></i> Google Drive URL
+                            </label>
+                            <input type="text" id="driveUrl" 
+                                   placeholder="https://drive.google.com/file/d/...">
+                            <p class="input-hint">
+                                <i class="fas fa-info-circle"></i>
+                                リンク共有が「リンクを知っている全員」に設定されている必要があります
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 分析開始ボタン -->
+                <button class="analyze-btn" id="analyzeBtn" disabled>
+                    <i class="fas fa-magic"></i> 分析開始
+                </button>
+            </section>
+
+            <!-- ローディング -->
+            <section class="loading-section" id="loadingSection" style="display: none;">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p class="loading-text">AI分析中...</p>
+                    <p class="loading-subtext">動画から表情と声の特徴を分析しています</p>
+                </div>
+            </section>
+
+            <!-- 結果セクション -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <h2><i class="fas fa-chart-bar"></i> 分析結果</h2>
+                
+                <!-- 総合スコア -->
+                <div class="overall-score-card">
+                    <div class="score-circle" id="overallScoreCircle">
+                        <svg viewBox="0 0 100 100">
+                            <circle class="score-bg" cx="50" cy="50" r="45"></circle>
+                            <circle class="score-progress" id="scoreProgress" cx="50" cy="50" r="45"></circle>
+                        </svg>
+                        <div class="score-value">
+                            <span class="score-number" id="overallScore">0</span>
+                            <span class="score-label">点</span>
+                        </div>
+                    </div>
+                    <div class="score-details">
+                        <span class="grade-badge" id="gradeBadge">-</span>
+                        <p class="grade-label" id="gradeLabel">-</p>
+                    </div>
+                </div>
+
+                <!-- 詳細スコア -->
+                <div class="detail-scores">
+                    <!-- 表情スコア -->
+                    <div class="score-card expression-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-smile"></i> 表情分析</h3>
+                            <span class="card-score" id="expressionScore">0点</span>
+                        </div>
+                        <div class="score-bars" id="expressionBars">
+                            <!-- 動的に生成 -->
+                        </div>
+                    </div>
+
+                    <!-- 声トーンスコア -->
+                    <div class="score-card voice-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-microphone"></i> 声のトーン分析</h3>
+                            <span class="card-score" id="voiceScore">0点</span>
+                        </div>
+                        <div class="score-bars" id="voiceBars">
+                            <!-- 動的に生成 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 総合評価 -->
+                <div class="summary-card">
+                    <h3><i class="fas fa-comment-dots"></i> AI総合評価</h3>
+                    <p class="summary-text" id="summaryText">-</p>
+                </div>
+
+                <!-- 改善点 -->
+                <div class="improvements-card">
+                    <h3><i class="fas fa-lightbulb"></i> 改善ポイント</h3>
+                    <ul class="improvements-list" id="improvementsList">
+                        <!-- 動的に生成 -->
+                    </ul>
+                </div>
+
+                <!-- 再分析ボタン -->
+                <button class="reanalyze-btn" id="reanalyzeBtn">
+                    <i class="fas fa-redo"></i> 新しい動画を分析
+                </button>
+            </section>
+        </main>
+
+        <!-- フッター -->
+        <footer class="app-footer">
+            <p>Powered by Gemma 4 (Gemini API)</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
