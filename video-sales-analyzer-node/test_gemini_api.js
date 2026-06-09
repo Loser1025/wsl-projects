@@ -188,7 +188,7 @@ async function downloadFromDrive(url) {
     console.log('=== Gemini APIテスト開始 ===');
     
     // Google Driveから動画をダウンロード
-    const videoBuffer = await downloadFromDrive('https://drive.google.com/file/d/1x7M1OveggRz2PZM-n9b3o_t-HJYxDYer/view?usp=drive_link');
+    const videoBuffer = await downloadFromDrive('https://drive.google.com/uc?export=download&id=1x7M1OveggRz2PZM-n9b3o_t-HJYxDYer');
     console.log('動画サイズ:', videoBuffer.length, 'バイト');
     
     // 分析を実行
