@@ -163,41 +163,116 @@ async function analyzeWithGemini(prompt, videoBuffer, apiKey) {
 
 // Google Driveから動画をダウンロード
 async function downloadFromDrive(url) {
-  console.log('Google Driveから動画をダウンロード中...');
-  console.log('URL:', url);
+  console.log('=== Google Driveダウンロード開始 ===');
+  console.log('入力URL:', url);
   
-  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)|id=([a-zA-Z0-9_-]+)/);
-  const fileId = match ? (match[1] || match[2]) : null;
-  
-  if (!fileId) {
-    throw new Error('無効なGoogle Drive URLです');
-  }
-  
-  console.log('ファイルID:', fileId);
-  
-  const videoPath = path.join(__dirname, 'downloaded_video.mp4');
-  
-  return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(videoPath);
-    const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+  try {
+    // URLからファイルIDを抽出
+    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)|id=([a-zA-Z0-9_-]+)/);
+    const fileId = match ? (match[1] || match[2]) : null;
     
+    if (!fileId) {
+      throw new Error('無効なGoogle Drive URLです。ファイルIDが見つかりません。');
+    }
+    
+    console.log('抽出されたファイルID:', fileId);
+    
+    const videoPath = path.join(__dirname, 'downloaded_video.mp4');
+    console.log('保存先:', videoPath);
+    
+    // ダウンロードURLを構築
+    const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
     console.log('ダウンロードURL:', driveUrl);
     
-    https.get(driveUrl, (response) => {
-      console.log('ステータスコード:', response.statusCode);
-      console.log('コンテンツタイプ:', response.headers['content-type']);
+    return new Promise((resolve, reject) => {
+      const file = fs.createWriteStream(videoPath);
       
-      response.pipe(file);
-      file.on('finish', () => {
-        file.close();
-        console.log('ダウンロード完了:', videoPath);
-        resolve(fs.readFileSync(videoPath));
+      console.log('HTTPリクエストを送信中...');
+      const request = https.get(driveUrl, (response) => {
+        console.log('=== レスポンス受信 ===');
+        console.log('ステータスコード:', response.statusCode);
+        console.log('ステータスメッセージ:', response.statusMessage);
+        console.log('コンテンツタイプ:', response.headers['content-type']);
+        console.log('コンテンツ長:', response.headers['content-length']);
+        console.log('全ヘッダー:', JSON.stringify(response.headers, null, 2));
+        
+        // リダイレクトを処理
+        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          console.log('リダイレクト先:', response.headers.location);
+          reject(new Error(`リダイレクトが発生しました: ${response.headers.location}`));
+          return;
+        }
+        
+        // エラーステータスを処理
+        if (response.statusCode >= 400) {
+          let errorData = '';
+          response.on('data', chunk => errorData += chunk);
+          response.on('end', () => {
+            console.error('エラーレスポンスボディ:', errorData);
+            reject(new Error(`HTTPエラー ${response.statusCode}: ${response.statusMessage}\n${errorData}`));
+          });
+          return;
+        }
+        
+        // ダウンロード進捗を監視
+        let downloadedBytes = 0;
+        response.on('data', (chunk) => {
+          downloadedBytes += chunk.length;
+          if (downloadedBytes % (1024 * 1024) === 0) {
+            console.log(`ダウンロード中: ${downloadedBytes / (1024 * 1024)} MB`);
+          }
+        });
+        
+        response.pipe(file);
+        
+        file.on('finish', () => {
+          file.close();
+          console.log('ダウンロード完了');
+          
+          // ファイルサイズを確認
+          const stats = fs.statSync(videoPath);
+          console.log('ダウンロードされたファイルサイズ:', stats.size, 'バイト');
+          
+          if (stats.size === 0) {
+            console.error('警告: ダウンロードされたファイルが空です');
+            reject(new Error('ダウンロードされたファイルが空です。共有設定またはURLを確認してください。'));
+          } else {
+            console.log('ファイルが正常にダウンロードされました');
+            resolve(fs.readFileSync(videoPath));
+          }
+        });
+        
+        file.on('error', (err) => {
+          console.error('ファイル書き込みエラー:', err.message);
+          reject(err);
+        });
       });
-    }).on('error', (err) => {
-      console.error('ダウンロードエラー:', err.message);
-      reject(err);
+      
+      request.on('error', (err) => {
+        console.error('HTTPリクエストエラー:', err.message);
+        console.error('エラータイプ:', err.code);
+        console.error('エラースタック:', err.stack);
+        reject(err);
+      });
+      
+      request.on('timeout', () => {
+        console.error('リクエストタイムアウト');
+        request.destroy();
+        reject(new Error('ダウンロードタイムアウト'));
+      });
+      
+      // 30秒でタイムアウト
+      request.setTimeout(30000, () => {
+        console.error('30秒経過しました。タイムアウト。');
+        request.destroy();
+        reject(new Error('ダウンロードタイムアウト（30秒）'));
+      });
     });
-  });
+  } catch (error) {
+    console.error('ダウンロード処理中に例外が発生:', error.message);
+    console.error('エラースタック:', error.stack);
+    throw error;
+  }
 }
 
 // メイン処理
