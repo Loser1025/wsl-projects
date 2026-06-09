@@ -259,7 +259,6 @@ class InteractiveOrchestrator:
         step_count        = 0
         empty_retry_count = 0
         had_tool_call     = False
-        no_tool_nudge_sent = False   # ターン内でツール未使用だった場合の1回限りの押し返しフラグ
         error_counts: dict[str, int] = {}
         write_tools  = {"write_file", "edit_file", "patch_file", "delete_file"}
 
@@ -295,24 +294,6 @@ class InteractiveOrchestrator:
                     messages.append({"role": "assistant", "content": "（思考中...）", "_skip_save": True})
                     messages.append({"role": "user",
                         "content": "ツール実行結果を踏まえて、作業内容と結果を日本語で報告してください。",
-                        "_skip_save": True,
-                    })
-                    step_count += 1
-                    continue
-
-                # ツール未使用で説明のみ返した検知: 1回だけ実行を促す
-                if (text and not had_tool_call and not no_tool_nudge_sent):
-                    no_tool_nudge_sent = True
-                    safe_print(C.yellow(
-                        "  ⚠ ツール未呼び出し検知 → 実行を促します"
-                    ), flush=True)
-                    messages.append({"role": "assistant", "content": text, "_skip_save": True})
-                    messages.append({"role": "user",
-                        "content": (
-                            "説明や手順の提示だけでなく、今すぐツールを呼び出して実際に作業を開始してください。"
-                            "write_file / edit_file / patch_file / run_bash などのツールを使ってコードを書くか、"
-                            "ファイルを編集してください。手順の説明は不要です。"
-                        ),
                         "_skip_save": True,
                     })
                     step_count += 1
