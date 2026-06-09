@@ -825,25 +825,56 @@ def set_sessions_dir(path: "Path") -> None:
 @tools.register(
     name="search_history",
     description=(
-        "過去のセッションログを検索し、関連するユーザー入力と回答を返す。"
-        "以前のタスクの結果・知見を参照したいときに使う。"
+        "過去のセッションログを検索し、ユーザー入力と回答を返す。"
+        "以前のタスクの結果・知見を参照したいときや、作業を再開したいときに使う。"
+        "query='' (空文字) にすると最新セッションから順に全件サマリを返す（作業再開時はまずこれを使うこと）。"
+        "キーワードを指定すると内容で絞り込む。max_results は多めに指定してよい（デフォルト10）。"
     ),
     parameters={
         "type": "object",
         "properties": {
-            "query":       {"type": "string", "description": "検索キーワード"},
-            "max_results": {"type": "integer", "description": "最大件数（デフォルト3）", "default": 3},
+            "query":       {"type": "string", "description": "検索キーワード（空文字で最新N件をすべて返す）", "default": ""},
+            "max_results": {"type": "integer", "description": "最大件数（デフォルト10）", "default": 10},
         },
-        "required": ["query"],
+        "required": [],
     }
 )
-def search_history(query: str, max_results: int = 3) -> str:
-    from .commands import _search_sessions
+def search_history(query: str = "", max_results: int = 10) -> str:
+    from .commands import _search_sessions, _parse_session_file
     if not _sessions_dir_for_tool or not _sessions_dir_for_tool.exists():
         return "セッションログがまだありません。"
+
+    # 空クエリ → 最新セッションから順にターン一覧を返す
+    if not query.strip():
+        jsonl_files = sorted(_sessions_dir_for_tool.glob("*.jsonl"), reverse=True)
+        lines = [f"[search_history: 最新セッション一覧  {len(jsonl_files)}ファイル]\n"]
+        shown = 0
+        for jf in jsonl_files:
+            s = _parse_session_file(jf)
+            if not s:
+                continue
+            turns = s.get("turns", [])
+            lines.append(f"=== {s['file']}  ({len(turns)} ターン  {s.get('model','')}) ===")
+            for t in turns:
+                user_preview = t["user"][:120].replace("\n", " ")
+                ans_preview  = t.get("answer", "")[:120].replace("\n", " ")
+                lines.append(f"  Q: {user_preview}")
+                if ans_preview:
+                    lines.append(f"  A: {ans_preview}")
+                shown += 1
+                if shown >= max_results:
+                    lines.append(f"\n…（{max_results}件表示済み。さらに必要なら max_results を増やすか query で絞り込む）")
+                    return "\n".join(lines)
+            lines.append("")
+        return "\n".join(lines)
+
+    # キーワード検索
     hits = _search_sessions(_sessions_dir_for_tool, query, max_results=max_results)
     if not hits:
-        return f"「{query}」に一致するログが見つかりませんでした。"
+        return (
+            f"「{query}」に一致するログが見つかりませんでした。\n"
+            f"ヒント: query='' で最新セッションの全ターンを確認できます。"
+        )
     lines = [f"[search_history: {query}] {len(hits)}件ヒット\n"]
     for i, h in enumerate(hits, 1):
         lines.append(f"--- [{i}] {h['file']}  {h['ts']}")
