@@ -148,7 +148,7 @@ async function downloadFromDrive(url) {
   console.log('Google Driveから動画をダウンロード中...');
   console.log('URL:', url);
   
-  const match = url.match(/-/d/([a-zA-Z0-9_-]+)|id=([a-zA-Z0-9_-]+)/g);
+  const match = url.match(/-/d/([a-zA-Z0-9_-]+)|id=([a-zA-Z0-9_-]+)/);
   const fileId = match ? (match[1] || match[2]) : null;
   
   if (!fileId) {
