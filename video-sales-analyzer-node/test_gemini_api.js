@@ -117,15 +117,33 @@ async function analyzeWithGemini(prompt, videoBuffer, apiKey) {
     console.log('コンテンツ生成中...');
     const { createPartFromUri } = require('@google/genai');
     
-    const response = await ai.models.generateContent({
-      model: 'gemma-4-31b-it',
-      contents: [
-        prompt,
-        createPartFromUri(fileState.uri, fileState.mimeType),
-      ],
-    });
-    
-    console.log('コンテンツ生成完了');
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemma-4-31b-it',
+        contents: [
+          prompt,
+          createPartFromUri(fileState.uri, fileState.mimeType),
+        ],
+      });
+      
+      console.log('コンテンツ生成完了');
+      console.log('レスポンス:', response);
+      return response.text;
+    } catch (error) {
+      console.error('Gemini APIエラー詳細:');
+      console.error('エラーメッセージ:', error.message);
+      console.error('エラータイプ:', error.constructor.name);
+      console.error('エラースタック:', error.stack);
+      
+      // エラーレスポンスを確認
+      if (error.response) {
+        console.error('レスポンスステータス:', error.response.status);
+        console.error('レスポンスデータ:', error.response.data);
+        console.error('レスポンスヘッダー:', error.response.headers);
+      }
+      
+      throw error;
+    }
     
     // ファイルを削除
     await ai.files.delete({ name: file.name });
