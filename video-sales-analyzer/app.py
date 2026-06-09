@@ -32,8 +32,17 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
-app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(__file__), "uploads")
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+# Vercelの/tmpディレクトリを使用（読み取り専用ファイルシステム対応）
+if os.environ.get("VERCEL"):
+    app.config["UPLOAD_FOLDER"] = "/tmp/uploads"
+else:
+    app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(__file__), "uploads")
+
+try:
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+except OSError:
+    pass  # 読み取り専用ファイルシステムの場合は無視
 
 # ============================================================
 # APIキー管理（フォールバック対応）
