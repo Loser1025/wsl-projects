@@ -142,20 +142,42 @@ function parseResponse(text) {
   try {
     let jsonText = text.trim();
     
+    // デバッグログ: 元のレスポンスをファイルに保存
+    const fs = require('fs');
+    const debugDir = '/tmp/debug-responses';
+    try {
+      if (!fs.existsSync(debugDir)) {
+        fs.mkdirSync(debugDir, { recursive: true });
+      }
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      fs.writeFileSync(`${debugDir}/response_${timestamp}.txt`, text);
+    } catch (e) {
+      console.error('デバッグファイル保存エラー:', e.message);
+    }
+    
     // コードブロックの抽出（より堅牢な処理）
     if (jsonText.includes('```json')) {
       const match = jsonText.match(/```json\s*([\s\S]*?)\s*```/);
       if (match && match[1]) {
         jsonText = match[1].trim();
+        console.log('JSONコードブロックを抽出しました');
+      } else {
+        console.log('JSONコードブロックの抽出に失敗しました');
       }
     } else if (jsonText.includes('```')) {
       const match = jsonText.match(/```\s*([\s\S]*?)\s*```/);
       if (match && match[1]) {
         jsonText = match[1].trim();
+        console.log('コードブロックを抽出しました');
+      } else {
+        console.log('コードブロックの抽出に失敗しました');
       }
     }
     
     // JSONパース
+    console.log('JSONパースを試みます...');
+    console.log('パース対象テキスト:', jsonText.substring(0, 200));
+    
     const result = JSON.parse(jsonText);
 
     result.overall_score = Math.max(0, Math.min(100, parseInt(result.overall_score) || 0));
@@ -167,17 +189,28 @@ function parseResponse(text) {
       }
     }
 
+    console.log('パース成功:', result);
     return result;
   } catch (error) {
     console.error('JSONパースエラー:', error);
-    console.error('問題のあるテキスト:', text.substring(0, 500));
+    console.error('エラータイプ:', error.constructor.name);
+    console.error('エラースタック:', error.stack);
+    console.error('問題のあるテキスト（先頭500文字）:', text.substring(0, 500));
+    console.error('問題のあるテキスト（末尾500文字）:', text.length > 500 ? text.substring(text.length - 500) : '');
+    
     return {
       error: true,
       message: 'レスポンスの解析に失敗しました: ' + error.message,
+      error_type: error.constructor.name,
       expression: { total_score: 0 },
       voice_tone: { total_score: 0 },
       overall_score: 0,
-      grade: GRADE_THRESHOLDS[GRADE_THRESHOLDS.length - 1]
+      grade: GRADE_THRESHOLDS[GRADE_THRESHOLDS.length - 1],
+      debug_info: {
+        text_length: text.length,
+        text_preview: text.substring(0, 200),
+        error_stack: error.stack
+      }
     };
   }
 }
