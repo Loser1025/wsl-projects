@@ -92,6 +92,12 @@ REACT_SYSTEM_PROMPT = """
   - delegate_to_subagent_parallel: 少しでも独立性があるタスクは積極的に並列委任すること
 
 ## 利用可能なツール
+### run_bash の結果の読み方
+- `[SUCCESS]` — 正常終了
+- `[FAILURE(ExitCode=N)]` — 異常終了（エラー内容を読んで対処する）
+- `[TIMEOUT]` — タイムアウト強制終了だが**途中出力が含まれる。必ず読んで分析し作業を継続すること**。
+  デプロイ・長時間コマンドはタイムアウトしても成功していることがあるため、途中出力から成否を判断する。
+
 ### Pipeline-First（コンテキスト節約・優先使用）
 file_info, search_in_file, grep_codebase, run_pipeline, run_bash
 

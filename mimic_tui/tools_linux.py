@@ -184,10 +184,14 @@ def run_bash(
     output = output.strip()
 
     if timed_out:
+        partial = f"\n途中出力:\n{output}" if output else "\n(出力なし)"
         return (
-            f"[FAILURE(TIMEOUT)] {timeout}秒経過 — コマンドを分割するか timeout を延ばしてください\n"
+            f"[TIMEOUT] {timeout}秒経過でプロセスを強制終了しました。\n"
             f"作業フォルダ: {cwd}\n"
-            + (f"途中出力:\n{output}" if output else "")
+            f"⚠ タイムアウトですが、途中出力を分析して作業を継続してください。\n"
+            f"  - デプロイ・インストール等は途中出力から成否を判断できる場合があります\n"
+            f"  - 必要なら timeout を延ばして再実行するか、出力の続きを別コマンドで確認してください"
+            f"{partial}"
         )
 
     rc = proc.returncode if proc.returncode is not None else -1
