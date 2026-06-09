@@ -280,9 +280,8 @@ async function downloadFromDrive(url) {
   try {
     console.log('=== Gemini APIテスト開始 ===');
     
-    // ダミーデータを使用（Google Driveからのダウンロードをスキップ）
-    console.log('ダミーデータを使用してテストを実行します');
-    const videoBuffer = Buffer.from('dummy video data', 'utf-8');
+    // Google Driveから動画をダウンロード
+    const videoBuffer = await downloadFromDrive('https://drive.google.com/file/d/1jY-yxjADzmCANlIFtHaZdSZNjGrGGKxQ/view?usp=sharing');
     console.log('動画サイズ:', videoBuffer.length, 'バイト');
     
     // 分析を実行
