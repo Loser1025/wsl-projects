@@ -13,8 +13,8 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 from flask import Flask, render_template, request, jsonify, send_from_directory
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmThreshold
+from google import genai
+from google.genai import types
 
 from config.settings import (
     API_KEYS, MODEL_NAME, FRAME_COUNT,
