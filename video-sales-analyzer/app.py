@@ -177,8 +177,7 @@ class SalesAnalyzer:
     """Gemma 4 (Gemini API) を使用した商談分析エンジン"""
     
     def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(MODEL_NAME)
+        self.client = genai.Client(api_key=api_key)
         self.api_key = api_key
     
     def _build_prompt(self) -> str:
