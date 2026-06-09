@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>商談動画アナライザー - AI表情・声トーン分析</title>
     <link rel="stylesheet" href="/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
     <div class="app-container">
@@ -26,48 +26,17 @@
         <main class="main-content">
             <!-- 入力セクション -->
             <section class="input-section">
-                <div class="input-tabs">
-                    <button class="tab-btn active" data-tab="upload">
-                        <i class="fas fa-upload"></i> ファイルアップロード
-                    </button>
-                    <button class="tab-btn" data-tab="drive">
-                        <i class="fab fa-google-drive"></i> Google Drive
-                    </button>
-                </div>
-
-                <!-- アップロードタブ -->
-                <div class="tab-content active" id="upload-tab">
-                    <div class="upload-area" id="uploadArea">
-                        <div class="upload-icon">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                        </div>
-                        <p class="upload-text">動画ファイルをドラッグ＆ドロップ</p>
-                        <p class="upload-hint">またはクリックしてファイルを選択</p>
-                        <p class="upload-formats">対応形式: MP4, AVI, MOV, MKV, WebM (最大4.5MB)</p>
-                        <input type="file" id="fileInput" accept="video/*" hidden>
-                    </div>
-                    <div class="file-info" id="fileInfo" style="display: none;">
-                        <i class="fas fa-file-video"></i>
-                        <span class="file-name"></span>
-                        <span class="file-size"></span>
-                        <button class="remove-file" id="removeFile"><i class="fas fa-times"></i></button>
-                    </div>
-                </div>
-
-                <!-- Google Driveタブ -->
-                <div class="tab-content" id="drive-tab">
-                    <div class="drive-input">
-                        <div class="input-group">
-                            <label for="driveUrl">
-                                <i class="fab fa-google-drive"></i> Google Drive URL
-                            </label>
-                            <input type="text" id="driveUrl" 
-                                   placeholder="https://drive.google.com/file/d/...">
-                            <p class="input-hint">
-                                <i class="fas fa-info-circle"></i>
-                                リンク共有が「リンクを知っている全員」に設定されている必要があります
-                            </p>
-                        </div>
+                <div class="drive-input">
+                    <div class="input-group">
+                        <label for="driveUrl">
+                            <i class="fab fa-google-drive"></i> Google Drive URL
+                        </label>
+                        <input type="text" id="driveUrl"
+                               placeholder="https://drive.google.com/file/d/...">
+                        <p class="input-hint">
+                            <i class="fas fa-info-circle"></i>
+                            リンク共有が「リンクを知っている全員」に設定されている必要があります
+                        </p>
                     </div>
                 </div>
 
@@ -81,8 +50,8 @@
             <section class="loading-section" id="loadingSection" style="display: none;">
                 <div class="loading-spinner">
                     <div class="spinner"></div>
-                    <p class="loading-text">AI分析中...</p>
-                    <p class="loading-subtext">動画から表情と声の特徴を分析しています</p>
+                    <p class="loading-text" id="loadingText">AI分析中...</p>
+                    <p class="loading-subtext" id="loadingSubtext">動画から表情と声の特徴を分析しています</p>
                 </div>
             </section>
 
@@ -156,7 +125,7 @@
 
         <!-- フッター -->
         <footer class="app-footer">
-            <p>Powered by Gemma 4 (Gemini API)</p>
+            <p>Powered by Gemini 3.1 Flash Lite</p>
         </footer>
     </div>
 

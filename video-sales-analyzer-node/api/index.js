@@ -1,36 +1,17 @@
 const express = require('express');
 const cors = require('cors');
-const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const publicPath = path.join(__dirname, '..', 'public');
 
 // ミドルウェア
 app.use(cors());
 app.use(express.json());
-
-// 静的ファイル配信
-const publicPath = path.join(__dirname, '..', 'public');
-app.use(express.static(publicPath, {
-  etag: false,
-  lastModified: false
-}));
-
-// ファイルアップロード設定
-const upload = multer({
-  dest: '/tmp/uploads/',
-  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB (Vercel制限)
-  fileFilter: (req, file, cb) => {
-    if (file.originalname.match(/\.(mp4|avi|mov|mkv|webm)$/i)) {
-      cb(null, true);
-    } else {
-      cb(new Error('対応していないファイル形式です'));
-    }
-  }
-});
+app.use(express.static(publicPath));
 
 // APIキー管理
 class APIKeyManager {
@@ -74,9 +55,9 @@ class APIKeyManager {
 
   get status() {
     return {
-      totalKeys: this.keys.length,
-      failedKeys: this.failedKeys.size,
-      availableKeys: this.keys.length - this.failedKeys.size
+      total_keys: this.keys.length,
+      failed_keys: this.failedKeys.size,
+      available_keys: this.keys.length - this.failedKeys.size
     };
   }
 }
@@ -216,113 +197,71 @@ function parseResponse(text) {
   }
 }
 
-// Gemini APIで分析（Files API使用）
-async function analyzeWithGemini(prompt, videoBuffer, apiKey) {
+// URI を使って分析
+async function analyzeWithUri(prompt, fileUri, mimeType, apiKey) {
   if (!apiKey) throw new Error('利用可能なAPIキーがありません');
-
-  const { GoogleGenAI } = require('@google/genai');
+  const { GoogleGenAI, createPartFromUri } = require('@google/genai');
   const ai = new GoogleGenAI({ apiKey });
 
-  // 一時ファイルに書き込む
-  const tmpPath = `/tmp/video_${Date.now()}.mp4`;
-  fs.writeFileSync(tmpPath, videoBuffer);
-
-  try {
-    // Files APIでアップロード（タイムアウト: 60秒）
-    const uploadTimeout = 60000;
-    const fileUploadPromise = ai.files.upload({
-      file: tmpPath,
-      config: {
-        displayName: 'video_analysis.mp4',
-        mimeType: 'video/mp4',
-      },
-    });
-    
-    const file = await Promise.race([
-      fileUploadPromise,
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('ファイルアップロードタイムアウト')), uploadTimeout)
-      )
-    ]);
-
-    // ファイルがACTIVEになるまで待機（タイムアウト: 120秒）
-    const processingTimeout = 120000;
-    const startTime = Date.now();
-    let fileState = await ai.files.get({ name: file.name });
-    
-    while (fileState.state === 'PROCESSING') {
-      if (Date.now() - startTime > processingTimeout) {
-        throw new Error('ファイル処理タイムアウト');
-      }
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      fileState = await ai.files.get({ name: file.name });
-    }
-
-    if (fileState.state !== 'ACTIVE') {
-      throw new Error('ファイルの処理に失敗しました');
-    }
-
-    // generateContentで分析（タイムアウト: 180秒）
-    const { createPartFromUri } = require('@google/genai');
-    
-    const generateTimeout = 180000;
-    const generatePromise = ai.models.generateContent({
-      model: 'gemma-4-31b-it',
-      contents: [
-        prompt,
-        createPartFromUri(fileState.uri, fileState.mimeType),
-      ],
-    });
-    
-    const response = await Promise.race([
-      generatePromise,
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('コンテンツ生成タイムアウト')), generateTimeout)
-      )
-    ]);
-
-    // ファイルを削除
-    await ai.files.delete({ name: file.name });
-
-    return response.text;
-  } finally {
-    // 一時ファイル削除
-    try { fs.unlinkSync(tmpPath); } catch (e) {}
-  }
+  const generateTimeout = 180000;
+  const response = await Promise.race([
+    ai.models.generateContent({
+      model: 'gemini-3.1-flash-lite',
+      contents: [prompt, createPartFromUri(fileUri, mimeType)],
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('コンテンツ生成タイムアウト')), generateTimeout)
+    ),
+  ]);
+  return response.text;
 }
 
-// フォールバック付き分析
-async function analyzeWithFallback(prompt, videoBuffer) {
+async function analyzeUriWithFallback(prompt, fileUri, mimeType) {
   let lastError = null;
-
-  console.log(`分析開始: 利用可能キー数=${keyManager.keys.length}`);
-
   while (keyManager.hasAvailableKey) {
     const apiKey = keyManager.currentKey;
-    console.log(`使用するキー: ${apiKey ? apiKey.substring(0, 8) + '...' : 'null'}`);
     if (!apiKey) break;
-
     try {
-      const responseText = await analyzeWithGemini(prompt, videoBuffer, apiKey);
+      const text = await analyzeWithUri(prompt, fileUri, mimeType, apiKey);
       keyManager.recordUsage(apiKey);
-      return parseResponse(responseText);
+      return parseResponse(text);
     } catch (error) {
-      console.error(`APIエラー: ${error.message}`);
-      const errorMsg = error.message.toLowerCase();
-
-      if (errorMsg.includes('quota') || errorMsg.includes('rate') || errorMsg.includes('429')) {
+      console.error(`URI分析エラー: ${error.message}`);
+      if (/quota|rate|429/i.test(error.message)) {
         keyManager.markFailed(apiKey);
         keyManager.rotateKey();
         lastError = error;
         continue;
       }
-
       lastError = error;
       break;
     }
   }
-
   throw lastError || new Error('分析に失敗しました');
+}
+
+// バッファを Gemini Files API にアップロードして ACTIVE になるまで待つ
+async function uploadToGemini(filePath, mimeType, apiKey) {
+  const ai = new GoogleGenAI({ apiKey });
+  const data = fs.readFileSync(filePath);
+  const blob = new Blob([data], { type: mimeType });
+
+  let file = await ai.files.upload({
+    file: blob,
+    config: { mimeType, displayName: 'drive_video' },
+  });
+
+  let retries = 0;
+  while (file.state === 'PROCESSING' && retries < 30) {
+    await new Promise(r => setTimeout(r, 3000));
+    file = await ai.files.get({ name: file.name });
+    retries++;
+  }
+
+  if (file.state !== 'ACTIVE') {
+    throw new Error(`Gemini ファイル処理失敗: ${file.state}`);
+  }
+  return file;
 }
 
 // ルート
@@ -334,48 +273,8 @@ app.get('/', (req, res) => {
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'ok',
-    model: 'gemma-4-31b-it',
+    model: 'gemini-3.1-flash-lite',
     api_keys: keyManager.status
-  });
-});
-
-// ファイルアップロード分析
-app.post('/api/analyze/upload', (req, res) => {
-  upload.single('video')(req, res, async (err) => {
-    if (err) {
-      console.error('アップロードエラー:', err.message);
-
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({
-          error: 'ファイルサイズが大きすぎます。4.5MB以下のファイルを選択してください。'
-        });
-      }
-
-      return res.status(400).json({ error: err.message });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ error: '動画ファイルが選択されていません' });
-    }
-
-    try {
-      const videoBuffer = fs.readFileSync(req.file.path);
-
-      const prompt = buildPrompt();
-      const result = await analyzeWithFallback(prompt, videoBuffer);
-
-      result.source = 'upload';
-      result.filename = req.file.originalname;
-
-      res.json(result);
-    } catch (error) {
-      console.error('分析エラー:', error);
-      res.status(500).json({ error: error.message });
-    } finally {
-      if (req.file && req.file.path) {
-        try { fs.unlinkSync(req.file.path); } catch (e) {}
-      }
-    }
   });
 });
 
@@ -393,32 +292,74 @@ app.post('/api/analyze/drive', async (req, res) => {
     return res.status(400).json({ error: '無効なGoogle Drive URLです' });
   }
 
+  let videoPath;
   try {
-    const https = require('https');
-    const videoPath = `/tmp/drive_${Date.now()}.mp4`;
+    const axios = require('axios');
+    videoPath = `/tmp/drive_${Date.now()}.mp4`;
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
 
-    await new Promise((resolve, reject) => {
-      const file = fs.createWriteStream(videoPath);
-      const url = `https://drive.google.com/uc?export=download&id=${fileId}`;
-
-      https.get(url, (response) => {
-        response.pipe(file);
-        file.on('finish', () => { file.close(); resolve(); });
-      }).on('error', reject);
+    // axios はリダイレクトを自動的に追跡する
+    const dlResponse = await axios.get(downloadUrl, {
+      responseType: 'arraybuffer',
+      maxRedirects: 10,
+      timeout: 120000,
+      headers: { 'User-Agent': 'Mozilla/5.0' },
     });
 
-    const videoBuffer = fs.readFileSync(videoPath);
+    // Google Drive の確認ページ（大容量ファイル）検出
+    const ct = dlResponse.headers['content-type'] || '';
+    if (ct.includes('text/html')) {
+      // confirm トークンを探して再ダウンロード
+      const html = Buffer.from(dlResponse.data).toString('utf8');
+      const confirmMatch = html.match(/confirm=([0-9A-Za-z_-]+)/);
+      if (!confirmMatch) {
+        throw new Error('Google Drive のダウンロード確認ページを処理できませんでした。共有設定を確認してください。');
+      }
+      const confirmUrl = `${downloadUrl}&confirm=${confirmMatch[1]}`;
+      const confirmed = await axios.get(confirmUrl, {
+        responseType: 'arraybuffer',
+        maxRedirects: 10,
+        timeout: 120000,
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
+      fs.writeFileSync(videoPath, confirmed.data);
+    } else {
+      fs.writeFileSync(videoPath, dlResponse.data);
+    }
 
-    const prompt = buildPrompt();
-    const result = await analyzeWithFallback(prompt, videoBuffer);
+    // 空ファイル検出
+    const stat = fs.statSync(videoPath);
+    if (stat.size < 1024) {
+      throw new Error('動画ファイルのダウンロードに失敗しました（ファイルが空または無効です）。共有設定を確認してください。');
+    }
+
+    const apiKey = keyManager.currentKey;
+    if (!apiKey) throw new Error('利用可能なAPIキーがありません');
+
+    const mimeType = 'video/mp4';
+    const geminiFile = await uploadToGemini(videoPath, mimeType, apiKey);
+
+    let result;
+    try {
+      const prompt = buildPrompt();
+      result = await analyzeUriWithFallback(prompt, geminiFile.uri, mimeType);
+    } finally {
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        await ai.files.delete({ name: geminiFile.name });
+      } catch (e) {}
+    }
 
     result.source = 'drive';
     result.drive_url = drive_url;
-
     res.json(result);
   } catch (error) {
     console.error('分析エラー:', error);
     res.status(500).json({ error: error.message });
+  } finally {
+    if (videoPath) {
+      try { fs.unlinkSync(videoPath); } catch (e) {}
+    }
   }
 });
 
