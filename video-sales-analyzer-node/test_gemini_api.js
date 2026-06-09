@@ -196,12 +196,54 @@ async function downloadFromDrive(url) {
         console.log('コンテンツ長:', response.headers['content-length']);
         console.log('全ヘッダー:', JSON.stringify(response.headers, null, 2));
         
-        // リダイレクトを処理
-        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-          console.log('リダイレクト先:', response.headers.location);
-          reject(new Error(`リダイレクトが発生しました: ${response.headers.location}`));
-          return;
+  // リダイレクトを処理
+  if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+    console.log('リダイレクト先:', response.headers.location);
+    console.log('リダイレクト先にアクセスします...');
+  
+    // リダイレクト先にアクセス
+    const redirectUrl = response.headers.location;
+    const redirectRequest = https.get(redirectUrl, (redirectResponse) => {
+      console.log('リダイレクト先のレスポンス:');
+      console.log('ステータスコード:', redirectResponse.statusCode);
+      console.log('コンテンツタイプ:', redirectResponse.headers['content-type']);
+    
+      if (redirectResponse.statusCode >= 400) {
+        let errorData = '';
+        redirectResponse.on('data', chunk => errorData += chunk);
+        redirectResponse.on('end', () => {
+          console.error('リダイレクト先のエラーレスポンス:', errorData);
+          reject(new Error(`リダイレクト先でエラーが発生しました: ${redirectResponse.statusCode}`));
+        });
+        return;
+      }
+    
+      // リダイレクト先のコンテンツをダウンロード
+      redirectResponse.pipe(file);
+      file.on('finish', () => {
+        file.close();
+        console.log('リダイレクト先からのダウンロード完了');
+      
+        const stats = fs.statSync(videoPath);
+        console.log('ダウンロードされたファイルサイズ:', stats.size, 'バイト');
+      
+        if (stats.size === 0) {
+          console.error('警告: リダイレクト先からダウンロードされたファイルが空です');
+          reject(new Error('リダイレクト先からダウンロードされたファイルが空です'));
+        } else {
+          console.log('ファイルが正常にダウンロードされました');
+          resolve(fs.readFileSync(videoPath));
         }
+      });
+    });
+  
+    redirectRequest.on('error', (err) => {
+      console.error('リダイレクト先のリクエストエラー:', err.message);
+      reject(err);
+    });
+  
+    return;
+  }
         
         // エラーステータスを処理
         if (response.statusCode >= 400) {
