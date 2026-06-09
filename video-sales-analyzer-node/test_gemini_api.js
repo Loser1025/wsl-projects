@@ -119,7 +119,7 @@ async function analyzeWithGemini(prompt, videoBuffer, apiKey) {
     
     try {
   const response = await ai.models.generateContent({
-    model: 'gemma-4-31b-it',
+    model: 'gemini-1.5-pro',
     contents: [
       prompt,
       createPartFromUri(fileState.uri, fileState.mimeType),
