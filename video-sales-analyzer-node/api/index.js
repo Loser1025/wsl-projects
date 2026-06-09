@@ -228,18 +228,32 @@ async function analyzeWithGemini(prompt, videoBuffer, apiKey) {
   fs.writeFileSync(tmpPath, videoBuffer);
 
   try {
-    // Files APIでアップロード
-    const file = await ai.files.upload({
+    // Files APIでアップロード（タイムアウト: 60秒）
+    const uploadTimeout = 60000;
+    const fileUploadPromise = ai.files.upload({
       file: tmpPath,
       config: {
         displayName: 'video_analysis.mp4',
         mimeType: 'video/mp4',
       },
     });
+    
+    const file = await Promise.race([
+      fileUploadPromise,
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('ファイルアップロードタイムアウト')), uploadTimeout)
+      )
+    ]);
 
-    // ファイルがACTIVEになるまで待機
+    // ファイルがACTIVEになるまで待機（タイムアウト: 120秒）
+    const processingTimeout = 120000;
+    const startTime = Date.now();
     let fileState = await ai.files.get({ name: file.name });
+    
     while (fileState.state === 'PROCESSING') {
+      if (Date.now() - startTime > processingTimeout) {
+        throw new Error('ファイル処理タイムアウト');
+      }
       await new Promise(resolve => setTimeout(resolve, 5000));
       fileState = await ai.files.get({ name: file.name });
     }
@@ -248,16 +262,24 @@ async function analyzeWithGemini(prompt, videoBuffer, apiKey) {
       throw new Error('ファイルの処理に失敗しました');
     }
 
-    // generateContentで分析
+    // generateContentで分析（タイムアウト: 180秒）
     const { createPartFromUri } = require('@google/genai');
-
-    const response = await ai.models.generateContent({
+    
+    const generateTimeout = 180000;
+    const generatePromise = ai.models.generateContent({
       model: 'gemma-4-31b-it',
       contents: [
         prompt,
         createPartFromUri(fileState.uri, fileState.mimeType),
       ],
     });
+    
+    const response = await Promise.race([
+      generatePromise,
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('コンテンツ生成タイムアウト')), generateTimeout)
+      )
+    ]);
 
     // ファイルを削除
     await ai.files.delete({ name: file.name });
