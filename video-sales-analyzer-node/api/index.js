@@ -141,12 +141,21 @@ function buildPrompt() {
 function parseResponse(text) {
   try {
     let jsonText = text.trim();
+    
+    // コードブロックの抽出（より堅牢な処理）
     if (jsonText.includes('```json')) {
-      jsonText = jsonText.split('```json')[1].split('```')[0];
+      const match = jsonText.match(/```json\s*([\s\S]*?)\s*```/);
+      if (match && match[1]) {
+        jsonText = match[1].trim();
+      }
     } else if (jsonText.includes('```')) {
-      jsonText = jsonText.split('```')[1].split('```')[0];
+      const match = jsonText.match(/```\s*([\s\S]*?)\s*```/);
+      if (match && match[1]) {
+        jsonText = match[1].trim();
+      }
     }
-
+    
+    // JSONパース
     const result = JSON.parse(jsonText);
 
     result.overall_score = Math.max(0, Math.min(100, parseInt(result.overall_score) || 0));
@@ -161,9 +170,10 @@ function parseResponse(text) {
     return result;
   } catch (error) {
     console.error('JSONパースエラー:', error);
+    console.error('問題のあるテキスト:', text.substring(0, 500));
     return {
       error: true,
-      message: 'レスポンスの解析に失敗しました',
+      message: 'レスポンスの解析に失敗しました: ' + error.message,
       expression: { total_score: 0 },
       voice_tone: { total_score: 0 },
       overall_score: 0,
