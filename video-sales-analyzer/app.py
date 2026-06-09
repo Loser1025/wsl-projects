@@ -30,7 +30,11 @@ from config.score_criteria import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+# Vercel環境でのテンプレート・静的ファイルパス設定
+template_folder = os.environ.get("FLASK_TEMPLATE_FOLDER", os.path.join(os.path.dirname(__file__), "templates"))
+static_folder = os.environ.get("FLASK_STATIC_FOLDER", os.path.join(os.path.dirname(__file__), "static"))
+
+app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
 # Vercelの/tmpディレクトリを使用（読み取り専用ファイルシステム対応）
