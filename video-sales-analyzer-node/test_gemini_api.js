@@ -336,9 +336,30 @@ async function downloadFromDrive(url) {
     
     // JSONパースを試みる
     try {
-      const result = JSON.parse(responseText);
+      // レスポンスからJSONを抽出
+      let jsonText = responseText;
+      if (jsonText.includes('```json')) {
+        const match = jsonText.match(/```json\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+          jsonText = match[1].trim();
+        }
+      } else if (jsonText.includes('```')) {
+        const match = jsonText.match(/```\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+          jsonText = match[1].trim();
+        }
+      }
+      
+      const result = JSON.parse(jsonText);
       console.log('=== パース成功 ===');
       console.log('総合スコア:', result.overall_score);
+      console.log('表情スコア:', result.expression.total_score);
+      console.log('声トーンスコア:', result.voice_tone.total_score);
+      console.log('総合評価:', result.summary);
+      console.log('改善点:');
+      result.improvements.forEach((item, index) => {
+        console.log(`${index + 1}. ${item}`);
+      });
     } catch (parseError) {
       console.error('=== JSONパースエラー ===');
       console.error(parseError.message);
