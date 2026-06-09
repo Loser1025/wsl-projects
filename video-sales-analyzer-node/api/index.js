@@ -144,13 +144,14 @@ function parseResponse(text) {
     
     // デバッグログ: 元のレスポンスをファイルに保存
     const fs = require('fs');
-    const debugDir = '/tmp/debug-responses';
+    const debugDir = path.join(__dirname, '..', 'debug-responses');
     try {
       if (!fs.existsSync(debugDir)) {
         fs.mkdirSync(debugDir, { recursive: true });
       }
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       fs.writeFileSync(`${debugDir}/response_${timestamp}.txt`, text);
+      console.log(`デバッグファイル保存: ${debugDir}/response_${timestamp}.txt`);
     } catch (e) {
       console.error('デバッグファイル保存エラー:', e.message);
     }
