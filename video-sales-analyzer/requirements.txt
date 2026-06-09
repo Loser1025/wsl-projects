@@ -1,0 +1,12 @@
+flask>=3.0.0
+google-generativeai>=0.8.0
+opencv-python>=4.10.0
+numpy>=1.26.0
+moviepy>=1.0.3
+Pillow>=10.0.0
+python-dotenv>=1.0.0
+gunicorn>=21.2.0
+requests>=2.31.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-api-python-client>=2.100.0
