@@ -118,13 +118,13 @@ async function analyzeWithGemini(prompt, videoBuffer, apiKey) {
     const { createPartFromUri } = require('@google/genai');
     
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemma-4-31b-it',
-        contents: [
-          prompt,
-          createPartFromUri(fileState.uri, fileState.mimeType),
-        ],
-      });
+  const response = await ai.models.generateContent({
+    model: 'gemini-1.5-flash',
+    contents: [
+      prompt,
+      createPartFromUri(fileState.uri, fileState.mimeType),
+    ],
+  });
       
       console.log('コンテンツ生成完了');
       console.log('レスポンス:', response);
