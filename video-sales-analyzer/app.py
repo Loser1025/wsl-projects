@@ -227,35 +227,37 @@ class SalesAnalyzer:
         
         for attempt in range(max_retries):
             try:
-                # コンテンツ構築
-                content = [prompt]
+                # コンテンツ構築（新しいSDK形式）
+                contents = []
+                
+                # テキストプロンプト
+                contents.append(prompt)
                 
                 # フレーム画像を追加
-                for i, frame_bytes in enumerate(frames):
-                    content.append({
-                        "mime_type": "image/jpeg",
-                        "data": frame_bytes
-                    })
+                for frame_bytes in frames:
+                    contents.append(
+                        types.Part.from_bytes(
+                            data=frame_bytes,
+                            mime_type="image/jpeg"
+                        )
+                    )
                 
                 # 音声を追加（あれば）
                 if audio_path and os.path.exists(audio_path):
                     with open(audio_path, "rb") as f:
                         audio_data = f.read()
-                    content.append({
-                        "mime_type": "audio/wav",
-                        "data": audio_data
-                    })
+                    contents.append(
+                        types.Part.from_bytes(
+                            data=audio_data,
+                            mime_type="audio/wav"
+                        )
+                    )
                 
                 # API呼び出し
                 logger.info(f"API呼び出し中... (試行 {attempt + 1}/{max_retries})")
-                response = self.model.generate_content(
-                    content,
-                    safety_settings={
-                        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmThreshold.BLOCK_NONE,
-                        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmThreshold.BLOCK_NONE,
-                        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmThreshold.BLOCK_NONE,
-                        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmThreshold.BLOCK_NONE,
-                    }
+                response = self.client.models.generate_content(
+                    model=MODEL_NAME,
+                    contents=contents,
                 )
                 
                 # レスポンス解析
