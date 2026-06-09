@@ -1,0 +1,13 @@
+# Render.com デプロイ設定
+services:
+  - type: web
+    name: video-sales-analyzer
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 300 app:app
+    envVars:
+      - key: GEMINI_API_KEYS
+        sync: false  # Renderダッシュボードで設定
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+    plan: free  # または starter, standard
