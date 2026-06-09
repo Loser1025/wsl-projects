@@ -52,6 +52,42 @@
                 document.getElementById('result').innerHTML = `<pre>エラー: ${error.message}</pre>`;
             }
         });
+
+        // Google Driveから分析ボタンのイベントリスナー
+        document.getElementById('driveButton').addEventListener('click', async () => {
+            const driveUrlInput = document.getElementById('driveUrlInput');
+            const driveUrl = driveUrlInput.value.trim();
+            
+            if (!driveUrl) {
+                alert('Google DriveのURLを入力してください');
+                return;
+            }
+            
+            document.getElementById('result').innerHTML = 'Google Driveから動画をダウンロード中...';
+            
+            try {
+                const result = await downloadAndAnalyzeFromDrive(driveUrl);
+                
+                if (result.error) {
+                    document.getElementById('result').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+                } else {
+                    document.getElementById('result').innerHTML = `
+                        <h2>分析結果</h2>
+                        <p>総合スコア: ${result.overall_score}</p>
+                        <p>表情スコア: ${result.expression.total_score}</p>
+                        <p>声トーンスコア: ${result.voice_tone.total_score}</p>
+                        <h3>総合評価</h3>
+                        <p>${result.summary}</p>
+                        <h3>改善点</h3>
+                        <ul>
+                            ${result.improvements.map(item => `<li>${item}</li>`).join('')}
+                        </ul>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<pre>エラー: ${error.message}</pre>`;
+            }
+        });
     </script>
 </body>
 </html>
