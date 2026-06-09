@@ -8,23 +8,25 @@ from typing import List
 
 # ============================================================
 # Gemini APIキー設定（複数アカウント対応）
-# 環境変数 GEMINI_API_KEYS でカンマ区切りで指定可能
-# 例: export GEMINI_API_KEYS="key1,key2,key3"
+# 以下のいずれかの方法で設定可能:
+# 1. GEMINI_API_KEYS でカンマ区切り: export GEMINI_API_KEYS="key1,key2,key3"
+# 2. GEMINI_KEY_1, GEMINI_KEY_2, GEMINI_KEY_3 で個別設定
 # ============================================================
 
-# 環境変数からAPIキーを取得
+# 方法1: カンマ区切りで取得
 _api_keys_env = os.environ.get("GEMINI_API_KEYS", "")
 
-# 直接ここにキーを記述することも可能（環境変数のフォールBACK）
-API_KEYS: List[str] = [
-    key.strip()
-    for key in _api_keys_env.split(",")
-    if key.strip()
-] if _api_keys_env else [
-    # ここに直接キーを記述（非推奨 - 環境変数を推奨）
-    # "YOUR_API_KEY_1",
-    # "YOUR_API_KEY_2",
-]
+if _api_keys_env:
+    API_KEYS: List[str] = [
+        key.strip() for key in _api_keys_env.split(",") if key.strip()
+    ]
+else:
+    # 方法2: 個別の環境変数から取得
+    API_KEYS = []
+    for i in range(1, 10):  # 最大9個まで対応
+        key = os.environ.get(f"GEMINI_KEY_{i}", "")
+        if key.strip():
+            API_KEYS.append(key.strip())
 
 # 現在のキーのインデックス（内部でフォールバック時に使用）
 _current_key_index = 0
