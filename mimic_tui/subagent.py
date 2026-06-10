@@ -1,7 +1,6 @@
-"""subagent.py — OverlayFS隔離による単一/並列サブエージェント委任。
+"""subagent.py — OverlayFS隔離によるWorkerサブエージェント実行。
 
-delegate_to_subagent / delegate_to_subagent_parallel は、エージェントが自身の
-判断で呼び出せる同期ツール。各サブエージェントは:
+team.py の Worker フェーズから run_subagent_reviewable() で呼ばれる。各実行は:
 
   1. 専用の作業部屋(workroom)を用意する
        lowerdir = 元のプロジェクト(読み取り専用)
@@ -9,12 +8,12 @@ delegate_to_subagent / delegate_to_subagent_parallel は、エージェントが
        merged   = 合成ビュー（サブエージェントの作業ディレクトリ）
   2. unshare -U -m -r で非特権ユーザー名前空間を作り、その中で overlay をマウントし
      `python3 -m mimic_tui --auto-prompt "<task>"` を MIMIC_CWD=<merged> で起動する
-  3. サブエージェントは Git に一切触れない（コミットは常に親が行う）
+  3. サブエージェントは Git に一切触れない（コミットは team.py 側が行う）
   4. プロセスが終了すると名前空間ごとマウントが自動的に解除される（後始末不要）
-  5. upperdir の中身がそのまま「変更点の差分」になる — 親はこれを検査し、
-     採用するかどうか・どう統合するかを判断したうえで自身の AutoGit でコミットする
-
-ロールバック = 一時ディレクトリの削除（常に finally で実行する）。
+  5. upperdir の中身が「変更点の差分」となる。run_subagent_reviewable() は
+     成功時に upperdir を破棄せず (result, upper, base) を返すので、
+     呼び出し側（Supervisorのレビュー後）が apply_subagent_changes() で
+     プロジェクトに適用するか、cleanup_subagent() で破棄するかを選ぶ。
 """
 from __future__ import annotations
 
@@ -31,7 +30,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from .utils import log
+from .utils import log, safe_print, C
 
 _DONE_MARKER  = "===MIMIC_DONE==="
 _TIMEOUT_SEC  = 1800  # 30分
@@ -121,8 +120,44 @@ def _summarize(lower: Path, upper: Path, changed: list[str],
     return "\n".join(lines)
 
 
-def _run_overlay_subagent(task: str, project_dir: str, label: str) -> SubagentResult:
-    """ひとつのサブエージェントを OverlayFS 隔離下で同期実行し、結果を回収する。"""
+def apply_subagent_changes(upper: Path, lower: Path, changed_files: list[str]) -> None:
+    """upperdir の変更（新規・更新ファイル）を project_dir(lower) に反映し、
+    upperdir 上の whiteout（削除マーカー）に対応するファイルを lower から削除する。"""
+    for rel in changed_files:
+        src = upper / rel
+        dst = lower / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+
+    for p in upper.rglob("*"):
+        try:
+            st = p.lstat()
+        except OSError:
+            continue
+        if not stat.S_ISCHR(st.st_mode):
+            continue
+        target = lower / p.relative_to(upper)
+        if target.exists():
+            if target.is_dir():
+                shutil.rmtree(target, ignore_errors=True)
+            else:
+                target.unlink()
+
+
+def cleanup_subagent(base: Path) -> None:
+    """run_subagent_reviewable が確保した一時ディレクトリを破棄する。"""
+    _force_rmtree(base)
+
+
+def run_subagent_reviewable(task: str, project_dir: str, label: str = "single"
+                              ) -> tuple[SubagentResult, Optional[Path], Optional[Path]]:
+    """Worker を OverlayFS 隔離下で同期実行する。
+
+    成功時は upperdir をすぐには破棄せず (result, upper, base) を返す。
+    呼び出し側はレビュー結果に応じて apply_subagent_changes() してから
+    cleanup_subagent(base) を呼ぶこと（採用しない場合は cleanup のみ）。
+    例外・タイムアウト時は内部で破棄して (result, None, None) を返す。
+    """
     base   = Path(tempfile.mkdtemp(prefix=f"mimic_subagent_{label}_"))
     lower  = Path(project_dir).resolve()
     upper  = base / "upper"
@@ -153,58 +188,54 @@ def _run_overlay_subagent(task: str, project_dir: str, label: str) -> SubagentRe
         proc = subprocess.Popen(
             ["unshare", "-U", "-m", "-r", "bash", "-c", script],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            start_new_session=True,
+            bufsize=1, start_new_session=True,
         )
-        try:
-            stdout, _ = proc.communicate(timeout=_TIMEOUT_SEC)
-        except subprocess.TimeoutExpired:
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            proc.wait()
+
+        # ── ハングアップ対策: 別スレッドでタイムアウト監視 ──
+        timed_out = threading.Event()
+        proc_done = threading.Event()
+
+        def _watchdog():
+            if not proc_done.wait(_TIMEOUT_SEC):
+                timed_out.set()
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+
+        watchdog = threading.Thread(target=_watchdog, daemon=True)
+        watchdog.start()
+
+        # ── Workerの出力をリアルタイムでそのまま転送 ──
+        prefix = f"  {C.gray(f'[Worker:{label}]')} "
+        stdout_chunks: list[str] = []
+        for raw_line in proc.stdout:
+            stdout_chunks.append(raw_line)
+            safe_print(prefix + raw_line.rstrip("\n"), flush=True)
+        proc.wait()
+        proc_done.set()
+        stdout = "".join(stdout_chunks)
+
+        if timed_out.is_set():
+            _force_rmtree(base)
             return SubagentResult(
                 task=task, ok=False,
                 summary=f"タイムアウト（{_TIMEOUT_SEC}秒）のため強制終了しました。",
-            )
+            ), None, None
 
         ok = (_DONE_MARKER in stdout) and proc.returncode == 0
         changed = _changed_files(upper)
         summary = _summarize(lower, upper, changed)
         if not ok:
             summary = f"⚠ サブエージェントは正常終了しませんでした（exit={proc.returncode}）。\n" + summary
-        return SubagentResult(
+        result = SubagentResult(
             task=task, ok=ok, changed_files=changed, summary=summary,
             raw_tail=stdout[-2000:],
         )
+        return result, upper, base
     except Exception as exc:
         log.error({"event": "subagent_error", "task": task, "error": str(exc)})
-        return SubagentResult(task=task, ok=False, summary=f"実行エラー: {exc}")
-    finally:
-        # ロールバック/後始末 = 一時ディレクトリの削除のみ
-        # （overlay マウントは unshare の名前空間終了時に自動解除される）
         _force_rmtree(base)
+        return SubagentResult(task=task, ok=False, summary=f"実行エラー: {exc}"), None, None
 
 
-def run_subagent(task: str, project_dir: str) -> SubagentResult:
-    """単一のサブエージェントに作業を委任し、完了まで同期的に待機する。"""
-    return _run_overlay_subagent(task, project_dir, label="single")
-
-
-def run_subagents_parallel(tasks: list[str], project_dir: str) -> list[SubagentResult]:
-    """複数タスクを独立した OverlayFS 隔離下で並列実行し、全完了まで待機する。
-
-    各サブエージェントは完全に独立した作業部屋を持ち、Git にも触れないため、
-    競合は構造的に発生しない（"並列"が無料で手に入る所以）。
-    """
-    results: list[Optional[SubagentResult]] = [None] * len(tasks)
-
-    def _worker(i: int, t: str):
-        results[i] = _run_overlay_subagent(t, project_dir, label=f"par{i}")
-
-    threads = [threading.Thread(target=_worker, args=(i, t)) for i, t in enumerate(tasks)]
-    for th in threads:
-        th.start()
-    for th in threads:
-        th.join()
-    return results  # type: ignore[return-value]

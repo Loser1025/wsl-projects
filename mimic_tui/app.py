@@ -914,22 +914,24 @@ class MimicApp(App):
         arg = arg.strip().lower()
         if arg in ("interactive", "react", "i"):
             self._agent_mode = "interactive"
+            self._ctx["agent"].tools = self._ctx["mon_tools"]
             self._ctx["agent"].set_system_prompt(self._ctx["react_prompt"])
             self._ctx["agent"].clear_history()
             self._ctx["interactive_orch"].react_log.clear()
             self._write_direct("⚡ モード: Interactive (ReAct)  会話履歴をリセットしました。\n")
         elif arg in ("extreme", "extreme-react", "x"):
             self._agent_mode = "extreme"
+            self._ctx["agent"].tools = self._ctx["extreme_tools"]
             self._ctx["agent"].set_system_prompt(
                 self._ctx["plan_prompt"] + EXTREME_REACT_SYSTEM_PROMPT
             )
             self._ctx["agent"].clear_history()
             self._ctx["interactive_orch"].react_log.clear()
-            self._write_direct("🔥 モード: Extreme React (脳内マルチプロファイル)  会話履歴をリセットしました。\n")
+            self._write_direct("🔥 モード: Extreme React (Director専任・委任特化)  書き込み系ツールを取り上げました。会話履歴をリセットしました。\n")
         else:
             mode_labels = {
                 "interactive": "Interactive (ReAct)",
-                "extreme": "Extreme React (脳内マルチプロファイル)",
+                "extreme": "Extreme React (Director専任・委任特化)",
             }
             label = mode_labels.get(self._agent_mode, self._agent_mode)
             self._write_direct(

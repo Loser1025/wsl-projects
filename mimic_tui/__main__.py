@@ -14,7 +14,7 @@ def _build_components(base_dir: str, active_config=None):
     """
     from .utils import safe_print, C, set_log_sink, log
     from .commands import register_search_command, register_sessions_command
-    from .tools import set_sessions_dir, tools as _base_tools
+    from .tools import set_sessions_dir, tools as _base_tools, ToolRegistry
     from . import config as _cfg
     from .config import load_config
     from .agent import OpenRouterAgent, AccountRotator
@@ -33,6 +33,9 @@ def _build_components(base_dir: str, active_config=None):
     if active_config is None:
         active_config = or_config or gemini_config or mistral_config
 
+    from .team import set_team_config
+    set_team_config(active_config)
+
     tool_log = ToolCallLog()
 
     def _inline_display(record):
@@ -44,6 +47,20 @@ def _build_components(base_dir: str, active_config=None):
 
     mon_tools = MonitoringToolRegistry(
         base       = _base_tools,
+        log        = tool_log,
+        display_fn = _inline_display,
+    )
+
+    # Extreme React モード用: 書き込み系ツールを取り上げ、
+    # 書き込みが必要な場合は delegate_to_team / delegate_to_team_parallel に
+    # 委任せざるを得ない構成にする（Worker→Supervisorループ側で適用・コミットする）。
+    _EXTREME_EXCLUDED_TOOLS = {"write_file", "edit_file", "patch_file", "delete_file"}
+    _extreme_registry = ToolRegistry()
+    for _name in _base_tools._tools:
+        if _name not in _EXTREME_EXCLUDED_TOOLS:
+            _extreme_registry.copy_tool(_name, _base_tools)
+    extreme_tools = MonitoringToolRegistry(
+        base       = _extreme_registry,
         log        = tool_log,
         display_fn = _inline_display,
     )
@@ -102,6 +119,7 @@ def _build_components(base_dir: str, active_config=None):
         auto_git         = auto_git,
         tool_log         = tool_log,
         mon_tools        = mon_tools,
+        extreme_tools    = extreme_tools,
         react_prompt     = react_prompt,
         plan_prompt      = plan_prompt,
         sessions_dir     = sessions_dir,
@@ -147,6 +165,10 @@ def main():
 
         or_config, gemini_config, mistral_config, system_prompt = load_config(base_dir)
         active_config = or_config or gemini_config or mistral_config
+
+        from .team import set_team_config
+        set_team_config(active_config)
+
         mon_tools = MonitoringToolRegistry(base=_base_tools, log=ToolCallLog())
         rotator   = AccountRotator(active_config)
         agent     = OpenRouterAgent(rotator, mon_tools)

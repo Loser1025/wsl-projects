@@ -6,5 +6,6 @@ from . import main
 from . import monitoring
 from . import orchestrator
 from . import proc_observer
+from . import team
 from . import tools          # tools の末尾で tools_linux と pipeline を自動インポート
 from . import utils
