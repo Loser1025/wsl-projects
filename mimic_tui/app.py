@@ -271,14 +271,11 @@ class MimicApp(App):
         self._write_direct(f"作業Dir: {cwd}\n")
         self._write_direct("─" * 60 + "\n")
 
-        self.query_one("#sec-system", Static).update(
-            "[bold #00ff41]■ SYSTEM[/]\n"
-            "  OS: WSL2 Linux\n"
-            "  Git: [bold #00ff41]ACTIVE[/]"
-        )
+        self._refresh_system_panel()
 
         self._refresh_status_ui()
         self.set_interval(2.0, self._tick_role_refresh)
+        self.set_interval(2.0, self._refresh_system_panel)
         self._set_input_hint("idle")
         self._build_file_tree()
         self._show_file_preview(None)
@@ -319,6 +316,21 @@ class MimicApp(App):
                 if profile:
                     lines.append(f"  Role:   [#ff8c42]{profile}[/]")
             self.query_one("#sec-status", Static).update("\n".join(lines))
+        except Exception:
+            pass
+
+    def _refresh_system_panel(self) -> None:
+        """■ SYSTEM パネルにシステム全体の CPU/メモリ使用率を表示する。"""
+        from .proc_observer import get_system_cpu_percent, get_system_mem_info
+        try:
+            cpu = get_system_cpu_percent()
+            used_mb, total_mb = get_system_mem_info()
+            mem_pct = (used_mb / total_mb * 100.0) if total_mb else 0.0
+            self.query_one("#sec-system", Static).update(
+                "[bold #00ff41]■ SYSTEM[/]\n"
+                f"  CPU: [#58a6ff]{cpu:5.1f}%[/]\n"
+                f"  MEM: [#58a6ff]{used_mb:6.0f}MB[/] / {total_mb:.0f}MB ({mem_pct:.0f}%)"
+            )
         except Exception:
             pass
 

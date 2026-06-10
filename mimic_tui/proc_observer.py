@@ -103,6 +103,56 @@ def _count_fds(pid: int) -> int:
         return 0
 
 
+# ── システム全体の CPU/メモリ使用率 ──────────────────────────────
+
+_prev_cpu_sample: Optional[tuple[float, float]] = None  # (idle, total)
+
+
+def get_system_cpu_percent() -> float:
+    """
+    /proc/stat から前回呼び出しとの差分でシステム全体のCPU使用率(%)を返す。
+    初回呼び出しは差分が取れないため 0.0 を返す。
+    """
+    global _prev_cpu_sample
+    try:
+        with open("/proc/stat") as f:
+            fields = f.readline().split()
+        values = [float(x) for x in fields[1:]]
+        idle  = values[3] + values[4]   # idle + iowait
+        total = sum(values)
+    except Exception:
+        return 0.0
+
+    prev = _prev_cpu_sample
+    _prev_cpu_sample = (idle, total)
+    if prev is None:
+        return 0.0
+
+    d_idle  = idle - prev[0]
+    d_total = total - prev[1]
+    if d_total <= 0:
+        return 0.0
+    return max(0.0, min(100.0, (1.0 - d_idle / d_total) * 100.0))
+
+
+def get_system_mem_info() -> tuple[float, float]:
+    """
+    /proc/meminfo からシステム全体の (使用量MB, 総容量MB) を返す。
+    読めない場合は (0.0, 0.0)。
+    """
+    try:
+        info: dict[str, float] = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                key, _, rest = line.partition(":")
+                info[key] = float(rest.strip().split()[0])  # kB
+        total = info.get("MemTotal", 0.0)
+        avail = info.get("MemAvailable", 0.0)
+        return (total - avail) / 1024.0, total / 1024.0
+    except Exception:
+        return 0.0, 0.0
+
+
 class ProcessMonitor:
     """
     バックグラウンドスレッドで指定 PID の /proc をポーリングする。
