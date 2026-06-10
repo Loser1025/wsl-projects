@@ -129,8 +129,53 @@
     </div>
 
     <div class="section">
+        <h2>ローカルPython実行 vs Google Colab使用時の違いとメリット</h2>
+        <table border="1" cellpadding="8" style="border-collapse: collapse; width: 100%; margin: 15px 0;">
+            <thead>
+                <tr>
+                    <th>項目</th>
+                    <th>ローカルPython実行</th>
+                    <th>Google Colab使用</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>環境構築</strong></td>
+                    <td>Pythonやライブラリのインストール、環境設定が必要。環境依存の問題が発生しやすい。</td>
+                    <td>ブラウザ上で即座に利用可能。環境構築不要で、常に最新のPython環境が提供される。</td>
+                </tr>
+                <tr>
+                    <td><strong>ハードウェアリソース</strong></td>
+                    <td>ローカルマシンのスペックに依存。高性能なGPUや大容量メモリが必要な場合、コストがかかる。</td>
+                    <td>無料でGPU/TPUが利用可能。高性能なハードウェアをクラウド上で利用できる。</td>
+                </tr>
+                <tr>
+                    <td><strong>共有・コラボレーション</strong></td>
+                    <td>ファイルを共有する必要があり、リアルタイムでの共同作業が難しい。</td>
+                    <td>Googleドライブと連携し、リアルタイムで共同編集が可能。URLを共有するだけでノートブックを共有できる。</td>
+                </tr>
+                <tr>
+                    <td><strong>自動化・スケジュール実行</strong></td>
+                    <td>cronやタスクスケジューラを使って自動化可能だが、設定が複雑。</td>
+                    <td>CLIが登場すれば、コマンドラインから直接実行やスケジュール設定が可能になり、自動化が容易になる。</td>
+                </tr>
+                <tr>
+                    <td><strong>データの取り扱い</strong></td>
+                    <td>ローカルファイルシステムに依存。大容量データの取り扱いには工夫が必要。</td>
+                    <td>Googleドライブやクラウドストレージと連携し、大容量データも容易に扱える。</td>
+                </tr>
+                <tr>
+                    <td><strong>AI機能の活用</strong></td>
+                    <td>AI機能を利用するには、別途ライブラリやAPIの設定が必要。</td>
+                    <td>「AIファースト」のColabでは、GeminiなどのAI機能が統合されており、コーディング支援やデータ分析が容易。</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
         <h2>まとめ</h2>
-        <p>Google Colab CLIが登場すれば、コマンドラインから直接Colabを操作できるようになり、自動化やリモート環境での利用がさらに便利になります。特に、CI/CD連携やスケジュール実行、チーム開発の効率化など、さまざまなシーンで活用できるでしょう。</p>
+        <p>Google Colab CLIが登場すれば、コマンドラインから直接Colabを操作できるようになり、自動化やリモート環境での利用がさらに便利になります。特に、CI/CD連携やスケジュール実行、チーム開発の効率化など、さまざまなシーンで活用できるでしょう。また、ローカルでのPython実行と比較して、Colabは環境構築の手間がなく、高性能なハードウェアやAI機能を手軽に利用できる点が大きなメリットです。</p>
     </div>
 
     <div class="footer">
