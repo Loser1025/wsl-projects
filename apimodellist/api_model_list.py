@@ -337,9 +337,10 @@ def fetch_models(api_name: str, api_key: str) -> List[Dict[str, Any]]:
 
             model_name = model.get("name", model_id)
 
-            # "free" という表記があるモデルだけをフィルタリング
-            if "free" not in model_name.lower() and "free" not in model_id.lower():
-                continue
+            # OpenRouterの場合のみ "free" という表記があるモデルだけをフィルタリング
+            if api_name == "OpenRouter":
+                if "free" not in model_name.lower() and "free" not in model_id.lower():
+                    continue
 
             result.append({
                 "id": model_id,
