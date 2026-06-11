@@ -124,6 +124,17 @@ agent into a "Director-only" role: in this mode `agent.tools` is swapped to a re
 - The Director itself never needs to apply diffs or commit — `delegate_to_team` returns a summary
   saying whether changes were already applied/committed.
 
+`delegate_research` (`team.py::run_research_qa`, also `_run_isolated` with `role="Researcher"`) is a
+lighter one-shot delegation for Q&A-style research (e.g. looking up external API docs). It reuses
+`_build_researcher_registry` (read-only tools + `web_search`/`fetch_webpage`) and
+`RESEARCH_QA_SYSTEM_PROMPT`, which instructs the fresh agent to investigate and return *only* a
+concise Japanese answer (avoiding repeated `---` separators), logged as `research_qa_done`. The
+Director is told (in both `REACT_SYSTEM_PROMPT` and `EXTREME_REACT_SYSTEM_PROMPT`) to use this
+instead of calling `web_search`/`fetch_webpage` itself for any research likely to need multiple
+fetches — keeping page contents and trial-and-error out of its own context, which would otherwise
+get compacted away and degrade later turns. Single quick lookups can still use `web_search`/
+`fetch_webpage` directly.
+
 ### Safety net (`autogit.py`)
 `AutoGit` (used unless `MIMIC_NO_AUTOGIT` is set, in which case `NullAutoGit` is used):
 `backup()` before each user turn, `checkpoint()` after each successful write tool, `rollback()`/
