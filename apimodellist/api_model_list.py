@@ -539,6 +539,23 @@ def search_api_keys(root_dir: Path) -> List[Dict[str, Any]]:
     return api_keys
 
 
+def set_api_keys_from_files(root_dir: Path) -> None:
+    """ディレクトリから検出されたAPIキーを環境変数に設定する。"""
+    detected_api_keys = search_api_keys(root_dir)
+
+    if not detected_api_keys:
+        console = Console()
+        console.print("[yellow]No API keys detected in the directory.[/yellow]")
+        return
+
+    for key_info in detected_api_keys:
+        env_key = key_info["env_key"]
+        api_key = key_info["key"]
+        os.environ[env_key] = api_key
+        console = Console()
+        console.print(f"[green]Set {env_key} from file: {key_info['file_path']}[/green]")
+
+
 def display_api_keys(api_keys: List[Dict[str, Any]]) -> None:
     """検出されたAPIキーを表形式で表示する。"""
     console = Console()
@@ -608,15 +625,14 @@ def main() -> None:
     """メイン処理。"""
     console = Console()
 
-    # 0. ディレクトリをスキャンしてAPIキーを検出
+    # 0. ディレクトリをスキャンしてAPIキーを検出し、環境変数に設定
     console.print("[bold blue]Scanning directory for API keys...[/bold blue]")
     root_dir = Path("/home/loser/wsl-projects")
-    detected_api_keys = search_api_keys(root_dir)
+    set_api_keys_from_files(root_dir)
 
+    detected_api_keys = search_api_keys(root_dir)
     if detected_api_keys:
         display_api_keys(detected_api_keys)
-    else:
-        console.print("[yellow]No API keys detected in the directory.[/yellow]")
 
     # 1. ディレクトリをスキャンしてAPIを検出
     console.print("[bold blue]Scanning directory for APIs...[/bold blue]")
