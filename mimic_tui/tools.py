@@ -773,6 +773,9 @@ def delegate_to_team(task: str, project_dir: str = ".") -> str:
         "互いに依存しない複数のタスクを、それぞれ delegate_to_team と同じ"
         "Worker→Supervisorレビュー付きループで並列実行する。"
         "各タスクの指示文(tasks)は事前に自分(Director)で調査し具体的に書くこと。"
+        "【重要】tasks は必ず文字列の配列（list[str]）で渡すこと（例: [\"タスク1の説明\", \"タスク2の説明\"]）。"
+        "1つのタスクを\"###\"等の区切りで連結した単一の文字列として渡してはならない"
+        "（文字列を渡すと1文字ごとに大量のWorkerが起動してしまう）。要素数は最大10件まで。"
     ),
     parameters={
         "type": "object",
@@ -780,7 +783,7 @@ def delegate_to_team(task: str, project_dir: str = ".") -> str:
             "tasks": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Workerチームに与えるタスク一覧（各要素が独立した自己完結タスクであること）",
+                "description": "Workerチームに与えるタスク一覧（各要素が独立した自己完結タスクであること、最大10件）",
             },
             "project_dir": {
                 "type": "string",
@@ -793,8 +796,13 @@ def delegate_to_team(task: str, project_dir: str = ".") -> str:
 )
 def delegate_to_team_parallel(tasks: list[str], project_dir: str = ".") -> str:
     from .team import run_team_tasks_parallel, _get_team_config
+    if isinstance(tasks, str):
+        return ("エラー: tasks は文字列ではなく、文字列の配列（list[str]）で渡してください。"
+                "例: [\"タスク1の説明\", \"タスク2の説明\"]")
     if not tasks:
         return "エラー: tasks が空です。"
+    if len(tasks) > 10:
+        return f"エラー: tasks が{len(tasks)}件あります。1回の呼び出しは10件以下に分割してください。"
     results = run_team_tasks_parallel(tasks, project_dir, _get_team_config())
     blocks = []
     for i, r in enumerate(results, 1):
