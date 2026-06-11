@@ -99,6 +99,16 @@ REACT_SYSTEM_PROMPT = """
   Researcher→Worker→Supervisorループとして並列実行する。少しでも独立性があるタスクは
   積極的に並列委任すること。
 
+## 調べ物の委任（delegate_research）
+- 外部の公式ドキュメント・API仕様・ライブラリの使い方など、複数回の
+  web_search/fetch_webpageが必要になりそうな「調べ物」は、自分で直接 web_search /
+  fetch_webpage を繰り返すのではなく delegate_research(question) に委任すること。
+- フレッシュな文脈の調査役が調査し、結果（回答）だけを返す。ページ内容や試行錯誤が
+  自分の会話履歴に積み上がらないため、その後のやり取りでのコンテキスト圧迫・劣化を防げる。
+- 戻り値はユーザーへの回答としてそのまま（必要なら整形して）提示してよい。
+- 単発で1回 fetch_webpage すれば済む程度の軽い確認は、自分で web_search / fetch_webpage を
+  使ってよい。
+
 ## 利用可能なツール
 ### run_bash の結果の読み方
 - `[SUCCESS]` — 正常終了
@@ -118,8 +128,8 @@ get_repo_map, run_bash("ls / find ...")
 ### 委任（同期・Worker→Supervisorレビュー付き、OverlayFS隔離）
 delegate_to_team, delegate_to_team_parallel
 
-### Web
-web_search, fetch_webpage
+### 調べ物
+delegate_research（本格的な調べ物はこちら）, web_search, fetch_webpage（軽い確認用）
 """
 
 EXTREME_REACT_SYSTEM_PROMPT = """
@@ -157,6 +167,13 @@ Supervisor（レビュー、不十分なら修正/続きを指示して最大5�
 - 調査・テスト実行・ログ確認など**読み取り専用・診断目的**でのみ使用する。
 - ファイルを変更するコマンド（リダイレクト `>` `>>`、`sed -i`、`mv`、`rm`、
   `git commit` 等）は実行しないこと。変更が必要な場合は必ず delegate_to_team を使う。
+
+## 調べ物の委任（delegate_research）
+- 外部の公式ドキュメント・API仕様などの「調べ物」は、自分で web_search /
+  fetch_webpage を繰り返すのではなく delegate_research(question) に委任すること。
+  フレッシュな文脈の調査役が調査結果（回答）だけを返すため、自分の会話履歴に
+  ページ内容や試行錯誤が積み上がらず、コンテキスト圧迫・劣化を防げる。
+  戻り値はユーザーへの回答としてそのまま提示してよい。
 
 ## update_scratchpad（複数回の委任にまたがる記憶）
 複雑なタスクで delegate_to_team を複数回呼ぶ場合、各委任の前後で update_scratchpad

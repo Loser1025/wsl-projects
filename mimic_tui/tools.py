@@ -802,6 +802,37 @@ def delegate_to_team_parallel(tasks: list[str], project_dir: str = ".") -> str:
     return f"[delegate_to_team_parallel: {len(results)} 件完了]\n\n" + "\n\n".join(blocks)
 
 
+@tools.register(
+    name="delegate_research",
+    description=(
+        "外部の公式ドキュメント・仕様などを調べる「調べ物」を、フレッシュな文脈の調査役"
+        "（Researcher）に委任し、調査結果（回答）だけを受け取る。"
+        "複数回のweb_search/fetch_webpageが必要になりそうな調べ物は、自分(Director)で"
+        "直接行わず必ずこれを使うこと。Web検索結果のページ内容や試行錯誤が自分の会話履歴に"
+        "積み上がるのを防ぎ、その後のやり取りでのコンテキスト圧迫・劣化を避けられる。"
+        "戻り値はユーザーへの回答としてそのまま提示してよい。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "question": {
+                "type": "string",
+                "description": "調べてほしいこと（ユーザーの質問の意図が伝わるように具体的に書く）",
+            },
+            "project_dir": {
+                "type": "string",
+                "description": "作業対象のプロジェクトディレクトリのフルパス（通常は現在の作業フォルダ）",
+                "default": ".",
+            },
+        },
+        "required": ["question"],
+    },
+)
+def delegate_research(question: str, project_dir: str = ".") -> str:
+    from .team import run_research_qa, _get_team_config
+    return run_research_qa(question, project_dir, _get_team_config())
+
+
 # ── search_history ツール ──────────────────────────────────────────
 _sessions_dir_for_tool: "Optional[Path]" = None
 

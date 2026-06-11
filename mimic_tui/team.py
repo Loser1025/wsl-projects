@@ -191,6 +191,38 @@ def run_supervisor(task: str, work_result: SubagentResult, project_dir: str, con
     return {"status": status, "feedback": feedback, "raw": raw}
 
 
+RESEARCH_QA_SYSTEM_PROMPT = """\
+あなたは調査役（Researcher）です。
+Director（指示役）から渡された「調べてほしいこと」について必要な調査を行い、
+その結果だけをユーザーへの回答として整理して返してください。
+
+# 調査
+- read_file, search_in_file, grep_codebase, file_info, smart_read, get_repo_map で
+  プロジェクト内の関連情報を確認できる
+- 必要であれば web_search / fetch_webpage で外部の仕様・公式ドキュメント等を調べる
+  （書き込みは一切できない）
+
+# 出力（最終回答）
+- 「調べてほしいこと」に対する答えだけを、簡潔に日本語で書くこと。
+  調査の過程・余談・関係ない情報は書かない。
+- Markdownの区切り線（---）を多用しない。見出しは最小限にする。
+- 情報源（URL等）があれば末尾に簡潔に添える。
+"""
+
+
+def run_research_qa(question: str, project_dir: str, config, label: str = "") -> str:
+    """ユーザーからの調べ物依頼に対し、フレッシュな文脈で調査を行い回答だけを返す。"""
+    registry = _build_researcher_registry()
+    prompt = (
+        f"[作業フォルダ] {Path(project_dir).resolve()}\n\n"
+        f"[調べてほしいこと]\n{question}\n"
+    )
+    answer = _run_isolated(config, registry, RESEARCH_QA_SYSTEM_PROMPT, prompt,
+                            max_rounds=_RESEARCHER_MAX_ROUNDS, label=label, role="Researcher")
+    log.info({"event": "research_qa_done", "question": question, "answer": answer[:2000]})
+    return answer
+
+
 def run_research(task: str, project_dir: str, config, label: str = "") -> str:
     """元の指示をもとに調査を行い、Worker向けの設計ワークフローを返す。"""
     registry = _build_researcher_registry()
