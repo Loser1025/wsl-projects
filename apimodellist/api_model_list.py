@@ -309,7 +309,10 @@ def fetch_models(api_name: str, api_key: str) -> List[Dict[str, Any]]:
 
     try:
         data = response.json()
-        models = data.get("data", []) if isinstance(data, dict) else data
+        if isinstance(data, dict):
+            models = data.get("data") or data.get("models") or []
+        else:
+            models = data if isinstance(data, list) else []
         if not isinstance(models, list):
             return []
 
@@ -332,9 +335,15 @@ def fetch_models(api_name: str, api_key: str) -> List[Dict[str, Any]]:
                     detail_data = detail_response.json()
                     context_length = detail_data.get(config["context_length_field"])
 
+            model_name = model.get("name", model_id)
+
+            # "free" という表記があるモデルだけをフィルタリング
+            if "free" not in model_name.lower() and "free" not in model_id.lower():
+                continue
+
             result.append({
                 "id": model_id,
-                "name": model.get("name", model_id),
+                "name": model_name,
                 "context_length": context_length,
                 "rate_limit_requests": rate_limit_requests,
                 "rate_limit_tokens": rate_limit_tokens,
@@ -638,8 +647,25 @@ def main() -> None:
     console.print("[bold blue]Scanning directory for APIs...[/bold blue]")
     detected_apis = scan_directory(root_dir)
 
+    # 1b. API_CONFIGS に定義されていて環境変数にキーがあるAPIも追加
+    detected_api_names = {api["name"] for api in detected_apis}
+    for api_name, config in API_CONFIGS.items():
+        if api_name in detected_api_names:
+            continue
+        env_key = config.get("env_key")
+        if env_key and os.getenv(env_key):
+            detected_apis.append({
+                "name": api_name,
+                "endpoint": config.get("base_url", "N/A"),
+                "has_key": True,
+                "file_path": "(environment variable)",
+            })
+            console.print(
+                f"[green]Added {api_name} from environment variable ({env_key})[/green]"
+            )
+
     if not detected_apis:
-        console.print("[yellow]No APIs detected in the directory.[/yellow]")
+        console.print("[yellow]No APIs detected in the directory or environment variables.[/yellow]")
         return
 
     console.print(f"[green]Detected {len(detected_apis)} API(s):[/green]")
@@ -687,10 +713,10 @@ def main() -> None:
         console.print(f"[blue]Fetching models for {api_name}...[/blue]")
         models = fetch_models(api_name, api_key)
         if models:
-            console.print(f"[green]Found {len(models)} model(s) for {api_name}.[/green]")
+            console.print(f"[green]Found {len(models)} free model(s) for {api_name}.[/green]")
             all_models.extend(models)
         else:
-            console.print(f"[red]Failed to fetch models for {api_name}.[/red]")
+            console.print(f"[yellow]No free models found for {api_name}.[/yellow]")
 
     # 4. データを整理
     organized_models = organize_models(all_models)
