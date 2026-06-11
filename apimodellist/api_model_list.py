@@ -349,6 +349,60 @@ def fetch_models(api_name: str, api_key: str) -> List[Dict[str, Any]]:
         return []
 
 
+def fetch_api_details(api_name: str, api_key: str) -> Dict[str, Any]:
+    """APIキーを使用してリクエストを送り、リミットやエイリアスなどの情報を取得する。"""
+    config = API_CONFIGS.get(api_name)
+    if not config:
+        return {}
+
+    console = Console()
+
+    # モデル一覧を取得
+    models = fetch_models(api_name, api_key)
+    if not models:
+        return {}
+
+    # レスポンスヘッダーからレートリミット情報を取得（fetch_models で取得済み）
+    rate_limit_requests = models[0].get("rate_limit_requests", "N/A")
+    rate_limit_tokens = models[0].get("rate_limit_tokens", "N/A")
+
+    # 各モデルの詳細からレートリミット情報を取得（個別モデルエンドポイント）
+    model_detail_requests = "N/A"
+    model_detail_tokens = "N/A"
+    for model in models[:1]:  # 最初のモデルだけ詳細取得
+        model_id = model.get("id", "")
+        if not model_id:
+            continue
+        endpoint = f"{config['models_endpoint'].rstrip('/')}/{model_id}"
+        detail_response = make_api_request(api_name, endpoint.lstrip("/"), api_key)
+        if detail_response:
+            headers = detail_response.headers
+            rl_header_requests = config["rate_limit_headers"]["requests"]
+            rl_header_tokens = config["rate_limit_headers"]["tokens"]
+            model_detail_requests = headers.get(rl_header_requests, rate_limit_requests)
+            model_detail_tokens = headers.get(rl_header_tokens, rate_limit_tokens)
+            break
+
+    # エイリアス情報を取得
+    aliases = []
+    for model in models:
+        model_aliases = extract_aliases(model)
+        if model_aliases and model_aliases != "-":
+            aliases.extend(
+                alias.strip()
+                for alias in model_aliases.split(",")
+                if alias.strip() and alias.strip() not in aliases
+            )
+
+    return {
+        "api_name": api_name,
+        "rate_limit_requests": model_detail_requests if model_detail_requests != "N/A" else rate_limit_requests,
+        "rate_limit_tokens": model_detail_tokens if model_detail_tokens != "N/A" else rate_limit_tokens,
+        "aliases": ", ".join(aliases) if aliases else "-",
+        "models_count": len(models),
+    }
+
+
 # ──────────────────────────────────────────────
 # データ整理機能
 # ──────────────────────────────────────────────
@@ -518,6 +572,35 @@ def display_api_keys(api_keys: List[Dict[str, Any]]) -> None:
     console.print(Panel(table, title="[bold]Detected API Keys[/bold]", border_style="blue"))
 
 
+def display_api_details(api_details: Dict[str, Any]) -> None:
+    """取得したAPIの詳細情報を表示する。"""
+    console = Console()
+
+    table = Table(
+        title="API Details",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan",
+        show_lines=True,
+    )
+
+    table.add_column("API Name", style="magenta", width=20)
+    table.add_column("Models Count", style="green", width=15)
+    table.add_column("Rate Limit (Requests)", justify="right", width=25)
+    table.add_column("Rate Limit (Tokens)", justify="right", width=25)
+    table.add_column("Aliases", style="dim", width=30)
+
+    table.add_row(
+        api_details.get("api_name", "N/A"),
+        str(api_details.get("models_count", "N/A")),
+        str(api_details.get("rate_limit_requests", "N/A")),
+        str(api_details.get("rate_limit_tokens", "N/A")),
+        api_details.get("aliases", "-"),
+    )
+
+    console.print(Panel(table, title="[bold]API Details[/bold]", border_style="blue"))
+
+
 # ──────────────────────────────────────────────
 # メイン処理
 # ──────────────────────────────────────────────
@@ -550,7 +633,28 @@ def main() -> None:
             f"Has Key: {api.get('has_key', False)})"
         )
 
-    # 2. 各APIのモデル一覧を取得
+    # 2. 各APIの詳細情報を取得・表示
+    console.print("[bold blue]Fetching API details...[/bold blue]")
+    for api in detected_apis:
+        api_name = api["name"]
+        env_key = API_CONFIGS.get(api_name, {}).get("env_key")
+        if not env_key:
+            console.print(f"[yellow]Skipping {api_name}: No environment variable configuration.[/yellow]")
+            continue
+
+        api_key = os.getenv(env_key)
+        if not api_key:
+            console.print(f"[yellow]Skipping {api_name}: {env_key} environment variable is not set.[/yellow]")
+            continue
+
+        console.print(f"[blue]Fetching details for {api_name}...[/blue]")
+        api_details = fetch_api_details(api_name, api_key)
+        if api_details:
+            display_api_details(api_details)
+        else:
+            console.print(f"[red]Failed to fetch details for {api_name}.[/red]")
+
+    # 3. 各APIのモデル一覧を取得
     all_models = []
     for api in detected_apis:
         api_name = api["name"]
@@ -572,10 +676,10 @@ def main() -> None:
         else:
             console.print(f"[red]Failed to fetch models for {api_name}.[/red]")
 
-    # 3. データを整理
+    # 4. データを整理
     organized_models = organize_models(all_models)
 
-    # 4. TUIで表示
+    # 5. TUIで表示
     display_models(organized_models)
 
 
