@@ -88,8 +88,15 @@ agent into a "Director-only" role: in this mode `agent.tools` is swapped to a re
   page through them with `read_tool_cache(cache_key, offset)`.
 
 ### Sub-agents & team delegation (`subagent.py`, `team.py`)
-`delegate_to_team[_parallel]` runs a Worker→Supervisor review loop (`team.py::run_team_task`,
-up to `MAX_TEAM_RETRIES = 5`):
+`delegate_to_team[_parallel]` runs a Researcher → Worker → Supervisor pipeline
+(`team.py::run_team_task`, up to `MAX_TEAM_RETRIES = 5` Worker/Supervisor rounds):
+- **Researcher** (`team.py::run_research` / `_run_isolated` with `role="Researcher"`): runs once,
+  before attempt 1 only. A fresh, history-less agent with `_build_researcher_registry`
+  (read-only tools + `web_search`/`fetch_webpage`, `_RESEARCHER_MAX_ROUNDS = 12`) investigates the
+  Director's task and produces a detailed Markdown "design workflow" (target file paths, current
+  code, step-by-step changes, code samples, completion criteria) which is prepended to the
+  Worker's task as `[Researcherによる設計ワークフロー]`. Logged as `team_research_done`
+  (truncated to 2000 chars). Streamed live (prefixed `[Researcher:<label>]`).
 - **Worker** (`subagent.py::run_subagent_reviewable`): a synchronous, sandboxed copy of mimic
   itself. Builds an OverlayFS workroom (`lowerdir`=project read-only, `upperdir`=scratch,
   `merged`=view), runs `unshare -U -m -r` in an unprivileged namespace, then launches
@@ -100,12 +107,17 @@ up to `MAX_TEAM_RETRIES = 5`):
   read-only tool registry (`_build_readonly_registry`: `read_file`, `search_in_file`,
   `grep_codebase`, `file_info`, `smart_read`, `get_repo_map`, `read_tool_cache`). Reviews the
   Worker's diff summary against the original task and returns
-  `{"status": "ok"|"retry", "feedback": "..."}`. Its reasoning/tool calls are streamed live too
-  (prefixed `[Supervisor:<label>]`).
+  `{"status": "ok"|"retry", "feedback": "..."}`. On `"retry"` the prompt asks it to separate
+  feedback into 修正 (what's wrong in the existing diff and how to fix it) and 続き (what
+  remaining work to do next), since the Worker continues from its current state rather than
+  starting over. Its reasoning/tool calls are streamed live too (prefixed `[Supervisor:<label>]`).
 - On `"ok"`: `apply_subagent_changes()` copies the `upperdir` diff onto the real project dir
   (including deletions via overlay whiteout markers), `AutoGit().checkpoint()` commits it, then
-  `cleanup_subagent()` removes the temp dir. On `"retry"`: temp dir is discarded and the Worker
-  re-runs with the Supervisor's feedback appended to the task.
+  `cleanup_subagent()` removes the temp dir. On `"retry"`: the same `base`/`upperdir` is kept and
+  passed back into `run_subagent_reviewable(..., base=base)`, so the next attempt re-mounts the
+  overlay on top of the *existing* changes and continues with the Supervisor's feedback appended
+  — only after `MAX_TEAM_RETRIES` is exhausted without `"ok"` is the temp dir finally discarded
+  (unapplied).
 - `delegate_to_team_parallel` runs independent tasks as threads, each with its own
   Worker/Supervisor/temp dir (labelled `#1`, `#2`, ...); applying changes is serialized via
   `_apply_lock` to avoid concurrent git operations.

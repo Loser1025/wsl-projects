@@ -149,7 +149,8 @@ def cleanup_subagent(base: Path) -> None:
     _force_rmtree(base)
 
 
-def run_subagent_reviewable(task: str, project_dir: str, label: str = "single"
+def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
+                              base: Optional[Path] = None
                               ) -> tuple[SubagentResult, Optional[Path], Optional[Path]]:
     """Worker を OverlayFS 隔離下で同期実行する。
 
@@ -157,8 +158,12 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single"
     呼び出し側はレビュー結果に応じて apply_subagent_changes() してから
     cleanup_subagent(base) を呼ぶこと（採用しない場合は cleanup のみ）。
     例外・タイムアウト時は内部で破棄して (result, None, None) を返す。
+
+    `base` を渡すと、前回までの upperdir（＝それまでの変更内容）を温存したまま
+    overlay を再マウントして続きから実行する（「やり直し」ではなく「続き」）。
     """
-    base   = Path(tempfile.mkdtemp(prefix=f"mimic_subagent_{label}_"))
+    if base is None:
+        base = Path(tempfile.mkdtemp(prefix=f"mimic_subagent_{label}_"))
     lower  = Path(project_dir).resolve()
     upper  = base / "upper"
     work   = base / "work"
