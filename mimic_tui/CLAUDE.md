@@ -111,6 +111,11 @@ agent into a "Director-only" role: in this mode `agent.tools` is swapped to a re
   feedback into 修正 (what's wrong in the existing diff and how to fix it) and 続き (what
   remaining work to do next), since the Worker continues from its current state rather than
   starting over. Its reasoning/tool calls are streamed live too (prefixed `[Supervisor:<label>]`).
+  Each call is still a brand-new agent (no shared conversation), but `run_team_task` passes the
+  *previous* Supervisor call's full raw output as `prev_raw`, included in the prompt as
+  `[前回のSupervisor所見]` alongside `[最終目的（元の指示）]`. `SUPERVISOR_SYSTEM_PROMPT` tells it
+  to prioritize checking whether its own prior 【修正】 points were actually addressed, rather than
+  re-deriving everything from scratch or repeating the same feedback.
 - On `"ok"`: `apply_subagent_changes()` copies the `upperdir` diff onto the real project dir
   (including deletions via overlay whiteout markers), `AutoGit().checkpoint()` commits it, then
   `cleanup_subagent()` removes the temp dir. On `"retry"`: the same `base`/`upperdir` is kept and

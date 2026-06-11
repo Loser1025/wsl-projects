@@ -70,6 +70,10 @@ Workerが「ここまでに行った作業」の差分サマリが、元の指�
   具体的に特定すること）
 - 必要であれば読み取り専用ツール（read_file, search_in_file, grep_codebase, file_info, smart_read, get_repo_map）で
   プロジェクトの現状を確認してよい（書き込みは一切できない）
+- 「前回のSupervisor所見」が渡されている場合は、その指摘（特に【修正】）が今回の
+  変更で実際に解消されているかを最優先で確認すること。解消されていなければ
+  同じ指摘を繰り返すのではなく、なぜ直っていないのか・どう直すべきかをより
+  具体的に書き直すこと
 
 # 出力形式（必須）
 最終回答は以下のJSON形式のみを1つ出力すること。説明文やMarkdownのコードブロックは付けない。
@@ -166,14 +170,20 @@ def _run_isolated(config, tool_registry: ToolRegistry, system_prompt: str,
 
 
 def run_supervisor(task: str, work_result: SubagentResult, project_dir: str, config,
-                    label: str = "") -> dict:
-    """Workerの結果をレビューし、{"status", "feedback", "raw"} を返す。"""
+                    label: str = "", prev_raw: str = "") -> dict:
+    """Workerの結果をレビューし、{"status", "feedback", "raw"} を返す。
+
+    `prev_raw` には前回のSupervisor呼び出しの生出力（あれば）を渡す。これにより
+    今回のSupervisorは「前回何を指摘し、それが直っているか」を踏まえて判定できる。
+    """
     registry = _build_readonly_registry()
     prompt = (
         f"[作業フォルダ] {Path(project_dir).resolve()}\n\n"
-        f"[元の指示]\n{task}\n\n"
-        f"[Workerの作業結果]\n{work_result.summary}\n"
+        f"[最終目的（元の指示）]\n{task}\n\n"
     )
+    if prev_raw:
+        prompt += f"[前回のSupervisor所見]\n{prev_raw}\n\n"
+    prompt += f"[Workerの作業結果]\n{work_result.summary}\n"
     raw = _run_isolated(config, registry, SUPERVISOR_SYSTEM_PROMPT, prompt, label=label)
 
     verdict: dict = {}
@@ -265,6 +275,7 @@ def run_team_task(task: str, project_dir: str, config, label: str = "") -> str:
     team_tag = f"[Team:{label}]" if label else "[Team]"
     base: Optional[Path] = None
     upper: Optional[Path] = None
+    prev_raw = ""
 
     safe_print(C.gray(f"  {team_tag} 🔍 Researcher調査中..."), flush=True)
     research = run_research(task, project_dir, config, label=label)
@@ -283,7 +294,8 @@ def run_team_task(task: str, project_dir: str, config, label: str = "") -> str:
         last_result, upper, base = run_subagent_reviewable(worker_task, project_dir, label=label or "single", base=base)
 
         safe_print(C.gray(f"  {team_tag} 👁 Supervisorレビュー中..."), flush=True)
-        verdict = run_supervisor(task, last_result, project_dir, config, label=label)
+        verdict = run_supervisor(task, last_result, project_dir, config, label=label, prev_raw=prev_raw)
+        prev_raw = verdict["raw"]
         log.info({"event": "team_supervisor_verdict", "attempt": attempt,
                    "status": verdict["status"], "feedback": verdict["feedback"][:200],
                    "worker_ok": last_result.ok, "worker_raw_tail": last_result.raw_tail[-300:]})
