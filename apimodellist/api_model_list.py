@@ -445,15 +445,98 @@ def display_models(models: List[Dict[str, Any]]) -> None:
 
 
 # ──────────────────────────────────────────────
+# APIキー検索機能
+# ──────────────────────────────────────────────
+def search_api_keys(root_dir: Path) -> List[Dict[str, Any]]:
+    """ディレクトリ内のファイルからAPIキーのパターンを検索する。"""
+    api_keys = []
+
+    for file_path in root_dir.rglob("*"):
+        if not file_path.is_file():
+            continue
+        if file_path.suffix.lower() not in TEXT_EXTENSIONS:
+            continue
+        if any(part in EXCLUDE_DIRS for part in file_path.parts):
+            continue
+
+        try:
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+        except (UnicodeDecodeError, PermissionError, OSError):
+            continue
+
+        for api_name, api_config in API_CONFIGS.items():
+            env_key = api_config.get("env_key")
+            if not env_key:
+                continue
+
+            # APIキーのパターンを検索（ENV_KEY = 'value' or ENV_KEY = "value"）
+            key_pattern = re.compile(
+                rf"{re.escape(env_key)}\s*=\s*['\"]([^'\"]+)['\"]", re.IGNORECASE
+            )
+            match = key_pattern.search(content)
+            if match:
+                api_keys.append({
+                    "api_name": api_name,
+                    "env_key": env_key,
+                    "key": match.group(1),
+                    "file_path": str(file_path.resolve()),
+                })
+
+    return api_keys
+
+
+def display_api_keys(api_keys: List[Dict[str, Any]]) -> None:
+    """検出されたAPIキーを表形式で表示する。"""
+    console = Console()
+
+    if not api_keys:
+        console.print("[yellow]No API keys found.[/yellow]")
+        return
+
+    table = Table(
+        title="Detected API Keys",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan",
+        show_lines=True,
+    )
+
+    table.add_column("API Name", style="magenta", width=20)
+    table.add_column("Env Key", style="yellow", width=25)
+    table.add_column("API Key", style="green", width=40)
+    table.add_column("File Path", style="dim", width=50)
+
+    for key in api_keys:
+        masked_key = key["key"][:8] + "..." if len(key["key"]) > 8 else key["key"]
+        table.add_row(
+            key["api_name"],
+            key["env_key"],
+            masked_key,
+            key["file_path"],
+        )
+
+    console.print(Panel(table, title="[bold]Detected API Keys[/bold]", border_style="blue"))
+
+
+# ──────────────────────────────────────────────
 # メイン処理
 # ──────────────────────────────────────────────
 def main() -> None:
     """メイン処理。"""
     console = Console()
 
+    # 0. ディレクトリをスキャンしてAPIキーを検出
+    console.print("[bold blue]Scanning directory for API keys...[/bold blue]")
+    root_dir = Path("/home/loser/wsl-projects")
+    detected_api_keys = search_api_keys(root_dir)
+
+    if detected_api_keys:
+        display_api_keys(detected_api_keys)
+    else:
+        console.print("[yellow]No API keys detected in the directory.[/yellow]")
+
     # 1. ディレクトリをスキャンしてAPIを検出
     console.print("[bold blue]Scanning directory for APIs...[/bold blue]")
-    root_dir = Path("/home/loser/wsl-projects")
     detected_apis = scan_directory(root_dir)
 
     if not detected_apis:
