@@ -53,7 +53,7 @@ API_CONFIGS = {
         "auth_prefix": "Bearer",
         "env_key": "MISTRAL_API_KEY",
         "model_id_field": "id",
-        "context_length_field": "max_tokens",
+        "context_length_field": "max_context_length",
         "rate_limit_headers": {
             "requests": "x-ratelimit-limit-requests",
             "tokens": "x-ratelimit-limit-tokens",
@@ -75,8 +75,8 @@ API_CONFIGS = {
     "Gemini": {
         "models_endpoint": "/v1/models",
         "base_url": "https://generativelanguage.googleapis.com",
-        "auth_header": "Authorization",
-        "auth_prefix": "Bearer",
+        "auth_header": "x-goog-api-key",
+        "auth_prefix": "",
         "env_key": "GOOGLE_API_KEY",
         "model_id_field": "name",
         "context_length_field": "inputTokenLimit",
