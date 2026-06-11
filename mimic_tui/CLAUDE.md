@@ -64,8 +64,11 @@ Key responsibilities:
 `BASH_EXECUTOR_GUIDANCE` and `REACT_SYSTEM_PROMPT` (appended to the user's `SYSTEM_PROMPT`) define
 the agent's operating rules — notably a "Pipeline-First" policy (prefer `search_in_file` /
 `grep_codebase` / `file_info` / `run_pipeline` over `read_file` to save context) and an
-"aggressive sub-agent delegation" policy. `EXTREME_REACT_SYSTEM_PROMPT` is an alternate
-profile-switching prompt selectable via `/mode`.
+"aggressive team delegation" policy (`delegate_to_team[_parallel]`, see below).
+`EXTREME_REACT_SYSTEM_PROMPT` is an alternate prompt selectable via `/mode extreme` that turns the
+agent into a "Director-only" role: in this mode `agent.tools` is swapped to a registry with
+`write_file`/`edit_file`/`patch_file`/`delete_file` removed (built in `_build_components` as
+`extreme_tools`), so all code changes must go through `delegate_to_team`.
 
 ### Tools (`tools.py`, `tools_linux.py`, `pipeline.py`)
 `ToolRegistry` (in `tools.py`) holds all tool specs/functions; tools self-register via
@@ -80,20 +83,34 @@ profile-switching prompt selectable via `/mode`.
   (registers itself onto the same `tools` registry from `tools.py`).
 - Web/browser: `web_search`, `fetch_webpage`, and Playwright-backed `browser_*` tools (no-op if
   `playwright` isn't installed; toggled via `enable_browser_tools`/`disable_browser_tools`).
-- Sub-agent delegation: `delegate_to_subagent` / `delegate_to_subagent_parallel` (see below).
+- Team delegation: `delegate_to_team` / `delegate_to_team_parallel` (see below).
 - Large tool outputs (>10000 chars) are auto-cached (`cache_tool_output`); the agent is told to
   page through them with `read_tool_cache(cache_key, offset)`.
 
-### Sub-agents (`subagent.py`)
-`delegate_to_subagent[_parallel]` spawns a synchronous, sandboxed copy of mimic itself:
-- Builds an OverlayFS workroom (`lowerdir`=project read-only, `upperdir`=scratch, `merged`=view).
-- Runs `unshare -U -m -r` to mount the overlay in an unprivileged namespace, then launches
-  `python3 -m mimic_tui --auto-prompt "<task>"` with `MIMIC_CWD=<merged>` and
-  `MIMIC_NO_AUTOGIT=1` (sub-agents never touch git).
-- Returns a `SubagentResult` summarizing changed files in `upperdir` as a diff; the parent agent
-  must review and apply changes itself via its own file tools, then commit.
-- Cleanup is automatic (namespace teardown unmounts overlay; `_force_rmtree` handles the
-  mode-0000 overlay `work` dir).
+### Sub-agents & team delegation (`subagent.py`, `team.py`)
+`delegate_to_team[_parallel]` runs a Worker→Supervisor review loop (`team.py::run_team_task`,
+up to `MAX_TEAM_RETRIES = 5`):
+- **Worker** (`subagent.py::run_subagent_reviewable`): a synchronous, sandboxed copy of mimic
+  itself. Builds an OverlayFS workroom (`lowerdir`=project read-only, `upperdir`=scratch,
+  `merged`=view), runs `unshare -U -m -r` in an unprivileged namespace, then launches
+  `python3 -m mimic_tui --auto-prompt "<task>"` with `MIMIC_NO_AUTOGIT=1`. Its stdout is streamed
+  live (prefixed `[Worker:<label>]`). Unlike a plain sub-agent, the `upperdir`/temp dir is *not*
+  cleaned up immediately — it's returned to the caller as `(SubagentResult, upper, base)`.
+- **Supervisor** (`team.py::run_supervisor` / `_run_isolated`): a fresh, history-less agent with a
+  read-only tool registry (`_build_readonly_registry`: `read_file`, `search_in_file`,
+  `grep_codebase`, `file_info`, `smart_read`, `get_repo_map`, `read_tool_cache`). Reviews the
+  Worker's diff summary against the original task and returns
+  `{"status": "ok"|"retry", "feedback": "..."}`. Its reasoning/tool calls are streamed live too
+  (prefixed `[Supervisor:<label>]`).
+- On `"ok"`: `apply_subagent_changes()` copies the `upperdir` diff onto the real project dir
+  (including deletions via overlay whiteout markers), `AutoGit().checkpoint()` commits it, then
+  `cleanup_subagent()` removes the temp dir. On `"retry"`: temp dir is discarded and the Worker
+  re-runs with the Supervisor's feedback appended to the task.
+- `delegate_to_team_parallel` runs independent tasks as threads, each with its own
+  Worker/Supervisor/temp dir (labelled `#1`, `#2`, ...); applying changes is serialized via
+  `_apply_lock` to avoid concurrent git operations.
+- The Director itself never needs to apply diffs or commit — `delegate_to_team` returns a summary
+  saying whether changes were already applied/committed.
 
 ### Safety net (`autogit.py`)
 `AutoGit` (used unless `MIMIC_NO_AUTOGIT` is set, in which case `NullAutoGit` is used):
