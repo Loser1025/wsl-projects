@@ -304,13 +304,19 @@ def make_api_request(
     try:
         response = requests.request(method, url, headers=headers, params=params, timeout=30)
         console.print(f"[dim]DEBUG {api_name}: status={response.status_code}[/dim]")
-        if response.status_code >= 400:
-            # エラー時はレスポンス本文も出力
+        if response.status_code != 200:
+            # エラー時はレスポンス本文（text と json の両方）を出力
+            console.print(f"[red]ERROR {api_name}: HTTP {response.status_code}[/red]")
             try:
-                err_body = response.text[:500]
+                err_text = response.text[:2000]
+                console.print(f"[red]ERROR {api_name}: Response text: {err_text}[/red]")
             except Exception:
-                err_body = "(unreadable)"
-            console.print(f"[red]ERROR {api_name}: HTTP {response.status_code} - {err_body}[/red]")
+                console.print(f"[red]ERROR {api_name}: Response text: (unreadable)[/red]")
+            try:
+                err_json = response.json()
+                console.print(f"[red]ERROR {api_name}: Response JSON: {json.dumps(err_json, indent=2, ensure_ascii=False)[:2000]}[/red]")
+            except (json.JSONDecodeError, ValueError):
+                pass  # JSON パース失敗時は text のみ出力
         response.raise_for_status()
         return response
     except requests.exceptions.Timeout:
@@ -320,7 +326,6 @@ def make_api_request(
         console.print(f"[red]ERROR {api_name}: Connection error for {url}: {e}[/red]")
         return None
     except requests.exceptions.HTTPError as e:
-        # raise_for_status からのエラー（raise_for_status前にステータスは出力済み）
         console.print(f"[red]ERROR {api_name}: HTTP error for {url}: {e}[/red]")
         return None
     except requests.exceptions.RequestException as e:
@@ -1018,5 +1023,47 @@ def main() -> None:
     display_models(organized_models)
 
 
+def get_api_models():
+    """APIからモデル一覧を取得するスタンドアロン関数。
+
+    注意: 実際のAPIエンドポイントやレスポンス形式が不明な場合は、
+    以下の url を実際のエンドポイントに修正してください。
+    """
+    # 環境変数の確認
+    api_token = os.getenv('API_TOKEN')
+    if not api_token:
+        print("Error: API_TOKEN が設定されていません。")
+        return None
+
+    # TODO: 実際のAPIエンドポイントが異なる場合は以下を修正してください
+    url = "https://api.example.com/v1/models"  # 実際のエンドポイントに修正が必要
+    headers = {
+        "Authorization": f"Bearer {api_token}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            data = response.json()
+            return data  # レスポンスの全データを返す
+        else:
+            print(f"Error: {response.status_code}")
+            print(f"Response: {response.text}")
+            try:
+                err_json = response.json()
+                print(f"Response JSON: {json.dumps(err_json, indent=2, ensure_ascii=False)}")
+            except (json.JSONDecodeError, ValueError):
+                pass
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"Request Error: {e}")
+        return None
+
+
 if __name__ == "__main__":
+    # get_api_models() を使用する場合は以下のコメントを解除してください
+    # models = get_api_models()
+    # print(models)
     main()
