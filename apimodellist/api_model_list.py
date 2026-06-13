@@ -507,10 +507,19 @@ def extract_aliases(model: Dict[str, Any]) -> str:
     aliases = []
     raw_data = model.get("raw_data", {})
     if isinstance(raw_data, dict):
-        if "id" in raw_data and raw_data["id"] != model["id"]:
-            aliases.append(raw_data["id"])
-        if "name" in raw_data and raw_data["name"] != model["name"]:
-            aliases.append(raw_data["name"])
+        # raw_data の id が model の id と異なる場合は alias
+        raw_id = raw_data.get("id", "")
+        if raw_id and raw_id != model.get("id", ""):
+            aliases.append(raw_id)
+        # raw_data の name が model の name と異なる場合は alias
+        raw_name = raw_data.get("name", "")
+        if raw_name and raw_name != model.get("name", ""):
+            aliases.append(raw_name)
+        # Gemini など id にプレフィックスがついている場合、短縮IDも alias として追加
+        if raw_id and "/" in raw_id:
+            short_id = raw_id.split("/")[-1]
+            if short_id and short_id != model.get("id", "") and short_id not in aliases:
+                aliases.append(short_id)
     return ", ".join(aliases) if aliases else "-"
 
 
