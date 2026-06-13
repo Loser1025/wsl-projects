@@ -337,18 +337,25 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
     return _format_team_result(task, last_result, verdict, MAX_TEAM_RETRIES, done=False, applied=False)
 
 
+# 並列Worker/Researcher/Supervisorの出力がTUIで入り乱れて読めなくなるため、
+# 同時実行数を一時的に1に制限している（タスク自体は順番に処理される）。
+_MAX_PARALLEL_TEAM_TASKS = 1
+
+
 def run_team_tasks_parallel(tasks: list[str], project_dir: str, config, verify_cmd: str = "") -> list[str]:
-    """複数タスクを独立した Worker→Supervisor ループとして並列実行する。"""
+    """複数タスクを独立した Worker→Supervisor ループとして実行する（同時実行数は_MAX_PARALLEL_TEAM_TASKS）。"""
     results: list[Optional[str]] = [None] * len(tasks)
 
     def _worker(i: int, t: str):
         results[i] = run_team_task(t, project_dir, config, label=f"#{i + 1}", verify_cmd=verify_cmd)
 
     threads = [threading.Thread(target=_worker, args=(i, t)) for i, t in enumerate(tasks)]
-    for th in threads:
-        th.start()
-    for th in threads:
-        th.join()
+    for batch_start in range(0, len(threads), _MAX_PARALLEL_TEAM_TASKS):
+        batch = threads[batch_start:batch_start + _MAX_PARALLEL_TEAM_TASKS]
+        for th in batch:
+            th.start()
+        for th in batch:
+            th.join()
     return results  # type: ignore[return-value]
 
 
