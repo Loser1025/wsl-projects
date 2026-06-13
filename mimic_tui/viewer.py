@@ -87,6 +87,25 @@ def _list_sessions(sessions_dir: Path) -> list[dict]:
         entries = _load_entries(f)
         if entries:
             out.append(_session_meta(f, entries))
+
+    # trace_id -> このtrace_idをown_trace_idとして持つセッション（=子セッション）
+    by_trace: dict[str, list[str]] = {}
+    for m in out:
+        if m["own_trace_id"]:
+            by_trace.setdefault(m["own_trace_id"], []).append(m["file"])
+
+    for m in out:
+        children: list[str] = []
+        for tid in m["team_trace_ids"]:
+            children.extend(by_trace.get(tid, []))
+        m["children"] = children
+
+    child_files: set[str] = set()
+    for m in out:
+        child_files.update(m["children"])
+    for m in out:
+        m["is_root"] = m["file"] not in child_files
+
     return out
 
 
@@ -113,10 +132,14 @@ _PAGE = r"""<!DOCTYPE html>
   body { font-family: -apple-system, sans-serif; margin: 0; display: flex; height: 100vh; background: #1e1e1e; color: #ddd; }
   #list { width: 340px; overflow-y: auto; border-right: 1px solid #444; padding: 8px; box-sizing: border-box; }
   #detail { flex: 1; overflow-y: auto; padding: 12px 20px; }
-  .session { padding: 8px; border-radius: 4px; cursor: pointer; margin-bottom: 4px; font-size: 13px; }
+  .session { padding: 8px; border-radius: 4px; cursor: pointer; margin-bottom: 4px; font-size: 13px; border-left: 2px solid transparent; }
   .session:hover, .session.active { background: #333; }
+  .session.active { border-left-color: #8cf; }
   .session .file { color: #8cf; font-weight: bold; }
   .session .meta { color: #999; font-size: 11px; }
+  .session .role { color: #6a9; font-weight: normal; }
+  .session .toggle { display: inline-block; width: 14px; text-align: center; color: #888; cursor: pointer; user-select: none; }
+  .session-children.collapsed { display: none; }
   .entry { margin: 6px 0; padding: 6px 10px; border-radius: 4px; font-size: 13px; }
   .entry .type { font-size: 11px; color: #999; margin-bottom: 2px; }
   .entry .tool-name { color: #8cf; font-weight: bold; }
@@ -142,21 +165,62 @@ _PAGE = r"""<!DOCTYPE html>
 <div id="list"></div>
 <div id="detail"><p>左のリストからセッションを選択してください。</p></div>
 <script>
+function renderSessionNode(container, s, byFile, depth, seen) {
+  if (seen.has(s.file)) return;
+  seen.add(s.file);
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'session-wrapper';
+
+  const hasChildren = (s.children || []).length > 0;
+  const div = document.createElement('div');
+  div.className = 'session';
+  div.style.marginLeft = (depth * 14) + 'px';
+  div.dataset.file = s.file;
+  const role = s.own_trace_id ? ' <span class="role">[Worker/Researcher/Supervisor]</span>'
+                               : (hasChildren ? ' <span class="role">[Director]</span>' : '');
+  const toggle = hasChildren ? '<span class="toggle">▼</span>' : '<span class="toggle"></span>';
+  div.innerHTML = `<div class="file">${toggle}${s.file}${role}</div>` +
+                  `<div class="meta">${s.model || ''} ${s.provider || ''}</div>` +
+                  `<div class="meta">${(s.first_user || '').replace(/</g,'&lt;')}</div>`;
+  div.onclick = (ev) => {
+    if (hasChildren && ev.target.classList.contains('toggle')) {
+      const childrenDiv = wrapper.querySelector('.session-children');
+      const collapsed = childrenDiv.classList.toggle('collapsed');
+      ev.target.textContent = collapsed ? '▶' : '▼';
+      return;
+    }
+    loadDetail(s.file);
+  };
+  wrapper.appendChild(div);
+
+  if (hasChildren) {
+    const childrenDiv = document.createElement('div');
+    childrenDiv.className = 'session-children';
+    for (const childFile of s.children) {
+      const child = byFile[childFile];
+      if (child) renderSessionNode(childrenDiv, child, byFile, depth + 1, seen);
+    }
+    wrapper.appendChild(childrenDiv);
+  }
+
+  container.appendChild(wrapper);
+}
+
 async function loadList() {
   const res = await fetch('/api/sessions');
   const sessions = await res.json();
+  const byFile = {};
+  for (const s of sessions) byFile[s.file] = s;
   const list = document.getElementById('list');
   list.innerHTML = '';
+  const seen = new Set();
   for (const s of sessions) {
-    const div = document.createElement('div');
-    div.className = 'session';
-    div.dataset.file = s.file;
-    const role = s.own_trace_id ? ' [Worker]' : (s.team_trace_ids.length ? ' [Director]' : '');
-    div.innerHTML = `<div class="file">${s.file}${role}</div>` +
-                    `<div class="meta">${s.model || ''} ${s.provider || ''}</div>` +
-                    `<div class="meta">${(s.first_user || '').replace(/</g,'&lt;')}</div>`;
-    div.onclick = () => loadDetail(s.file);
-    list.appendChild(div);
+    if (s.is_root) renderSessionNode(list, s, byFile, 0, seen);
+  }
+  // is_root の判定漏れ（循環参照など）で取り残されたセッションも末尾に表示する
+  for (const s of sessions) {
+    if (!seen.has(s.file)) renderSessionNode(list, s, byFile, 0, seen);
   }
 }
 
