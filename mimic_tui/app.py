@@ -291,6 +291,7 @@ class MimicApp(App):
             "busy":     "⏳ 実行中... (Ctrl+C で中断)",
             "approval": f"Y/n を入力  ·  Enter で確定  ·  {self._APPROVAL_TIMEOUT}秒で自動承認",
             "search":   "番号カンマ区切り / all で全件 / n でキャンセル  ·  Enter で確定",
+            "sessions": "y で注入 / n でキャンセル  ·  Enter で確定",
         }
         try:
             self.query_one("#input-bar").border_title = custom or hints.get(mode, "")
@@ -958,6 +959,10 @@ class MimicApp(App):
             self._cmd_search(rest)
             return
 
+        if cmd == "sessions" and rest.strip():
+            self._cmd_sessions(rest)
+            return
+
         match = cmd_registry.route(text)
         if match:
             _, handler, args = match
@@ -1070,6 +1075,52 @@ class MimicApp(App):
             self._write_direct(f"  ✓ {len(selected)} 件をコンテキストに注入しました。\n")
 
         self._enter_approval_mode(on_response, hint_mode="search")
+
+    # ── /sessions ────────────────────────────────────────────────────
+
+    def _cmd_sessions(self, arg: str) -> None:
+        from .commands import _parse_session_file, resolve_session, build_session_inject_text
+
+        sd = self._ctx["sessions_dir"]
+        jsonl_files = sorted(sd.glob("*.jsonl"), reverse=True)
+        sessions = [s for s in (_parse_session_file(f) for f in jsonl_files) if s]
+
+        session, ambiguous = resolve_session(sessions, arg)
+        if session is None:
+            if ambiguous:
+                self._write_direct(f"  {len(ambiguous)} 件ヒットしました。番号で絞り込んでください:\n")
+                for i, s in enumerate(ambiguous, 1):
+                    self._write_direct(f"  [{i}] {s.get('file', '')}\n")
+            elif arg.strip().isdigit():
+                self._write_direct(f"  番号 {arg.strip()} のセッションが見つかりません（1〜{len(sessions)}）。\n")
+            else:
+                self._write_direct(f"  「{arg.strip()}」に一致するセッションが見つかりません。\n")
+            return
+
+        turns = session.get("turns", [])
+        self._write_direct(f"\nセッション詳細  {session.get('file', '')}\n")
+        self._write_direct(f"モデル: {session.get('model', '不明')}  /  {len(turns)} ターン\n")
+        for i, turn in enumerate(turns, 1):
+            self._write_direct(f"  [Turn {i}] {turn.get('ts', '')}\n")
+            self._write_direct(f"    User: {turn['user'][:200]}\n")
+            if turn.get("tools"):
+                self._write_direct(f"    Tools: {', '.join(turn['tools'])}\n")
+            if turn.get("answer"):
+                self._write_direct(f"    Answer: {turn['answer'][:300]}\n")
+
+        self._write_direct("  この内容をコンテキストに注入しますか？ [y/n]: ")
+
+        def on_response(resp: str) -> None:
+            resp = resp.strip().lower()
+            if resp not in ("y", "yes"):
+                return
+            inject_text = build_session_inject_text(session)
+            agent = self._ctx["agent"]
+            agent.conversation.append({"role": "user",      "content": inject_text})
+            agent.conversation.append({"role": "assistant", "content": "了解しました。参考情報を確認しました。"})
+            self._write_direct("  ✓ コンテキストに注入しました。\n")
+
+        self._enter_approval_mode(on_response, hint_mode="sessions")
 
     # ── エージェント実行 ──────────────────────────────────────────────
 

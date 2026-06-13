@@ -294,23 +294,10 @@ def _print_session_detail(session: dict):
         safe_print()
 
 
-def _inject_session(agent: OpenRouterAgent, session: dict):
-    """選択したセッションの全ターン内容をコンテキストに注入する（確認あり）。"""
-    turns = session.get("turns", [])
-    if not turns:
-        return
-
-    safe_print(C.yellow("  コンテキストに注入しますか？ [y/n]: "), end="", flush=True)
-    try:
-        resp = sys.stdin.readline().strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        safe_print()
-        return
-
-    if resp not in ("y", "yes"):
-        return
-
+def build_session_inject_text(session: dict) -> str:
+    """選択したセッションの全ターン内容を、コンテキスト注入用のテキストにまとめる。"""
     file_name = session.get("file", "")
+    turns = session.get("turns", [])
     inject_lines = [f"[過去セッションの参考情報（/sessions {file_name}）]"]
     for i, turn in enumerate(turns, 1):
         inject_lines.append(f"\nTurn {i} User: {turn['user']}")
@@ -318,10 +305,25 @@ def _inject_session(agent: OpenRouterAgent, session: dict):
             inject_lines.append(f"Tools: {', '.join(turn['tools'])}")
         if turn.get("answer"):
             inject_lines.append(f"Answer: {turn['answer']}")
-    inject_text = "\n".join(inject_lines)
-    agent.conversation.append({"role": "user",      "content": inject_text})
-    agent.conversation.append({"role": "assistant", "content": "了解しました。参考情報を確認しました。"})
-    safe_print(C.green(f"  ✓ セッション {file_name}（{len(turns)}ターン）をコンテキストに注入しました。"))
+    return "\n".join(inject_lines)
+
+
+def resolve_session(sessions: list[dict], arg: str) -> "tuple[Optional[dict], list[dict]]":
+    """番号またはファイル名の一部から、セッションを1件に絞り込む。
+
+    戻り値: (該当セッション or None, 複数ヒット時の候補リスト)
+    """
+    arg = arg.strip()
+    if arg.isdigit():
+        idx = int(arg) - 1
+        if 0 <= idx < len(sessions):
+            return sessions[idx], []
+        return None, []
+
+    matched = [s for s in sessions if arg in s.get("file", "")]
+    if len(matched) == 1:
+        return matched[0], []
+    return None, matched
 
 
 def register_viewer_command(sessions_dir_getter):
@@ -361,22 +363,16 @@ def register_sessions_command(sessions_dir_getter):
             _print_sessions_list(sessions)
             return
 
-        if arg.isdigit():
-            idx = int(arg) - 1
-            if 0 <= idx < len(sessions):
-                _print_session_detail(sessions[idx])
-                _inject_session(agent, sessions[idx])
-            else:
-                safe_print(C.red(f"  番号 {arg} のセッションが見つかりません（1〜{len(sessions)}）。"))
+        session, ambiguous = resolve_session(sessions, arg)
+        if session is not None:
+            _print_session_detail(session)
             return
 
-        matched = [s for s in sessions if arg in s.get("file", "")]
-        if len(matched) == 1:
-            _print_session_detail(matched[0])
-            _inject_session(agent, matched[0])
-        elif len(matched) > 1:
-            safe_print(C.yellow(f"  {len(matched)} 件ヒットしました。番号で絞り込んでください:"))
-            _print_sessions_list(matched)
+        if ambiguous:
+            safe_print(C.yellow(f"  {len(ambiguous)} 件ヒットしました。番号で絞り込んでください:"))
+            _print_sessions_list(ambiguous)
+        elif arg.isdigit():
+            safe_print(C.red(f"  番号 {arg} のセッションが見つかりません（1〜{len(sessions)}）。"))
         else:
             safe_print(C.gray(f"  「{arg}」に一致するセッションが見つかりません。"))
 
