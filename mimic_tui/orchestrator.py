@@ -136,6 +136,18 @@ delegate_to_team, delegate_to_team_parallel
 delegate_research（本格的な調べ物はこちら）, web_search, fetch_webpage（軽い確認用）
 """
 
+# delegate_to_team の Worker（サブエージェント、MIMIC_NO_AUTOGIT=1で起動）にのみ
+# 追加で付与するガイダンス。Directorには付与しない（毎ターンの追加往復を避けるため）。
+WORKER_COMPLETION_GUIDANCE = """
+
+## 完了報告（重要・Workerとして実行中）
+- 指示されたタスクを完了したと判断したら、最終回答を返す**直前に必ず一度**
+  mark_task_done を呼ぶこと。これを呼ばずに終了すると「完了サインなし」とみなされ、
+  続きの作業を行うためにその場で自動的に再実行される。
+- ツール呼び出しの失敗等で完了できない場合は mark_task_done を呼ばず、状況を
+  日本語テキストで報告して停止する（無理に呼ばない）。
+"""
+
 EXTREME_REACT_SYSTEM_PROMPT = """
 # 役割と行動指針（Extreme React = Director専任モード）
 あなたはこのモードでは「指示係（Director）」専任です。ファイルを直接書き換える
@@ -208,6 +220,7 @@ class InteractiveOrchestrator:
         self.agent    = agent
         self.auto_git = auto_git
         self.react_log = ReactLog()
+        self.task_done_signaled = False  # mark_task_done が呼ばれたら True
 
     @staticmethod
     def _fmt_args(args: dict) -> str:
@@ -289,6 +302,7 @@ class InteractiveOrchestrator:
     def _run_react_inner(self, user_message: str, on_done=None) -> str:
         from .tools import clear_read_files_registry
         clear_read_files_registry()
+        self.task_done_signaled = False
 
         # ── 1. Auto-Git バックアップ ──────────────────────────────
         backup_result = self.auto_git.backup(self.agent.cwd)
@@ -482,6 +496,9 @@ class InteractiveOrchestrator:
                     "tool_call_id": r["call_id"],
                     "content": r["result"],
                 })
+            if any(tc.get("name") == "mark_task_done" for tc in tool_calls):
+                self.task_done_signaled = True
+
             had_tool_call = True
             step_count += 1
 

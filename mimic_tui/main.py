@@ -48,8 +48,11 @@ def auto_mode(
         if answer_sent.is_set():
             return
         answer_sent.set()
-        sys.stdout.write(_MIMIC_DONE_MARKER + "\n")
-        sys.stdout.flush()
+        # mark_task_done が呼ばれていない場合は「完了サインなし」として
+        # 完了マーカーを出さない（subagent.py 側でその場での再実行対象になる）
+        if interactive_orch.task_done_signaled:
+            sys.stdout.write(_MIMIC_DONE_MARKER + "\n")
+            sys.stdout.flush()
 
     error_holder: list = [None]
 

@@ -172,7 +172,7 @@ def main():
         from .autogit import AutoGit, NullAutoGit
         from .tools import tools as _base_tools
         from .monitoring import MonitoringToolRegistry, ToolCallLog
-        from .orchestrator import InteractiveOrchestrator, BASH_EXECUTOR_GUIDANCE, REACT_SYSTEM_PROMPT
+        from .orchestrator import InteractiveOrchestrator, BASH_EXECUTOR_GUIDANCE, REACT_SYSTEM_PROMPT, WORKER_COMPLETION_GUIDANCE
         from .main import auto_mode
         from .utils import set_log_sink, set_team_event_sink
 
@@ -213,6 +213,8 @@ def main():
         agent     = OpenRouterAgent(rotator, mon_tools)
         plan_prompt  = (system_prompt or "") + BASH_EXECUTOR_GUIDANCE
         react_prompt = plan_prompt + REACT_SYSTEM_PROMPT
+        if os.environ.get("MIMIC_NO_AUTOGIT"):
+            react_prompt += WORKER_COMPLETION_GUIDANCE
         agent.set_system_prompt(react_prompt)
         # サブエージェント（delegate_to_subagent）として起動された場合は Git に触れない
         auto_git = NullAutoGit() if os.environ.get("MIMIC_NO_AUTOGIT") else AutoGit()

@@ -182,6 +182,26 @@ tools = ToolRegistry()
 _browser_registry = ToolRegistry()
 
 @tools.register(
+    name="mark_task_done",
+    description=(
+        "タスクが完了したことを明示的に報告する。サブエージェント(Worker)として実行している"
+        "場合、これを呼ばずに終了すると「完了サインなし」として、続きの作業を行うために"
+        "その場で自動的に再実行される。指示されたタスクを完了したと判断したら、最終回答を"
+        "返す直前に必ず一度呼ぶこと。途中で諦める／エラーで進められなくなった場合は呼ばないこと。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "summary": {"type": "string", "description": "完了した作業内容の簡潔な要約（任意）"}
+        },
+        "required": []
+    }
+)
+def mark_task_done(summary: str = "") -> str:
+    return "✓ 完了として記録しました。最終回答で作業内容を報告してください。"
+
+
+@tools.register(
     name="update_scratchpad",
     description="作業メモを更新する（800字以内）。ゴール・完了済み・次のステップ・発見事項を記録し記憶喪失を防ぐ。",
     parameters={

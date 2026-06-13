@@ -37,6 +37,13 @@ _DONE_MARKER  = "===MIMIC_DONE==="
 _VERIFY_MARKER = "===MIMIC_VERIFY_START==="
 _TIMEOUT_SEC  = 1800  # 30分
 _VERIFY_TIMEOUT_SEC = 300  # 5分
+_MAX_RESUME_ATTEMPTS = 2  # 完了サイン(mark_task_done)なしで終了した場合のその場再開回数
+_RESUME_NOTE = (
+    "\n\n[システム通知] 前回の実行は完了報告（mark_task_doneツール呼び出し）を行わずに"
+    "終了しました。ツール呼び出しの失敗等で停止した可能性があります。これまでの変更内容を"
+    "確認し、残りの作業を続けてください。タスクが完了したら、最終回答を返す前に必ず"
+    "mark_task_done を呼んでください。"
+)
 
 # mimic_tui パッケージの実体があるディレクトリ（python3 -m mimic_tui の起点）
 _LAUNCHER_DIR = Path(__file__).resolve().parent.parent
@@ -220,66 +227,85 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
                 f"MIMIC_PROVIDER={shlex.quote(provider)} "
                 f"MIMIC_MODEL={shlex.quote(model)} "
             )
-        agent_cmd = (
-            f"cd {shlex.quote(str(merged))} && "
-            f"PYTHONPATH={shlex.quote(str(_LAUNCHER_DIR))}:$PYTHONPATH "
-            f"MIMIC_NO_AUTOGIT=1 "
-            f"{trace_env}"
-            f"{model_env}"
-            f"python3 -m mimic_tui --auto-prompt {shlex.quote(task)}"
-        )
-        inner_cmd = f"{agent_cmd}; agent_exit=$?"
-        if verify_cmd:
-            inner_cmd += (
-                f"; echo {_VERIFY_MARKER}"
-                f"; timeout {_VERIFY_TIMEOUT_SEC} bash -c {shlex.quote(verify_cmd)}"
-                f"; echo MIMIC_VERIFY_EXIT=$?"
+
+        current_task = task
+        signaled = False
+        for resume_attempt in range(_MAX_RESUME_ATTEMPTS + 1):
+            agent_cmd = (
+                f"cd {shlex.quote(str(merged))} && "
+                f"PYTHONPATH={shlex.quote(str(_LAUNCHER_DIR))}:$PYTHONPATH "
+                f"MIMIC_NO_AUTOGIT=1 "
+                f"{trace_env}"
+                f"{model_env}"
+                f"python3 -m mimic_tui --auto-prompt {shlex.quote(current_task)}"
             )
-        inner_cmd += "; exit $agent_exit"
-        script = f"{mount_cmd} && {inner_cmd}"
+            inner_cmd = f"{agent_cmd}; agent_exit=$?"
+            if verify_cmd:
+                inner_cmd += (
+                    f"; echo {_VERIFY_MARKER}"
+                    f"; timeout {_VERIFY_TIMEOUT_SEC} bash -c {shlex.quote(verify_cmd)}"
+                    f"; echo MIMIC_VERIFY_EXIT=$?"
+                )
+            inner_cmd += "; exit $agent_exit"
+            script = f"{mount_cmd} && {inner_cmd}"
 
-        proc = subprocess.Popen(
-            ["unshare", "-U", "-m", "-r", "bash", "-c", script],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            bufsize=1, start_new_session=True,
-        )
+            proc = subprocess.Popen(
+                ["unshare", "-U", "-m", "-r", "bash", "-c", script],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                bufsize=1, start_new_session=True,
+            )
 
-        # ── ハングアップ対策: 別スレッドでタイムアウト監視 ──
-        timed_out = threading.Event()
-        proc_done = threading.Event()
+            # ── ハングアップ対策: 別スレッドでタイムアウト監視 ──
+            timed_out = threading.Event()
+            proc_done = threading.Event()
 
-        def _watchdog():
-            if not proc_done.wait(_TIMEOUT_SEC):
-                timed_out.set()
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+            def _watchdog():
+                if not proc_done.wait(_TIMEOUT_SEC):
+                    timed_out.set()
+                    try:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
 
-        watchdog = threading.Thread(target=_watchdog, daemon=True)
-        watchdog.start()
+            watchdog = threading.Thread(target=_watchdog, daemon=True)
+            watchdog.start()
 
-        # ── Workerの出力をリアルタイムでそのまま転送 ──
-        prefix = f"  {C.gray(f'[Worker:{label}]')} "
-        stdout_chunks: list[str] = []
-        for raw_line in proc.stdout:
-            stdout_chunks.append(raw_line)
-            safe_print(prefix + raw_line.rstrip("\n"), flush=True)
-        proc.wait()
-        proc_done.set()
-        stdout = "".join(stdout_chunks)
+            # ── Workerの出力をリアルタイムでそのまま転送 ──
+            prefix = f"  {C.gray(f'[Worker:{label}]')} "
+            stdout_chunks: list[str] = []
+            for raw_line in proc.stdout:
+                stdout_chunks.append(raw_line)
+                safe_print(prefix + raw_line.rstrip("\n"), flush=True)
+            proc.wait()
+            proc_done.set()
+            stdout = "".join(stdout_chunks)
 
-        if timed_out.is_set():
-            _force_rmtree(base)
-            return SubagentResult(
-                task=task, ok=False,
-                summary=f"タイムアウト（{_TIMEOUT_SEC}秒）のため強制終了しました。",
-            ), None, None
+            if timed_out.is_set():
+                _force_rmtree(base)
+                return SubagentResult(
+                    task=task, ok=False,
+                    summary=f"タイムアウト（{_TIMEOUT_SEC}秒）のため強制終了しました。",
+                ), None, None
 
-        ok = (_DONE_MARKER in stdout) and proc.returncode == 0
+            signaled = _DONE_MARKER in stdout
+            if signaled or resume_attempt == _MAX_RESUME_ATTEMPTS:
+                break
+
+            safe_print(C.yellow(
+                f"  [Worker:{label}] ⚠ 完了サイン(mark_task_done)なしで終了 → "
+                f"その場で再開します ({resume_attempt + 1}/{_MAX_RESUME_ATTEMPTS})"
+            ), flush=True)
+            current_task = task + _RESUME_NOTE
+
+        ok = signaled and proc.returncode == 0
         changed = _changed_files(upper)
         summary = _summarize(lower, upper, changed)
-        if not ok:
+        if not signaled:
+            summary = (
+                f"⚠ {_MAX_RESUME_ATTEMPTS}回再開しても完了サイン(mark_task_done)が"
+                f"得られませんでした（最終exit={proc.returncode}）。\n" + summary
+            )
+        elif not ok:
             summary = f"⚠ サブエージェントは正常終了しませんでした（exit={proc.returncode}）。\n" + summary
 
         verify_exit: Optional[int] = None
