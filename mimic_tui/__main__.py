@@ -51,10 +51,18 @@ def _build_components(base_dir: str, active_config=None):
         display_fn = _inline_display,
     )
 
-    # Extreme React モード用: 書き込み系ツールを取り上げ、
-    # 書き込みが必要な場合は delegate_to_team / delegate_to_team_parallel に
-    # 委任せざるを得ない構成にする（Worker→Supervisorループ側で適用・コミットする）。
-    _EXTREME_EXCLUDED_TOOLS = {"write_file", "edit_file", "patch_file", "delete_file"}
+    # Extreme React モード用: 書き込み系・シェル実行系・読み取り系のツールを
+    # すべて取り上げ、調査は delegate_research、実装・修正・検証は
+    # delegate_to_team / delegate_to_team_parallel に委任せざるを得ない構成にする
+    # （フレッシュな文脈のResearcher/Worker/Supervisorが実際にファイルへ触れる）。
+    # 残るのは delegate_research / delegate_to_team[_parallel] / update_scratchpad のみ。
+    _EXTREME_EXCLUDED_TOOLS = {
+        "write_file", "edit_file", "patch_file", "delete_file",
+        "run_bash", "run_pipeline",
+        "read_file", "search_in_file", "grep_codebase", "file_info",
+        "smart_read", "get_repo_map", "read_tool_cache", "search_history",
+        "web_search", "fetch_webpage",
+    }
     _extreme_registry = ToolRegistry()
     for _name in _base_tools._tools:
         if _name not in _EXTREME_EXCLUDED_TOOLS:

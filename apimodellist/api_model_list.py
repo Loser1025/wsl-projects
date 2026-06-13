@@ -102,12 +102,14 @@ API_CONFIGS = {
 
 # ファイル拡張子のホワイトリスト
 TEXT_EXTENSIONS = {
-    ".py", ".json", ".env", ".txt", ".yaml", ".yml", ".toml", ".cfg", ".ini", ".md"
+    ".py", ".json", ".env", ".txt", ".yaml", ".yml", ".toml", ".cfg", ".ini", ".md",
+    ".js", ".ts", ".jsx", ".tsx", ".cjs", ".mjs",
 }
 
 # 除外ディレクトリ
 EXCLUDE_DIRS = {
-    ".venv", "node_modules", "__pycache__", ".git", "site-packages", "lib", "bin", "include"
+    ".venv", "node_modules", "__pycache__", ".git", "site-packages", "lib", "bin", "include",
+    ".mimic",
 }
 
 # APIキーワード（api_scanner.py から流用）
@@ -551,20 +553,156 @@ def display_models(models: List[Dict[str, Any]]) -> None:
 # ──────────────────────────────────────────────
 # APIキー検索機能
 # ──────────────────────────────────────────────
-def search_api_keys(root_dir: Path) -> List[Dict[str, Any]]:
-    """ディレクトリ内のファイルからAPIキーのパターンを検索する。"""
-    api_keys = []
+def _mask_key(key: str) -> str:
+    """APIキーを安全にマスクする (first4...last4)。"""
+    if len(key) <= 8:
+        return "***"
+    return key[:4] + "..." + key[-4:]
 
-    # API名から数値サフィックスキーのプレフィックスへのマッピング
-    # 例: "Mistral" → "MISTRAL_KEY", "Gemini" → "GEMINI_KEY"
-    NUMERIC_SUFFIX_PREFIX_MAP = {
-        "OpenAI": "OPENAI_KEY",
-        "OpenRouter": "OPENROUTER_KEY",
-        "Mistral": "MISTRAL_KEY",
-        "Anthropic": "ANTHROPIC_KEY",
-        "Gemini": "GEMINI_KEY",
-        "HuggingFace": "HUGGINGFACE_KEY",
-    }
+
+def _is_placeholder(value: str) -> bool:
+    """値がプレースホルダー/無効な値かどうかを判定する。"""
+    stripped = value.strip()
+    if not stripped or len(stripped) < 8:
+        return True
+    lower = stripped.lower()
+    # プレースホルダーパターン
+    placeholder_keywords = [
+        "your_api_key", "your-key", "your_key", "xxx", "example", "here",
+        "removed", "todo", "placeholder", "test_key", "dummy", "fake",
+        "changeme", "change-me", "insert-here", "insert_here",
+    ]
+    for kw in placeholder_keywords:
+        if kw in lower:
+            return True
+    # URLパターン
+    if lower.startswith("http://") or lower.startswith("https://"):
+        return True
+    # ファイルパスパターン
+    if lower.startswith("/") or lower.startswith("./") or lower.startswith("~/"):
+        return True
+    # Python式パターン (os.getenv, config.settings, etc.)
+    if "os.getenv" in lower or "config.settings" in lower or "environ[" in lower:
+        return True
+    # カンマ区切りリスト
+    if "," in stripped and len(stripped.split(",")) > 2:
+        return True
+    return False
+
+
+def _build_alias_patterns(api_name: str, env_key: str) -> list:
+    """
+    API名とenv_keyから、検索すべき環境変数名のaliasパターンリストを生成する。
+    例: ("Mistral", "MISTRAL_API_KEY") -> ["MISTRAL_API_KEY", "MISTRAL_KEY", "MISTRAL_KEY_1", "MISTRAL_KEY_2", ...]
+    """
+    aliases = set()
+    aliases.add(env_key)
+
+    # env_keyの_BASE部分を抽出 (例: MISTRAL_API_KEY -> MISTRAL)
+    base = env_key
+    for suffix in ["_API_KEY", "_ACCESS_KEY", "_SECRET_KEY", "_TOKEN_KEY"]:
+        if base.endswith(suffix):
+            base = base[: -len(suffix)]
+            break
+    if base == env_key:
+        # サフィックスが取れない場合は最後の _ まで
+        parts = base.rsplit("_", 1)
+        if len(parts) == 2:
+            base = parts[0]
+
+    aliases.add(base + "_KEY")
+    for i in range(1, 10):
+        aliases.add(f"{base}_{i}")
+        aliases.add(f"{base}_KEY_{i}")
+
+    return list(aliases)
+
+
+def _validate_key(provider: str, key: str) -> bool:
+    """
+    軽量なprovider validation。HTTP 2xxなら有効とみなす。
+    ネットワークエラー/タイムアウトはFalse（無効/不明）を返す。
+    """
+    try:
+        if provider == "Mistral":
+            resp = requests.get(
+                "https://api.mistral.ai/v1/models",
+                headers={"Authorization": f"Bearer {key}"},
+                timeout=10,
+            )
+            return resp.status_code < 400
+        elif provider == "Gemini":
+            resp = requests.get(
+                "https://generativelanguage.googleapis.com/v1/models",
+                headers={"x-goog-api-key": key},
+                timeout=10,
+            )
+            return resp.status_code < 400
+        elif provider == "OpenRouter":
+            resp = requests.get(
+                "https://openrouter.ai/api/v1/models",
+                headers={"Authorization": f"Bearer {key}"},
+                timeout=10,
+            )
+            return resp.status_code < 400
+        elif provider == "OpenAI":
+            resp = requests.get(
+                "https://api.openai.com/v1/models",
+                headers={"Authorization": f"Bearer {key}"},
+                timeout=10,
+            )
+            return resp.status_code < 400
+    except Exception:
+        return False
+    return False
+
+
+def search_api_keys(root_dir: Path) -> List[Dict[str, Any]]:
+    """
+    ディレクトリ内のファイルからAPIキーを検索し、dedup + 軽量validation済みの
+    最良候補リストを返す。
+
+    各canonical env_key (例: MISTRAL_API_KEY) につき最良候補1つだけを返す。
+    """
+    console = Console()
+
+    # 収集: canonical_env_key -> list of candidates
+    candidates: Dict[str, List[Dict[str, Any]]] = {}
+
+    # スキップするファイル自身
+    script_names = {"api_model_list.py", "api_scanner.py"}
+
+    # ファイル優先度を推定するためのヘルパー
+    def _file_priority(file_path: Path) -> int:
+        """低いほど優先（.env=0, 通常ソース=1, ログ/doc=2）"""
+        name = file_path.name
+        suffix = file_path.suffix.lower()
+        if name == ".env" or name.startswith(".env."):
+            return 0
+        if suffix in (".log", ".md", ".txt"):
+            return 2
+        return 1
+
+    # aliasパターン -> canonical env_key の逆引きマップを構築
+    alias_to_canonical: Dict[str, str] = {}
+    for api_name, api_config in API_CONFIGS.items():
+        env_key = api_config.get("env_key", "")
+        if not env_key:
+            continue
+        aliases = _build_alias_patterns(api_name, env_key)
+        for alias in aliases:
+            alias_to_canonical[alias.upper()] = env_key
+
+    # 全alias名を正規表現用にソート（長い順 -> 短い順で優先マッチ）
+    all_alias_names = sorted(alias_to_canonical.keys(), key=lambda x: -len(x))
+    # パターン: 引用符あり/なし両方に対応
+    # グループ1: 引用符あり KEY = 'value' / KEY = "value" / KEY: 'value' / KEY: "value"
+    # グループ2: 引用符なし KEY = value（whitespace/#/行末まで）
+    alias_pattern = re.compile(
+        r"(?:^|[\s])(?:" + "|".join(re.escape(a) for a in all_alias_names) + r")"
+        r"\s*[=:]\s*(?:['\"]([^'\"]{8,})['\"]|([^\s'\"#]{8,}))",
+        re.IGNORECASE | re.MULTILINE,
+    )
 
     for file_path in root_dir.rglob("*"):
         if not file_path.is_file():
@@ -573,53 +711,107 @@ def search_api_keys(root_dir: Path) -> List[Dict[str, Any]]:
             continue
         if any(part in EXCLUDE_DIRS for part in file_path.parts):
             continue
+        # 自身のスキャリプトを除外
+        if file_path.name in script_names:
+            continue
 
         try:
             content = file_path.read_text(encoding="utf-8", errors="ignore")
         except (UnicodeDecodeError, PermissionError, OSError):
             continue
 
-        for api_name, api_config in API_CONFIGS.items():
-            env_key = api_config.get("env_key")
-            if not env_key:
+        for match in alias_pattern.finditer(content):
+            matched_env_name = match.group(0).split("=")[0].split(":")[0].strip()
+            if not matched_env_name:
+                continue
+            upper_name = matched_env_name.upper()
+            canonical = alias_to_canonical.get(upper_name)
+            if not canonical:
                 continue
 
-            found_key = None
+            # 引用符付き(grp1)と未引用(grp2)のどちらかを取得
+            value = match.group(1) if match.group(1) else match.group(2)
+            if not value:
+                continue
+            value = value.strip()
 
-            # 1. まず正確な env_key パターンを検索（ENV_KEY = 'value' or ENV_KEY = "value"）
-            exact_pattern = re.compile(
-                rf"{re.escape(env_key)}\s*=\s*['\"]([^'\"]+)['\"]", re.IGNORECASE
-            )
-            match = exact_pattern.search(content)
-            if match:
-                found_key = match.group(1)
+            # valueがenv_var名自体でないかチェック
+            if value.upper() == upper_name:
+                continue
 
-            # 2. 正確なキーが見つからない場合、数値サフィックス付きキーを検索
-            #    例: MISTRAL_KEY_1 = 'value', GEMINI_KEY_2 = "value"
-            if found_key is None:
-                numeric_prefix = NUMERIC_SUFFIX_PREFIX_MAP.get(api_name)
-                if numeric_prefix:
-                    numeric_pattern = re.compile(
-                        rf"{re.escape(numeric_prefix)}_\d+\s*=\s*['\"]([^'\"]+)['\"]",
-                        re.IGNORECASE,
-                    )
-                    match = numeric_pattern.search(content)
-                    if match:
-                        found_key = match.group(1)
+            # プレースホルダーフィルタ
+            if _is_placeholder(value):
+                continue
 
-            if found_key is not None:
-                api_keys.append({
-                    "api_name": api_name,
-                    "env_key": env_key,
-                    "key": found_key,
-                    "file_path": str(file_path.resolve()),
-                })
+            api_name_for_key = None
+            for aname, aconf in API_CONFIGS.items():
+                if aconf.get("env_key") == canonical:
+                    api_name_for_key = aname
+                    break
 
-    return api_keys
+            candidate = {
+                "api_name": api_name_for_key or "Unknown",
+                "env_key": canonical,
+                "key": value,
+                "file_path": str(file_path.resolve()),
+                "file_priority": _file_priority(file_path),
+                "matched_env_name": matched_env_name,
+            }
+
+            if canonical not in candidates:
+                candidates[canonical] = []
+            candidates[canonical].append(candidate)
+
+    # Dedup: canonical env_keyごとに最良候補を選択
+    results = []
+    for canonical, cands in candidates.items():
+        if not cands:
+            continue
+
+        # ファイル優先度でソート
+        cands.sort(key=lambda c: c["file_priority"])
+
+        # 最良候補を選択: validationを試み、成功した最初のものを採用
+        selected = None
+        api_name_for_key = cands[0]["api_name"]
+
+        # まず同じ優先度グループごとにvalidation
+        priority_groups: Dict[int, List[Dict]] = {}
+        for c in cands:
+            priority_groups.setdefault(c["file_priority"], []).append(c)
+
+        for priority in sorted(priority_groups.keys()):
+            group = priority_groups[priority]
+            for c in group:
+                is_valid = _validate_key(api_name_for_key, c["key"])
+                if is_valid:
+                    selected = c
+                    break
+            if selected:
+                break
+
+        # validationで見つからなければ最高優先度の最初の候補
+        if not selected:
+            selected = cands[0]
+
+        # 内部フィールドを除去して結果に追加
+        cleaned = {
+            "api_name": selected["api_name"],
+            "env_key": selected["env_key"],
+            "key": selected["key"],
+            "file_path": selected["file_path"],
+        }
+        results.append(cleaned)
+        console.print(
+            f"[dim]Detected {cleaned['env_key']}={_mask_key(cleaned['key'])} "
+            f"from {cleaned['file_path']}[/dim]"
+        )
+
+    return results
 
 
 def set_api_keys_from_files(root_dir: Path) -> None:
-    """ディレクトリから検出されたAPIキーを環境変数に設定する。"""
+    """ディレクトリから検出されたAPIキーを環境変数に設定する（dedup/validation済み）。"""
     detected_api_keys = search_api_keys(root_dir)
 
     if not detected_api_keys:
@@ -632,7 +824,8 @@ def set_api_keys_from_files(root_dir: Path) -> None:
         api_key = key_info["key"]
         os.environ[env_key] = api_key
         console = Console()
-        console.print(f"[green]Set {env_key} from file: {key_info['file_path']}[/green]")
+        masked = _mask_key(api_key)
+        console.print(f"[green]Set {env_key}={masked} from file: {key_info['file_path']}[/green]")
 
 
 def display_api_keys(api_keys: List[Dict[str, Any]]) -> None:
@@ -657,7 +850,7 @@ def display_api_keys(api_keys: List[Dict[str, Any]]) -> None:
     table.add_column("File Path", style="dim", width=50)
 
     for key in api_keys:
-        masked_key = key["key"][:8] + "..." if len(key["key"]) > 8 else key["key"]
+        masked_key = _mask_key(key["key"])
         table.add_row(
             key["api_name"],
             key["env_key"],

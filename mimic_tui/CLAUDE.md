@@ -67,8 +67,11 @@ the agent's operating rules — notably a "Pipeline-First" policy (prefer `searc
 "aggressive team delegation" policy (`delegate_to_team[_parallel]`, see below).
 `EXTREME_REACT_SYSTEM_PROMPT` is an alternate prompt selectable via `/mode extreme` that turns the
 agent into a "Director-only" role: in this mode `agent.tools` is swapped to a registry with
-`write_file`/`edit_file`/`patch_file`/`delete_file` removed (built in `_build_components` as
-`extreme_tools`), so all code changes must go through `delegate_to_team`.
+`write_file`/`edit_file`/`patch_file`/`delete_file`/`run_bash`/`run_pipeline` removed (`_EXTREME_EXCLUDED_TOOLS`
+in `_build_components`, registry built as `extreme_tools`), so all code changes, test runs, and
+verification must go through `delegate_to_team` (the Worker runs inside its own sandbox and can use
+`run_bash`/`run_pipeline` freely). This also closes the loophole where the Director could bypass the
+removed write tools via shell redirection/`sed -i`/etc.
 
 ### Tools (`tools.py`, `tools_linux.py`, `pipeline.py`)
 `ToolRegistry` (in `tools.py`) holds all tool specs/functions; tools self-register via
