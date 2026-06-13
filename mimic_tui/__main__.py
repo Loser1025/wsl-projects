@@ -173,6 +173,7 @@ def main():
         from .monitoring import MonitoringToolRegistry, ToolCallLog
         from .orchestrator import InteractiveOrchestrator, BASH_EXECUTOR_GUIDANCE, REACT_SYSTEM_PROMPT
         from .main import auto_mode
+        from .utils import set_log_sink, set_team_event_sink
 
         or_config, gemini_config, mistral_config, system_prompt = load_config(base_dir)
         active_config = or_config or gemini_config or mistral_config
@@ -204,6 +205,13 @@ def main():
                 cwd      = agent.cwd,
                 trace_id = trace_id,
             )
+            # ネストしたdelegate_to_team[_parallel]が発行するteam_*イベントを
+            # このサブエージェント自身のjsonlにも記録し、ビューアで孫世代の
+            # セッションまでtrace_idで紐付けられるようにする。
+            set_log_sink(lambda level, msg:
+                interactive_orch.react_log.add("system_event", level=level, content=msg))
+            set_team_event_sink(lambda event:
+                interactive_orch.react_log.add("system_event", level="info", content=str(event)))
 
         idx = args.index("--auto-prompt")
         auto_mode(interactive_orch, args[idx + 1]) if idx + 1 < len(args) else sys.exit(1)

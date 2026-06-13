@@ -81,6 +81,16 @@ def _annotate_system_events(entries: list[dict]) -> list[dict]:
     return entries
 
 
+def _scratchpad_history(entries: list[dict]) -> list[dict]:
+    """update_scratchpad ツール呼び出しの履歴を時系列で返す。"""
+    history = []
+    for e in entries:
+        if e.get("type") == "action" and e.get("tool") == "update_scratchpad":
+            content = (e.get("args") or {}).get("content", "")
+            history.append({"ts": e.get("ts", ""), "step": e.get("step"), "content": content})
+    return history
+
+
 def _list_sessions(sessions_dir: Path) -> list[dict]:
     out = []
     for f in sorted(sessions_dir.glob("*.jsonl"), reverse=True):
@@ -152,6 +162,10 @@ _PAGE = r"""<!DOCTYPE html>
   .links { margin-top: 10px; }
   .links a { display: inline-block; margin: 2px 6px 2px 0; padding: 4px 8px; background: #345; color: #cde; border-radius: 4px; text-decoration: none; font-size: 12px; }
   h2 { font-size: 16px; }
+  .scratchpad { margin: 10px 0; padding: 8px 10px; border-radius: 4px; background: #233322; border: 1px solid #355; }
+  .scratchpad-title { font-size: 12px; color: #9c9; font-weight: bold; margin-bottom: 4px; }
+  .scratchpad-rev { margin: 6px 0; padding-top: 4px; border-top: 1px solid #355; }
+  .scratchpad-ts { font-size: 11px; color: #999; }
   pre.json, pre.text { white-space: pre-wrap; word-break: break-word; margin: 4px 0 0 0; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; }
   .json-key { color: #9cdcfe; }
   .json-string { color: #ce9178; }
@@ -274,6 +288,21 @@ async function loadDetail(file) {
     }
     html += '</div>';
   }
+  if (data.scratchpad_history && data.scratchpad_history.length) {
+    const hist = data.scratchpad_history;
+    const latest = hist[hist.length - 1];
+    html += '<div class="scratchpad">';
+    html += `<div class="scratchpad-title">📋 スクラッチパッド（最終更新: ${esc(latest.ts || '')}）</div>`;
+    html += `<pre class="text">${esc(latest.content || '')}</pre>`;
+    if (hist.length > 1) {
+      html += `<details><summary>更新履歴（${hist.length}件）</summary>`;
+      for (const h of hist) {
+        html += `<div class="scratchpad-rev"><div class="scratchpad-ts">${esc(h.ts || '')}</div><pre class="text">${esc(h.content || '')}</pre></div>`;
+      }
+      html += '</details>';
+    }
+    html += '</div>';
+  }
   for (const e of data.entries) {
     let body = '';
     if (e.type === 'user_input' || e.type === 'final_answer' || e.type === 'thought') {
@@ -358,7 +387,12 @@ class _Handler(BaseHTTPRequestHandler):
             entries = _annotate_system_events(entries)
             all_meta = _list_sessions(self.sessions_dir)
             linked = _linked_sessions(meta, all_meta)
-            self._send_json({"entries": entries, "linked_sessions": linked})
+            scratchpad_history = _scratchpad_history(entries)
+            self._send_json({
+                "entries": entries,
+                "linked_sessions": linked,
+                "scratchpad_history": scratchpad_history,
+            })
             return
 
         self.send_error(404)
