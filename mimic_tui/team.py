@@ -303,7 +303,7 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
 
         safe_print(C.gray(f"  {team_tag} ⚙ Worker実行 (試行{attempt}/{MAX_TEAM_RETRIES})"), flush=True)
         _log_team_event({"event": "team_worker_start", "attempt": attempt, "task": task, "resumed": base is not None, "trace_id": trace_id})
-        last_result, upper, base = run_subagent_reviewable(worker_task, project_dir, label=label or "single", base=base, trace_id=trace_id, verify_cmd=verify_cmd)
+        last_result, upper, base = run_subagent_reviewable(worker_task, project_dir, label=label or "single", base=base, trace_id=trace_id, verify_cmd=verify_cmd, provider=config.name, model=config.model)
 
         safe_print(C.gray(f"  {team_tag} 👁 Supervisorレビュー中..."), flush=True)
         verdict = run_supervisor(task, last_result, project_dir, config, label=label, prev_raw=prev_raw)

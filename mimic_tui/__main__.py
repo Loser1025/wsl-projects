@@ -179,10 +179,36 @@ def main():
         or_config, gemini_config, mistral_config, system_prompt = load_config(base_dir)
         active_config = or_config or gemini_config or mistral_config
 
+        # Worker（delegate_to_team経由）には、起動時に MIMIC_PROVIDER/MIMIC_MODEL で
+        # Directorが選択中のプロバイダー・モデルが渡される。これを優先することで、
+        # Workerが.envの先頭設定（デフォルトモデル）に固定されず、Directorと同じ
+        # モデルで動作するようになる。
+        _provider_map = {"openrouter": or_config, "gemini": gemini_config, "mistral": mistral_config}
+        _wanted_provider = os.environ.get("MIMIC_PROVIDER")
+        _wanted_model    = os.environ.get("MIMIC_MODEL")
+        if _wanted_provider and _provider_map.get(_wanted_provider):
+            active_config = _provider_map[_wanted_provider]
+            if _wanted_model:
+                active_config.model = _wanted_model
+
         from .team import set_team_config
         set_team_config(active_config)
 
-        mon_tools = MonitoringToolRegistry(base=_base_tools, log=ToolCallLog())
+        # Worker（delegate_to_team経由のサブエージェント、MIMIC_NO_AUTOGIT=1で起動）には
+        # delegate_to_team[_parallel]/delegate_researchを与えない。与えると、Workerが
+        # さらに自分のWorkerを再帰的に委任し続け、サブエージェントが無限増殖してしまう。
+        if os.environ.get("MIMIC_NO_AUTOGIT"):
+            from .tools import ToolRegistry
+            _DELEGATE_TOOLS = {"delegate_to_team", "delegate_to_team_parallel", "delegate_research"}
+            _worker_registry = ToolRegistry()
+            for _name in _base_tools._tools:
+                if _name not in _DELEGATE_TOOLS:
+                    _worker_registry.copy_tool(_name, _base_tools)
+            _agent_tools = _worker_registry
+        else:
+            _agent_tools = _base_tools
+
+        mon_tools = MonitoringToolRegistry(base=_agent_tools, log=ToolCallLog())
         rotator   = AccountRotator(active_config)
         agent     = OpenRouterAgent(rotator, mon_tools)
         plan_prompt  = (system_prompt or "") + BASH_EXECUTOR_GUIDANCE

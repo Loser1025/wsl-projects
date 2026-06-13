@@ -175,6 +175,8 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
                               base: Optional[Path] = None,
                               trace_id: Optional[str] = None,
                               verify_cmd: str = "",
+                              provider: Optional[str] = None,
+                              model: Optional[str] = None,
                               ) -> tuple[SubagentResult, Optional[Path], Optional[Path]]:
     """Worker を OverlayFS 隔離下で同期実行する。
 
@@ -212,11 +214,18 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
         # （agent.cwd は単に起動時の OS cwd になる）。そこで cwd 自体を merged にし、
         # モジュール解決だけ PYTHONPATH で実体ディレクトリを指す。
         trace_env = f"MIMIC_TRACE_ID={shlex.quote(trace_id)} " if trace_id else ""
+        model_env = ""
+        if provider and model:
+            model_env = (
+                f"MIMIC_PROVIDER={shlex.quote(provider)} "
+                f"MIMIC_MODEL={shlex.quote(model)} "
+            )
         agent_cmd = (
             f"cd {shlex.quote(str(merged))} && "
             f"PYTHONPATH={shlex.quote(str(_LAUNCHER_DIR))}:$PYTHONPATH "
             f"MIMIC_NO_AUTOGIT=1 "
             f"{trace_env}"
+            f"{model_env}"
             f"python3 -m mimic_tui --auto-prompt {shlex.quote(task)}"
         )
         inner_cmd = f"{agent_cmd}; agent_exit=$?"

@@ -567,26 +567,36 @@ def fetch_api_details(api_name: str, api_key: str) -> Dict[str, Any]:
     }
 
 
-def fetch_key_info_openrouter(api_key: str) -> Dict[str, Any]:
+def fetch_key_info_openrouter(api_name: str = "OpenRouter") -> Dict[str, Any]:
     """OpenRouter /v1/keys からキー使用量・リミットを取得する。
 
-    OpenRouter の /v1/keys エンドポイントを呼び出し、レスポンスボディから
-    RPM/TPM のリミット情報を取得する。
+    プロジェクト内のファイルからスキャンしたAPIキーを使用する。
 
     Args:
-        api_key: OpenRouter API キー
+        api_name: API名（デフォルト: "OpenRouter"）
 
     Returns:
         Dict[str, Any]: {
             "status": "success" | "error",
-            "rpm": int | None,          # RPM上限 (rate_limit.requests.limit)
-            "rpm_remaining": int | None, # 残りRPM (rate_limit.requests.remaining)
-            "tpm": int | None,           # TPM上限 (rate_limit.tokens.limit)
-            "tpm_remaining": int | None,  # 残りTPM (rate_limit.tokens.remaining)
-            "reset": str | None,         # リセット時刻 ISO形式 (rate_limit.requests.reset)
-            "message": str | None        # エラーメッセージ
+            "rpm": int | None,
+            "rpm_remaining": int | None,
+            "tpm": int | None,
+            "tpm_remaining": int | None,
+            "reset": str | None,
+            "message": str | None
         }
     """
+    api_key = _get_api_key_from_scanned_results(api_name)
+    if not api_key:
+        return {
+            "status": "error",
+            "rpm": None,
+            "rpm_remaining": None,
+            "tpm": None,
+            "tpm_remaining": None,
+            "reset": None,
+            "message": "APIキーが見つかりませんでした",
+        }
     url = "https://openrouter.ai/api/v1/keys"
     headers = {"Authorization": f"Bearer {api_key}"}
     try:
@@ -599,10 +609,20 @@ def fetch_key_info_openrouter(api_key: str) -> Dict[str, Any]:
                 "tpm": None,
                 "tpm_remaining": None,
                 "reset": None,
-                "message": f"HTTP {resp.status_code}: {resp.text[:500]}"
+                "message": f"HTTP {resp.status_code}: {resp.text[:500]}",
             }
         data = resp.json()
-        rate_limit = data.get("rate_limit", {})
+        if not isinstance(data, dict) or "rate_limit" not in data:
+            return {
+                "status": "error",
+                "rpm": None,
+                "rpm_remaining": None,
+                "tpm": None,
+                "tpm_remaining": None,
+                "reset": None,
+                "message": "不正なAPIキーです",
+            }
+        rate_limit = data["rate_limit"]
         requests_info = rate_limit.get("requests", {})
         tokens_info = rate_limit.get("tokens", {})
         return {
@@ -612,7 +632,7 @@ def fetch_key_info_openrouter(api_key: str) -> Dict[str, Any]:
             "tpm": tokens_info.get("limit"),
             "tpm_remaining": tokens_info.get("remaining"),
             "reset": requests_info.get("reset"),
-            "message": None
+            "message": None,
         }
     except requests.exceptions.RequestException as e:
         return {
@@ -622,29 +642,38 @@ def fetch_key_info_openrouter(api_key: str) -> Dict[str, Any]:
             "tpm": None,
             "tpm_remaining": None,
             "reset": None,
-            "message": str(e)
+            "message": f"ネットワークエラーが発生しました: {e}",
         }
 
 
-def fetch_key_info_mistral(api_key: str) -> Dict[str, Any]:
+def fetch_key_info_mistral(api_name: str = "Mistral") -> Dict[str, Any]:
     """Mistral APIのレスポンスヘッダーからRPM/TPMを取得する。
 
-    Mistral API の /v1/models エンドポイントを呼び出し、レスポンスヘッダーから
-    RPM/TPM のリミット情報を取得する。
+    プロジェクト内のファイルからスキャンしたAPIキーを使用する。
 
     Args:
-        api_key: Mistral API キー
+        api_name: API名（デフォルト: "Mistral"）
 
     Returns:
         Dict[str, Any]: {
             "status": "success" | "error",
-            "rpm": int | None,           # RPM上限 (x-ratelimit-limit-requests)
-            "rpm_remaining": int | None,  # 残りRPM (x-ratelimit-remaining-requests)
-            "tpm": int | None,            # TPM上限 (ratelimitbysize-limit-tokens)
-            "tpm_remaining": int | None,   # 残りTPM (ratelimitbysize-remaining-tokens)
-            "message": str | None          # エラーメッセージ
+            "rpm": int | None,
+            "rpm_remaining": int | None,
+            "tpm": int | None,
+            "tpm_remaining": int | None,
+            "message": str | None
         }
     """
+    api_key = _get_api_key_from_scanned_results(api_name)
+    if not api_key:
+        return {
+            "status": "error",
+            "rpm": None,
+            "rpm_remaining": None,
+            "tpm": None,
+            "tpm_remaining": None,
+            "message": "APIキーが見つかりませんでした",
+        }
     url = "https://api.mistral.ai/v1/models"
     headers = {"Authorization": f"Bearer {api_key}"}
     try:
@@ -656,7 +685,7 @@ def fetch_key_info_mistral(api_key: str) -> Dict[str, Any]:
                 "rpm_remaining": None,
                 "tpm": None,
                 "tpm_remaining": None,
-                "message": f"HTTP {resp.status_code}: {resp.text[:500]}"
+                "message": f"HTTP {resp.status_code}: {resp.text[:500]}",
             }
         resp_headers = resp.headers
         rpm = resp_headers.get("x-ratelimit-limit-requests")
@@ -669,7 +698,7 @@ def fetch_key_info_mistral(api_key: str) -> Dict[str, Any]:
             "rpm_remaining": int(rpm_remaining) if rpm_remaining is not None else None,
             "tpm": int(tpm) if tpm is not None else None,
             "tpm_remaining": int(tpm_remaining) if tpm_remaining is not None else None,
-            "message": None
+            "message": None,
         }
     except (requests.exceptions.RequestException, ValueError) as e:
         return {
@@ -678,29 +707,38 @@ def fetch_key_info_mistral(api_key: str) -> Dict[str, Any]:
             "rpm_remaining": None,
             "tpm": None,
             "tpm_remaining": None,
-            "message": str(e)
+            "message": f"ネットワークエラーが発生しました: {e}",
         }
 
 
-def fetch_key_info_gemini(api_key: str) -> Dict[str, Any]:
+def fetch_key_info_gemini(api_name: str = "Gemini") -> Dict[str, Any]:
     """Gemini APIのレスポンスヘッダーからRPM/TPMを取得する。
 
-    Gemini API の /v1beta/models エンドポイントを呼び出し、レスポンスヘッダーから
-    RPM/TPM のリミット情報を取得する。
+    プロジェクト内のファイルからスキャンしたAPIキーを使用する。
 
     Args:
-        api_key: Gemini (Google) API キー
+        api_name: API名（デフォルト: "Gemini"）
 
     Returns:
         Dict[str, Any]: {
             "status": "success" | "error",
-            "rpm": int | None,           # RPM上限 (x-goog-quota-requests-per-minute)
-            "rpm_remaining": int | None,  # 残りRPM (x-goog-quota-remaining-requests)
-            "tpm": int | None,            # TPM上限 (x-goog-quota-tokens-per-minute)
-            "tpm_remaining": int | None,   # 残りTPM (x-goog-quota-remaining-tokens)
-            "message": str | None          # エラーメッセージ
+            "rpm": int | None,
+            "rpm_remaining": int | None,
+            "tpm": int | None,
+            "tpm_remaining": int | None,
+            "message": str | None
         }
     """
+    api_key = _get_api_key_from_scanned_results(api_name)
+    if not api_key:
+        return {
+            "status": "error",
+            "rpm": None,
+            "rpm_remaining": None,
+            "tpm": None,
+            "tpm_remaining": None,
+            "message": "APIキーが見つかりませんでした",
+        }
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
     try:
         resp = requests.get(url, timeout=10)
@@ -711,7 +749,7 @@ def fetch_key_info_gemini(api_key: str) -> Dict[str, Any]:
                 "rpm_remaining": None,
                 "tpm": None,
                 "tpm_remaining": None,
-                "message": f"HTTP {resp.status_code}: {resp.text[:500]}"
+                "message": f"HTTP {resp.status_code}: {resp.text[:500]}",
             }
         resp_headers = resp.headers
         rpm = resp_headers.get("x-goog-quota-requests-per-minute")
@@ -724,7 +762,7 @@ def fetch_key_info_gemini(api_key: str) -> Dict[str, Any]:
             "rpm_remaining": int(rpm_remaining) if rpm_remaining is not None else None,
             "tpm": int(tpm) if tpm is not None else None,
             "tpm_remaining": int(tpm_remaining) if tpm_remaining is not None else None,
-            "message": None
+            "message": None,
         }
     except (requests.exceptions.RequestException, ValueError) as e:
         return {
@@ -733,7 +771,7 @@ def fetch_key_info_gemini(api_key: str) -> Dict[str, Any]:
             "rpm_remaining": None,
             "tpm": None,
             "tpm_remaining": None,
-            "message": str(e)
+            "message": f"ネットワークエラーが発生しました: {e}",
         }
 
 
@@ -1143,6 +1181,23 @@ def search_api_keys(root_dir: Path) -> List[Dict[str, Any]]:
     return results
 
 
+def _get_api_key_from_scanned_results(api_name: str, root_dir: Path = Path("/home/loser/wsl-projects")) -> Optional[str]:
+    """スキャン結果から指定API名に対応するAPIキーを取得する。
+
+    Args:
+        api_name: API名（例: "OpenRouter", "Mistral", "Gemini"）
+        root_dir: スキャン対象のルートディレクトリ
+
+    Returns:
+        str: 見つかったAPIキー、見つからない場合は None
+    """
+    detected_api_keys = search_api_keys(root_dir)
+    for key_info in detected_api_keys:
+        if key_info["api_name"] == api_name:
+            return key_info["key"]
+    return None
+
+
 def set_api_keys_from_files(root_dir: Path) -> None:
     """ディレクトリから検出されたAPIキーを環境変数に設定する（dedup/validation済み）。"""
     detected_api_keys = search_api_keys(root_dir)
@@ -1327,7 +1382,9 @@ def main() -> None:
             console.print(f"[yellow]Skipping {api_name}: No environment variable configuration.[/yellow]")
             continue
 
-        api_key = os.getenv(env_key)
+        api_key = _get_api_key_from_scanned_results(api_name, root_dir)
+        if not api_key:
+            api_key = os.getenv(env_key)  # フォールバック
         if not api_key:
             console.print(f"[yellow]Skipping {api_name}: {env_key} environment variable is not set.[/yellow]")
             continue
@@ -1337,11 +1394,11 @@ def main() -> None:
         if api_details:
             # key_info 取得
             if api_name == "OpenRouter":
-                key_info = fetch_key_info_openrouter(api_key)
+                key_info = fetch_key_info_openrouter(api_name)
             elif api_name == "Mistral":
-                key_info = fetch_key_info_mistral(api_key)
+                key_info = fetch_key_info_mistral(api_name)
             elif api_name == "Gemini":
-                key_info = fetch_key_info_gemini(api_key)
+                key_info = fetch_key_info_gemini(api_name)
             else:
                 key_info = {}
             api_details["key_info"] = key_info
