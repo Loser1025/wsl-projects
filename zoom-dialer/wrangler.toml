@@ -1,0 +1,7 @@
+name = "zoom-dialer"
+main = "src/index.ts"
+compatibility_date = "2026-06-13"
+
+[[kv_namespaces]]
+binding = "PHONE_STORE"
+id = "df957e28ed894d0b824c5a6f938fdeb9"

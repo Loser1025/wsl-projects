@@ -32,7 +32,7 @@ export default {
     // ==========================================
     if (url.pathname === '/upload' && request.method === 'POST') {
       const formData = await request.formData();
-      const file = formData.get('csv') as File;
+      const file = formData.get('csv') as File | null;
       if (!file) return new Response('CSVファイルがありません', { status: 400 });
 
       const csvText = await file.text();
