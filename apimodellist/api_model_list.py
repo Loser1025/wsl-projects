@@ -238,7 +238,9 @@ def scan_directory(root_dir: Path) -> List[Dict[str, Any]]:
     for file_path in root_dir.rglob("*"):
         if not file_path.is_file():
             continue
-        if file_path.suffix.lower() not in TEXT_EXTENSIONS:
+        suffix = file_path.suffix.lower()
+        basename = file_path.name
+        if suffix not in TEXT_EXTENSIONS and not basename.startswith(".env"):
             continue
         if any(part in EXCLUDE_DIRS for part in file_path.parts):
             continue
@@ -562,7 +564,7 @@ def _mask_key(key: str) -> str:
 
 def _is_placeholder(value: str) -> bool:
     """値がプレースホルダー/無効な値かどうかを判定する。"""
-    stripped = value.strip()
+    stripped = value.strip().rstrip("\\n").rstrip("\\r")
     if not stripped or len(stripped) < 8:
         return True
     lower = stripped.lower()
@@ -571,6 +573,7 @@ def _is_placeholder(value: str) -> bool:
         "your_api_key", "your-key", "your_key", "xxx", "example", "here",
         "removed", "todo", "placeholder", "test_key", "dummy", "fake",
         "changeme", "change-me", "insert-here", "insert_here",
+        "your_api-key", "api_key_here", "key_here",
     ]
     for kw in placeholder_keywords:
         if kw in lower:
@@ -581,11 +584,23 @@ def _is_placeholder(value: str) -> bool:
     # ファイルパスパターン
     if lower.startswith("/") or lower.startswith("./") or lower.startswith("~/"):
         return True
-    # Python式パターン (os.getenv, config.settings, etc.)
-    if "os.getenv" in lower or "config.settings" in lower or "environ[" in lower:
+    # Python式パターン (os.getenv, config.settings, process.env etc.)
+    if "os.getenv" in lower or "config.settings" in lower or "environ[" in lower or "process.env" in lower:
         return True
     # カンマ区切りリスト
     if "," in stripped and len(stripped.split(",")) > 2:
+        return True
+    # 値がほぼすべて小文字+ハイフンだけ（テストキーっぽい）
+    if re.match(r"^[a-z\-]+$", stripped):
+        return True
+    # GitHub Actions 式 ${{ ... }}
+    if "${{" in stripped or "}}" in stripped:
+        return True
+    # テンプレート変数 ${VAR} パターン
+    if re.match(r"^\$\{.*\}$", stripped):
+        return True
+    # ドキュメント内のプレースホルダー (sk-ant-... など)
+    if re.match(r"^sk-ant-\.\.\.$", stripped):
         return True
     return False
 
@@ -593,10 +608,16 @@ def _is_placeholder(value: str) -> bool:
 def _build_alias_patterns(api_name: str, env_key: str) -> list:
     """
     API名とenv_keyから、検索すべき環境変数名のaliasパターンリストを生成する。
-    例: ("Mistral", "MISTRAL_API_KEY") -> ["MISTRAL_API_KEY", "MISTRAL_KEY", "MISTRAL_KEY_1", "MISTRAL_KEY_2", ...]
+    例: ("Mistral", "MISTRAL_API_KEY") -> ["MISTRAL_API_KEY", "MISTRAL_KEY", "MISTRAL_KEY_1", ...]
     """
     aliases = set()
     aliases.add(env_key)
+
+    # 追加のベース名（provider固有の別名）
+    # 例: Gemini の canonical env_key は GOOGLE_API_KEY だが、GEMINI_KEY_1 なども使われる
+    extra_bases = {
+        "Gemini": ["GOOGLE", "GEMINI"],
+    }
 
     # env_keyの_BASE部分を抽出 (例: MISTRAL_API_KEY -> MISTRAL)
     base = env_key
@@ -610,10 +631,15 @@ def _build_alias_patterns(api_name: str, env_key: str) -> list:
         if len(parts) == 2:
             base = parts[0]
 
-    aliases.add(base + "_KEY")
-    for i in range(1, 10):
-        aliases.add(f"{base}_{i}")
-        aliases.add(f"{base}_KEY_{i}")
+    bases = [base]
+    bases.extend(extra_bases.get(api_name, []))
+
+    for b in bases:
+        aliases.add(b + "_KEY")
+        aliases.add(b + "_API_KEY")
+        for i in range(1, 10):
+            aliases.add(f"{b}_{i}")
+            aliases.add(f"{b}_KEY_{i}")
 
     return list(aliases)
 
@@ -707,12 +733,15 @@ def search_api_keys(root_dir: Path) -> List[Dict[str, Any]]:
     for file_path in root_dir.rglob("*"):
         if not file_path.is_file():
             continue
-        if file_path.suffix.lower() not in TEXT_EXTENSIONS:
-            continue
         if any(part in EXCLUDE_DIRS for part in file_path.parts):
             continue
         # 自身のスキャリプトを除外
         if file_path.name in script_names:
+            continue
+        # 拡張子チェック (.env など拡張子のないファイルも許可)
+        suffix = file_path.suffix.lower()
+        basename = file_path.name
+        if suffix not in TEXT_EXTENSIONS and not basename.startswith(".env"):
             continue
 
         try:
