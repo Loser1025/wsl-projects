@@ -555,6 +555,17 @@ def search_api_keys(root_dir: Path) -> List[Dict[str, Any]]:
     """ディレクトリ内のファイルからAPIキーのパターンを検索する。"""
     api_keys = []
 
+    # API名から数値サフィックスキーのプレフィックスへのマッピング
+    # 例: "Mistral" → "MISTRAL_KEY", "Gemini" → "GEMINI_KEY"
+    NUMERIC_SUFFIX_PREFIX_MAP = {
+        "OpenAI": "OPENAI_KEY",
+        "OpenRouter": "OPENROUTER_KEY",
+        "Mistral": "MISTRAL_KEY",
+        "Anthropic": "ANTHROPIC_KEY",
+        "Gemini": "GEMINI_KEY",
+        "HuggingFace": "HUGGINGFACE_KEY",
+    }
+
     for file_path in root_dir.rglob("*"):
         if not file_path.is_file():
             continue
@@ -573,16 +584,34 @@ def search_api_keys(root_dir: Path) -> List[Dict[str, Any]]:
             if not env_key:
                 continue
 
-            # APIキーのパターンを検索（ENV_KEY = 'value' or ENV_KEY = "value"）
-            key_pattern = re.compile(
+            found_key = None
+
+            # 1. まず正確な env_key パターンを検索（ENV_KEY = 'value' or ENV_KEY = "value"）
+            exact_pattern = re.compile(
                 rf"{re.escape(env_key)}\s*=\s*['\"]([^'\"]+)['\"]", re.IGNORECASE
             )
-            match = key_pattern.search(content)
+            match = exact_pattern.search(content)
             if match:
+                found_key = match.group(1)
+
+            # 2. 正確なキーが見つからない場合、数値サフィックス付きキーを検索
+            #    例: MISTRAL_KEY_1 = 'value', GEMINI_KEY_2 = "value"
+            if found_key is None:
+                numeric_prefix = NUMERIC_SUFFIX_PREFIX_MAP.get(api_name)
+                if numeric_prefix:
+                    numeric_pattern = re.compile(
+                        rf"{re.escape(numeric_prefix)}_\d+\s*=\s*['\"]([^'\"]+)['\"]",
+                        re.IGNORECASE,
+                    )
+                    match = numeric_pattern.search(content)
+                    if match:
+                        found_key = match.group(1)
+
+            if found_key is not None:
                 api_keys.append({
                     "api_name": api_name,
                     "env_key": env_key,
-                    "key": match.group(1),
+                    "key": found_key,
                     "file_path": str(file_path.resolve()),
                 })
 
