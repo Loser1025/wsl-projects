@@ -1,0 +1,20 @@
+{
+  "name": "zoom-dialer",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.4",
+    "@cloudflare/workers-types": "^4.20260613.1",
+    "typescript": "^6.0.3",
+    "vitest": "~3.2.0",
+    "wrangler": "^4.100.0"
+  },
+  "type": "module"
+}
