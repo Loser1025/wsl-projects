@@ -69,8 +69,10 @@ API_CONFIGS = {
             "size_limit": "ratelimitbysize-limit",
             "size_remaining": "ratelimitbysize-remaining",
             "size_reset": "ratelimitbysize-reset",
+            "tokens_limit": "ratelimitbysize-limit-tokens",
+            "tokens_remaining": "ratelimitbysize-remaining-tokens",
         },
-        "keyinfo_note": "Mistral API does not provide usage/quota information via API. Check your usage at https://console.mistral.ai/",
+        "keyinfo_note": "Mistral API rate limits are available via response headers.",
     },
     "Anthropic": {
         "models_endpoint": "/v1/messages",
@@ -94,16 +96,16 @@ API_CONFIGS = {
         "model_id_field": "name",
         "context_length_field": "inputTokenLimit",
         "rate_limit_headers": {
-            "requests": "x-ratelimit-limit-requests",
-            "tokens": "x-ratelimit-limit-tokens",
-            "remaining_requests": "x-ratelimit-remaining-requests",
-            "remaining_tokens": "x-ratelimit-remaining-tokens",
+            "requests": "x-goog-quota-requests-per-minute",
+            "tokens": "x-goog-quota-tokens-per-minute",
+            "remaining_requests": "x-goog-quota-remaining-requests",
+            "remaining_tokens": "x-goog-quota-remaining-tokens",
             "reset_requests": "x-ratelimit-reset-requests",
             "reset_tokens": "x-ratelimit-reset-tokens",
             "quota_limit": "x-goog-quota-limit",
             "quota_remaining": "x-goog-quota-remaining",
         },
-        "keyinfo_note": "Gemini API does not provide per-key usage/quota via API. Check your usage at Google Cloud Console (https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas)",
+        "keyinfo_note": "Gemini API rate limits are available via response headers.",
     },
     "HuggingFace": {
         "models_endpoint": "/models",
@@ -566,27 +568,173 @@ def fetch_api_details(api_name: str, api_key: str) -> Dict[str, Any]:
 
 
 def fetch_key_info_openrouter(api_key: str) -> Dict[str, Any]:
-    """OpenRouter /v1/keys からキー使用量・リミット取得"""
+    """OpenRouter /v1/keys からキー使用量・リミットを取得する。
+
+    OpenRouter の /v1/keys エンドポイントを呼び出し、レスポンスボディから
+    RPM/TPM のリミット情報を取得する。
+
+    Args:
+        api_key: OpenRouter API キー
+
+    Returns:
+        Dict[str, Any]: {
+            "status": "success" | "error",
+            "rpm": int | None,          # RPM上限 (rate_limit.requests.limit)
+            "rpm_remaining": int | None, # 残りRPM (rate_limit.requests.remaining)
+            "tpm": int | None,           # TPM上限 (rate_limit.tokens.limit)
+            "tpm_remaining": int | None,  # 残りTPM (rate_limit.tokens.remaining)
+            "reset": str | None,         # リセット時刻 ISO形式 (rate_limit.requests.reset)
+            "message": str | None        # エラーメッセージ
+        }
+    """
     url = "https://openrouter.ai/api/v1/keys"
     headers = {"Authorization": f"Bearer {api_key}"}
     try:
         resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            return {"status": "ok", "data": data}
-        return {"status": "error", "code": resp.status_code, "message": resp.text[:500]}
+        if resp.status_code != 200:
+            return {
+                "status": "error",
+                "rpm": None,
+                "rpm_remaining": None,
+                "tpm": None,
+                "tpm_remaining": None,
+                "reset": None,
+                "message": f"HTTP {resp.status_code}: {resp.text[:500]}"
+            }
+        data = resp.json()
+        rate_limit = data.get("rate_limit", {})
+        requests_info = rate_limit.get("requests", {})
+        tokens_info = rate_limit.get("tokens", {})
+        return {
+            "status": "success",
+            "rpm": requests_info.get("limit"),
+            "rpm_remaining": requests_info.get("remaining"),
+            "tpm": tokens_info.get("limit"),
+            "tpm_remaining": tokens_info.get("remaining"),
+            "reset": requests_info.get("reset"),
+            "message": None
+        }
     except requests.exceptions.RequestException as e:
-        return {"status": "error", "code": 0, "message": str(e)}
+        return {
+            "status": "error",
+            "rpm": None,
+            "rpm_remaining": None,
+            "tpm": None,
+            "tpm_remaining": None,
+            "reset": None,
+            "message": str(e)
+        }
 
 
-def fetch_key_info_mistral() -> Dict[str, Any]:
-    """Mistral: 利用量APIなし"""
-    return {"status": "unavailable", "message": "Mistral API does not provide usage/quota information via API. Check https://console.mistral.ai/"}
+def fetch_key_info_mistral(api_key: str) -> Dict[str, Any]:
+    """Mistral APIのレスポンスヘッダーからRPM/TPMを取得する。
+
+    Mistral API の /v1/models エンドポイントを呼び出し、レスポンスヘッダーから
+    RPM/TPM のリミット情報を取得する。
+
+    Args:
+        api_key: Mistral API キー
+
+    Returns:
+        Dict[str, Any]: {
+            "status": "success" | "error",
+            "rpm": int | None,           # RPM上限 (x-ratelimit-limit-requests)
+            "rpm_remaining": int | None,  # 残りRPM (x-ratelimit-remaining-requests)
+            "tpm": int | None,            # TPM上限 (ratelimitbysize-limit-tokens)
+            "tpm_remaining": int | None,   # 残りTPM (ratelimitbysize-remaining-tokens)
+            "message": str | None          # エラーメッセージ
+        }
+    """
+    url = "https://api.mistral.ai/v1/models"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return {
+                "status": "error",
+                "rpm": None,
+                "rpm_remaining": None,
+                "tpm": None,
+                "tpm_remaining": None,
+                "message": f"HTTP {resp.status_code}: {resp.text[:500]}"
+            }
+        resp_headers = resp.headers
+        rpm = resp_headers.get("x-ratelimit-limit-requests")
+        rpm_remaining = resp_headers.get("x-ratelimit-remaining-requests")
+        tpm = resp_headers.get("ratelimitbysize-limit-tokens")
+        tpm_remaining = resp_headers.get("ratelimitbysize-remaining-tokens")
+        return {
+            "status": "success",
+            "rpm": int(rpm) if rpm is not None else None,
+            "rpm_remaining": int(rpm_remaining) if rpm_remaining is not None else None,
+            "tpm": int(tpm) if tpm is not None else None,
+            "tpm_remaining": int(tpm_remaining) if tpm_remaining is not None else None,
+            "message": None
+        }
+    except (requests.exceptions.RequestException, ValueError) as e:
+        return {
+            "status": "error",
+            "rpm": None,
+            "rpm_remaining": None,
+            "tpm": None,
+            "tpm_remaining": None,
+            "message": str(e)
+        }
 
 
-def fetch_key_info_gemini() -> Dict[str, Any]:
-    """Gemini: 利用量APIなし"""
-    return {"status": "unavailable", "message": "Gemini usage/quota must be checked at Google Cloud Console: https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas"}
+def fetch_key_info_gemini(api_key: str) -> Dict[str, Any]:
+    """Gemini APIのレスポンスヘッダーからRPM/TPMを取得する。
+
+    Gemini API の /v1beta/models エンドポイントを呼び出し、レスポンスヘッダーから
+    RPM/TPM のリミット情報を取得する。
+
+    Args:
+        api_key: Gemini (Google) API キー
+
+    Returns:
+        Dict[str, Any]: {
+            "status": "success" | "error",
+            "rpm": int | None,           # RPM上限 (x-goog-quota-requests-per-minute)
+            "rpm_remaining": int | None,  # 残りRPM (x-goog-quota-remaining-requests)
+            "tpm": int | None,            # TPM上限 (x-goog-quota-tokens-per-minute)
+            "tpm_remaining": int | None,   # 残りTPM (x-goog-quota-remaining-tokens)
+            "message": str | None          # エラーメッセージ
+        }
+    """
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+    try:
+        resp = requests.get(url, timeout=10)
+        if resp.status_code != 200:
+            return {
+                "status": "error",
+                "rpm": None,
+                "rpm_remaining": None,
+                "tpm": None,
+                "tpm_remaining": None,
+                "message": f"HTTP {resp.status_code}: {resp.text[:500]}"
+            }
+        resp_headers = resp.headers
+        rpm = resp_headers.get("x-goog-quota-requests-per-minute")
+        rpm_remaining = resp_headers.get("x-goog-quota-remaining-requests")
+        tpm = resp_headers.get("x-goog-quota-tokens-per-minute")
+        tpm_remaining = resp_headers.get("x-goog-quota-remaining-tokens")
+        return {
+            "status": "success",
+            "rpm": int(rpm) if rpm is not None else None,
+            "rpm_remaining": int(rpm_remaining) if rpm_remaining is not None else None,
+            "tpm": int(tpm) if tpm is not None else None,
+            "tpm_remaining": int(tpm_remaining) if tpm_remaining is not None else None,
+            "message": None
+        }
+    except (requests.exceptions.RequestException, ValueError) as e:
+        return {
+            "status": "error",
+            "rpm": None,
+            "rpm_remaining": None,
+            "tpm": None,
+            "tpm_remaining": None,
+            "message": str(e)
+        }
 
 
 # ──────────────────────────────────────────────
@@ -1191,9 +1339,9 @@ def main() -> None:
             if api_name == "OpenRouter":
                 key_info = fetch_key_info_openrouter(api_key)
             elif api_name == "Mistral":
-                key_info = fetch_key_info_mistral()
+                key_info = fetch_key_info_mistral(api_key)
             elif api_name == "Gemini":
-                key_info = fetch_key_info_gemini()
+                key_info = fetch_key_info_gemini(api_key)
             else:
                 key_info = {}
             api_details["key_info"] = key_info
