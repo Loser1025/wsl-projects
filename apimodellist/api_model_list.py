@@ -360,9 +360,9 @@ def fetch_models(api_name: str, api_key: str) -> List[Dict[str, Any]]:
         console = Console()
         console.print(f"[dim]DEBUG {api_name}: got {len(models)} models[/dim]")
 
-        # レートリミット情報を取得
-        rate_limit_requests = response.headers.get(config["rate_limit_headers"]["requests"])
-        rate_limit_tokens = response.headers.get(config["rate_limit_headers"]["tokens"])
+        # レートリミット情報を取得（ヘッダーがない場合は N/A）
+        rate_limit_requests = response.headers.get(config["rate_limit_headers"]["requests"]) or "N/A"
+        rate_limit_tokens = response.headers.get(config["rate_limit_headers"]["tokens"]) or "N/A"
 
         result = []
         for model in models:
@@ -547,8 +547,8 @@ def display_models(models: List[Dict[str, Any]]) -> None:
         api_names = model.get("api_names", model.get("api_name", "N/A"))
         model_name = model.get("name", model.get("id", "N/A"))
         max_tokens = str(model.get("context_length", "N/A"))
-        rpm = str(model.get("rate_limit_requests", "N/A"))
-        tpm = str(model.get("rate_limit_tokens", "N/A"))
+        rpm = str(model.get("rate_limit_requests") or "N/A")
+        tpm = str(model.get("rate_limit_tokens") or "N/A")
         aliases = model.get("aliases", "-")
 
         table.add_row(api_names, model_name, max_tokens, rpm, tpm, aliases)

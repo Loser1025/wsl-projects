@@ -104,7 +104,7 @@ def _linked_sessions(meta: dict, all_meta: list[dict]) -> list[str]:
     return sorted(linked)
 
 
-_PAGE = """<!DOCTYPE html>
+_PAGE = r"""<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -117,8 +117,9 @@ _PAGE = """<!DOCTYPE html>
   .session:hover, .session.active { background: #333; }
   .session .file { color: #8cf; font-weight: bold; }
   .session .meta { color: #999; font-size: 11px; }
-  .entry { margin: 6px 0; padding: 6px 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-word; font-size: 13px; }
+  .entry { margin: 6px 0; padding: 6px 10px; border-radius: 4px; font-size: 13px; }
   .entry .type { font-size: 11px; color: #999; margin-bottom: 2px; }
+  .entry .tool-name { color: #8cf; font-weight: bold; }
   .user_input { background: #234; }
   .thought { background: #2a2a1a; }
   .action { background: #1a2a2a; }
@@ -128,6 +129,13 @@ _PAGE = """<!DOCTYPE html>
   .links { margin-top: 10px; }
   .links a { display: inline-block; margin: 2px 6px 2px 0; padding: 4px 8px; background: #345; color: #cde; border-radius: 4px; text-decoration: none; font-size: 12px; }
   h2 { font-size: 16px; }
+  pre.json, pre.text { white-space: pre-wrap; word-break: break-word; margin: 4px 0 0 0; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; }
+  .json-key { color: #9cdcfe; }
+  .json-string { color: #ce9178; }
+  .json-number { color: #b5cea8; }
+  .json-bool, .json-null { color: #569cd6; }
+  details > summary { cursor: pointer; color: #8cf; font-size: 11px; margin-top: 2px; }
+  details[open] > summary { margin-bottom: 2px; }
 </style>
 </head>
 <body>
@@ -152,6 +160,41 @@ async function loadList() {
   }
 }
 
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function syntaxHighlight(json) {
+  json = esc(json);
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+    let cls = 'json-number';
+    if (/^"/.test(match)) {
+      cls = /:$/.test(match) ? 'json-key' : 'json-string';
+    } else if (/^(true|false)$/.test(match)) {
+      cls = 'json-bool';
+    } else if (match === 'null') {
+      cls = 'json-null';
+    }
+    return '<span class="' + cls + '">' + match + '</span>';
+  });
+}
+
+const COLLAPSE_THRESHOLD = 600;
+
+function jsonBlock(value) {
+  const pretty = JSON.stringify(value, null, 2);
+  const inner = `<pre class="json">${syntaxHighlight(pretty)}</pre>`;
+  if (pretty.length <= COLLAPSE_THRESHOLD) return inner;
+  return `<details><summary>展開/折りたたみ（${pretty.length}文字）</summary>${inner}</details>`;
+}
+
+function textBlock(text) {
+  text = text || '';
+  const inner = `<pre class="text">${esc(text)}</pre>`;
+  if (text.length <= COLLAPSE_THRESHOLD) return inner;
+  return `<details><summary>展開/折りたたみ（${text.length}文字）</summary>${inner}</details>`;
+}
+
 async function loadDetail(file) {
   document.querySelectorAll('#list .session').forEach(el => {
     el.classList.toggle('active', el.dataset.file === file);
@@ -170,17 +213,28 @@ async function loadDetail(file) {
   for (const e of data.entries) {
     let body = '';
     if (e.type === 'user_input' || e.type === 'final_answer' || e.type === 'thought') {
-      body = e.content || '';
+      body = textBlock(e.content || '');
     } else if (e.type === 'action') {
-      body = `${e.tool || ''}(${JSON.stringify(e.args || {})})`;
+      body = `<span class="tool-name">${esc(e.tool || '')}</span>` + jsonBlock(e.args || {});
     } else if (e.type === 'observation') {
-      body = (e.result || '').slice(0, 1000);
+      const result = e.result || '';
+      let parsed = null;
+      try { parsed = JSON.parse(result); } catch (_) {}
+      if (parsed !== null && typeof parsed === 'object') {
+        body = jsonBlock(parsed);
+      } else {
+        body = textBlock(result);
+      }
     } else if (e.type === 'system_event') {
-      body = `[${e.level || ''}] ${e.content || ''}`;
+      if (e.content_obj !== undefined) {
+        body = `<span class="tool-name">[${esc(e.level || '')}]</span>` + jsonBlock(e.content_obj);
+      } else {
+        body = `<span class="tool-name">[${esc(e.level || '')}]</span>` + textBlock(e.content || '');
+      }
     } else {
-      body = JSON.stringify(e);
+      body = jsonBlock(e);
     }
-    html += `<div class="entry ${e.type}"><div class="type">${e.type} ${e.ts || ''}</div>${body.replace(/</g,'&lt;')}</div>`;
+    html += `<div class="entry ${e.type}"><div class="type">${e.type} ${e.ts || ''}</div>${body}</div>`;
   }
   detail.innerHTML = html;
   detail.querySelectorAll('a[data-file]').forEach(a => {
