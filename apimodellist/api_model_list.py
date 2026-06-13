@@ -243,10 +243,10 @@ def scan_directory(root_dir: Path) -> List[Dict[str, Any]]:
         apis = extract_api_info(file_path)
         all_apis.extend(apis)
 
-    # 重複を除去（同じAPI名 + ファイルパスの組み合わせをマージ）
+    # 重複を除去（API名でマージ。同じAPI名の複数ファイル出現を1エントリにまとめる）
     merged = {}
     for api in all_apis:
-        key = (api["name"], api["file_path"])
+        key = api["name"]
         if key not in merged:
             merged[key] = api.copy()
         else:
@@ -271,6 +271,8 @@ def make_api_request(
     """APIにリクエストを送信する。"""
     config = API_CONFIGS.get(api_name)
     if not config:
+        console = Console()
+        console.print(f"[red]No config found for API: {api_name}[/red]")
         return None
 
     base_url = config["base_url"]
@@ -284,13 +286,41 @@ def make_api_request(
     else:
         headers[auth_header] = api_key
 
+    # デバッグログ: URL とヘッダー（キー値はマスク）
+    console = Console()
+    safe_headers = {}
+    for k, v in headers.items():
+        if k.lower() in ("authorization", "x-api-key", "x-goog-api-key"):
+            safe_headers[k] = v[:12] + "..." if len(v) > 12 else "***"
+        else:
+            safe_headers[k] = v
+    console.print(f"[dim]DEBUG {api_name}: {method} {url}[/dim]")
+    console.print(f"[dim]DEBUG {api_name}: headers={safe_headers}[/dim]")
+
     try:
         response = requests.request(method, url, headers=headers, params=params, timeout=30)
+        console.print(f"[dim]DEBUG {api_name}: status={response.status_code}[/dim]")
+        if response.status_code >= 400:
+            # エラー時はレスポンス本文も出力
+            try:
+                err_body = response.text[:500]
+            except Exception:
+                err_body = "(unreadable)"
+            console.print(f"[red]ERROR {api_name}: HTTP {response.status_code} - {err_body}[/red]")
         response.raise_for_status()
         return response
+    except requests.exceptions.Timeout:
+        console.print(f"[red]ERROR {api_name}: Request to {url} timed out[/red]")
+        return None
+    except requests.exceptions.ConnectionError as e:
+        console.print(f"[red]ERROR {api_name}: Connection error for {url}: {e}[/red]")
+        return None
+    except requests.exceptions.HTTPError as e:
+        # raise_for_status からのエラー（raise_for_status前にステータスは出力済み）
+        console.print(f"[red]ERROR {api_name}: HTTP error for {url}: {e}[/red]")
+        return None
     except requests.exceptions.RequestException as e:
-        console = Console()
-        console.print(f"[red]Error making API request to {url}: {e}[/red]")
+        console.print(f"[red]ERROR {api_name}: Request to {url} failed: {e}[/red]")
         return None
 
 
@@ -314,7 +344,12 @@ def fetch_models(api_name: str, api_key: str) -> List[Dict[str, Any]]:
         else:
             models = data if isinstance(data, list) else []
         if not isinstance(models, list):
+            console = Console()
+            console.print(f"[yellow]Unexpected response format from {api_name}: {type(data)}[/yellow]")
             return []
+
+        console = Console()
+        console.print(f"[dim]DEBUG {api_name}: got {len(models)} models[/dim]")
 
         # レートリミット情報を取得
         rate_limit_requests = response.headers.get(config["rate_limit_headers"]["requests"])
@@ -325,6 +360,10 @@ def fetch_models(api_name: str, api_key: str) -> List[Dict[str, Any]]:
             model_id = model.get(config["model_id_field"], "")
             if not model_id:
                 continue
+
+            # Gemini: name フィールドが "models/gemini-1.5-pro" 形式なのでプレフィックスを除去
+            if api_name == "Gemini" and model_id.startswith("models/"):
+                model_id = model_id[len("models/"):]
 
             # モデル詳細を取得（必要に応じて）
             context_length = model.get(config["context_length_field"])
@@ -338,6 +377,7 @@ def fetch_models(api_name: str, api_key: str) -> List[Dict[str, Any]]:
             model_name = model.get("name", model_id)
 
             # OpenRouterの場合のみ "free" という表記があるモデルだけをフィルタリング
+            # Mistral, Gemini などは全モデルを取得する
             if api_name == "OpenRouter":
                 if "free" not in model_name.lower() and "free" not in model_id.lower():
                     continue
@@ -714,10 +754,11 @@ def main() -> None:
         console.print(f"[blue]Fetching models for {api_name}...[/blue]")
         models = fetch_models(api_name, api_key)
         if models:
-            console.print(f"[green]Found {len(models)} free model(s) for {api_name}.[/green]")
+            label = "free model(s)" if api_name == "OpenRouter" else "model(s)"
+            console.print(f"[green]Found {len(models)} {label} for {api_name}.[/green]")
             all_models.extend(models)
         else:
-            console.print(f"[yellow]No free models found for {api_name}.[/yellow]")
+            console.print(f"[yellow]No models found for {api_name}.[/yellow]")
 
     # 4. データを整理
     organized_models = organize_models(all_models)
