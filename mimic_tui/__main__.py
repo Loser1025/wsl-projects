@@ -55,12 +55,13 @@ def _build_components(base_dir: str, active_config=None):
     # すべて取り上げ、調査は delegate_research、実装・修正・検証は
     # delegate_to_team / delegate_to_team_parallel に委任せざるを得ない構成にする
     # （フレッシュな文脈のResearcher/Worker/Supervisorが実際にファイルへ触れる）。
-    # 残るのは delegate_research / delegate_to_team[_parallel] / update_scratchpad のみ。
+    # 残るのは delegate_research / delegate_to_team[_parallel] / update_scratchpad /
+    # search_history（過去セッションの参照のみで、現プロジェクトのファイルには触れない）のみ。
     _EXTREME_EXCLUDED_TOOLS = {
         "write_file", "edit_file", "patch_file", "delete_file",
         "run_bash", "run_pipeline",
         "read_file", "search_in_file", "grep_codebase", "file_info",
-        "smart_read", "get_repo_map", "read_tool_cache", "search_history",
+        "smart_read", "get_repo_map", "read_tool_cache",
         "web_search", "fetch_webpage",
     }
     _extreme_registry = ToolRegistry()
