@@ -302,7 +302,7 @@ def make_api_request(
     console.print(f"[dim]DEBUG {api_name}: headers={safe_headers}[/dim]")
 
     try:
-        response = requests.request(method, url, headers=headers, params=params, timeout=30)
+        response = requests.request(method, url, headers=headers, params=params, timeout=5)
         console.print(f"[dim]DEBUG {api_name}: status={response.status_code}[/dim]")
         if response.status_code != 200:
             # エラー時はレスポンス本文（text と json の両方）を出力
