@@ -813,14 +813,12 @@ def delegate_to_team_parallel(tasks: list[str], project_dir: str = ".") -> str:
 @tools.register(
     name="delegate_research",
     description=(
-        "「調べ物」を、フレッシュな文脈の調査役（Researcher）に委任し、調査結果（回答）だけを"
-        "受け取る。外部の公式ドキュメント・仕様の調査（web_search/fetch_webpage）だけでなく、"
-        "このプロジェクト内のコード・ファイルの調査・確認（read_file/grep_codebase/"
-        "search_in_file/get_repo_map等）にも使える。"
-        "複数回のツール呼び出しが必要になりそうな調べ物・コード確認は、自分(Director)で"
-        "直接行わず必ずこれを使うこと。ページ内容やコードの読み取り・試行錯誤が自分の会話履歴に"
+        "外部の公式ドキュメント・仕様などを調べる「調べ物」を、フレッシュな文脈の調査役"
+        "（Researcher）に委任し、調査結果（回答）だけを受け取る。"
+        "複数回のweb_search/fetch_webpageが必要になりそうな調べ物は、自分(Director)で"
+        "直接行わず必ずこれを使うこと。Web検索結果のページ内容や試行錯誤が自分の会話履歴に"
         "積み上がるのを防ぎ、その後のやり取りでのコンテキスト圧迫・劣化を避けられる。"
-        "戻り値はユーザーへの回答やDirectorの判断材料としてそのまま使ってよい。"
+        "戻り値はユーザーへの回答としてそのまま提示してよい。"
     ),
     parameters={
         "type": "object",

@@ -66,14 +66,11 @@ the agent's operating rules — notably a "Pipeline-First" policy (prefer `searc
 `grep_codebase` / `file_info` / `run_pipeline` over `read_file` to save context) and an
 "aggressive team delegation" policy (`delegate_to_team[_parallel]`, see below).
 `EXTREME_REACT_SYSTEM_PROMPT` is an alternate prompt selectable via `/mode extreme` that turns the
-agent into a pure "Director" role: in this mode `agent.tools` is swapped to a registry containing
-only `delegate_research` / `delegate_to_team` / `delegate_to_team_parallel` / `update_scratchpad`
-(`_EXTREME_EXCLUDED_TOOLS` in `_build_components` removes everything else — write tools, shell
-tools, *and* read-only investigation tools like `read_file`/`grep_codebase`/`search_in_file`/
-`web_search`/etc. — registry built as `extreme_tools`). All investigation/verification goes
-through `delegate_research` (fresh Researcher with read-only+web tools) and all code
-changes/tests go through `delegate_to_team` (Worker runs inside its own sandbox with full
-`run_bash`/`run_pipeline` access). This also closes the loophole where the Director could bypass
+agent into a "Director-only" role: in this mode `agent.tools` is swapped to a registry with
+`write_file`/`edit_file`/`patch_file`/`delete_file`/`run_bash`/`run_pipeline` removed (`_EXTREME_EXCLUDED_TOOLS`
+in `_build_components`, registry built as `extreme_tools`), so all code changes, test runs, and
+verification must go through `delegate_to_team` (the Worker runs inside its own sandbox and can use
+`run_bash`/`run_pipeline` freely). This also closes the loophole where the Director could bypass the
 removed write tools via shell redirection/`sed -i`/etc.
 
 ### Tools (`tools.py`, `tools_linux.py`, `pipeline.py`)
