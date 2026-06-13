@@ -308,6 +308,24 @@ def set_log_sink(fn) -> None:
     _log_sink = fn
 
 
+# ── チームイベントシンク（team.py の team_* イベントを ReactLog に転送）─────
+_team_event_sink = None  # callable(event: dict) | None
+
+def set_team_event_sink(fn) -> None:
+    """team.py の team_* イベントを ReactLog に転送するコールバックを登録する。"""
+    global _team_event_sink
+    _team_event_sink = fn
+
+
+def emit_team_event(event: dict) -> None:
+    """team.py から呼ばれる。_team_event_sink が設定されていれば転送する。"""
+    if _team_event_sink is not None:
+        try:
+            _team_event_sink(event)
+        except Exception:
+            pass
+
+
 class _ReactSinkHandler(logging.Handler):
     """Python logging の WARNING/ERROR を ReactLog に転送するハンドラ。"""
     def emit(self, record: logging.LogRecord) -> None:

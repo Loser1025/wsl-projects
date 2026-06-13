@@ -294,6 +294,20 @@ def _print_session_detail(session: dict):
         safe_print()
 
 
+def register_viewer_command(sessions_dir_getter):
+    """sessions_dir を返すコールバックを受け取って /viewer を登録する。"""
+
+    @cmd_registry.register("viewer", "ローカル観測ビューアを起動してURLを表示")
+    def cmd_viewer(agent: OpenRouterAgent, args: str):
+        sd = sessions_dir_getter()
+        if not sd or not sd.exists():
+            safe_print(C.yellow("  セッションログがまだありません。"))
+            return
+        from .viewer import start_viewer_server
+        url = start_viewer_server(sd)
+        safe_print(C.green(f"  ✓ 観測ビューアを起動しました: {url}"))
+
+
 def register_sessions_command(sessions_dir_getter):
     """sessions_dir を返すコールバックを受け取って /sessions を登録する。"""
 

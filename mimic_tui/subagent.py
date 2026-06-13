@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import difflib
 import os
+import re
 import shlex
 import shutil
 import signal
@@ -33,7 +34,9 @@ from typing import Optional
 from .utils import log, safe_print, C
 
 _DONE_MARKER  = "===MIMIC_DONE==="
+_VERIFY_MARKER = "===MIMIC_VERIFY_START==="
 _TIMEOUT_SEC  = 1800  # 30分
+_VERIFY_TIMEOUT_SEC = 300  # 5分
 
 # mimic_tui パッケージの実体があるディレクトリ（python3 -m mimic_tui の起点）
 _LAUNCHER_DIR = Path(__file__).resolve().parent.parent
@@ -46,6 +49,8 @@ class SubagentResult:
     changed_files: list[str] = field(default_factory=list)
     summary: str = ""
     raw_tail: str = ""   # デバッグ用: サブエージェント標準出力の末尾
+    verify_exit: Optional[int] = None   # verify_cmd を指定した場合の終了コード
+    verify_output: str = ""             # verify_cmd の出力（末尾）
 
 
 def _force_rmtree(path: Path) -> None:
@@ -120,6 +125,23 @@ def _summarize(lower: Path, upper: Path, changed: list[str],
     return "\n".join(lines)
 
 
+def _append_verify_section(summary: str, verify_cmd: str, verify_exit: Optional[int],
+                            verify_output: str, max_output_chars: int = 2000) -> str:
+    """verify_cmd が指定されていた場合、その実行結果セクションを summary に追記する。"""
+    if not verify_cmd:
+        return summary
+    tail = verify_output[-max_output_chars:]
+    if len(verify_output) > max_output_chars:
+        tail = f"…（出力 {len(verify_output)} 文字中 末尾 {max_output_chars} 文字のみ表示）\n" + tail
+    section = (
+        f"\n\n[検証コマンド実行結果]\n"
+        f"コマンド: {verify_cmd}\n"
+        f"終了コード: {verify_exit if verify_exit is not None else '(取得できませんでした)'}\n"
+        f"{tail}"
+    )
+    return summary + section
+
+
 def apply_subagent_changes(upper: Path, lower: Path, changed_files: list[str]) -> None:
     """upperdir の変更（新規・更新ファイル）を project_dir(lower) に反映し、
     upperdir 上の whiteout（削除マーカー）に対応するファイルを lower から削除する。"""
@@ -150,7 +172,9 @@ def cleanup_subagent(base: Path) -> None:
 
 
 def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
-                              base: Optional[Path] = None
+                              base: Optional[Path] = None,
+                              trace_id: Optional[str] = None,
+                              verify_cmd: str = "",
                               ) -> tuple[SubagentResult, Optional[Path], Optional[Path]]:
     """Worker を OverlayFS 隔離下で同期実行する。
 
@@ -161,6 +185,11 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
 
     `base` を渡すと、前回までの upperdir（＝それまでの変更内容）を温存したまま
     overlay を再マウントして続きから実行する（「やり直し」ではなく「続き」）。
+
+    `verify_cmd` を渡すと、Worker のエージェント実行が終わった直後・同じ overlay
+    マウント上で `timeout {_VERIFY_TIMEOUT_SEC} bash -c <verify_cmd>` を実行し、
+    その終了コード・出力を SubagentResult.verify_exit / verify_output に格納する。
+    空文字列の場合はこのステップ自体を行わない（従来と同じ動作）。
     """
     if base is None:
         base = Path(tempfile.mkdtemp(prefix=f"mimic_subagent_{label}_"))
@@ -182,12 +211,22 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
         # --auto-prompt は _build_components を経由しないため MIMIC_CWD は効かない
         # （agent.cwd は単に起動時の OS cwd になる）。そこで cwd 自体を merged にし、
         # モジュール解決だけ PYTHONPATH で実体ディレクトリを指す。
-        inner_cmd = (
+        trace_env = f"MIMIC_TRACE_ID={shlex.quote(trace_id)} " if trace_id else ""
+        agent_cmd = (
             f"cd {shlex.quote(str(merged))} && "
             f"PYTHONPATH={shlex.quote(str(_LAUNCHER_DIR))}:$PYTHONPATH "
             f"MIMIC_NO_AUTOGIT=1 "
+            f"{trace_env}"
             f"python3 -m mimic_tui --auto-prompt {shlex.quote(task)}"
         )
+        inner_cmd = f"{agent_cmd}; agent_exit=$?"
+        if verify_cmd:
+            inner_cmd += (
+                f"; echo {_VERIFY_MARKER}"
+                f"; timeout {_VERIFY_TIMEOUT_SEC} bash -c {shlex.quote(verify_cmd)}"
+                f"; echo MIMIC_VERIFY_EXIT=$?"
+            )
+        inner_cmd += "; exit $agent_exit"
         script = f"{mount_cmd} && {inner_cmd}"
 
         proc = subprocess.Popen(
@@ -233,9 +272,22 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
         summary = _summarize(lower, upper, changed)
         if not ok:
             summary = f"⚠ サブエージェントは正常終了しませんでした（exit={proc.returncode}）。\n" + summary
+
+        verify_exit: Optional[int] = None
+        verify_output = ""
+        if verify_cmd:
+            agent_output, _, verify_part = stdout.partition(_VERIFY_MARKER + "\n")
+            verify_output = verify_part
+            m = re.search(r"MIMIC_VERIFY_EXIT=(\d+)", verify_part)
+            if m:
+                verify_exit = int(m.group(1))
+                verify_output = verify_part[:m.start()]
+            summary = _append_verify_section(summary, verify_cmd, verify_exit, verify_output)
+
         result = SubagentResult(
             task=task, ok=ok, changed_files=changed, summary=summary,
             raw_tail=stdout[-2000:],
+            verify_exit=verify_exit, verify_output=verify_output,
         )
         return result, upper, base
     except Exception as exc:

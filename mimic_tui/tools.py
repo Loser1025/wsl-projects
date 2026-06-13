@@ -745,6 +745,9 @@ def patch_file(path: str, search: str, replace: str) -> str:
         "レビューして、不十分なら最大5回までやり直しを繰り返すレビュー付き委任ツール。"
         "【重要】指示文(task)は必ず自分(Director)で事前にgrep_codebase等で調査したうえで、"
         "対象ファイル・変更内容を具体的に書くこと。曖昧な指示はWorkerの手戻りに直結する。"
+        "対象に既存のテスト/ビルド/lintがある場合は verify_cmd にそのコマンドを指定すること。"
+        "指定すると、Worker実行後に同じ作業ディレクトリでこのコマンドが実行され、"
+        "終了コードと出力がSupervisorの判定材料になる（省略時は差分内容のみで判定される）。"
     ),
     parameters={
         "type": "object",
@@ -758,13 +761,19 @@ def patch_file(path: str, search: str, replace: str) -> str:
                 "description": "作業対象のプロジェクトディレクトリのフルパス（通常は現在の作業フォルダ）",
                 "default": ".",
             },
+            "verify_cmd": {
+                "type": "string",
+                "description": "変更を検証するテスト/ビルド/lintコマンド（例: \"pytest tests/test_x.py -q\"）。"
+                                "省略可。指定すると終了コード・出力がSupervisorに渡される。",
+                "default": "",
+            },
         },
         "required": ["task"],
     },
 )
-def delegate_to_team(task: str, project_dir: str = ".") -> str:
+def delegate_to_team(task: str, project_dir: str = ".", verify_cmd: str = "") -> str:
     from .team import run_team_task, _get_team_config
-    return run_team_task(task, project_dir, _get_team_config())
+    return run_team_task(task, project_dir, _get_team_config(), verify_cmd=verify_cmd)
 
 
 @tools.register(
@@ -776,6 +785,9 @@ def delegate_to_team(task: str, project_dir: str = ".") -> str:
         "【重要】tasks は必ず文字列の配列（list[str]）で渡すこと（例: [\"タスク1の説明\", \"タスク2の説明\"]）。"
         "1つのタスクを\"###\"等の区切りで連結した単一の文字列として渡してはならない"
         "（文字列を渡すと1文字ごとに大量のWorkerが起動してしまう）。要素数は最大10件まで。"
+        "verify_cmdを指定すると、各タスクのWorker実行後に同じ作業ディレクトリ（タスクごとに"
+        "独立したoverlay）でこのコマンドが実行され、終了コードと出力が各Supervisorの判定材料になる"
+        "（全タスク共通の1コマンドのみ。省略時は差分内容のみで判定される）。"
     ),
     parameters={
         "type": "object",
@@ -790,11 +802,16 @@ def delegate_to_team(task: str, project_dir: str = ".") -> str:
                 "description": "作業対象のプロジェクトディレクトリのフルパス（通常は現在の作業フォルダ）",
                 "default": ".",
             },
+            "verify_cmd": {
+                "type": "string",
+                "description": "各タスクのWorker実行後に実行する検証コマンド（全タスク共通）。省略可。",
+                "default": "",
+            },
         },
         "required": ["tasks"],
     },
 )
-def delegate_to_team_parallel(tasks: list[str], project_dir: str = ".") -> str:
+def delegate_to_team_parallel(tasks: list[str], project_dir: str = ".", verify_cmd: str = "") -> str:
     from .team import run_team_tasks_parallel, _get_team_config
     if isinstance(tasks, str):
         return ("エラー: tasks は文字列ではなく、文字列の配列（list[str]）で渡してください。"
@@ -803,7 +820,7 @@ def delegate_to_team_parallel(tasks: list[str], project_dir: str = ".") -> str:
         return "エラー: tasks が空です。"
     if len(tasks) > 10:
         return f"エラー: tasks が{len(tasks)}件あります。1回の呼び出しは10件以下に分割してください。"
-    results = run_team_tasks_parallel(tasks, project_dir, _get_team_config())
+    results = run_team_tasks_parallel(tasks, project_dir, _get_team_config(), verify_cmd=verify_cmd)
     blocks = []
     for i, r in enumerate(results, 1):
         blocks.append(f"── チーム {i}/{len(results)} ──\n{r}")

@@ -1032,38 +1032,52 @@ def get_api_models():
     # 環境変数の確認
     api_token = os.getenv('API_TOKEN')
     if not api_token:
-        print("Error: API_TOKEN が設定されていません。")
+        print("Error: API_TOKEN が設定されていません。環境変数を設定してから再実行してください。")
+        print("例: export API_TOKEN='your-api-token-here'")
         return None
 
     # TODO: 実際のAPIエンドポイントが異なる場合は以下を修正してください
-    url = "https://api.example.com/v1/models"  # 実際のエンドポイントに修正が必要
+    # 現在は仮のエンドポイント (https://api.example.com/v1/models) を使用しています。
+    # 使用するAPIに応じて、正しい URL に変更してください。
+    url = "https://api.example.com/v1/models"  # ⚠️ 実際のエンドポイントに修正が必要
     headers = {
         "Authorization": f"Bearer {api_token}",
         "Content-Type": "application/json"
     }
 
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=30)
 
         if response.status_code == 200:
             data = response.json()
-            return data  # レスポンスの全データを返す
+            # レスポンスの全データを返す（従来の data.get("token") から変更）
+            return data
         else:
-            print(f"Error: {response.status_code}")
-            print(f"Response: {response.text}")
+            print(f"Error: HTTP {response.status_code}")
+            print(f"Response Text: {response.text}")
             try:
                 err_json = response.json()
                 print(f"Response JSON: {json.dumps(err_json, indent=2, ensure_ascii=False)}")
             except (json.JSONDecodeError, ValueError):
                 pass
             return None
+    except requests.exceptions.Timeout as e:
+        print(f"Request Timeout Error: {e}")
+        return None
+    except requests.exceptions.ConnectionError as e:
+        print(f"Connection Error: {e}")
+        return None
     except requests.exceptions.RequestException as e:
         print(f"Request Error: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected Error: {e}")
         return None
 
 
 if __name__ == "__main__":
-    # get_api_models() を使用する場合は以下のコメントを解除してください
+    # スタンドアロンで実行する場合は以下のコメントを解除してください
     # models = get_api_models()
-    # print(models)
+    # if models:
+    #     print(json.dumps(models, indent=2, ensure_ascii=False))
     main()

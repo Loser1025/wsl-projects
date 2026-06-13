@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -34,7 +35,13 @@ from .config import OpenRouterConfig, GoogleAIConfig, MistralConfig
 from .subagent import (apply_subagent_changes, cleanup_subagent,
                         run_subagent_reviewable, SubagentResult)
 from .tools import ToolRegistry, tools as _base_tools
-from .utils import safe_print, C, log
+from .utils import safe_print, C, log, emit_team_event
+
+
+def _log_team_event(event: dict) -> None:
+    """mimic.log への記録に加えて、ReactLog（観測ビューア用）にも転送する。"""
+    log.info(event)
+    emit_team_event(event)
 
 _apply_lock = threading.Lock()
 
@@ -68,6 +75,10 @@ Workerが「ここまでに行った作業」の差分サマリが、元の指�
 - これまでの変更の中に、誤り・壊れたコード・指示と矛盾する内容・余計な副作用が無いか
   （read_file等の読み取り専用ツールでファイルの現状を確認し、該当ファイル名・箇所を
   具体的に特定すること）
+- Workerの作業結果に「[検証コマンド実行結果]」が含まれている場合、終了コードが0以外で
+  あれば原則として "retry" と判定し、feedbackの【修正】にその失敗内容（出力から読み取れる
+  原因とファイル名・箇所）を具体的に書くこと。「[検証コマンド実行結果]」が無い場合は
+  従来通り差分内容のみで判断する
 - 必要であれば読み取り専用ツール（read_file, search_in_file, grep_codebase, file_info, smart_read, get_repo_map）で
   プロジェクトの現状を確認してよい（書き込みは一切できない）
 - 「前回のSupervisor所見」が渡されている場合は、その指摘（特に【修正】）が今回の
@@ -266,7 +277,7 @@ def _format_team_result(task: str, last_result: SubagentResult,
     return "\n".join(lines)
 
 
-def run_team_task(task: str, project_dir: str, config, label: str = "") -> str:
+def run_team_task(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "") -> str:
     """Worker → Supervisor のレビュー付きループを最大 MAX_TEAM_RETRIES 回実行する。"""
     feedback = ""
     last_result: Optional[SubagentResult] = None
@@ -276,10 +287,11 @@ def run_team_task(task: str, project_dir: str, config, label: str = "") -> str:
     base: Optional[Path] = None
     upper: Optional[Path] = None
     prev_raw = ""
+    trace_id = uuid.uuid4().hex[:8]
 
     safe_print(C.gray(f"  {team_tag} 🔍 Researcher調査中..."), flush=True)
     research = run_research(task, project_dir, config, label=label)
-    log.info({"event": "team_research_done", "task": task, "research": research[:2000]})
+    _log_team_event({"event": "team_research_done", "task": task, "research": research[:2000], "trace_id": trace_id})
 
     for attempt in range(1, MAX_TEAM_RETRIES + 1):
         if feedback:
@@ -290,15 +302,16 @@ def run_team_task(task: str, project_dir: str, config, label: str = "") -> str:
             worker_task = task
 
         safe_print(C.gray(f"  {team_tag} ⚙ Worker実行 (試行{attempt}/{MAX_TEAM_RETRIES})"), flush=True)
-        log.info({"event": "team_worker_start", "attempt": attempt, "task": task, "resumed": base is not None})
-        last_result, upper, base = run_subagent_reviewable(worker_task, project_dir, label=label or "single", base=base)
+        _log_team_event({"event": "team_worker_start", "attempt": attempt, "task": task, "resumed": base is not None, "trace_id": trace_id})
+        last_result, upper, base = run_subagent_reviewable(worker_task, project_dir, label=label or "single", base=base, trace_id=trace_id, verify_cmd=verify_cmd)
 
         safe_print(C.gray(f"  {team_tag} 👁 Supervisorレビュー中..."), flush=True)
         verdict = run_supervisor(task, last_result, project_dir, config, label=label, prev_raw=prev_raw)
         prev_raw = verdict["raw"]
-        log.info({"event": "team_supervisor_verdict", "attempt": attempt,
+        _log_team_event({"event": "team_supervisor_verdict", "attempt": attempt,
                    "status": verdict["status"], "feedback": verdict["feedback"][:200],
-                   "worker_ok": last_result.ok, "worker_raw_tail": last_result.raw_tail[-300:]})
+                   "worker_ok": last_result.ok, "worker_raw_tail": last_result.raw_tail[-300:],
+                   "trace_id": trace_id})
 
         if verdict["status"] == "ok":
             safe_print(C.green(f"  {team_tag} 👁 監視結果: ok (試行{attempt}/{MAX_TEAM_RETRIES})"), flush=True)
@@ -324,12 +337,12 @@ def run_team_task(task: str, project_dir: str, config, label: str = "") -> str:
     return _format_team_result(task, last_result, verdict, MAX_TEAM_RETRIES, done=False, applied=False)
 
 
-def run_team_tasks_parallel(tasks: list[str], project_dir: str, config) -> list[str]:
+def run_team_tasks_parallel(tasks: list[str], project_dir: str, config, verify_cmd: str = "") -> list[str]:
     """複数タスクを独立した Worker→Supervisor ループとして並列実行する。"""
     results: list[Optional[str]] = [None] * len(tasks)
 
     def _worker(i: int, t: str):
-        results[i] = run_team_task(t, project_dir, config, label=f"#{i + 1}")
+        results[i] = run_team_task(t, project_dir, config, label=f"#{i + 1}", verify_cmd=verify_cmd)
 
     threads = [threading.Thread(target=_worker, args=(i, t)) for i, t in enumerate(tasks)]
     for th in threads:

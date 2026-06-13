@@ -12,8 +12,8 @@ def _build_components(base_dir: str, active_config=None):
     active_config を渡すと planner/reflector 含む全エージェントがそのモデルを使う。
     省略時は .env の最初の設定を使用する。
     """
-    from .utils import safe_print, C, set_log_sink, log
-    from .commands import register_search_command, register_sessions_command
+    from .utils import safe_print, C, set_log_sink, set_team_event_sink, log
+    from .commands import register_search_command, register_sessions_command, register_viewer_command
     from .tools import set_sessions_dir, tools as _base_tools, ToolRegistry
     from . import config as _cfg
     from .config import load_config
@@ -107,8 +107,11 @@ def _build_components(base_dir: str, active_config=None):
     )
     set_log_sink(lambda level, msg:
         interactive_orch.react_log.add("system_event", level=level, content=msg))
+    set_team_event_sink(lambda event:
+        interactive_orch.react_log.add("system_event", level="info", content=str(event)))
     register_search_command(lambda: sessions_dir)
     register_sessions_command(lambda: sessions_dir)
+    register_viewer_command(lambda: sessions_dir)
     set_sessions_dir(sessions_dir)
 
     from .commands import cmd_registry
@@ -186,6 +189,22 @@ def main():
         # サブエージェント（delegate_to_subagent）として起動された場合は Git に触れない
         auto_git = NullAutoGit() if os.environ.get("MIMIC_NO_AUTOGIT") else AutoGit()
         interactive_orch = InteractiveOrchestrator(agent, auto_git)
+
+        trace_id = os.environ.get("MIMIC_TRACE_ID")
+        if trace_id:
+            sessions_dir = Path(__file__).parent / ".mimic" / "sessions"
+            sessions_dir.mkdir(parents=True, exist_ok=True)
+            from datetime import datetime as _dt
+            _jsonl_path = sessions_dir / f"{_dt.now().strftime('%Y-%m-%d_%H-%M')}.jsonl"
+            interactive_orch.react_log.set_jsonl_path(_jsonl_path)
+            interactive_orch.react_log.add(
+                "session_start",
+                model    = active_config.model,
+                provider = active_config.name,
+                cwd      = agent.cwd,
+                trace_id = trace_id,
+            )
+
         idx = args.index("--auto-prompt")
         auto_mode(interactive_orch, args[idx + 1]) if idx + 1 < len(args) else sys.exit(1)
         return
