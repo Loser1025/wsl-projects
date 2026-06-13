@@ -44,7 +44,12 @@ API_CONFIGS = {
         "rate_limit_headers": {
             "requests": "x-ratelimit-limit-requests",
             "tokens": "x-ratelimit-limit-tokens",
+            "remaining_requests": "x-ratelimit-remaining-requests",
+            "remaining_tokens": "x-ratelimit-remaining-tokens",
+            "reset_requests": "x-ratelimit-reset-requests",
+            "reset_tokens": "x-ratelimit-reset-tokens",
         },
+        "keyinfo_endpoint": "/v1/keys",
     },
     "Mistral": {
         "models_endpoint": "/v1/models",
@@ -57,7 +62,15 @@ API_CONFIGS = {
         "rate_limit_headers": {
             "requests": "x-ratelimit-limit-requests",
             "tokens": "x-ratelimit-limit-tokens",
+            "remaining_requests": "x-ratelimit-remaining-requests",
+            "remaining_tokens": "x-ratelimit-remaining-tokens",
+            "reset_requests": "x-ratelimit-reset-requests",
+            "reset_tokens": "x-ratelimit-reset-tokens",
+            "size_limit": "ratelimitbysize-limit",
+            "size_remaining": "ratelimitbysize-remaining",
+            "size_reset": "ratelimitbysize-reset",
         },
+        "keyinfo_note": "Mistral API does not provide usage/quota information via API. Check your usage at https://console.mistral.ai/",
     },
     "Anthropic": {
         "models_endpoint": "/v1/messages",
@@ -73,9 +86,9 @@ API_CONFIGS = {
         },
     },
     "Gemini": {
-        "models_endpoint": "/v1/models",
+        "models_endpoint": "/v1beta/models",
         "base_url": "https://generativelanguage.googleapis.com",
-        "auth_header": "x-goog-api-key",
+        "auth_header": "",
         "auth_prefix": "",
         "env_key": "GOOGLE_API_KEY",
         "model_id_field": "name",
@@ -83,7 +96,14 @@ API_CONFIGS = {
         "rate_limit_headers": {
             "requests": "x-ratelimit-limit-requests",
             "tokens": "x-ratelimit-limit-tokens",
+            "remaining_requests": "x-ratelimit-remaining-requests",
+            "remaining_tokens": "x-ratelimit-remaining-tokens",
+            "reset_requests": "x-ratelimit-reset-requests",
+            "reset_tokens": "x-ratelimit-reset-tokens",
+            "quota_limit": "x-goog-quota-limit",
+            "quota_remaining": "x-goog-quota-remaining",
         },
+        "keyinfo_note": "Gemini API does not provide per-key usage/quota via API. Check your usage at Google Cloud Console (https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas)",
     },
     "HuggingFace": {
         "models_endpoint": "/models",
@@ -285,7 +305,11 @@ def make_api_request(
     headers = {}
     auth_header = config["auth_header"]
     auth_prefix = config["auth_prefix"]
-    if auth_prefix:
+    if not auth_header:
+        # auth_header が空 → クエリパラメータ ?key=KEY で認証（Gemini等）
+        params = params or {}
+        params["key"] = api_key
+    elif auth_prefix:
         headers[auth_header] = f"{auth_prefix} {api_key}"
     else:
         headers[auth_header] = api_key
@@ -361,8 +385,21 @@ def fetch_models(api_name: str, api_key: str) -> List[Dict[str, Any]]:
         console.print(f"[dim]DEBUG {api_name}: got {len(models)} models[/dim]")
 
         # レートリミット情報を取得（ヘッダーがない場合は N/A）
-        rate_limit_requests = response.headers.get(config["rate_limit_headers"]["requests"]) or "N/A"
-        rate_limit_tokens = response.headers.get(config["rate_limit_headers"]["tokens"]) or "N/A"
+        rl = config["rate_limit_headers"]
+        rate_limit_requests = response.headers.get(rl["requests"]) or "N/A"
+        rate_limit_tokens = response.headers.get(rl["tokens"]) or "N/A"
+        # remaining / reset
+        rate_limit_remaining_requests = response.headers.get(rl.get("remaining_requests", "")) or "N/A"
+        rate_limit_remaining_tokens = response.headers.get(rl.get("remaining_tokens", "")) or "N/A"
+        rate_limit_reset_requests = response.headers.get(rl.get("reset_requests", "")) or "N/A"
+        rate_limit_reset_tokens = response.headers.get(rl.get("reset_tokens", "")) or "N/A"
+        # Mistral固有
+        rate_limit_size_limit = response.headers.get(rl.get("size_limit", "")) or "N/A"
+        rate_limit_size_remaining = response.headers.get(rl.get("size_remaining", "")) or "N/A"
+        rate_limit_size_reset = response.headers.get(rl.get("size_reset", "")) or "N/A"
+        # Gemini固有
+        rate_limit_quota_limit = response.headers.get(rl.get("quota_limit", "")) or "N/A"
+        rate_limit_quota_remaining = response.headers.get(rl.get("quota_remaining", "")) or "N/A"
 
         result = []
         for model in models:
@@ -397,6 +434,15 @@ def fetch_models(api_name: str, api_key: str) -> List[Dict[str, Any]]:
                 "context_length": context_length,
                 "rate_limit_requests": rate_limit_requests,
                 "rate_limit_tokens": rate_limit_tokens,
+                "rate_limit_remaining_requests": rate_limit_remaining_requests,
+                "rate_limit_remaining_tokens": rate_limit_remaining_tokens,
+                "rate_limit_reset_requests": rate_limit_reset_requests,
+                "rate_limit_reset_tokens": rate_limit_reset_tokens,
+                "rate_limit_size_limit": rate_limit_size_limit,
+                "rate_limit_size_remaining": rate_limit_size_remaining,
+                "rate_limit_size_reset": rate_limit_size_reset,
+                "rate_limit_quota_limit": rate_limit_quota_limit,
+                "rate_limit_quota_remaining": rate_limit_quota_remaining,
                 "api_name": api_name,
                 "raw_data": model,
             })
@@ -424,6 +470,15 @@ def fetch_api_details(api_name: str, api_key: str) -> Dict[str, Any]:
     # レスポンスヘッダーからレートリミット情報を取得（fetch_models で取得済み）
     rate_limit_requests = models[0].get("rate_limit_requests", "N/A")
     rate_limit_tokens = models[0].get("rate_limit_tokens", "N/A")
+    rate_limit_remaining_requests = models[0].get("rate_limit_remaining_requests", "N/A")
+    rate_limit_remaining_tokens = models[0].get("rate_limit_remaining_tokens", "N/A")
+    rate_limit_reset_requests = models[0].get("rate_limit_reset_requests", "N/A")
+    rate_limit_reset_tokens = models[0].get("rate_limit_reset_tokens", "N/A")
+    rate_limit_size_limit = models[0].get("rate_limit_size_limit", "N/A")
+    rate_limit_size_remaining = models[0].get("rate_limit_size_remaining", "N/A")
+    rate_limit_size_reset = models[0].get("rate_limit_size_reset", "N/A")
+    rate_limit_quota_limit = models[0].get("rate_limit_quota_limit", "N/A")
+    rate_limit_quota_remaining = models[0].get("rate_limit_quota_remaining", "N/A")
 
     # 各モデルの詳細からレートリミット情報を取得（個別モデルエンドポイント）
     model_detail_requests = "N/A"
@@ -436,10 +491,48 @@ def fetch_api_details(api_name: str, api_key: str) -> Dict[str, Any]:
         detail_response = make_api_request(api_name, endpoint.lstrip("/"), api_key)
         if detail_response:
             headers = detail_response.headers
-            rl_header_requests = config["rate_limit_headers"]["requests"]
-            rl_header_tokens = config["rate_limit_headers"]["tokens"]
-            model_detail_requests = headers.get(rl_header_requests, rate_limit_requests)
-            model_detail_tokens = headers.get(rl_header_tokens, rate_limit_tokens)
+            rl = config["rate_limit_headers"]
+            model_detail_requests = headers.get(rl["requests"], rate_limit_requests)
+            model_detail_tokens = headers.get(rl["tokens"], rate_limit_tokens)
+            # detail_response からも remaining/reset を取得（上書き）
+            if rl.get("remaining_requests"):
+                dr = headers.get(rl["remaining_requests"])
+                if dr is not None:
+                    rate_limit_remaining_requests = dr
+            if rl.get("remaining_tokens"):
+                dr = headers.get(rl["remaining_tokens"])
+                if dr is not None:
+                    rate_limit_remaining_tokens = dr
+            if rl.get("reset_requests"):
+                dr = headers.get(rl["reset_requests"])
+                if dr is not None:
+                    rate_limit_reset_requests = dr
+            if rl.get("reset_tokens"):
+                dr = headers.get(rl["reset_tokens"])
+                if dr is not None:
+                    rate_limit_reset_tokens = dr
+            # Mistral固有
+            if rl.get("size_limit"):
+                dr = headers.get(rl["size_limit"])
+                if dr is not None:
+                    rate_limit_size_limit = dr
+            if rl.get("size_remaining"):
+                dr = headers.get(rl["size_remaining"])
+                if dr is not None:
+                    rate_limit_size_remaining = dr
+            if rl.get("size_reset"):
+                dr = headers.get(rl["size_reset"])
+                if dr is not None:
+                    rate_limit_size_reset = dr
+            # Gemini固有
+            if rl.get("quota_limit"):
+                dr = headers.get(rl["quota_limit"])
+                if dr is not None:
+                    rate_limit_quota_limit = dr
+            if rl.get("quota_remaining"):
+                dr = headers.get(rl["quota_remaining"])
+                if dr is not None:
+                    rate_limit_quota_remaining = dr
             break
 
     # エイリアス情報を取得
@@ -457,9 +550,43 @@ def fetch_api_details(api_name: str, api_key: str) -> Dict[str, Any]:
         "api_name": api_name,
         "rate_limit_requests": model_detail_requests if model_detail_requests != "N/A" else rate_limit_requests,
         "rate_limit_tokens": model_detail_tokens if model_detail_tokens != "N/A" else rate_limit_tokens,
+        "rate_limit_remaining_requests": rate_limit_remaining_requests,
+        "rate_limit_remaining_tokens": rate_limit_remaining_tokens,
+        "rate_limit_reset_requests": rate_limit_reset_requests,
+        "rate_limit_reset_tokens": rate_limit_reset_tokens,
+        "rate_limit_size_limit": rate_limit_size_limit,
+        "rate_limit_size_remaining": rate_limit_size_remaining,
+        "rate_limit_size_reset": rate_limit_size_reset,
+        "rate_limit_quota_limit": rate_limit_quota_limit,
+        "rate_limit_quota_remaining": rate_limit_quota_remaining,
         "aliases": ", ".join(aliases) if aliases else "-",
         "models_count": len(models),
+        "keyinfo_note": config.get("keyinfo_note", ""),
     }
+
+
+def fetch_key_info_openrouter(api_key: str) -> Dict[str, Any]:
+    """OpenRouter /v1/keys からキー使用量・リミット取得"""
+    url = "https://openrouter.ai/api/v1/keys"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            return {"status": "ok", "data": data}
+        return {"status": "error", "code": resp.status_code, "message": resp.text[:500]}
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "code": 0, "message": str(e)}
+
+
+def fetch_key_info_mistral() -> Dict[str, Any]:
+    """Mistral: 利用量APIなし"""
+    return {"status": "unavailable", "message": "Mistral API does not provide usage/quota information via API. Check https://console.mistral.ai/"}
+
+
+def fetch_key_info_gemini() -> Dict[str, Any]:
+    """Gemini: 利用量APIなし"""
+    return {"status": "unavailable", "message": "Gemini usage/quota must be checked at Google Cloud Console: https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas"}
 
 
 # ──────────────────────────────────────────────
@@ -496,6 +623,15 @@ def organize_models(all_models: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "context_length": model.get("context_length", "N/A"),
             "rate_limit_requests": model.get("rate_limit_requests", "N/A"),
             "rate_limit_tokens": model.get("rate_limit_tokens", "N/A"),
+            "rate_limit_remaining_requests": model.get("rate_limit_remaining_requests", "N/A"),
+            "rate_limit_remaining_tokens": model.get("rate_limit_remaining_tokens", "N/A"),
+            "rate_limit_reset_requests": model.get("rate_limit_reset_requests", "N/A"),
+            "rate_limit_reset_tokens": model.get("rate_limit_reset_tokens", "N/A"),
+            "rate_limit_size_limit": model.get("rate_limit_size_limit", "N/A"),
+            "rate_limit_size_remaining": model.get("rate_limit_size_remaining", "N/A"),
+            "rate_limit_size_reset": model.get("rate_limit_size_reset", "N/A"),
+            "rate_limit_quota_limit": model.get("rate_limit_quota_limit", "N/A"),
+            "rate_limit_quota_remaining": model.get("rate_limit_quota_remaining", "N/A"),
             "aliases": extract_aliases(model),
         })
 
@@ -520,6 +656,12 @@ def extract_aliases(model: Dict[str, Any]) -> str:
             short_id = raw_id.split("/")[-1]
             if short_id and short_id != model.get("id", "") and short_id not in aliases:
                 aliases.append(short_id)
+        # Mistral: model_id が -latest で終わる場合、ベース名をエイリアスとして追加
+        model_id = model.get("id", "")
+        if model_id.endswith("-latest"):
+            base_name = model_id[:-len("-latest")]
+            if base_name and base_name not in aliases:
+                aliases.append(f"{base_name} (versioned)")
     return ", ".join(aliases) if aliases else "-"
 
 
@@ -916,21 +1058,68 @@ def display_api_details(api_details: Dict[str, Any]) -> None:
         show_lines=True,
     )
 
-    table.add_column("API Name", style="magenta", width=20)
-    table.add_column("Models Count", style="green", width=15)
-    table.add_column("Rate Limit (Requests)", justify="right", width=25)
-    table.add_column("Rate Limit (Tokens)", justify="right", width=25)
-    table.add_column("Aliases", style="dim", width=30)
+    table.add_column("API Name", style="magenta", width=18)
+    table.add_column("Models", style="green", width=8)
+    table.add_column("Key Info", width=13)
+    table.add_column("Req Limit", justify="right", width=12)
+    table.add_column("Req Remaining", justify="right", width=14)
+    table.add_column("Req Reset", justify="right", width=12)
+    table.add_column("Tok Limit", justify="right", width=12)
+    table.add_column("Tok Remaining", justify="right", width=14)
+    table.add_column("Tok Reset", justify="right", width=12)
+    table.add_column("Aliases", style="dim", width=25)
+
+    api_name_val = api_details.get("api_name", "N/A")
+
+    # key_info ステータスのスタイル分け
+    key_info = api_details.get("key_info", {})
+    key_info_status = key_info.get("status", "N/A")
+    key_info_display = {
+        "ok": "[green]ok[/green]",
+        "error": "[red]error[/red]",
+        "unavailable": "[yellow]unavailable[/yellow]",
+    }.get(key_info_status, key_info_status)
 
     table.add_row(
-        api_details.get("api_name", "N/A"),
+        api_name_val,
         str(api_details.get("models_count", "N/A")),
+        key_info_display,
         str(api_details.get("rate_limit_requests", "N/A")),
+        str(api_details.get("rate_limit_remaining_requests", "N/A")),
+        str(api_details.get("rate_limit_reset_requests", "N/A")),
         str(api_details.get("rate_limit_tokens", "N/A")),
+        str(api_details.get("rate_limit_remaining_tokens", "N/A")),
+        str(api_details.get("rate_limit_reset_tokens", "N/A")),
         api_details.get("aliases", "-"),
     )
 
-    console.print(Panel(table, title="[bold]API Details[/bold]", border_style="blue"))
+    panel = Panel(table, title="[bold]API Details[/bold]", border_style="blue")
+    console.print(panel)
+
+    # プロバイダ固有のrate_limit追加情報
+    extra_lines = []
+    size_limit = api_details.get("rate_limit_size_limit", "N/A")
+    if size_limit != "N/A":
+        extra_lines.append(
+            f"[dim]  Size Limit: {size_limit} | Remaining: {api_details.get('rate_limit_size_remaining', 'N/A')} | Reset: {api_details.get('rate_limit_size_reset', 'N/A')}[/dim]"
+        )
+    quota_limit = api_details.get("rate_limit_quota_limit", "N/A")
+    if quota_limit != "N/A":
+        extra_lines.append(
+            f"[dim]  Quota Limit: {quota_limit} | Remaining: {api_details.get('rate_limit_quota_remaining', 'N/A')}[/dim]"
+        )
+    if extra_lines:
+        for line in extra_lines:
+            console.print(line)
+
+    # keyinfo_note がある場合
+    keyinfo_note = api_details.get("keyinfo_note", "")
+    if keyinfo_note:
+        console.print(f"[dim]  Note: {keyinfo_note}[/dim]")
+
+    # key_info error時にメッセージ表示
+    if key_info_status == "error":
+        console.print(f"[dim]  Key Info Error: {key_info.get('message', '')}[/dim]")
 
 
 # ──────────────────────────────────────────────
@@ -998,6 +1187,16 @@ def main() -> None:
         console.print(f"[blue]Fetching details for {api_name}...[/blue]")
         api_details = fetch_api_details(api_name, api_key)
         if api_details:
+            # key_info 取得
+            if api_name == "OpenRouter":
+                key_info = fetch_key_info_openrouter(api_key)
+            elif api_name == "Mistral":
+                key_info = fetch_key_info_mistral()
+            elif api_name == "Gemini":
+                key_info = fetch_key_info_gemini()
+            else:
+                key_info = {}
+            api_details["key_info"] = key_info
             display_api_details(api_details)
         else:
             console.print(f"[red]Failed to fetch details for {api_name}.[/red]")
