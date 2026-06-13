@@ -538,14 +538,75 @@ class MimicApp(App):
     # ── タブ: Scratchpad ─────────────────────────────────────────────
 
     def _refresh_scratchpad_tab(self) -> None:
+        import ast
         from .utils import get_scratchpad
+        from .viewer import _load_entries, _scratchpad_history
+
         log = self.query_one("#scratchpad-log", RichLog)
         log.clear()
+
+        entries = self._ctx["interactive_orch"].react_log.entries
+
+        log.write("[bold #00ff41]■ このエージェント（Director）[/]")
         content = get_scratchpad()
         if content:
             log.write(content)
         else:
             log.write("[dim]スクラッチパッドはまだ空です。[/dim]")
+
+        history = [e for e in entries
+                   if e.get("type") == "action" and e.get("tool") == "update_scratchpad"]
+        if len(history) > 1:
+            log.write("")
+            log.write(f"[dim]── 更新履歴（{len(history)}件、新しい順） ──[/dim]")
+            for e in reversed(history[:-1]):
+                ts = e.get("ts", "")
+                c  = (e.get("args") or {}).get("content", "")
+                log.write(f"[dim]{ts}[/dim]")
+                log.write(f"[#8b949e]{c}[/]")
+
+        # delegate_to_team で起動したサブエージェント（Worker）のスクラッチパッドも表示する
+        trace_ids: list[str] = []
+        for e in entries:
+            if e.get("type") != "system_event":
+                continue
+            try:
+                obj = ast.literal_eval(e.get("content", ""))
+            except Exception:
+                continue
+            if isinstance(obj, dict) and obj.get("event") == "team_worker_start":
+                tid = obj.get("trace_id")
+                if tid and tid not in trace_ids:
+                    trace_ids.append(tid)
+
+        if trace_ids:
+            sessions_dir = self._ctx.get("sessions_dir")
+            files = sorted(sessions_dir.glob("*.jsonl"), reverse=True) if sessions_dir else []
+            for tid in trace_ids:
+                sub_entries: Optional[list] = None
+                sub_file = ""
+                for f in files:
+                    es = _load_entries(f)
+                    if any(se.get("type") == "session_start" and se.get("trace_id") == tid for se in es):
+                        sub_entries = es
+                        sub_file = f.name
+                        break
+
+                log.write("")
+                title = f"[bold #58a6ff]■ サブエージェント（Worker, trace_id={tid}）[/]"
+                if sub_file:
+                    title += f"  [dim]{sub_file}[/dim]"
+                log.write(title)
+
+                if sub_entries is None:
+                    log.write("[dim](セッションログがまだありません)[/dim]")
+                    continue
+                sub_history = _scratchpad_history(sub_entries)
+                if sub_history:
+                    log.write(sub_history[-1]["content"])
+                else:
+                    log.write("[dim]スクラッチパッドはまだ空です。[/dim]")
+
         self._refresh_status_ui()
 
     # ── タブ: Log ────────────────────────────────────────────────────
