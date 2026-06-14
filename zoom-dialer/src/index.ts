@@ -448,6 +448,141 @@ export default {
       );
     }
 
+    // ==========================================
+    // 9. デバッグダッシュボード (GET /debug)
+    // ==========================================
+    if (url.pathname === '/debug' && request.method === 'GET') {
+      const systemStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
+      const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
+      const currentIndex = parseInt(currentIndexRaw, 10);
+      const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
+      const queue = JSON.parse(queueRaw);
+      const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
+      const results = JSON.parse(resultsRaw);
+
+      const lastUploadResultRaw = await env.PHONE_STORE.get('last_upload_result');
+      let lastUploadResult: UploadDebugResult | null = null;
+      if (lastUploadResultRaw) {
+        try {
+          lastUploadResult = JSON.parse(lastUploadResultRaw);
+        } catch { /* パースエラーは無視 */ }
+      }
+
+      // Zoom API接続テスト
+      let zoomApiStatus = '🟢 接続成功';
+      let zoomApiDetail = '';
+      try {
+        const token = await getZoomToken(env);
+        zoomApiDetail = `トークン取得成功 (${token.length}文字)`;
+      } catch (err: any) {
+        zoomApiStatus = '🔴 接続失敗';
+        zoomApiDetail = err.message || '不明なエラー';
+      }
+
+      const recentLogs = debugLogs.slice(-50).reverse();
+      const errorLogs = debugLogs.filter(l => l.includes('[ERROR]')).slice(-20);
+      const progressPercent = queue.length > 0 ? Math.round((currentIndex / queue.length) * 100) : 0;
+      const lastUploadSummary = lastUploadResult
+        ? `${lastUploadResult.filename} (${lastUploadResult.validCount}件通過 / ${lastUploadResult.invalidCount}件除外)`
+        : 'なし';
+
+      const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>デバッグダッシュボード - Zoom Phone 自動架電</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <header class="mb-8 border-b border-slate-700 pb-4 flex justify-between items-center">
+      <div class="flex items-center gap-4">
+        <h1 class="text-2xl font-bold text-white">🔧 デバッグダッシュボード</h1>
+        <a href="/" class="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-slate-300">← 管理画面に戻る</a>
+      </div>
+      <span class="text-sm bg-amber-600/20 text-amber-400 px-3 py-1 rounded-full border border-amber-600/30">DEBUG</span>
+    </header>
+
+    <!-- システムステータス -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+        <p class="text-xs text-slate-400 font-medium mb-1">システム状態</p>
+        <p class="text-lg font-bold ${systemStatus === 'running' ? 'text-emerald-400' : systemStatus === 'paused' ? 'text-amber-400' : 'text-slate-500'}">${systemStatus === 'running' ? '🟢 稼働中' : systemStatus === 'paused' ? '🟡 一時停止' : '⚪ 停止'}</p>
+      </div>
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+        <p class="text-xs text-slate-400 font-medium mb-1">キュー / インデックス</p>
+        <p class="text-2xl font-black text-white">${currentIndex} <span class="text-sm font-normal text-slate-500">/ ${queue.length}</span></p>
+      </div>
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+        <p class="text-xs text-slate-400 font-medium mb-1">進捗率</p>
+        <p class="text-2xl font-black text-indigo-400">${progressPercent}%</p>
+        <div class="w-full bg-slate-700 rounded-full h-1.5 mt-2">
+          <div class="bg-indigo-500 h-1.5 rounded-full" style="width: ${progressPercent}%"></div>
+        </div>
+      </div>
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+        <p class="text-xs text-slate-400 font-medium mb-1">Zoom API接続</p>
+        <p class="text-sm font-bold">${zoomApiStatus}</p>
+        <p class="text-xs text-slate-500 mt-1">${zoomApiDetail}</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- 最終アップロード結果 -->
+      <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+        <h2 class="text-base font-bold mb-3 text-white">📂 最終アップロード結果</h2>
+        ${lastUploadResult ? `
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span class="text-slate-400">ファイル名</span><span class="text-slate-200">${lastUploadResult.filename}</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">実行日時</span><span class="text-slate-200">${lastUploadResult.timestamp}</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">マッチ総数</span><span class="text-slate-200">${lastUploadResult.totalMatched} 件</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">有効 / 除外</span><span class="text-emerald-400">${lastUploadResult.validCount} 件</span> / <span class="text-rose-400">${lastUploadResult.invalidCount} 件</span></div>
+            ${lastUploadResult.errorMessage ? `<p class="text-rose-400 mt-2 text-xs">⚠ ${lastUploadResult.errorMessage}</p>` : ''}
+            ${Object.keys(lastUploadResult.invalidReasons).length > 0 ? `
+              <div class="flex flex-wrap gap-1 mt-2">
+                ${Object.entries(lastUploadResult.invalidReasons).map(([r, c]) => `<span class="bg-rose-900/30 text-rose-300 px-2 py-0.5 rounded text-xs">${r}: ${c}件</span>`).join('')}
+              </div>
+            ` : ''}
+          </div>
+        ` : '<p class="text-slate-500 text-sm">まだアップロード記録がありません</p>'}
+      </div>
+
+      <!-- 最近のエラー一覧 -->
+      <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+        <h2 class="text-base font-bold mb-3 text-white">⚠️ 最近のエラー (${errorLogs.length}件)</h2>
+        ${errorLogs.length > 0 ? `
+          <div class="space-y-1 max-h-72 overflow-y-auto">
+            ${errorLogs.map(l => `<div class="text-xs font-mono text-rose-400 bg-slate-900/50 px-3 py-1.5 rounded border-l-2 border-rose-500">${l}</div>`).join('')}
+          </div>
+        ` : '<p class="text-slate-500 text-sm">エラーは記録されていません</p>'}
+      </div>
+    </div>
+
+    <!-- デバッグログ -->
+    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mt-6">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-base font-bold text-white">📋 デバッグログ (最新${recentLogs.length}件)</h2>
+        <form action="/debug/clear-logs" method="POST" class="inline">
+          <button type="submit" class="text-xs bg-slate-700 hover:bg-rose-600 text-slate-300 hover:text-white px-3 py-1 rounded cursor-pointer transition-colors">🗑️ ログを消去</button>
+        </form>
+        <button onclick="location.reload()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1 rounded cursor-pointer">🔄 リロード</button>
+      </div>
+      <pre class="bg-slate-950 p-4 rounded-lg text-xs font-mono text-slate-300 max-h-96 overflow-y-auto whitespace-pre-wrap leading-relaxed border border-slate-700">${recentLogs.join('\n') || '(ログなし)'}</pre>
+    </div>
+
+    <footer class="mt-8 border-t border-slate-700 pt-4 flex justify-between items-center">
+      <a href="/" class="text-sm text-slate-400 hover:text-white">← 管理画面に戻る</a>
+      <span class="text-xs text-slate-600">Zoom Phone Auto-Dialer Debug Dashboard</span>
+    </footer>
+  </div>
+</body>
+</html>`;
+
+      addLog('[debug] ダッシュボード表示');
+      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    }
+
     return new Response('Not Found', { status: 404 });
   }
 };
@@ -606,7 +741,10 @@ function getAdminDashboardHTML(total: number, current: number, status: string, r
     <div class="max-w-4xl mx-auto px-4 py-8">
       <header class="mb-8 border-b border-slate-200 pb-4 flex justify-between items-center">
         <h1 class="text-2xl font-bold text-slate-900">📞 Zoom Phone 架電オートメーション</h1>
-        <span class="text-sm bg-slate-200 px-3 py-1 rounded-full text-slate-700">Powered by Cloudflare</span>
+        <div class="flex items-center gap-3">
+          <a href="/debug" class="text-sm bg-amber-100 text-amber-700 hover:bg-amber-200 px-3 py-1 rounded-full font-medium">🔧 デバッグ</a>
+          <span class="text-sm bg-slate-200 px-3 py-1 rounded-full text-slate-700">Powered by Cloudflare</span>
+        </div>
       </header>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
