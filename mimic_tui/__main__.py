@@ -199,7 +199,7 @@ def main():
         # さらに自分のWorkerを再帰的に委任し続け、サブエージェントが無限増殖してしまう。
         if os.environ.get("MIMIC_NO_AUTOGIT"):
             from .tools import ToolRegistry
-            _DELEGATE_TOOLS = {"delegate_to_team", "delegate_to_team_parallel", "delegate_research"}
+            _DELEGATE_TOOLS = {"delegate_to_team", "delegate_to_team_parallel", "delegate_to_worker", "delegate_research"}
             _worker_registry = ToolRegistry()
             for _name in _base_tools._tools:
                 if _name not in _DELEGATE_TOOLS:

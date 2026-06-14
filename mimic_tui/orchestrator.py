@@ -103,6 +103,18 @@ REACT_SYSTEM_PROMPT = """
   実行され、終了コードと出力がSupervisorの判定材料になる（指定しなければ差分内容
   のみで判定される）。
 
+## 単発委任（delegate_to_worker）
+- 対象ファイル・変更内容が既に明確で、調査やレビューが不要な単純なタスク
+  （例: 指定箇所の小さな修正、決まったコマンドの実行と結果確認）には、
+  Researcher/Supervisorを介さない delegate_to_worker を使うこと。delegate_to_team
+  より高速・低コストだが、第三者レビューが無い。
+- Workerが完了報告（mark_task_done）し、かつ verify_cmd を指定していればその終了コードが
+  0の場合のみ、変更が自動的に適用・コミットされる。それ以外（完了報告なし、または
+  verify_cmd失敗）は変更は適用されず、差分・検証結果がそのまま返るので、内容を確認した上で
+  delegate_to_worker を再度呼ぶか、delegate_to_team にエスカレートすること。
+- 曖昧・大規模・複数ファイルにまたがる変更や、第三者レビューが欲しい場合は
+  delegate_to_team を使うこと。
+
 ## 調べ物の委任（delegate_research）
 - 外部の公式ドキュメント・API仕様・ライブラリの使い方など、複数回の
   web_search/fetch_webpageが必要になりそうな「調べ物」は、自分で直接 web_search /
@@ -131,6 +143,9 @@ get_repo_map, run_bash("ls / find ...")
 
 ### 委任（同期・Worker→Supervisorレビュー付き、OverlayFS隔離）
 delegate_to_team, delegate_to_team_parallel
+
+### 単発委任（同期・レビュー無し、自己完結タスク向け）
+delegate_to_worker
 
 ### 調べ物
 delegate_research（本格的な調べ物はこちら）, web_search, fetch_webpage（軽い確認用）
@@ -171,6 +186,9 @@ Supervisor（レビュー、不十分なら修正/続きを指示して最大5�
    delegate_to_team を呼び、互いに独立したタスクは delegate_to_team_parallel で
    まとめて並列委任する。指示文(task)には、自分が把握している目的・対象範囲・
    制約条件を漏れなく書く（ファイル単位の詳細はResearcherが調査するので不要）。
+   対象が既に明確で自己完結している単純なタスクのみ delegate_to_worker
+   （Researcher/Supervisor無し）も使えるが、このモードではファイルを直接読めず
+   Supervisorのレビューも無いため、必ず verify_cmd を指定すること。
 3. 【適用は自動】delegate_to_teamが"完了・適用済み"を返した場合、変更は既に
    プロジェクトへ反映され、AutoGitでコミット済みである。**あなた自身でファイルを
    書き換えたりコミットし直したりする必要はない**。

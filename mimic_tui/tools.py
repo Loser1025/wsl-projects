@@ -797,6 +797,46 @@ def delegate_to_team(task: str, project_dir: str = ".", verify_cmd: str = "") ->
 
 
 @tools.register(
+    name="delegate_to_worker",
+    description=(
+        "Researcher/Supervisorを介さず、Workerを1回だけ実行する軽量版の委任ツール。"
+        "対象ファイル・変更内容が既に明確で自己完結している、単純なタスク向け"
+        "（例: 指定箇所の小さな修正、決まったコマンドの実行と結果確認）。"
+        "Workerが mark_task_done を呼んで完了報告し、かつ verify_cmd を指定した場合は"
+        "その終了コードが0であった場合のみ、変更が自動的にプロジェクトへ適用・コミットされる。"
+        "完了報告が無い、またはverify_cmdが失敗した場合は変更は適用されず、"
+        "差分・検証結果がそのまま返るので、再度delegate_to_workerを呼ぶか"
+        "delegate_to_team にエスカレートすること。"
+        "調査が必要・曖昧・大規模な変更には delegate_to_team を使うこと。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "task": {
+                "type": "string",
+                "description": "Workerへの具体的・詳細な指示（対象ファイル・変更内容を含む）",
+            },
+            "project_dir": {
+                "type": "string",
+                "description": "作業対象のプロジェクトディレクトリのフルパス（通常は現在の作業フォルダ）",
+                "default": ".",
+            },
+            "verify_cmd": {
+                "type": "string",
+                "description": "変更を検証するテスト/ビルド/lintコマンド（例: \"pytest tests/test_x.py -q\"）。"
+                                "省略可。指定した場合、終了コード0でのみ変更が適用される。",
+                "default": "",
+            },
+        },
+        "required": ["task"],
+    },
+)
+def delegate_to_worker(task: str, project_dir: str = ".", verify_cmd: str = "") -> str:
+    from .team import run_worker_once, _get_team_config
+    return run_worker_once(task, project_dir, _get_team_config(), verify_cmd=verify_cmd)
+
+
+@tools.register(
     name="delegate_to_team_parallel",
     description=(
         "互いに依存しない複数のタスクを、それぞれ delegate_to_team と同じ"

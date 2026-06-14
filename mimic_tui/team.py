@@ -337,6 +337,71 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
     return _format_team_result(task, last_result, verdict, MAX_TEAM_RETRIES, done=False, applied=False)
 
 
+def _format_worker_result(result: SubagentResult, applied: bool, done: bool, note: str = "") -> str:
+    if done:
+        status_label = "✓ 完了・適用済み" if applied else "✓ 完了（変更なし）"
+    else:
+        status_label = "⚠ 未完了・未適用（再委任、または delegate_to_team での再試行を検討してください）"
+    lines = [
+        f"[delegate_to_worker: {status_label}]",
+        "",
+        result.summary,
+    ]
+    if done and applied:
+        lines.append("")
+        lines.append("(変更はプロジェクトに適用され、AutoGitでコミット済みです)")
+    if note:
+        lines.append("")
+        lines.append(note)
+    return "\n".join(lines)
+
+
+def run_worker_once(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "") -> str:
+    """Researcher/Supervisorを介さず、Workerを1回だけ実行する単発委任。
+
+    mark_task_done が呼ばれ（=result.ok）、かつ verify_cmd を指定した場合は
+    その終了コードが0の場合のみ、変更をプロジェクトに適用・コミットする。
+    それ以外は変更を適用せず、差分・検証結果をそのままDirectorに返す
+    （Directorが再委任するか delegate_to_team にエスカレートするかを判断する）。
+    """
+    resolved_dir = str(Path(project_dir).resolve())
+    trace_id = uuid.uuid4().hex[:8]
+
+    _log_team_event({
+        "event": "team_worker_start", "attempt": 1, "task": task,
+        "resumed": False, "trace_id": trace_id, "mode": "single",
+    })
+    result, upper, base = run_subagent_reviewable(
+        task, project_dir, label=label or "single", trace_id=trace_id,
+        verify_cmd=verify_cmd, provider=config.name, model=config.model,
+    )
+
+    if upper is None or base is None:
+        # タイムアウト・実行エラー（既に内部で破棄済み）
+        return _format_worker_result(result, applied=False, done=False)
+
+    note = ""
+    if verify_cmd and result.verify_exit in (124, 125, 127):
+        note = (
+            f"[注意] verify_cmd自体が正常に実行できなかった可能性があります"
+            f"（終了コード{result.verify_exit}）。verify_cmdの内容を確認してください。"
+        )
+
+    verify_ok = (not verify_cmd) or result.verify_exit == 0
+    if result.ok and verify_ok:
+        applied = False
+        if result.changed_files:
+            with _apply_lock:
+                apply_subagent_changes(upper, Path(resolved_dir), result.changed_files)
+                AutoGit().checkpoint(resolved_dir, "delegate_to_worker")
+            applied = True
+        cleanup_subagent(base)
+        return _format_worker_result(result, applied=applied, done=True)
+
+    cleanup_subagent(base)
+    return _format_worker_result(result, applied=False, done=False, note=note)
+
+
 # 並列Worker/Researcher/Supervisorの出力がTUIで入り乱れて読めなくなるため、
 # 同時実行数を一時的に1に制限している（タスク自体は順番に処理される）。
 _MAX_PARALLEL_TEAM_TASKS = 1
