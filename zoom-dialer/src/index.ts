@@ -68,7 +68,7 @@ function checkEnvVariables(env: Env): { env_check: EnvCheckResult; token_preview
   const env_check: EnvCheckResult = {};
 
   // Zoom 環境変数のチェック
-  const zoomVars: (keyof Env)[] = ['ZOOM_ACCOUNT_ID', 'ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET', 'ZOOM_USER_ID', 'ZOOM_WEBHOOK_SECRET'];
+  const zoomVars: (keyof Env)[] = ['ZOOM_ACCOUNT_ID', 'ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET', 'ZOOM_USER_ID', 'ZOOM_WEBHOOK_SECRET', 'ZOOM_CALLER_NUMBER'];
   for (const key of zoomVars) {
     const val = env[key];
     if (val === undefined || val === null) {
@@ -106,6 +106,7 @@ export interface Env {
   ZOOM_CLIENT_SECRET: string;
   ZOOM_USER_ID: string;
   ZOOM_WEBHOOK_SECRET: string;
+  ZOOM_CALLER_NUMBER: string;
 }
 
 export default {
@@ -275,7 +276,7 @@ export default {
 
         const token = await getZoomToken(env);
         addLog(`[upload] 初回架電を開始: ${maskPhoneNumber(zoomFormatNumbers[0])}`);
-        await triggerZoomCall(token, env.ZOOM_USER_ID, zoomFormatNumbers[0]);
+        await triggerZoomCall(token, env.ZOOM_USER_ID, zoomFormatNumbers[0], env.ZOOM_CALLER_NUMBER);
 
         addLog('[upload] 処理完了 → リダイレクト');
         return Response.redirect(url.origin, 303);
@@ -332,7 +333,7 @@ export default {
           if (currentIndex < queue.length) {
             addLog(`[toggle-status] 再開: index=${currentIndex}, ${maskPhoneNumber(queue[currentIndex])}`);
             const token = await getZoomToken(env);
-            await triggerZoomCall(token, env.ZOOM_USER_ID, queue[currentIndex]);
+            await triggerZoomCall(token, env.ZOOM_USER_ID, queue[currentIndex], env.ZOOM_CALLER_NUMBER);
           } else {
             addLog('[toggle-status] キュー終了済みのため架電不要');
           }
@@ -390,7 +391,7 @@ export default {
             const nextPhone = queue[nextIndex];
             addLog(`[webhook] 次番号へ遷移: index=${nextIndex}, ${maskPhoneNumber(nextPhone)}`);
             const token = await getZoomToken(env);
-            await triggerZoomCall(token, env.ZOOM_USER_ID, nextPhone);
+            await triggerZoomCall(token, env.ZOOM_USER_ID, nextPhone, env.ZOOM_CALLER_NUMBER);
           } else if (nextIndex >= queue.length) {
             await env.PHONE_STORE.put('system_status', 'stopped');
             addLog('[webhook] キュー消化完了 → system_status=stopped');
@@ -699,14 +700,17 @@ async function getZoomToken(env: Env): Promise<string> {
   }
 }
 
-async function triggerZoomCall(token: string, userId: string, phoneNumber: string) {
+async function triggerZoomCall(token: string, userId: string, phoneNumber: string, fromNumber: string) {
   try {
-    const url = `https://api.zoom.us/v2/phone/users/${userId}/commands/dial`;
-    addLog(`[triggerZoomCall] APIリクエスト: ${maskPhoneNumber(phoneNumber)}`);
+    const url = `https://api.zoom.us/v2/phone/users/${userId}/calls`;
+    addLog(`[triggerZoomCall] 発信元: ${maskPhoneNumber(fromNumber)} → 発信先: ${maskPhoneNumber(phoneNumber)}`);
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ call_number: phoneNumber })
+      body: JSON.stringify({
+        from: { phone_number: fromNumber },
+        to: { phone_number: phoneNumber }
+      })
     });
     const responseText = await response.text();
     if (!response.ok) {
