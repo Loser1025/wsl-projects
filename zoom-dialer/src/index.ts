@@ -208,7 +208,7 @@ export default {
           return new Response(JSON.stringify({ plainToken, encryptedToken }), { headers: { 'Content-Type': 'application/json' } });
         }
 
-        if (eventType === 'phone.call_ended' || eventType === 'phone_call_ended') {
+        if (eventType === 'phone.call_ended' || eventType === 'phone_call_ended' || eventType === 'phone.caller_ended' || eventType === 'phone_caller_ended') {
           const payload = body.payload?.object || body.payload || {};
           saveLogToKV(env, '[webhook] payload=' + JSON.stringify(payload).slice(0, 200));
           console.log('[webhook] payload=' + JSON.stringify(payload).slice(0, 200));
