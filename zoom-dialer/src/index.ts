@@ -24,6 +24,18 @@ function addLog(message: string): void {
   }
 }
 
+// KVにログを保存する関数（非同期、即座に実行）
+function saveLogToKV(env: Env, message: string): void {
+  const entry = `[${formatTime(new Date())}] ${message}`;
+  // 即座にKVに保存（awaitしないでfire-and-forget）
+  env.PHONE_STORE.get('debug_logs').then(raw => {
+    const logs = raw ? JSON.parse(raw) : [];
+    logs.push(entry);
+    if (logs.length > 200) logs.shift();
+    env.PHONE_STORE.put('debug_logs', JSON.stringify(logs));
+  }).catch(() => {});
+}
+
 // ==========================================
 // 型定義
 // ==========================================
@@ -69,6 +81,7 @@ export default {
         const status = await env.PHONE_STORE.get('system_status') || 'stopped';
 
         addLog(`[dashboard] index=${currentIndex}/${queue.length}, next=${nextPhone || 'なし'}, results=${results.length}`);
+        saveLogToKV(env, `[dashboard] index=${currentIndex}/${queue.length}, next=${nextPhone || 'なし'}, results=${results.length}`);
 
         const html = getDashboardHTML(queue, currentIndex, results, nextPhone, status);
         return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
@@ -128,9 +141,11 @@ export default {
         }
 
         addLog(`[upload] ${zoomCallUris.length}件保存（${matches.length}件マッチ）`);
+        saveLogToKV(env, `[upload] ${zoomCallUris.length}件保存（${matches.length}件マッチ）`);
         return new Response(null, { status: 302, headers: { 'Location': '/' } });
       } catch (err: any) {
         addLog(`[upload] ERROR: ${err.message}`);
+        saveLogToKV(env, `[upload] ERROR: ${err.message}`);
         return new Response('エラー: ' + err.message, { status: 500 });
       }
     }
@@ -183,6 +198,7 @@ export default {
         const eventType = body.event;
 
         addLog(`[webhook] イベント: ${eventType}`);
+        saveLogToKV(env, `[webhook] イベント: ${eventType}`);
 
         if (eventType === 'endpoint.url_validation') {
           const plainToken = body.payload.plainToken;
@@ -207,6 +223,7 @@ export default {
           const resultStr = connected ? 'コネクト' : '不在/応答なし';
 
           addLog(`[webhook] 通話終了: ${maskPhoneNumber(calleeNumber)}, ${resultStr}, ${duration}s`);
+          saveLogToKV(env, `[webhook] 通話終了: ${maskPhoneNumber(calleeNumber)}, ${resultStr}, ${duration}s`);
 
           // 結果を保存
           const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
@@ -231,16 +248,19 @@ export default {
             const nextPhone = '+81' + rawNum.replace('+81', '');
             await env.PHONE_STORE.put('next_phone', nextPhone);
             addLog(`[webhook] 次番号セット: index=${nextIndex}, ${maskPhoneNumber(nextPhone)}`);
+            saveLogToKV(env, `[webhook] 次番号セット: index=${nextIndex}, ${maskPhoneNumber(nextPhone)}`);
           } else {
             await env.PHONE_STORE.put('system_status', 'stopped');
             await env.PHONE_STORE.delete('next_phone');
             addLog('[webhook] 全番号完了 → stopped');
+            saveLogToKV(env, '[webhook] 全番号完了 → stopped');
           }
         }
 
         return new Response('OK');
       } catch (err: any) {
         addLog(`[webhook] ERROR: ${err.message}`);
+        saveLogToKV(env, `[webhook] ERROR: ${err.message}`);
         return new Response('OK');
       }
     }
@@ -275,6 +295,7 @@ export default {
         }
 
         addLog(`[skip] index=${currentIndex}をスキップ → next=${nextIndex}`);
+        saveLogToKV(env, `[skip] index=${currentIndex}をスキップ → next=${nextIndex}`);
         return new Response(null, { status: 302, headers: { 'Location': '/' } });
       } catch (err: any) {
         return new Response('エラー: ' + err.message, { status: 500 });
@@ -293,6 +314,7 @@ export default {
         await env.PHONE_STORE.put('system_status', 'stopped');
         await env.PHONE_STORE.delete('next_phone');
         addLog('[reset] 完全リセット完了');
+        saveLogToKV(env, '[reset] 完全リセット完了');
         return new Response(null, { status: 302, headers: { 'Location': '/' } });
       } catch (err: any) {
         return new Response('エラー: ' + err.message, { status: 500 });
@@ -325,8 +347,10 @@ export default {
       const nextPhone = await env.PHONE_STORE.get('next_phone');
       const status = await env.PHONE_STORE.get('system_status') || 'stopped';
       const progressPercent = queue.length > 0 ? Math.round((currentIndex / queue.length) * 100) : 0;
-      const recentLogs = debugLogs.slice(-50).reverse();
-      const errorLogs = debugLogs.filter(l => l.includes('[ERROR]')).slice(-20);
+      const kvLogsRaw = await env.PHONE_STORE.get('debug_logs');
+      const kvLogs = kvLogsRaw ? JSON.parse(kvLogsRaw) : [];
+      const recentLogs = kvLogs.slice(-50).reverse();
+      const errorLogs = kvLogs.filter((l: string) => l.includes('[ERROR]')).slice(-20);
 
       const html = `<!DOCTYPE html>
 <html lang="ja">
@@ -366,6 +390,7 @@ export default {
 
     // POST /debug/clear-logs
     if (url.pathname === '/debug/clear-logs' && request.method === 'POST') {
+      await env.PHONE_STORE.delete('debug_logs');
       debugLogs.length = 0;
       return new Response('OK');
     }
