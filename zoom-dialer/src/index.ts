@@ -1,16 +1,42 @@
-﻿// ==========================================
-// デバッグログ機構
-// ==========================================
-
 // ==========================================
 // デバッグログ機構
 // ==========================================
 
 const debugLogs: string[] = [];
 
+function maskPhoneNumber(phone: string): string {
+  if (phone.length <= 4) return '****';
+  return phone.slice(0, 3) + '****' + phone.slice(-4);
+}
+
+function formatTime(date: Date): string {
+  const h = date.getHours().toString().padStart(2, '0');
+  const m = date.getMinutes().toString().padStart(2, '0');
+  const s = date.getSeconds().toString().padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
+function addLog(message: string): void {
+  const entry = `[${formatTime(new Date())}] ${message}`;
+  debugLogs.push(entry);
+  if (debugLogs.length > 100) {
+    debugLogs.shift();
+  }
+}
+
 // ==========================================
-// アップロードデバッグ結果の型定義
+// 型定義
 // ==========================================
+
+export interface Env {
+  PHONE_STORE: KVNamespace;
+  ZOOM_ACCOUNT_ID: string;
+  ZOOM_CLIENT_ID: string;
+  ZOOM_CLIENT_SECRET: string;
+  ZOOM_USER_ID: string;
+  ZOOM_WEBHOOK_SECRET: string;
+  ZOOM_CALLER_NUMBER: string;
+}
 
 interface PhoneValidationDetail {
   raw: string;
@@ -36,424 +62,18 @@ interface UploadDebugResult {
   errorMessage?: string;
 }
 
-function maskPhoneNumber(phone: string): string {
-  if (phone.length <= 4) return '****';
-  return phone.slice(0, 3) + '****' + phone.slice(-4);
-}
-
-function formatTime(date: Date): string {
-  const h = date.getHours().toString().padStart(2, '0');
-  const m = date.getMinutes().toString().padStart(2, '0');
-  const s = date.getSeconds().toString().padStart(2, '0');
-  return `${h}:${m}:${s}`;
-}
-
-function addLog(message: string): void {
-  const entry = `[${formatTime(new Date())}] ${message}`;
-  debugLogs.push(entry);
-  if (debugLogs.length > 100) {
-    debugLogs.shift();
-  }
-}
-
 // ==========================================
-// 環境変数チェック用ヘルパー
+// メインハンドラ
 // ==========================================
-
-interface EnvCheckResult {
-  [key: string]: string;
-}
-
-function checkEnvVariables(env: Env): { env_check: EnvCheckResult; token_preview: { accountId: string; clientId: string } } {
-  const env_check: EnvCheckResult = {};
-
-  // Zoom 環境変数のチェック
-  const zoomVars: (keyof Env)[] = ['ZOOM_ACCOUNT_ID', 'ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET', 'ZOOM_USER_ID', 'ZOOM_WEBHOOK_SECRET', 'ZOOM_CALLER_NUMBER'];
-  for (const key of zoomVars) {
-    const val = env[key];
-    if (val === undefined || val === null) {
-      env_check[key] = '❌ 未設定';
-    } else if (val === '') {
-      env_check[key] = '⚠️ 空文字';
-    } else {
-      const preview = String(val).slice(0, 4);
-      env_check[key] = `✅ 設定済み (先頭4文字: ${preview}...)`;
-    }
-  }
-
-  // PHONE_STORE バインディングの存在確認
-  if (env.PHONE_STORE && typeof env.PHONE_STORE === 'object') {
-    env_check['PHONE_STORE'] = '✅ 設定済み';
-  } else {
-    env_check['PHONE_STORE'] = '❌ 未設定';
-  }
-
-  // トークンリクエスト用プレビュー
-  const accountId = env.ZOOM_ACCOUNT_ID || '';
-  const clientId = env.ZOOM_CLIENT_ID || '';
-  const token_preview = {
-    accountId: accountId ? accountId.slice(0, 4) + '...' : '(未設定)',
-    clientId: clientId ? clientId.slice(0, 4) + '...' : '(未設定)'
-  };
-
-  return { env_check, token_preview };
-}
-
-export interface Env {
-  PHONE_STORE: KVNamespace;
-  ZOOM_ACCOUNT_ID: string;
-  ZOOM_CLIENT_ID: string;
-  ZOOM_CLIENT_SECRET: string;
-  ZOOM_USER_ID: string;
-  ZOOM_WEBHOOK_SECRET: string;
-  ZOOM_CALLER_NUMBER: string;
-}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
     // ==========================================
-    // 1. WEBアプリの画面表示 (GET /)
+    // 1. 管理画面 (GET /)
     // ==========================================
     if (url.pathname === '/' && request.method === 'GET') {
-      const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
-      const queue = JSON.parse(queueRaw);
-      const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
-      const currentIndex = parseInt(currentIndexRaw, 10);
-      const systemStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
-      const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
-      const results = JSON.parse(resultsRaw).reverse();
-
-      // 最終アップロード結果を取得
-      const lastUploadResultRaw = await env.PHONE_STORE.get('last_upload_result');
-      let lastUploadResult: UploadDebugResult | null = null;
-      if (lastUploadResultRaw) {
-        try {
-          lastUploadResult = JSON.parse(lastUploadResultRaw);
-        } catch {
-          // パースエラーは無視
-        }
-      }
-
-      addLog(`[dashboard] 表示: status=${systemStatus}, index=${currentIndex}, results=${results.length}件`);
-
-      const html = getAdminDashboardHTML(queue.length, currentIndex, systemStatus, results, lastUploadResult);
-      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-    }
-
-    // ==========================================
-    // 2. CSVアップロード処理 (POST /upload)
-    // ==========================================
-    if (url.pathname === '/upload' && request.method === 'POST') {
-      try {
-        addLog('[upload] リクエスト受信');
-        const formData = await request.formData();
-        const file = formData.get('csv') as File | null;
-        if (!file) {
-          console.error('[ERROR] CSVファイルがフォームに含まれていません');
-          addLog('[upload] ERROR: ファイルなし');
-          return new Response('CSVファイルがありません', { status: 400 });
-        }
-
-        addLog(`[upload] ファイル受信: name=${file.name}, size=${file.size}bytes`);
-        const csvText = await file.text();
-        const csvPreview = csvText.slice(0, 200);
-        const phonePattern = /(?:0\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{4})/g;
-        const matches = csvText.match(phonePattern) || [];
-        addLog(`[upload] 正規表現マッチ件数: ${matches.length}`);
-
-        // ==========================================
-        // バリデーション詳細の記録
-        // ==========================================
-        const validationDetails: PhoneValidationDetail[] = [];
-        const invalidReasons: Record<string, number> = {};
-        const cleanNumbers: string[] = [];
-        const seenNumbers = new Set<string>();
-
-        for (const match of matches) {
-          const cleanNum = match.replace(/\D/g, '');
-          const digitCount = cleanNum.length;
-
-          // バリデーション理由の判定
-          let valid = true;
-          let reason: string | undefined;
-
-          if (digitCount < 10) {
-            valid = false;
-            reason = '桁数不足';
-          } else if (digitCount > 11) {
-            valid = false;
-            reason = '桁数超過';
-          } else if (!cleanNum.startsWith('0')) {
-            valid = false;
-            reason = '0で始まらない';
-          }
-
-          if (valid) {
-            const zoomFormat = '+81' + cleanNum.slice(1);
-            if (seenNumbers.has(zoomFormat)) {
-              valid = false;
-              reason = '重複';
-            } else {
-              seenNumbers.add(zoomFormat);
-            }
-          }
-
-          validationDetails.push({
-            raw: match,
-            cleaned: cleanNum,
-            digitCount,
-            valid,
-            reason
-          });
-
-          if (valid) {
-            cleanNumbers.push(match.replace(/\D/g, ''));
-          } else {
-            invalidReasons[reason!] = (invalidReasons[reason!] || 0) + 1;
-          }
-        }
-
-        // 重複排除後の cleanNumbers を再構築（+81形式）
-        const finalCleanNumbers = cleanNumbers.map(n => {
-          // 既に +81 形式になっているはず
-          return n.startsWith('+81') ? n : '+81' + n.slice(1);
-        });
-
-        addLog(`[upload] バリデーション通過: ${finalCleanNumbers.length}件, 除外: ${Object.values(invalidReasons).reduce((a, b) => a + b, 0)}件`);
-
-        // ==========================================
-        // デバッグ結果の構築
-        // ==========================================
-        const debugResult: UploadDebugResult = {
-          timestamp: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
-          filename: file.name,
-          fileSize: file.size,
-          csvPreview,
-          totalMatched: matches.length,
-          validCount: finalCleanNumbers.length,
-          invalidCount: Object.values(invalidReasons).reduce((a, b) => a + b, 0),
-          invalidReasons,
-          firstFewValid: finalCleanNumbers.slice(0, 3).map(n => maskPhoneNumber(n)),
-          sampleRawMatches: matches.slice(0, 5),
-          validationDetails,
-          success: finalCleanNumbers.length > 0
-        };
-
-        if (finalCleanNumbers.length === 0) {
-          debugResult.success = false;
-          debugResult.errorMessage = matches.length === 0
-            ? '正規表現にマッチする電話番号がCSV内に見つかりませんでした'
-            : `正規表現マッチ ${matches.length} 件のうち、バリデーション通過が0件でした`;
-
-          // 失敗結果をKVに保存
-          await env.PHONE_STORE.put('last_upload_result', JSON.stringify(debugResult));
-          addLog(`[upload] ERROR: ${debugResult.errorMessage}`);
-
-          return new Response(
-            `<script>
-              alert("有効な電話番号が見つかりませんでした。\\n\\nマッチ数: ${matches.length}件\\n通過: 0件\\n\\nCSV先頭200文字:\\n${csvPreview.replace(/'/g, "\\'").replace(/\n/g, '\\n')}");
-              location.href="/";
-            </script>`,
-            { headers: { 'Content-Type': 'text/html' } }
-          );
-        }
-
-        // 成功時: 正しい+81形式で保存
-        const zoomFormatNumbers = finalCleanNumbers.map(n => {
-          const digits = n.replace(/\D/g, ''); // 数字のみ
-          return '+81' + digits.slice(1); // 先頭の0を+81に
-        });
-
-        await env.PHONE_STORE.put('queue', JSON.stringify(zoomFormatNumbers));
-        await env.PHONE_STORE.put('results', JSON.stringify([]));
-        await env.PHONE_STORE.put('current_index', '0');
-        await env.PHONE_STORE.put('system_status', 'running');
-        // 成功結果をKVに保存
-        await env.PHONE_STORE.put('last_upload_result', JSON.stringify(debugResult));
-        addLog(`[upload] KV保存完了: queue=${zoomFormatNumbers.length}件, current_index=0, status=running`);
-
-        const token = await getZoomToken(env);
-        addLog(`[upload] 初回架電を開始: ${maskPhoneNumber(zoomFormatNumbers[0])}`);
-        await triggerZoomCall(token, env.ZOOM_USER_ID, zoomFormatNumbers[0], env.ZOOM_CALLER_NUMBER);
-
-        addLog('[upload] 処理完了 → リダイレクト');
-        return Response.redirect(url.origin, 303);
-      } catch (err: any) {
-        console.error('[ERROR] upload 処理で例外:', err.message, err.stack);
-        addLog(`[upload] ERROR: ${err.message}`);
-
-        // エラー結果をKVに保存
-        const errorDebugResult: UploadDebugResult = {
-          timestamp: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
-          filename: 'unknown',
-          fileSize: 0,
-          csvPreview: '',
-          totalMatched: 0,
-          validCount: 0,
-          invalidCount: 0,
-          invalidReasons: {},
-          firstFewValid: [],
-          sampleRawMatches: [],
-          validationDetails: [],
-          success: false,
-          errorMessage: err.message
-        };
-        await env.PHONE_STORE.put('last_upload_result', JSON.stringify(errorDebugResult));
-
-        return new Response(
-          `<script>alert("アップロード処理中にエラーが発生しました: ${err.message}"); location.href="/";</script>`,
-          { headers: { 'Content-Type': 'text/html' }, status: 500 }
-        );
-      }
-    }
-
-    // ==========================================
-    // 3. 一時停止 / 再開の制御 (POST /toggle-status)
-    // ==========================================
-    if (url.pathname === '/toggle-status' && request.method === 'POST') {
-      try {
-        addLog('[toggle-status] リクエスト受信');
-        const currentStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
-        let newStatus = 'stopped';
-
-        if (currentStatus === 'running') {
-          newStatus = 'paused';
-          addLog(`[toggle-status] ${currentStatus} → ${newStatus}`);
-        } else if (currentStatus === 'paused') {
-          newStatus = 'running';
-          addLog(`[toggle-status] ${currentStatus} → ${newStatus}`);
-
-          const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
-          const queue = JSON.parse(queueRaw);
-          const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
-          const currentIndex = parseInt(currentIndexRaw, 10);
-
-          if (currentIndex < queue.length) {
-            addLog(`[toggle-status] 再開: index=${currentIndex}, ${maskPhoneNumber(queue[currentIndex])}`);
-            const token = await getZoomToken(env);
-            await triggerZoomCall(token, env.ZOOM_USER_ID, queue[currentIndex], env.ZOOM_CALLER_NUMBER);
-          } else {
-            addLog('[toggle-status] キュー終了済みのため架電不要');
-          }
-        } else {
-          addLog(`[toggle-status] ${currentStatus} → stopped (デフォルト)`);
-        }
-
-        await env.PHONE_STORE.put('system_status', newStatus);
-        return Response.redirect(url.origin, 303);
-      } catch (err: any) {
-        console.error('[ERROR] toggle-status 処理で例外:', err.message, err.stack);
-        addLog(`[toggle-status] ERROR: ${err.message}`);
-        return Response.redirect(url.origin, 303);
-      }
-    }
-
-    // ==========================================
-    // 4. Zoom Webhook受付 (POST /webhook)
-    // ==========================================
-    if (url.pathname === '/webhook' && request.method === 'POST') {
-      try {
-        addLog('[webhook] リクエスト受信');
-        const body = await request.json() as any;
-        addLog(`[webhook] イベント種別: ${body.event}`);
-
-        if (body.event === 'endpoint.url_validation') {
-          addLog('[webhook] URL検証リクエストを処理');
-          const encryptedToken = await cryptoHmacSha256(body.payload.plainToken, env.ZOOM_WEBHOOK_SECRET);
-          return new Response(JSON.stringify({ plainToken: body.payload.plainToken, encryptedToken }), {
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-
-        if (body.event === 'phone.call_ended') {
-          const callLog = body.payload.object;
-          const lastPhone = callLog.callee_number_number || callLog.caller_number_number;
-          const resultStatus = callLog.result;
-          const statusJapanese = resultStatus === 'completed' ? 'コネクト' : '不在/応答なし';
-          addLog(`[webhook] 通話終了: ${maskPhoneNumber(lastPhone)}, 結果=${statusJapanese}`);
-
-          const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
-          const results = JSON.parse(resultsRaw);
-          results.push({ phone_number: lastPhone, result: statusJapanese, time: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) });
-          await env.PHONE_STORE.put('results', JSON.stringify(results));
-
-          const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
-          const nextIndex = parseInt(currentIndexRaw, 10) + 1;
-          await env.PHONE_STORE.put('current_index', nextIndex.toString());
-
-          const systemStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
-          const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
-          const queue = JSON.parse(queueRaw);
-
-          if (systemStatus === 'running' && nextIndex < queue.length) {
-            const nextPhone = queue[nextIndex];
-            addLog(`[webhook] 次番号へ遷移: index=${nextIndex}, ${maskPhoneNumber(nextPhone)}`);
-            const token = await getZoomToken(env);
-            await triggerZoomCall(token, env.ZOOM_USER_ID, nextPhone, env.ZOOM_CALLER_NUMBER);
-          } else if (nextIndex >= queue.length) {
-            await env.PHONE_STORE.put('system_status', 'stopped');
-            addLog('[webhook] キュー消化完了 → system_status=stopped');
-          } else {
-            addLog(`[webhook] 架電スキップ: status=${systemStatus}, nextIndex=${nextIndex}`);
-          }
-
-          return new Response('Webhook Processed', { status: 200 });
-        }
-
-        addLog(`[webhook] 未処理イベント: ${body.event}`);
-        return new Response('Event Ignored', { status: 200 });
-      } catch (err: any) {
-        console.error('[ERROR] webhook 処理で例外:', err.message, err.stack);
-        addLog(`[webhook] ERROR: ${err.message}`);
-        return new Response('Internal Server Error', { status: 500 });
-      }
-    }
-
-    // ==========================================
-    // 5. 結果CSVのダウンロード (GET /results)
-    // ==========================================
-    if (url.pathname === '/results' && request.method === 'GET') {
-      try {
-        addLog('[results] リクエスト受信');
-        const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
-        const results = JSON.parse(resultsRaw);
-        addLog(`[results] 結果件数: ${results.length}件`);
-
-        let csvString = '﻿電話番号,結果,架電日時\n';
-        for (const row of results) {
-          csvString += `"${row.phone_number}","${row.result}","${row.time}"\n`;
-        }
-
-        return new Response(csvString, {
-          headers: {
-            'Content-Type': 'text/csv; charset=utf-8',
-            'Content-Disposition': 'attachment; filename="zoom_call_results.csv"'
-          }
-        });
-      } catch (err: any) {
-        console.error('[ERROR] results 処理で例外:', err.message, err.stack);
-        addLog(`[results] ERROR: ${err.message}`);
-        return new Response('Error generating CSV', { status: 500 });
-      }
-    }
-
-    // ==========================================
-    // 6. デバッグ用APIエンドポイント
-    // ==========================================
-
-    // GET /debug/logs — 全ログを返す
-    if (url.pathname === '/debug/logs' && request.method === 'GET') {
-      addLog('[debug] /debug/logs リクエスト受信');
-      return new Response(
-        JSON.stringify({ logs: debugLogs, count: debugLogs.length }),
-        { headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // GET /debug/status — システム状態サマリー + 最新5件ログ
-    if (url.pathname === '/debug/status' && request.method === 'GET') {
       try {
         const systemStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
         const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
@@ -461,45 +81,270 @@ export default {
         const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
         const queue = JSON.parse(queueRaw);
         const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
-        const results = JSON.parse(resultsRaw);
+        const results = JSON.parse(resultsRaw).reverse();
+        const nextPhone = await env.PHONE_STORE.get('next_phone');
 
-        const { env_check, token_preview } = checkEnvVariables(env);
+        const lastUploadResultRaw = await env.PHONE_STORE.get('last_upload_result');
+        let lastUploadResult: UploadDebugResult | null = null;
+        if (lastUploadResultRaw) {
+          try { lastUploadResult = JSON.parse(lastUploadResultRaw); } catch { /* ignore */ }
+        }
 
-        return new Response(
-          JSON.stringify({
-            system_status: systemStatus,
-            current_index: currentIndex,
-            queue_length: queue.length,
-            results_length: results.length,
-            recent_logs: debugLogs.slice(-5),
-            env_check,
-            token_preview
-          }),
-          { headers: { 'Content-Type': 'application/json' } }
-        );
+        addLog(`[dashboard] status=${systemStatus}, index=${currentIndex}/${queue.length}, results=${results.length}`);
+        const html = getAdminDashboardHTML(queue, currentIndex, systemStatus, results, nextPhone, lastUploadResult);
+        return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       } catch (err: any) {
-        console.error('[ERROR] debug/status 例外:', err.message);
-        return new Response(
-          JSON.stringify({ error: err.message }),
-          { status: 500, headers: { 'Content-Type': 'application/json' } }
-        );
+        return new Response(`エラー: ${err.message}`, { status: 500 });
       }
     }
 
-    // POST /debug/clear-logs — ログを全消去
-    if (url.pathname === '/debug/clear-logs' && request.method === 'POST') {
-      debugLogs.length = 0;
-      addLog('[debug] ログを消去');
-      return new Response(
-        JSON.stringify({ message: 'Logs cleared', count: 0 }),
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+    // ==========================================
+    // 2. CSVアップロード (POST /upload)
+    // ==========================================
+    if (url.pathname === '/upload' && request.method === 'POST') {
+      try {
+        addLog('[upload] リクエスト受信');
+        const formData = await request.formData();
+        const file = formData.get('csv') as File | null;
+        if (!file) return new Response('CSVファイルがありません', { status: 400 });
+
+        const csvText = await file.text();
+        addLog(`[upload] ファイル受信: ${file.name}, ${file.size}バイト`);
+
+        const phonePattern = /(?:0\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{4})/g;
+        const matches = csvText.match(phonePattern) || [];
+        addLog(`[upload] 正規表現マッチ: ${matches.length}件`);
+
+        const validationDetails: PhoneValidationDetail[] = [];
+        const cleanNumbers: string[] = [];
+        const invalidReasons: Record<string, number> = {};
+        const seen = new Set<string>();
+
+        for (const match of matches) {
+          const cleaned = match.replace(/\D/g, '');
+          let valid = true;
+          let reason: string | undefined;
+
+          if (!cleaned.startsWith('0')) {
+            valid = false; reason = '0で始まらない';
+          } else if (cleaned.length < 10 || cleaned.length > 11) {
+            valid = false; reason = `桁数不足(${cleaned.length}桁)`;
+          } else {
+            const zoomFormat = '+81' + cleaned.slice(1);
+            if (seen.has(zoomFormat)) {
+              valid = false; reason = '重複';
+            } else {
+              seen.add(zoomFormat);
+            }
+          }
+
+          validationDetails.push({ raw: match, cleaned, digitCount: cleaned.length, valid, reason });
+
+          if (valid) {
+            cleanNumbers.push(cleaned);
+          } else {
+            invalidReasons[reason!] = (invalidReasons[reason!] || 0) + 1;
+          }
+        }
+
+        const zoomFormatNumbers = cleanNumbers.map(n => '+81' + n.slice(1));
+        addLog(`[upload] バリデーション: 通過=${zoomFormatNumbers.length}, 除外=${Object.values(invalidReasons).reduce((a,b)=>a+b,0)}`);
+
+        await env.PHONE_STORE.put('queue', JSON.stringify(zoomFormatNumbers));
+        await env.PHONE_STORE.put('current_index', '0');
+        await env.PHONE_STORE.put('results', '[]');
+        await env.PHONE_STORE.put('system_status', 'running');
+        if (zoomFormatNumbers.length > 0) {
+          await env.PHONE_STORE.put('next_phone', zoomFormatNumbers[0]);
+        }
+        addLog(`[upload] KV保存完了: queue=${zoomFormatNumbers.length}件`);
+
+        const uploadResult: UploadDebugResult = {
+          timestamp: new Date().toISOString(),
+          filename: file.name,
+          fileSize: file.size,
+          csvPreview: csvText.slice(0, 200),
+          totalMatched: matches.length,
+          validCount: zoomFormatNumbers.length,
+          invalidCount: Object.values(invalidReasons).reduce((a, b) => a + b, 0),
+          invalidReasons,
+          firstFewValid: zoomFormatNumbers.slice(0, 3).map(maskPhoneNumber),
+          sampleRawMatches: matches.slice(0, 5),
+          validationDetails,
+          success: zoomFormatNumbers.length > 0,
+          errorMessage: zoomFormatNumbers.length === 0 ? '有効な電話番号がありませんでした' : undefined
+        };
+        await env.PHONE_STORE.put('last_upload_result', JSON.stringify(uploadResult));
+
+        return new Response(null, { status: 302, headers: { 'Location': '/' } });
+      } catch (err: any) {
+        console.error('[ERROR] upload:', err);
+        addLog(`[upload] ERROR: ${err.message}`);
+        return new Response(`エラー: ${err.message}`, { status: 500 });
+      }
     }
 
     // ==========================================
-    // 9. デバッグダッシュボード (GET /debug)
+    // 3. 架電実行 (POST /dial)
     // ==========================================
-    if (url.pathname === '/debug' && request.method === 'GET') {
+    if (url.pathname === '/dial' && request.method === 'POST') {
+      try {
+        const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
+        const currentIndex = parseInt(currentIndexRaw, 10);
+        const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
+        const queue = JSON.parse(queueRaw);
+        const nextPhoneRaw = await env.PHONE_STORE.get('next_phone');
+
+        const targetPhone = nextPhoneRaw || queue[currentIndex] || null;
+        if (!targetPhone) {
+          return new Response(JSON.stringify({ success: false, message: '架電対象の番号がありません' }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        addLog(`[dial] 架電実行: ${maskPhoneNumber(targetPhone)}`);
+        const token = await getZoomToken(env);
+        await triggerZoomCall(token, env.ZOOM_USER_ID, targetPhone, env.ZOOM_CALLER_NUMBER);
+        return new Response(JSON.stringify({ success: true, message: '架電しました', phone: targetPhone }), { headers: { 'Content-Type': 'application/json' } });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, message: err.message }), { headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // ==========================================
+    // 4. スキップ (POST /pause)
+    // ==========================================
+    if (url.pathname === '/pause' && request.method === 'POST') {
+      try {
+        const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
+        const currentIndex = parseInt(currentIndexRaw, 10);
+        const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
+        const queue = JSON.parse(queueRaw);
+        const skippedPhone = queue[currentIndex];
+
+        const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
+        const results = JSON.parse(resultsRaw);
+        results.push({ phone_number: skippedPhone, result: 'スキップ', time: new Date().toISOString() });
+
+        const nextIndex = currentIndex + 1;
+        await env.PHONE_STORE.put('current_index', String(nextIndex));
+        await env.PHONE_STORE.put('results', JSON.stringify(results));
+
+        if (nextIndex < queue.length) {
+          await env.PHONE_STORE.put('next_phone', queue[nextIndex]);
+        } else {
+          await env.PHONE_STORE.put('system_status', 'stopped');
+          await env.PHONE_STORE.delete('next_phone');
+        }
+
+        return new Response(JSON.stringify({ success: true, skipped: skippedPhone, next_phone: queue[nextIndex] || null }), { headers: { 'Content-Type': 'application/json' } });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, message: err.message }), { headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // ==========================================
+    // 5. リセット (POST /reset)
+    // ==========================================
+    if (url.pathname === '/reset' && request.method === 'POST') {
+      try {
+        const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
+        const queue = JSON.parse(queueRaw);
+        await env.PHONE_STORE.put('current_index', '0');
+        await env.PHONE_STORE.put('results', '[]');
+        await env.PHONE_STORE.put('system_status', 'running');
+        await env.PHONE_STORE.delete('next_phone');
+        if (queue.length > 0) {
+          await env.PHONE_STORE.put('next_phone', queue[0]);
+        }
+        addLog('[reset] リセット完了');
+        return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ success: false, message: err.message }), { headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // ==========================================
+    // 6. Webhook (POST /webhook)
+    // ==========================================
+    if (url.pathname === '/webhook' && request.method === 'POST') {
+      try {
+        const body = await request.json() as any;
+        const eventType = body.event;
+
+        addLog(`[webhook] イベント受信: ${eventType}`);
+
+        if (eventType === 'endpoint.url_validation') {
+          const plainToken = body.payload.plainToken;
+          const secret = env.ZOOM_WEBHOOK_SECRET;
+          const cryptoKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+          const signature = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(plainToken));
+          const encryptedToken = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+          return new Response(JSON.stringify({ plainToken, encryptedToken }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (eventType === 'phone.call_ended' || eventType === 'phone_call_ended') {
+          const callLog = body.payload?.object || body.payload || {};
+          const calleeNumber = callLog.callee_number_number || callLog.callee?.phone_number || callLog.to?.phone_number || '';
+          const callerNumber = callLog.caller_number_number || callLog.caller?.phone_number || callLog.from?.phone_number || '';
+          const duration = callLog.duration || callLog.talk_time || 0;
+
+          addLog(`[webhook] 通話終了: caller=${maskPhoneNumber(callerNumber)}, callee=${maskPhoneNumber(calleeNumber)}, duration=${duration}s`);
+
+          const connected = duration > 0 || callLog.result === 'connected' || callLog.disconnect_type === 'call_end';
+
+          const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
+          const results = JSON.parse(resultsRaw);
+          results.push({
+            phone_number: calleeNumber,
+            result: connected ? 'コネクト' : '不在/応答なし',
+            time: new Date().toISOString()
+          });
+          await env.PHONE_STORE.put('results', JSON.stringify(results));
+
+          const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
+          const currentIndex = parseInt(currentIndexRaw, 10);
+          const nextIndex = currentIndex + 1;
+          await env.PHONE_STORE.put('current_index', String(nextIndex));
+
+          const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
+          const queue = JSON.parse(queueRaw);
+
+          if (nextIndex < queue.length) {
+            await env.PHONE_STORE.put('next_phone', queue[nextIndex]);
+            addLog(`[webhook] → index=${nextIndex}, 次番号=${maskPhoneNumber(queue[nextIndex])}, 架電は手動です`);
+          } else {
+            await env.PHONE_STORE.put('system_status', 'stopped');
+            await env.PHONE_STORE.delete('next_phone');
+            addLog('[webhook] 全番号完了 → stopped');
+          }
+        }
+
+        return new Response('OK');
+      } catch (err: any) {
+        console.error('[ERROR] webhook:', err);
+        addLog(`[webhook] ERROR: ${err.message}`);
+        return new Response('OK');
+      }
+    }
+
+    // ==========================================
+    // 7. 結果ダウンロード (GET /results)
+    // ==========================================
+    if (url.pathname === '/results' && request.method === 'GET') {
+      const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
+      const results = JSON.parse(resultsRaw).reverse();
+      const bom = '\uFEFF';
+      const csv = bom + '電話番号,結果,完了日時\n' + results.map((r: any) => `${r.phone_number},${r.result},${r.time}`).join('\n');
+      return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="results.csv"' } });
+    }
+
+    // ==========================================
+    // 8. デバッグエンドポイント
+    // ==========================================
+    if (url.pathname === '/debug/logs' && request.method === 'GET') {
+      return new Response(JSON.stringify({ logs: debugLogs, count: debugLogs.length }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (url.pathname === '/debug/status' && request.method === 'GET') {
       const systemStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
       const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
       const currentIndex = parseInt(currentIndexRaw, 10);
@@ -507,16 +352,52 @@ export default {
       const queue = JSON.parse(queueRaw);
       const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
       const results = JSON.parse(resultsRaw);
+      const nextPhone = await env.PHONE_STORE.get('next_phone');
 
-      const lastUploadResultRaw = await env.PHONE_STORE.get('last_upload_result');
-      let lastUploadResult: UploadDebugResult | null = null;
-      if (lastUploadResultRaw) {
-        try {
-          lastUploadResult = JSON.parse(lastUploadResultRaw);
-        } catch { /* パースエラーは無視 */ }
+      const zoomVars: (keyof Env)[] = ['ZOOM_ACCOUNT_ID', 'ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET', 'ZOOM_USER_ID', 'ZOOM_WEBHOOK_SECRET', 'ZOOM_CALLER_NUMBER'];
+      const env_check: Record<string, string> = {};
+      for (const key of zoomVars) {
+        const val = env[key];
+        if (val === undefined || val === null) env_check[key] = '❌ 未設定';
+        else if (val === '') env_check[key] = '⚠️ 空文字';
+        else env_check[key] = `✅ 設定済み (${String(val).slice(0, 4)}...)`;
       }
+      env_check['PHONE_STORE'] = (env.PHONE_STORE && typeof env.PHONE_STORE === 'object') ? '✅ 設定済み' : '❌ 未設定';
 
-      // Zoom API接続テスト
+      const accountId = env.ZOOM_ACCOUNT_ID || '';
+      const clientId = env.ZOOM_CLIENT_ID || '';
+
+      return new Response(JSON.stringify({
+        status: systemStatus,
+        current_index: currentIndex,
+        queue_length: queue.length,
+        results_count: results.length,
+        next_phone: nextPhone,
+        env_check,
+        token_preview: {
+          accountId: accountId ? accountId.slice(0, 4) + '...' : '(未設定)',
+          clientId: clientId ? clientId.slice(0, 4) + '...' : '(未設定)'
+        },
+        recent_logs: debugLogs.slice(-5).reverse()
+      }, null, 2), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (url.pathname === '/debug/clear-logs' && request.method === 'POST') {
+      debugLogs.length = 0;
+      return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (url.pathname === '/debug' && request.method === 'GET') {
+      // デバッグダッシュボード画面（manage画面のリンクから遷移）
+      const systemStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
+      const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
+      const currentIndex = parseInt(currentIndexRaw, 10);
+      const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
+      const queue = JSON.parse(queueRaw);
+      const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
+      const results = JSON.parse(resultsRaw);
+      const nextPhone = await env.PHONE_STORE.get('next_phone');
+
       let zoomApiStatus = '🟢 接続成功';
       let zoomApiDetail = '';
       try {
@@ -527,154 +408,70 @@ export default {
         zoomApiDetail = err.message || '不明なエラー';
       }
 
-      const { env_check, token_preview } = checkEnvVariables(env);
-
       const recentLogs = debugLogs.slice(-50).reverse();
       const errorLogs = debugLogs.filter(l => l.includes('[ERROR]')).slice(-20);
       const progressPercent = queue.length > 0 ? Math.round((currentIndex / queue.length) * 100) : 0;
-      const lastUploadSummary = lastUploadResult
-        ? `${lastUploadResult.filename} (${lastUploadResult.validCount}件通過 / ${lastUploadResult.invalidCount}件除外)`
-        : 'なし';
-
-      // 環境変数チェックHTML生成
-      const envCheckRows = Object.entries(env_check).map(([key, value]) => {
-        let colorClass = 'text-rose-400';
-        if (value.startsWith('✅')) colorClass = 'text-emerald-400';
-        else if (value.startsWith('⚠️')) colorClass = 'text-amber-400';
-        return `<tr class="border-b border-slate-700"><td class="py-2 px-3 text-slate-300 font-mono text-xs">${key}</td><td class="py-2 px-3 ${colorClass} text-xs font-medium">${value}</td></tr>`;
-      }).join('');
 
       const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>デバッグダッシュボード - Zoom Phone 自動架電</title>
+  <title>デバッグダッシュボード - Zoom Phone</title>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans min-h-screen">
   <div class="max-w-6xl mx-auto px-4 py-8">
     <header class="mb-8 border-b border-slate-700 pb-4 flex justify-between items-center">
-      <div class="flex items-center gap-4">
-        <h1 class="text-2xl font-bold text-white">🔧 デバッグダッシュボード</h1>
-        <a href="/" class="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-slate-300">← 管理画面に戻る</a>
-      </div>
-      <span class="text-sm bg-amber-600/20 text-amber-400 px-3 py-1 rounded-full border border-amber-600/30">DEBUG</span>
+      <h1 class="text-2xl font-bold">🔧 デバッグダッシュボード</h1>
+      <a href="/" class="text-blue-400 hover:text-blue-300 text-sm">← 管理画面に戻る</a>
     </header>
 
-    <!-- システムステータス -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
-        <p class="text-xs text-slate-400 font-medium mb-1">システム状態</p>
-        <p class="text-lg font-bold ${systemStatus === 'running' ? 'text-emerald-400' : systemStatus === 'paused' ? 'text-amber-400' : 'text-slate-500'}">${systemStatus === 'running' ? '🟢 稼働中' : systemStatus === 'paused' ? '🟡 一時停止' : '⚪ 停止'}</p>
-      </div>
-      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
-        <p class="text-xs text-slate-400 font-medium mb-1">キュー / インデックス</p>
-        <p class="text-2xl font-black text-white">${currentIndex} <span class="text-sm font-normal text-slate-500">/ ${queue.length}</span></p>
-      </div>
-      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
-        <p class="text-xs text-slate-400 font-medium mb-1">進捗率</p>
-        <p class="text-2xl font-black text-indigo-400">${progressPercent}%</p>
-        <div class="w-full bg-slate-700 rounded-full h-1.5 mt-2">
-          <div class="bg-indigo-500 h-1.5 rounded-full" style="width: ${progressPercent}%"></div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="bg-slate-800 rounded-lg p-6">
+        <h2 class="text-lg font-semibold mb-4 text-slate-300">システム状態</h2>
+        <div class="space-y-2">
+          <p>ステータス: <span class="font-mono ${systemStatus === 'running' ? 'text-green-400' : 'text-yellow-400'}">${systemStatus}</span></p>
+          <p>進捗: <span class="font-mono">${currentIndex} / ${queue.length}</span> (${progressPercent}%)</p>
+          <p>結果件数: <span class="font-mono">${results.length}</span></p>
+          <p>次番号: <span class="font-mono text-green-400">${nextPhone || 'なし'}</span></p>
         </div>
       </div>
-      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
-        <p class="text-xs text-slate-400 font-medium mb-1">Zoom API接続</p>
-        <p class="text-sm font-bold">${zoomApiStatus}</p>
-        <p class="text-xs text-slate-500 mt-1">${zoomApiDetail}</p>
+      <div class="bg-slate-800 rounded-lg p-6">
+        <h2 class="text-lg font-semibold mb-4 text-slate-300">Zoom API接続</h2>
+        <p class="mb-1">${zoomApiStatus}</p>
+        <p class="text-sm text-slate-400">${zoomApiDetail}</p>
       </div>
     </div>
 
-    <!-- 環境変数チェック -->
-    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-8">
-      <h2 class="text-base font-bold mb-3 text-white">🔑 環境変数チェック</h2>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead>
-            <tr class="border-b border-slate-600">
-              <th class="py-2 px-3 text-slate-400 font-medium text-xs">変数名</th>
-              <th class="py-2 px-3 text-slate-400 font-medium text-xs">状態</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${envCheckRows}
-          </tbody>
-        </table>
-      </div>
-      <div class="mt-4 pt-4 border-t border-slate-700">
-        <p class="text-xs text-slate-400 font-medium mb-2">トークンリクエスト用プレビュー</p>
-        <div class="grid grid-cols-2 gap-4 text-xs">
-          <div>
-            <span class="text-slate-500">accountId:</span>
-            <span class="text-slate-300 font-mono ml-2">${token_preview.accountId}</span>
-          </div>
-          <div>
-            <span class="text-slate-500">clientId:</span>
-            <span class="text-slate-300 font-mono ml-2">${token_preview.clientId}</span>
-          </div>
-        </div>
-      </div>
+    <div class="bg-slate-800 rounded-lg p-6 mb-8">
+      <h2 class="text-lg font-semibold mb-4 text-slate-300">最新ログ (最新50件)</h2>
+      <pre class="bg-slate-950 p-4 rounded text-sm overflow-x-auto max-h-64 overflow-y-auto font-mono text-xs">${recentLogs.join('\\n') || 'ログなし'}</pre>
+      <form method="POST" action="/debug/clear-logs" class="mt-4">
+        <button type="submit" class="px-4 py-2 bg-red-700 hover:bg-red-600 rounded text-sm">ログクリア</button>
+        <button type="button" onclick="location.reload()" class="px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded text-sm ml-2">リロード</button>
+      </form>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <!-- 最終アップロード結果 -->
-      <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
-        <h2 class="text-base font-bold mb-3 text-white">📂 最終アップロード結果</h2>
-        ${lastUploadResult ? `
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between"><span class="text-slate-400">ファイル名</span><span class="text-slate-200">${lastUploadResult.filename}</span></div>
-            <div class="flex justify-between"><span class="text-slate-400">実行日時</span><span class="text-slate-200">${lastUploadResult.timestamp}</span></div>
-            <div class="flex justify-between"><span class="text-slate-400">マッチ総数</span><span class="text-slate-200">${lastUploadResult.totalMatched} 件</span></div>
-            <div class="flex justify-between"><span class="text-slate-400">有効 / 除外</span><span class="text-emerald-400">${lastUploadResult.validCount} 件</span> / <span class="text-rose-400">${lastUploadResult.invalidCount} 件</span></div>
-            ${lastUploadResult.errorMessage ? `<p class="text-rose-400 mt-2 text-xs">⚠ ${lastUploadResult.errorMessage}</p>` : ''}
-            ${Object.keys(lastUploadResult.invalidReasons).length > 0 ? `
-              <div class="flex flex-wrap gap-1 mt-2">
-                ${Object.entries(lastUploadResult.invalidReasons).map(([r, c]) => `<span class="bg-rose-900/30 text-rose-300 px-2 py-0.5 rounded text-xs">${r}: ${c}件</span>`).join('')}
-              </div>
-            ` : ''}
-          </div>
-        ` : '<p class="text-slate-500 text-sm">まだアップロード記録がありません</p>'}
-      </div>
-
-      <!-- 最近のエラー一覧 -->
-      <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
-        <h2 class="text-base font-bold mb-3 text-white">⚠️ 最近のエラー (${errorLogs.length}件)</h2>
-        ${errorLogs.length > 0 ? `
-          <div class="space-y-1 max-h-72 overflow-y-auto">
-            ${errorLogs.map(l => `<div class="text-xs font-mono text-rose-400 bg-slate-900/50 px-3 py-1.5 rounded border-l-2 border-rose-500">${l}</div>`).join('')}
-          </div>
-        ` : '<p class="text-slate-500 text-sm">エラーは記録されていません</p>'}
-      </div>
+    ${errorLogs.length > 0 ? `
+    <div class="bg-red-900/30 border border-red-700 rounded-lg p-6">
+      <h2 class="text-lg font-semibold mb-4 text-red-400">エラーログ (${errorLogs.length}件)</h2>
+      <pre class="bg-slate-950 p-4 rounded text-sm overflow-x-auto max-h-48 overflow-y-auto font-mono text-xs text-red-300">${errorLogs.join('\\n')}</pre>
     </div>
-
-    <!-- デバッグログ -->
-    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mt-6">
-      <div class="flex justify-between items-center mb-3">
-        <h2 class="text-base font-bold text-white">📋 デバッグログ (最新${recentLogs.length}件)</h2>
-        <form action="/debug/clear-logs" method="POST" class="inline">
-          <button type="submit" class="text-xs bg-slate-700 hover:bg-rose-600 text-slate-300 hover:text-white px-3 py-1 rounded cursor-pointer transition-colors">🗑️ ログを消去</button>
-        </form>
-        <button onclick="location.reload()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1 rounded cursor-pointer">🔄 リロード</button>
-      </div>
-      <pre class="bg-slate-950 p-4 rounded-lg text-xs font-mono text-slate-300 max-h-96 overflow-y-auto whitespace-pre-wrap leading-relaxed border border-slate-700">${recentLogs.join('\n') || '(ログなし)'}</pre>
-    </div>
-
-    <footer class="mt-8 border-t border-slate-700 pt-4 flex justify-between items-center">
-      <a href="/" class="text-sm text-slate-400 hover:text-white">← 管理画面に戻る</a>
-      <span class="text-xs text-slate-600">Zoom Phone Auto-Dialer Debug Dashboard</span>
-    </footer>
+    ` : ''}
   </div>
 </body>
 </html>`;
-
-      addLog('[debug] ダッシュボード表示');
       return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
 
     return new Response('Not Found', { status: 404 });
   }
 };
+
+// ==========================================
+// ヘルパー関数
+// ==========================================
 
 async function getZoomToken(env: Env): Promise<string> {
   try {
@@ -725,201 +522,156 @@ async function triggerZoomCall(token: string, userId: string, phoneNumber: strin
   }
 }
 
-async function cryptoHmacSha256(plainToken: string, secret: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(plainToken));
-  return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
+// ==========================================
+// ダッシュボードHTML生成
+// ==========================================
 
-function getAdminDashboardHTML(total: number, current: number, status: string, results: any[], uploadResult: UploadDebugResult | null = null): string {
-  const statusLabels: Record<string, string> = { running: '🟢 稼働中 (自動発信中)', paused: '🟡 一時停止中', stopped: '⚪ 停止・未開始' };
-  const statusBtnTexts: Record<string, string> = { running: '一時停止する', paused: '自動架電を再開する', stopped: 'リスト未読み込み' };
-  const btnColor = status === 'running' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-500 hover:bg-emerald-600';
+function getAdminDashboardHTML(
+  queue: string[],
+  current: number,
+  status: string,
+  results: any[],
+  nextPhone: string | null,
+  uploadResult: UploadDebugResult | null
+): string {
+  const total = queue.length;
+  const progressPercent = total > 0 ? Math.round((current / total) * 100) : 0;
+  const displayPhone = nextPhone || queue[current] || '';
+  const isFinished = current >= total;
 
-  // 最終アップロード結果セクションのHTML生成
-  let uploadResultHTML = '';
-  if (uploadResult) {
-    const resultColor = uploadResult.success ? 'border-emerald-200 bg-emerald-50/30' : 'border-rose-200 bg-rose-50/30';
-    const resultIcon = uploadResult.success ? '✅' : '❌';
-    const resultTitle = uploadResult.success ? '最終アップロード結果（成功）' : '最終アップロード結果（失敗）';
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zoom Phone クリックToコール</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <header class="mb-8 flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-slate-700">📞 Zoom Phone クリックToコール</h1>
+      <a href="/debug" class="text-sm text-blue-500 hover:text-blue-700">🔧 デバッグ</a>
+    </header>
 
-    // 除外理由の内訳
-    const invalidReasonsHTML = Object.keys(uploadResult.invalidReasons).length > 0
-      ? Object.entries(uploadResult.invalidReasons).map(([reason, count]) =>
-          `<span class="inline-block bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-xs mr-1 mb-1">${reason}: ${count}件</span>`
-        ).join('')
-      : '<span class="text-slate-400 text-xs">なし</span>';
+    <div id="message" class="mb-4 hidden p-3 rounded-lg text-sm font-medium"></div>
 
-    // 有効番号サンプル
-    const firstFewValidHTML = uploadResult.firstFewValid.length > 0
-      ? uploadResult.firstFewValid.map(n => `<span class="inline-block bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs mr-1 mb-1 font-mono">${n}</span>`).join('')
-      : '<span class="text-slate-400 text-xs">なし</span>';
-
-    // マッチした生文字列サンプル
-    const sampleRawMatchesHTML = uploadResult.sampleRawMatches.length > 0
-      ? uploadResult.sampleRawMatches.map(n => `<span class="inline-block bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs mr-1 mb-1 font-mono">${n}</span>`).join('')
-      : '<span class="text-slate-400 text-xs">なし</span>';
-
-    uploadResultHTML = `
-      <div class="bg-white p-6 rounded-xl border ${resultColor} mb-8">
-        <h2 class="text-base font-bold mb-3 text-slate-900">${resultIcon} ${resultTitle}</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div>
-            <p class="text-slate-500 font-medium mb-1">実行日時</p>
-            <p class="text-slate-900">${uploadResult.timestamp}</p>
-          </div>
-          <div>
-            <p class="text-slate-500 font-medium mb-1">ファイル名</p>
-            <p class="text-slate-900">${uploadResult.filename} (${uploadResult.fileSize.toLocaleString()} bytes)</p>
-          </div>
-          <div>
-            <p class="text-slate-500 font-medium mb-1">正規表現マッチ総数</p>
-            <p class="text-slate-900 font-bold">${uploadResult.totalMatched} 件</p>
-          </div>
-          <div>
-            <p class="text-slate-500 font-medium mb-1">バリデーション結果</p>
-            <p class="text-slate-900">
-              <span class="text-emerald-600 font-bold">${uploadResult.validCount} 件通過</span>
-              ${uploadResult.invalidCount > 0 ? ` / <span class="text-rose-600 font-bold">${uploadResult.invalidCount} 件除外</span>` : ''}
-            </p>
-          </div>
-          <div class="md:col-span-2">
-            <p class="text-slate-500 font-medium mb-1">除外理由の内訳</p>
-            <div class="flex flex-wrap">${invalidReasonsHTML}</div>
-          </div>
-          <div class="md:col-span-2">
-            <p class="text-slate-500 font-medium mb-1">有効番号サンプル（先頭3件、マスク表示）</p>
-            <div class="flex flex-wrap">${firstFewValidHTML}</div>
-          </div>
-          <div class="md:col-span-2">
-            <p class="text-slate-500 font-medium mb-1">マッチした生文字列サンプル（先頭5件）</p>
-            <div class="flex flex-wrap">${sampleRawMatchesHTML}</div>
-          </div>
-          <div class="md:col-span-2">
-            <p class="text-slate-500 font-medium mb-1">CSV先頭200文字</p>
-            <pre class="bg-slate-100 p-2 rounded text-xs text-slate-700 overflow-x-auto whitespace-pre-wrap">${uploadResult.csvPreview || '(空)'}</pre>
-          </div>
-          ${uploadResult.errorMessage ? `
-          <div class="md:col-span-2">
-            <p class="text-slate-500 font-medium mb-1">エラーメッセージ</p>
-            <p class="text-rose-600">${uploadResult.errorMessage}</p>
-          </div>
-          ` : ''}
-          ${!uploadResult.success && uploadResult.totalMatched === 0 ? `
-          <div class="md:col-span-2">
-            <p class="text-slate-500 font-medium mb-1">推奨フォーマット</p>
-            <pre class="bg-slate-100 p-2 rounded text-xs text-slate-700">電話番号
-090-1234-5678
-080-9876-5432
-07012345678</pre>
-          </div>
-          ` : ''}
-        </div>
-      </div>
-    `;
-  }
-  
-  return `
-  <!DOCTYPE html>
-  <html lang="ja">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zoom Phone 自動架電ダッシュボード</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  </head>
-  <body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
-    <div class="max-w-4xl mx-auto px-4 py-8">
-      <header class="mb-8 border-b border-slate-200 pb-4 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-slate-900">📞 Zoom Phone 架電オートメーション</h1>
-        <div class="flex items-center gap-3">
-          <a href="/debug" class="text-sm bg-amber-100 text-amber-700 hover:bg-amber-200 px-3 py-1 rounded-full font-medium">🔧 デバッグ</a>
-          <span class="text-sm bg-slate-200 px-3 py-1 rounded-full text-slate-700">Powered by Cloudflare</span>
-        </div>
-      </header>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white p-6 rounded-xl border border-slate-200">
-          <p class="text-sm text-slate-500 font-medium mb-1">システム状態</p>
-          <p class="text-lg font-bold">${statusLabels[status] || status}</p>
-          ${status !== 'stopped' ? `
-            <form action="/toggle-status" method="POST" class="mt-4">
-              <button class="w-full ${btnColor} text-white font-semibold py-2 px-4 rounded-lg cursor-pointer text-sm">
-                ${statusBtnTexts[status]}
-              </button>
-            </form>
-          ` : ''}
-        </div>
-
-        <div class="bg-white p-6 rounded-xl border border-slate-200">
-          <p class="text-sm text-slate-500 font-medium mb-1">現在の進捗</p>
-          <p class="text-3xl font-black text-slate-900">${total > 0 ? `${current} <span class="text-sm font-normal text-slate-400">/ ${total} 件</span>` : '0 件'}</p>
-          <div class="w-full bg-slate-100 rounded-full h-2.5 mt-4">
-            <div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${total > 0 ? (current / total) * 100 : 0}%"></div>
-          </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-xl border border-slate-200 flex flex-col justify-between">
-          <div>
-            <p class="text-sm text-slate-500 font-medium mb-1">データ出力</p>
-            <p class="text-xs text-slate-400">現在までの結果をリアルタイムに出力します</p>
-          </div>
-          <a href="/results" class="w-full text-center bg-slate-900 text-white font-semibold py-2 px-4 rounded-lg inline-block text-sm mt-4">
-            📥 結果CSVをダウンロード
-          </a>
-        </div>
-      </div>
-
-      <div class="bg-white p-6 rounded-xl border border-slate-200 mb-8">
-        <h2 class="text-base font-bold mb-3 text-slate-900">📂 新規架電リストのアップロード</h2>
-        <form action="/upload" method="POST" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-3">
-          <input type="file" name="csv" accept=".csv" required class="flex-1 block w-full text-sm border border-slate-200 rounded-lg p-1">
-          <button type="submit" class="bg-indigo-600 text-white font-semibold py-2 px-6 rounded-lg text-sm">
-            読み込み ＆ 架電スタート
-          </button>
-        </form>
-      </div>
-
-      ${uploadResultHTML}
-
-      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-          <h2 class="text-base font-bold text-slate-900">📋 架電結果履歴</h2>
-          <button onclick="location.reload()" class="text-xs text-indigo-600 font-medium">🔄 画面を更新する</button>
-        </div>
-        <div class="overflow-x-auto max-h-96">
-          <table class="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-                <th class="px-6 py-3">電話番号</th>
-                <th class="px-6 py-3">結果</th>
-                <th class="px-6 py-3">完了日時</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              ${results.length === 0 ? `
-                <tr>
-                  <td colspan="3" class="px-6 py-8 text-center text-slate-400">まだ通話データがありません。</td>
-                </tr>
-              ` : results.map((r: any) => `
-                <tr class="hover:bg-slate-50/50">
-                  <td class="px-6 py-4 font-mono font-medium text-slate-900">${r.phone_number}</td>
-                  <td class="px-6 py-4">
-                    <span class="px-2.5 py-1 rounded-full text-xs font-bold ${r.result === 'コネクト' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">
-                      ${r.result}
-                    </span>
-                  </td>
-                  <td class="px-6 py-4 text-slate-500">${r.time}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
+    ${total === 0 ? `
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+      <p class="text-slate-500 mb-6 text-lg">CSVファイルをアップロードして開始してください</p>
+      <form method="POST" action="/upload" enctype="multipart/form-data" class="space-y-4">
+        <input type="file" name="csv" accept=".csv,.txt" required class="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+        <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">CSVをアップロード</button>
+      </form>
+      <p class="text-xs text-slate-400 mt-4">※ アップロード後、最初の番号がセットされます。架電は手動ボタンで行います。</p>
     </div>
-  </body>
-  </html>
-  `;
+    ` : `
+    <div class="space-y-6">
+      <!-- 状態カード -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div class="flex justify-between items-center mb-4">
+          <span class="text-slate-500 text-sm">進捗</span>
+          <span class="text-2xl font-bold">${current} <span class="text-slate-400 text-lg">/ ${total}</span></span>
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-3 mb-6">
+          <div class="bg-blue-500 h-3 rounded-full transition-all" style="width: ${progressPercent}%"></div>
+        </div>
+        <div class="bg-blue-50 rounded-lg p-4 text-center">
+          <p class="text-xs text-blue-400 mb-1">次の番号</p>
+          <p class="text-3xl font-bold text-blue-700 tracking-wider">${displayPhone || '—'}</p>
+        </div>
+      </div>
+
+      <!-- 操作ボタン -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-3">
+        ${!isFinished ? `
+        <button onclick="doDial()" class="w-full py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl shadow-lg shadow-green-200 transition-all">📞 架電する</button>
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="doPause()" class="py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg">⏭ スキップ</button>
+          <button onclick="doReset()" class="py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg">🔄 リセット</button>
+        </div>
+        ` : `
+        <div class="text-center py-6">
+          <p class="text-2xl font-bold text-green-600 mb-4">✅ 全番号完了</p>
+          <button onclick="doReset()" class="py-3 px-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">🔄 最初からやり直す</button>
+        </div>
+        `}
+      </div>
+    </div>
+    `}
+
+    ${uploadResult ? `
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
+      <h2 class="font-semibold mb-3 text-slate-700">📄 アップロード結果</h2>
+      <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+        <div><span class="text-slate-500">ファイル:</span> ${uploadResult.filename}</div>
+        <div><span class="text-slate-500">マッチ:</span> ${uploadResult.totalMatched}件</div>
+        <div><span class="text-green-600">通過:</span> ${uploadResult.validCount}件</div>
+        <div><span class="text-red-500">除外:</span> ${uploadResult.invalidCount}件</div>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- 結果履歴 -->
+    ${results.length > 0 ? `
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="font-semibold text-slate-700">📋 結果履歴 (${results.length}件)</h2>
+        <a href="/results" class="text-sm text-blue-500 hover:text-blue-700">CSVダウンロード ↓</a>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="border-b text-slate-500"><th class="py-2 text-left">電話番号</th><th class="py-2 text-left">結果</th><th class="py-2 text-right">日時</th></tr></thead>
+          <tbody>
+            ${results.slice(0, 50).map(r => `
+            <tr class="border-b border-slate-100">
+              <td class="py-2 font-mono">${r.phone_number}</td>
+              <td class="py-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${r.result === 'コネクト' ? 'bg-green-100 text-green-700' : r.result === 'スキップ' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}">${r.result}</span></td>
+              <td class="py-2 text-right text-slate-400">${r.time ? new Date(r.time).toLocaleString('ja-JP') : ''}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    ` : ''}
+  </div>
+
+  <script>
+    function showMessage(msg, type) {
+      const el = document.getElementById('message');
+      el.textContent = msg;
+      el.className = 'mb-4 p-3 rounded-lg text-sm font-medium ' + (type === 'success' ? 'bg-green-100 text-green-700' : type === 'error' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700');
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 5000);
+    }
+
+    async function doDial() {
+      try {
+        const res = await fetch('/dial', { method: 'POST' });
+        const data = await res.json();
+        showMessage(data.success ? '📞 架電しました: ' + (data.phone || '') : '❌ 架電失敗: ' + data.message, data.success ? 'success' : 'error');
+        if (data.success) setTimeout(() => location.reload(), 1500);
+      } catch (e) { showMessage('❌ エラー: ' + e.message, 'error'); }
+    }
+
+    async function doPause() {
+      try {
+        const res = await fetch('/pause', { method: 'POST' });
+        const data = await res.json();
+        showMessage(data.success ? '⏭ スキップしました' : '❌ ' + data.message, data.success ? 'success' : 'error');
+        if (data.success) setTimeout(() => location.reload(), 800);
+      } catch (e) { showMessage('❌ エラー: ' + e.message, 'error'); }
+    }
+
+    async function doReset() {
+      try {
+        const res = await fetch('/reset', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) location.reload();
+        else showMessage('❌ ' + data.message, 'error');
+      } catch (e) { showMessage('❌ エラー: ' + e.message, 'error'); }
+    }
+  </script>
+</body>
+</html>`;
 }
