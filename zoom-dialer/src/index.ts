@@ -432,7 +432,7 @@ function getDashboardHTML(
       <!-- 操作 -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
         ${!isFinished && zoomUrl ? `
-        <button onclick="makeCall('${zoomUrl}')" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 架電する（Zoom起動）</button>
+        <a href="${zoomUrl}" target="_blank" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 架電する（Zoom起動）</a>
         <div class="grid grid-cols-2 gap-3">
           <button onclick="doSkip()" class="py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-all">⏭ スキップ</button>
           <button onclick="doReset()" class="py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all">🔄 リセット</button>
@@ -486,13 +486,13 @@ function getDashboardHTML(
       location.reload();
     }
     function makeCall(url) {
-      // iframe方式: 隠しiframeにzoomphonecall://を読み込ませる
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = url;
-      document.body.appendChild(iframe);
-      // 5秒後にiframeを削除
-      setTimeout(() => document.body.removeChild(iframe), 5000);
+      // 新しいウィンドウ/タブで開く（ポップアップブロッカーに引っかかる可能性あり）
+      window.open(url, '_blank');
+
+      // フォールバック: location.assignも試す
+      setTimeout(() => {
+        window.location.assign(url);
+      }, 100);
     }
   </script>
 </body>
