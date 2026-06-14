@@ -486,7 +486,13 @@ function getDashboardHTML(
       location.reload();
     }
     function makeCall(url) {
-      window.location.href = url;
+      // iframe方式: 隠しiframeにzoomphonecall://を読み込ませる
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      // 5秒後にiframeを削除
+      setTimeout(() => document.body.removeChild(iframe), 5000);
     }
   </script>
 </body>
