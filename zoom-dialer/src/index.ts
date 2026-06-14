@@ -432,7 +432,7 @@ function getDashboardHTML(
       <!-- 操作 -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
         ${!isFinished && zoomUrl ? `
-        <a href="${zoomUrl}" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 架電する（Zoom起動）</a>
+        <button onclick="makeCall('${zoomUrl}')" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 架電する（Zoom起動）</button>
         <div class="grid grid-cols-2 gap-3">
           <button onclick="doSkip()" class="py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-all">⏭ スキップ</button>
           <button onclick="doReset()" class="py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all">🔄 リセット</button>
@@ -484,6 +484,9 @@ function getDashboardHTML(
     async function doReset() {
       await fetch('/reset', { method: 'POST' });
       location.reload();
+    }
+    function makeCall(url) {
+      window.location.href = url;
     }
   </script>
 </body>
