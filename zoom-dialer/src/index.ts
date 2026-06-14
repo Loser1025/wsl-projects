@@ -165,7 +165,7 @@ export default {
           });
 
           if (valid) {
-            cleanNumbers.push(match.replace(/\D/g, '').replace(/^0/, '+81'));
+            cleanNumbers.push(match.replace(/\D/g, ''));
           } else {
             invalidReasons[reason!] = (invalidReasons[reason!] || 0) + 1;
           }
