@@ -56,6 +56,49 @@ function addLog(message: string): void {
   }
 }
 
+// ==========================================
+// 環境変数チェック用ヘルパー
+// ==========================================
+
+interface EnvCheckResult {
+  [key: string]: string;
+}
+
+function checkEnvVariables(env: Env): { env_check: EnvCheckResult; token_preview: { accountId: string; clientId: string } } {
+  const env_check: EnvCheckResult = {};
+
+  // Zoom 環境変数のチェック
+  const zoomVars: (keyof Env)[] = ['ZOOM_ACCOUNT_ID', 'ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET', 'ZOOM_USER_ID', 'ZOOM_WEBHOOK_SECRET'];
+  for (const key of zoomVars) {
+    const val = env[key];
+    if (val === undefined || val === null) {
+      env_check[key] = '❌ 未設定';
+    } else if (val === '') {
+      env_check[key] = '⚠️ 空文字';
+    } else {
+      const preview = String(val).slice(0, 4);
+      env_check[key] = `✅ 設定済み (先頭4文字: ${preview}...)`;
+    }
+  }
+
+  // PHONE_STORE バインディングの存在確認
+  if (env.PHONE_STORE && typeof env.PHONE_STORE === 'object') {
+    env_check['PHONE_STORE'] = '✅ 設定済み';
+  } else {
+    env_check['PHONE_STORE'] = '❌ 未設定';
+  }
+
+  // トークンリクエスト用プレビュー
+  const accountId = env.ZOOM_ACCOUNT_ID || '';
+  const clientId = env.ZOOM_CLIENT_ID || '';
+  const token_preview = {
+    accountId: accountId ? accountId.slice(0, 4) + '...' : '(未設定)',
+    clientId: clientId ? clientId.slice(0, 4) + '...' : '(未設定)'
+  };
+
+  return { env_check, token_preview };
+}
+
 export interface Env {
   PHONE_STORE: KVNamespace;
   ZOOM_ACCOUNT_ID: string;
@@ -419,13 +462,17 @@ export default {
         const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
         const results = JSON.parse(resultsRaw);
 
+        const { env_check, token_preview } = checkEnvVariables(env);
+
         return new Response(
           JSON.stringify({
             system_status: systemStatus,
             current_index: currentIndex,
             queue_length: queue.length,
             results_length: results.length,
-            recent_logs: debugLogs.slice(-5)
+            recent_logs: debugLogs.slice(-5),
+            env_check,
+            token_preview
           }),
           { headers: { 'Content-Type': 'application/json' } }
         );
@@ -479,12 +526,22 @@ export default {
         zoomApiDetail = err.message || '不明なエラー';
       }
 
+      const { env_check, token_preview } = checkEnvVariables(env);
+
       const recentLogs = debugLogs.slice(-50).reverse();
       const errorLogs = debugLogs.filter(l => l.includes('[ERROR]')).slice(-20);
       const progressPercent = queue.length > 0 ? Math.round((currentIndex / queue.length) * 100) : 0;
       const lastUploadSummary = lastUploadResult
         ? `${lastUploadResult.filename} (${lastUploadResult.validCount}件通過 / ${lastUploadResult.invalidCount}件除外)`
         : 'なし';
+
+      // 環境変数チェックHTML生成
+      const envCheckRows = Object.entries(env_check).map(([key, value]) => {
+        let colorClass = 'text-rose-400';
+        if (value.startsWith('✅')) colorClass = 'text-emerald-400';
+        else if (value.startsWith('⚠️')) colorClass = 'text-amber-400';
+        return `<tr class="border-b border-slate-700"><td class="py-2 px-3 text-slate-300 font-mono text-xs">${key}</td><td class="py-2 px-3 ${colorClass} text-xs font-medium">${value}</td></tr>`;
+      }).join('');
 
       const html = `<!DOCTYPE html>
 <html lang="ja">
@@ -525,6 +582,37 @@ export default {
         <p class="text-xs text-slate-400 font-medium mb-1">Zoom API接続</p>
         <p class="text-sm font-bold">${zoomApiStatus}</p>
         <p class="text-xs text-slate-500 mt-1">${zoomApiDetail}</p>
+      </div>
+    </div>
+
+    <!-- 環境変数チェック -->
+    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-8">
+      <h2 class="text-base font-bold mb-3 text-white">🔑 環境変数チェック</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-slate-600">
+              <th class="py-2 px-3 text-slate-400 font-medium text-xs">変数名</th>
+              <th class="py-2 px-3 text-slate-400 font-medium text-xs">状態</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${envCheckRows}
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4 pt-4 border-t border-slate-700">
+        <p class="text-xs text-slate-400 font-medium mb-2">トークンリクエスト用プレビュー</p>
+        <div class="grid grid-cols-2 gap-4 text-xs">
+          <div>
+            <span class="text-slate-500">accountId:</span>
+            <span class="text-slate-300 font-mono ml-2">${token_preview.accountId}</span>
+          </div>
+          <div>
+            <span class="text-slate-500">clientId:</span>
+            <span class="text-slate-300 font-mono ml-2">${token_preview.clientId}</span>
+          </div>
+        </div>
       </div>
     </div>
 
