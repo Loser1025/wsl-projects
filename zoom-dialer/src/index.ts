@@ -95,9 +95,14 @@ export default {
         const seen = new Set<string>();
 
         for (const match of matches) {
-          const cleaned = match.replace(/\D/g, '');
+          let cleaned = match.replace(/\D/g, '');
           let valid = true;
           let reason: string | undefined;
+
+          // +81 プレフィックスの名残（81始まり）を 0 始まりに正規化
+          if (cleaned.startsWith('81') && cleaned.length >= 11) {
+            cleaned = '0' + cleaned.slice(2);
+          }
 
           if (!cleaned.startsWith('0')) { valid = false; reason = '0で始まらない'; }
           else if (cleaned.length < 10 || cleaned.length > 11) { valid = false; reason = `桁数不足(${cleaned.length}桁)`; }
@@ -153,10 +158,12 @@ export default {
           return new Response(data, { headers: { 'Content-Type': 'application/json' } });
         }
 
-        const zoomUrl = queue[currentIndex]; // zoomphonecall://+81...
+        const zoomUrl = queue[currentIndex] || null;
+        // next_phone が +81 重複していた場合は正規化
+        const normalizedPhone = nextPhone ? '+81' + nextPhone.replace('+81', '') : null;
         const data = JSON.stringify({
           done: false,
-          phone: nextPhone,
+          phone: normalizedPhone,
           zoomphonecall_url: zoomUrl,
           index: currentIndex,
           total: queue.length
@@ -220,7 +227,8 @@ export default {
           const queue = JSON.parse(queueRaw);
 
           if (nextIndex < queue.length) {
-            const nextPhone = '+81' + queue[nextIndex].replace('zoomphonecall://+81', '');
+            const rawNum = queue[nextIndex].replace('zoomphonecall://+81', '');
+            const nextPhone = '+81' + rawNum.replace('+81', '');
             await env.PHONE_STORE.put('next_phone', nextPhone);
             addLog(`[webhook] 次番号セット: index=${nextIndex}, ${maskPhoneNumber(nextPhone)}`);
           } else {
@@ -258,7 +266,8 @@ export default {
         await env.PHONE_STORE.put('current_index', String(nextIndex));
 
         if (nextIndex < queue.length) {
-          const nextPhone = '+81' + queue[nextIndex].replace('zoomphonecall://+81', '');
+          const rawNum = queue[nextIndex].replace('zoomphonecall://+81', '');
+          const nextPhone = '+81' + rawNum.replace('+81', '');
           await env.PHONE_STORE.put('next_phone', nextPhone);
         } else {
           await env.PHONE_STORE.put('system_status', 'stopped');
@@ -284,7 +293,8 @@ export default {
         await env.PHONE_STORE.put('system_status', 'running');
         await env.PHONE_STORE.delete('next_phone');
         if (queue.length > 0) {
-          const firstPhone = '+81' + queue[0].replace('zoomphonecall://+81', '');
+          const rawNum = queue[0].replace('zoomphonecall://+81', '');
+          const firstPhone = '+81' + rawNum.replace('+81', '');
           await env.PHONE_STORE.put('next_phone', firstPhone);
         }
         addLog('[reset] リセット完了');
