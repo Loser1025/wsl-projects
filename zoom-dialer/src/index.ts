@@ -701,12 +701,15 @@ async function getZoomToken(env: Env): Promise<string> {
 
 async function triggerZoomCall(token: string, userId: string, phoneNumber: string) {
   try {
-    const url = `https://api.zoom.us/v2/phone/users/${userId}/commands/dial`;
+    const url = `https://api.zoom.us/v2/phone/commands/dial`;
     addLog(`[triggerZoomCall] APIリクエスト: ${maskPhoneNumber(phoneNumber)}`);
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ call_number: phoneNumber })
+      body: JSON.stringify({
+        user_id: userId,
+        call_number: phoneNumber
+      })
     });
     const responseText = await response.text();
     if (!response.ok) {
