@@ -286,18 +286,13 @@ export default {
     // ==========================================
     if (url.pathname === '/reset' && request.method === 'POST') {
       try {
-        const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
-        const queue = JSON.parse(queueRaw);
+        // 全データをクリア（完全リセット）
+        await env.PHONE_STORE.put('queue', '[]');
         await env.PHONE_STORE.put('current_index', '0');
         await env.PHONE_STORE.put('results', '[]');
-        await env.PHONE_STORE.put('system_status', 'running');
+        await env.PHONE_STORE.put('system_status', 'stopped');
         await env.PHONE_STORE.delete('next_phone');
-        if (queue.length > 0) {
-          const rawNum = queue[0].replace('zoomphonecall://+81', '');
-          const firstPhone = '+81' + rawNum.replace('+81', '');
-          await env.PHONE_STORE.put('next_phone', firstPhone);
-        }
-        addLog('[reset] リセット完了');
+        addLog('[reset] 完全リセット完了');
         return new Response(null, { status: 302, headers: { 'Location': '/' } });
       } catch (err: any) {
         return new Response('エラー: ' + err.message, { status: 500 });
