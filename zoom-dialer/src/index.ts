@@ -1,3 +1,29 @@
+﻿// ==========================================
+// デバッグログ機構
+// ==========================================
+
+const debugLogs: string[] = [];
+
+function maskPhoneNumber(phone: string): string {
+  if (phone.length <= 4) return '****';
+  return phone.slice(0, 3) + '****' + phone.slice(-4);
+}
+
+function formatTime(date: Date): string {
+  const h = date.getHours().toString().padStart(2, '0');
+  const m = date.getMinutes().toString().padStart(2, '0');
+  const s = date.getSeconds().toString().padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
+function addLog(message: string): void {
+  const entry = `[${formatTime(new Date())}] ${message}`;
+  debugLogs.push(entry);
+  if (debugLogs.length > 100) {
+    debugLogs.shift();
+  }
+}
+
 export interface Env {
   PHONE_STORE: KVNamespace;
   ZOOM_ACCOUNT_ID: string;
@@ -23,6 +49,8 @@ export default {
       const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
       const results = JSON.parse(resultsRaw).reverse();
 
+      addLog(`[dashboard] 表示: status=${systemStatus}, index=${currentIndex}, results=${results.length}件`);
+
       const html = getAdminDashboardHTML(queue.length, currentIndex, systemStatus, results);
       return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
@@ -31,106 +59,161 @@ export default {
     // 2. CSVアップロード処理 (POST /upload)
     // ==========================================
     if (url.pathname === '/upload' && request.method === 'POST') {
-      const formData = await request.formData();
-      const file = formData.get('csv') as File | null;
-      if (!file) return new Response('CSVファイルがありません', { status: 400 });
-
-      const csvText = await file.text();
-      const phonePattern = /(?:0\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{4})/g;
-      const matches = csvText.match(phonePattern) || [];
-      
-      const cleanNumbers: string[] = [];
-      for (const match of matches) {
-        const cleanNum = match.replace(/\D/g, '');
-        if ((cleanNum.length === 10 || cleanNum.length === 11) && cleanNum.startsWith('0')) {
-          const zoomFormat = '+81' + cleanNum.slice(1);
-          if (!cleanNumbers.includes(zoomFormat)) cleanNumbers.push(zoomFormat);
+      try {
+        addLog('[upload] リクエスト受信');
+        const formData = await request.formData();
+        const file = formData.get('csv') as File | null;
+        if (!file) {
+          console.error('[ERROR] CSVファイルがフォームに含まれていません');
+          addLog('[upload] ERROR: ファイルなし');
+          return new Response('CSVファイルがありません', { status: 400 });
         }
+
+        addLog(`[upload] ファイル受信: name=${file.name}, size=${file.size}bytes`);
+        const csvText = await file.text();
+        const phonePattern = /(?:0\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{4})/g;
+        const matches = csvText.match(phonePattern) || [];
+        addLog(`[upload] 正規表現マッチ件数: ${matches.length}`);
+
+        const cleanNumbers: string[] = [];
+        let excludedCount = 0;
+        for (const match of matches) {
+          const cleanNum = match.replace(/\D/g, '');
+          if ((cleanNum.length === 10 || cleanNum.length === 11) && cleanNum.startsWith('0')) {
+            const zoomFormat = '+81' + cleanNum.slice(1);
+            if (!cleanNumbers.includes(zoomFormat)) cleanNumbers.push(zoomFormat);
+          } else {
+            excludedCount++;
+          }
+        }
+        addLog(`[upload] バリデーション通過: ${cleanNumbers.length}件, 除外: ${excludedCount}件`);
+
+        if (cleanNumbers.length === 0) {
+          addLog('[upload] ERROR: 有効な電話番号が0件');
+          return new Response('<script>alert("有効な電話番号が見つかりませんでした。"); location.href="/";</script>', { headers: { 'Content-Type': 'text/html' } });
+        }
+
+        await env.PHONE_STORE.put('queue', JSON.stringify(cleanNumbers));
+        await env.PHONE_STORE.put('results', JSON.stringify([]));
+        await env.PHONE_STORE.put('current_index', '0');
+        await env.PHONE_STORE.put('system_status', 'running');
+        addLog(`[upload] KV保存完了: queue=${cleanNumbers.length}件, current_index=0, status=running`);
+
+        const token = await getZoomToken(env);
+        addLog(`[upload] 初回架電を開始: ${maskPhoneNumber(cleanNumbers[0])}`);
+        await triggerZoomCall(token, env.ZOOM_USER_ID, cleanNumbers[0]);
+
+        addLog('[upload] 処理完了 → リダイレクト');
+        return Response.redirect(url.origin, 303);
+      } catch (err: any) {
+        console.error('[ERROR] upload 処理で例外:', err.message, err.stack);
+        addLog(`[upload] ERROR: ${err.message}`);
+        return new Response(
+          `<script>alert("アップロード処理中にエラーが発生しました: ${err.message}"); location.href="/";</script>`,
+          { headers: { 'Content-Type': 'text/html' }, status: 500 }
+        );
       }
-
-      if (cleanNumbers.length === 0) {
-        return new Response('<script>alert("有効な電話番号が見つかりませんでした。"); location.href="/";</script>', { headers: { 'Content-Type': 'text/html' } });
-      }
-
-      await env.PHONE_STORE.put('queue', JSON.stringify(cleanNumbers));
-      await env.PHONE_STORE.put('results', JSON.stringify([]));
-      await env.PHONE_STORE.put('current_index', '0');
-      await env.PHONE_STORE.put('system_status', 'running');
-
-      const token = await getZoomToken(env);
-      await triggerZoomCall(token, env.ZOOM_USER_ID, cleanNumbers[0]);
-
-      return Response.redirect(url.origin, 303);
     }
 
     // ==========================================
     // 3. 一時停止 / 再開の制御 (POST /toggle-status)
     // ==========================================
     if (url.pathname === '/toggle-status' && request.method === 'POST') {
-      const currentStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
-      let newStatus = 'stopped';
+      try {
+        addLog('[toggle-status] リクエスト受信');
+        const currentStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
+        let newStatus = 'stopped';
 
-      if (currentStatus === 'running') {
-        newStatus = 'paused';
-      } else if (currentStatus === 'paused') {
-        newStatus = 'running';
-        
-        const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
-        const queue = JSON.parse(queueRaw);
-        const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
-        const currentIndex = parseInt(currentIndexRaw, 10);
+        if (currentStatus === 'running') {
+          newStatus = 'paused';
+          addLog(`[toggle-status] ${currentStatus} → ${newStatus}`);
+        } else if (currentStatus === 'paused') {
+          newStatus = 'running';
+          addLog(`[toggle-status] ${currentStatus} → ${newStatus}`);
 
-        if (currentIndex < queue.length) {
-          const token = await getZoomToken(env);
-          await triggerZoomCall(token, env.ZOOM_USER_ID, queue[currentIndex]);
+          const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
+          const queue = JSON.parse(queueRaw);
+          const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
+          const currentIndex = parseInt(currentIndexRaw, 10);
+
+          if (currentIndex < queue.length) {
+            addLog(`[toggle-status] 再開: index=${currentIndex}, ${maskPhoneNumber(queue[currentIndex])}`);
+            const token = await getZoomToken(env);
+            await triggerZoomCall(token, env.ZOOM_USER_ID, queue[currentIndex]);
+          } else {
+            addLog('[toggle-status] キュー終了済みのため架電不要');
+          }
+        } else {
+          addLog(`[toggle-status] ${currentStatus} → stopped (デフォルト)`);
         }
-      }
 
-      await env.PHONE_STORE.put('system_status', newStatus);
-      return Response.redirect(url.origin, 303);
+        await env.PHONE_STORE.put('system_status', newStatus);
+        return Response.redirect(url.origin, 303);
+      } catch (err: any) {
+        console.error('[ERROR] toggle-status 処理で例外:', err.message, err.stack);
+        addLog(`[toggle-status] ERROR: ${err.message}`);
+        return Response.redirect(url.origin, 303);
+      }
     }
 
     // ==========================================
     // 4. Zoom Webhook受付 (POST /webhook)
     // ==========================================
     if (url.pathname === '/webhook' && request.method === 'POST') {
-      const body = await request.json() as any;
+      try {
+        addLog('[webhook] リクエスト受信');
+        const body = await request.json() as any;
+        addLog(`[webhook] イベント種別: ${body.event}`);
 
-      if (body.event === 'endpoint.url_validation') {
-        const encryptedToken = await cryptoHmacSha256(body.payload.plainToken, env.ZOOM_WEBHOOK_SECRET);
-        return new Response(JSON.stringify({ plainToken: body.payload.plainToken, encryptedToken }), {
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
-      if (body.event === 'phone.call_ended') {
-        const callLog = body.payload.object;
-        const lastPhone = callLog.callee_number_number || callLog.caller_number_number;
-        const resultStatus = callLog.result;
-        const statusJapanese = resultStatus === 'completed' ? 'コネクト' : '不在/応答なし';
-
-        const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
-        const results = JSON.parse(resultsRaw);
-        results.push({ phone_number: lastPhone, result: statusJapanese, time: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) });
-        await env.PHONE_STORE.put('results', JSON.stringify(results));
-
-        const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
-        const nextIndex = parseInt(currentIndexRaw, 10) + 1;
-        await env.PHONE_STORE.put('current_index', nextIndex.toString());
-
-        const systemStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
-        const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
-        const queue = JSON.parse(queueRaw);
-
-        if (systemStatus === 'running' && nextIndex < queue.length) {
-          const nextPhone = queue[nextIndex];
-          const token = await getZoomToken(env);
-          await triggerZoomCall(token, env.ZOOM_USER_ID, nextPhone);
-        } else if (nextIndex >= queue.length) {
-          await env.PHONE_STORE.put('system_status', 'stopped');
+        if (body.event === 'endpoint.url_validation') {
+          addLog('[webhook] URL検証リクエストを処理');
+          const encryptedToken = await cryptoHmacSha256(body.payload.plainToken, env.ZOOM_WEBHOOK_SECRET);
+          return new Response(JSON.stringify({ plainToken: body.payload.plainToken, encryptedToken }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
 
-        return new Response('Webhook Processed', { status: 200 });
+        if (body.event === 'phone.call_ended') {
+          const callLog = body.payload.object;
+          const lastPhone = callLog.callee_number_number || callLog.caller_number_number;
+          const resultStatus = callLog.result;
+          const statusJapanese = resultStatus === 'completed' ? 'コネクト' : '不在/応答なし';
+          addLog(`[webhook] 通話終了: ${maskPhoneNumber(lastPhone)}, 結果=${statusJapanese}`);
+
+          const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
+          const results = JSON.parse(resultsRaw);
+          results.push({ phone_number: lastPhone, result: statusJapanese, time: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) });
+          await env.PHONE_STORE.put('results', JSON.stringify(results));
+
+          const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
+          const nextIndex = parseInt(currentIndexRaw, 10) + 1;
+          await env.PHONE_STORE.put('current_index', nextIndex.toString());
+
+          const systemStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
+          const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
+          const queue = JSON.parse(queueRaw);
+
+          if (systemStatus === 'running' && nextIndex < queue.length) {
+            const nextPhone = queue[nextIndex];
+            addLog(`[webhook] 次番号へ遷移: index=${nextIndex}, ${maskPhoneNumber(nextPhone)}`);
+            const token = await getZoomToken(env);
+            await triggerZoomCall(token, env.ZOOM_USER_ID, nextPhone);
+          } else if (nextIndex >= queue.length) {
+            await env.PHONE_STORE.put('system_status', 'stopped');
+            addLog('[webhook] キュー消化完了 → system_status=stopped');
+          } else {
+            addLog(`[webhook] 架電スキップ: status=${systemStatus}, nextIndex=${nextIndex}`);
+          }
+
+          return new Response('Webhook Processed', { status: 200 });
+        }
+
+        addLog(`[webhook] 未処理イベント: ${body.event}`);
+        return new Response('Event Ignored', { status: 200 });
+      } catch (err: any) {
+        console.error('[ERROR] webhook 処理で例外:', err.message, err.stack);
+        addLog(`[webhook] ERROR: ${err.message}`);
+        return new Response('Internal Server Error', { status: 500 });
       }
     }
 
@@ -138,20 +221,81 @@ export default {
     // 5. 結果CSVのダウンロード (GET /results)
     // ==========================================
     if (url.pathname === '/results' && request.method === 'GET') {
-      const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
-      const results = JSON.parse(resultsRaw);
+      try {
+        addLog('[results] リクエスト受信');
+        const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
+        const results = JSON.parse(resultsRaw);
+        addLog(`[results] 結果件数: ${results.length}件`);
 
-      let csvString = '﻿電話番号,結果,架電日時\n';
-      for (const row of results) {
-        csvString += `"${row.phone_number}","${row.result}","${row.time}"\n`;
-      }
-
-      return new Response(csvString, {
-        headers: {
-          'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': 'attachment; filename="zoom_call_results.csv"'
+        let csvString = '﻿電話番号,結果,架電日時\n';
+        for (const row of results) {
+          csvString += `"${row.phone_number}","${row.result}","${row.time}"\n`;
         }
-      });
+
+        return new Response(csvString, {
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': 'attachment; filename="zoom_call_results.csv"'
+          }
+        });
+      } catch (err: any) {
+        console.error('[ERROR] results 処理で例外:', err.message, err.stack);
+        addLog(`[results] ERROR: ${err.message}`);
+        return new Response('Error generating CSV', { status: 500 });
+      }
+    }
+
+    // ==========================================
+    // 6. デバッグ用APIエンドポイント
+    // ==========================================
+
+    // GET /debug/logs — 全ログを返す
+    if (url.pathname === '/debug/logs' && request.method === 'GET') {
+      addLog('[debug] /debug/logs リクエスト受信');
+      return new Response(
+        JSON.stringify({ logs: debugLogs, count: debugLogs.length }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // GET /debug/status — システム状態サマリー + 最新5件ログ
+    if (url.pathname === '/debug/status' && request.method === 'GET') {
+      try {
+        const systemStatus = await env.PHONE_STORE.get('system_status') || 'stopped';
+        const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
+        const currentIndex = parseInt(currentIndexRaw, 10);
+        const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
+        const queue = JSON.parse(queueRaw);
+        const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
+        const results = JSON.parse(resultsRaw);
+
+        return new Response(
+          JSON.stringify({
+            system_status: systemStatus,
+            current_index: currentIndex,
+            queue_length: queue.length,
+            results_length: results.length,
+            recent_logs: debugLogs.slice(-5)
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+      } catch (err: any) {
+        console.error('[ERROR] debug/status 例外:', err.message);
+        return new Response(
+          JSON.stringify({ error: err.message }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // POST /debug/clear-logs — ログを全消去
+    if (url.pathname === '/debug/clear-logs' && request.method === 'POST') {
+      debugLogs.length = 0;
+      addLog('[debug] ログを消去');
+      return new Response(
+        JSON.stringify({ message: 'Logs cleared', count: 0 }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
     return new Response('Not Found', { status: 404 });
@@ -159,23 +303,49 @@ export default {
 };
 
 async function getZoomToken(env: Env): Promise<string> {
-  const url = `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${env.ZOOM_ACCOUNT_ID}`;
-  const credentials = btoa(`${env.ZOOM_CLIENT_ID}:${env.ZOOM_CLIENT_SECRET}`);
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' }
-  });
-  const data = await response.json() as any;
-  return data.access_token;
+  try {
+    addLog('[getZoomToken] トークン取得リクエスト送信');
+    const url = `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${env.ZOOM_ACCOUNT_ID}`;
+    const credentials = btoa(`${env.ZOOM_CLIENT_ID}:${env.ZOOM_CLIENT_SECRET}`);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+    const data = await response.json() as any;
+    if (!response.ok) {
+      console.error(`[ERROR] getZoomToken: status=${response.status}, body=${JSON.stringify(data)}`);
+      addLog(`[getZoomToken] ERROR: status=${response.status}, error=${data.error || 'unknown'}`);
+      throw new Error(`Zoom OAuth failed: ${response.status}`);
+    }
+    addLog(`[getZoomToken] トークン取得成功`);
+    return data.access_token;
+  } catch (err: any) {
+    console.error('[ERROR] getZoomToken 例外:', err.message, err.stack);
+    addLog(`[getZoomToken] ERROR: ${err.message}`);
+    throw err;
+  }
 }
 
 async function triggerZoomCall(token: string, userId: string, phoneNumber: string) {
-  const url = `https://api.zoom.us/v2/phone/users/${userId}/commands/dial`;
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ call_number: phoneNumber })
-  });
+  try {
+    const url = `https://api.zoom.us/v2/phone/users/${userId}/commands/dial`;
+    addLog(`[triggerZoomCall] APIリクエスト: ${maskPhoneNumber(phoneNumber)}`);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ call_number: phoneNumber })
+    });
+    const responseText = await response.text();
+    if (!response.ok) {
+      console.error(`[ERROR] triggerZoomCall: status=${response.status}, body=${responseText}`);
+      addLog(`[triggerZoomCall] ERROR: status=${response.status}, body=${responseText}`);
+    } else {
+      addLog(`[triggerZoomCall] 成功: status=${response.status}`);
+    }
+  } catch (err: any) {
+    console.error('[ERROR] triggerZoomCall 例外:', err.message, err.stack);
+    addLog(`[triggerZoomCall] ERROR: ${err.message}`);
+  }
 }
 
 async function cryptoHmacSha256(plainToken: string, secret: string): Promise<string> {
