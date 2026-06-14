@@ -196,20 +196,13 @@ export default {
       try {
         const body = await request.json() as any;
         const eventType = body.event;
-
-        addLog(`[webhook] イベント: ${eventType}`);
-        saveLogToKV(env, `[webhook] イベント: ${eventType}`);
+        saveLogToKV(env, '[webhook] event=' + eventType);
+        console.log('[webhook] event=' + eventType);
 
         if (eventType === 'endpoint.url_validation') {
           const plainToken = body.payload.plainToken;
           const secret = env.ZOOM_WEBHOOK_SECRET;
-          const cryptoKey = await crypto.subtle.importKey(
-            'raw',
-            new TextEncoder().encode(secret),
-            { name: 'HMAC', hash: 'SHA-256' },
-            false,
-            ['sign']
-          );
+          const cryptoKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
           const signature = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(plainToken));
           const encryptedToken = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
           return new Response(JSON.stringify({ plainToken, encryptedToken }), { headers: { 'Content-Type': 'application/json' } });
@@ -217,25 +210,21 @@ export default {
 
         if (eventType === 'phone.call_ended' || eventType === 'phone_call_ended') {
           const payload = body.payload?.object || body.payload || {};
+          saveLogToKV(env, '[webhook] payload=' + JSON.stringify(payload).slice(0, 200));
+          console.log('[webhook] payload=' + JSON.stringify(payload).slice(0, 200));
+
           const calleeNumber = payload.callee_number_number || payload.callee?.phone_number || payload.to?.phone_number || '';
           const duration = payload.duration || payload.talk_time || 0;
-          const connected = duration > 0;
-          const resultStr = connected ? 'コネクト' : '不在/応答なし';
+          const resultStr = duration > 0 ? 'コネクト' : '不在/応答なし';
 
-          addLog(`[webhook] 通話終了: ${maskPhoneNumber(calleeNumber)}, ${resultStr}, ${duration}s`);
-          saveLogToKV(env, `[webhook] 通話終了: ${maskPhoneNumber(calleeNumber)}, ${resultStr}, ${duration}s`);
+          addLog('[webhook] call ended: ' + maskPhoneNumber(calleeNumber) + ', ' + resultStr + ', ' + duration + 's');
+          saveLogToKV(env, '[webhook] call ended: ' + maskPhoneNumber(calleeNumber) + ', ' + resultStr + ', ' + duration + 's');
 
-          // 結果を保存
           const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
           const results = JSON.parse(resultsRaw);
-          results.push({
-            phone_number: calleeNumber,
-            result: resultStr,
-            time: new Date().toISOString()
-          });
+          results.push({ phone_number: calleeNumber, result: resultStr, time: new Date().toISOString() });
           await env.PHONE_STORE.put('results', JSON.stringify(results));
 
-          // 次の番号へ進む
           const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
           const nextIndex = parseInt(currentIndexRaw, 10) + 1;
           await env.PHONE_STORE.put('current_index', String(nextIndex));
@@ -243,24 +232,29 @@ export default {
           const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
           const queue = JSON.parse(queueRaw);
 
+          let nextPhone = null;
           if (nextIndex < queue.length) {
             const rawNum = queue[nextIndex].replace('zoomphonecall://+81', '');
-            const nextPhone = '+81' + rawNum.replace('+81', '');
+            nextPhone = '+81' + rawNum.replace('+81', '');
             await env.PHONE_STORE.put('next_phone', nextPhone);
-            addLog(`[webhook] 次番号セット: index=${nextIndex}, ${maskPhoneNumber(nextPhone)}`);
-            saveLogToKV(env, `[webhook] 次番号セット: index=${nextIndex}, ${maskPhoneNumber(nextPhone)}`);
+            addLog('[webhook] next phone set: ' + maskPhoneNumber(nextPhone));
+            saveLogToKV(env, '[webhook] next phone set: ' + maskPhoneNumber(nextPhone));
           } else {
             await env.PHONE_STORE.put('system_status', 'stopped');
             await env.PHONE_STORE.delete('next_phone');
-            addLog('[webhook] 全番号完了 → stopped');
-            saveLogToKV(env, '[webhook] 全番号完了 → stopped');
+            addLog('[webhook] all done -> stopped');
+            saveLogToKV(env, '[webhook] all done -> stopped');
           }
+
+          const respData = { ok: true, nextIndex: nextIndex, queueLen: queue.length, nextPhone: nextPhone };
+          return new Response(JSON.stringify(respData), { headers: { 'Content-Type': 'application/json' } });
         }
 
         return new Response('OK');
       } catch (err: any) {
-        addLog(`[webhook] ERROR: ${err.message}`);
-        saveLogToKV(env, `[webhook] ERROR: ${err.message}`);
+        addLog('[webhook] ERROR: ' + err.message);
+        saveLogToKV(env, '[webhook] ERROR: ' + err.message);
+        console.error('[webhook] ERROR:', err.message);
         return new Response('OK');
       }
     }
