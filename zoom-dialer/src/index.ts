@@ -2,7 +2,39 @@
 // デバッグログ機構
 // ==========================================
 
+// ==========================================
+// デバッグログ機構
+// ==========================================
+
 const debugLogs: string[] = [];
+
+// ==========================================
+// アップロードデバッグ結果の型定義
+// ==========================================
+
+interface PhoneValidationDetail {
+  raw: string;
+  cleaned: string;
+  digitCount: number;
+  valid: boolean;
+  reason?: string;
+}
+
+interface UploadDebugResult {
+  timestamp: string;
+  filename: string;
+  fileSize: number;
+  csvPreview: string;
+  totalMatched: number;
+  validCount: number;
+  invalidCount: number;
+  invalidReasons: Record<string, number>;
+  firstFewValid: string[];
+  sampleRawMatches: string[];
+  validationDetails: PhoneValidationDetail[];
+  success: boolean;
+  errorMessage?: string;
+}
 
 function maskPhoneNumber(phone: string): string {
   if (phone.length <= 4) return '****';
@@ -49,9 +81,20 @@ export default {
       const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
       const results = JSON.parse(resultsRaw).reverse();
 
+      // 最終アップロード結果を取得
+      const lastUploadResultRaw = await env.PHONE_STORE.get('last_upload_result');
+      let lastUploadResult: UploadDebugResult | null = null;
+      if (lastUploadResultRaw) {
+        try {
+          lastUploadResult = JSON.parse(lastUploadResultRaw);
+        } catch {
+          // パースエラーは無視
+        }
+      }
+
       addLog(`[dashboard] 表示: status=${systemStatus}, index=${currentIndex}, results=${results.length}件`);
 
-      const html = getAdminDashboardHTML(queue.length, currentIndex, systemStatus, results);
+      const html = getAdminDashboardHTML(queue.length, currentIndex, systemStatus, results, lastUploadResult);
       return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
 
@@ -71,43 +114,150 @@ export default {
 
         addLog(`[upload] ファイル受信: name=${file.name}, size=${file.size}bytes`);
         const csvText = await file.text();
+        const csvPreview = csvText.slice(0, 200);
         const phonePattern = /(?:0\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{4})/g;
         const matches = csvText.match(phonePattern) || [];
         addLog(`[upload] 正規表現マッチ件数: ${matches.length}`);
 
+        // ==========================================
+        // バリデーション詳細の記録
+        // ==========================================
+        const validationDetails: PhoneValidationDetail[] = [];
+        const invalidReasons: Record<string, number> = {};
         const cleanNumbers: string[] = [];
-        let excludedCount = 0;
+        const seenNumbers = new Set<string>();
+
         for (const match of matches) {
           const cleanNum = match.replace(/\D/g, '');
-          if ((cleanNum.length === 10 || cleanNum.length === 11) && cleanNum.startsWith('0')) {
+          const digitCount = cleanNum.length;
+
+          // バリデーション理由の判定
+          let valid = true;
+          let reason: string | undefined;
+
+          if (digitCount < 10) {
+            valid = false;
+            reason = '桁数不足';
+          } else if (digitCount > 11) {
+            valid = false;
+            reason = '桁数超過';
+          } else if (!cleanNum.startsWith('0')) {
+            valid = false;
+            reason = '0で始まらない';
+          }
+
+          if (valid) {
             const zoomFormat = '+81' + cleanNum.slice(1);
-            if (!cleanNumbers.includes(zoomFormat)) cleanNumbers.push(zoomFormat);
+            if (seenNumbers.has(zoomFormat)) {
+              valid = false;
+              reason = '重複';
+            } else {
+              seenNumbers.add(zoomFormat);
+            }
+          }
+
+          validationDetails.push({
+            raw: match,
+            cleaned: cleanNum,
+            digitCount,
+            valid,
+            reason
+          });
+
+          if (valid) {
+            cleanNumbers.push(match.replace(/\D/g, '').replace(/^0/, '+81'));
           } else {
-            excludedCount++;
+            invalidReasons[reason!] = (invalidReasons[reason!] || 0) + 1;
           }
         }
-        addLog(`[upload] バリデーション通過: ${cleanNumbers.length}件, 除外: ${excludedCount}件`);
 
-        if (cleanNumbers.length === 0) {
-          addLog('[upload] ERROR: 有効な電話番号が0件');
-          return new Response('<script>alert("有効な電話番号が見つかりませんでした。"); location.href="/";</script>', { headers: { 'Content-Type': 'text/html' } });
+        // 重複排除後の cleanNumbers を再構築（+81形式）
+        const finalCleanNumbers = cleanNumbers.map(n => {
+          // 既に +81 形式になっているはず
+          return n.startsWith('+81') ? n : '+81' + n.slice(1);
+        });
+
+        addLog(`[upload] バリデーション通過: ${finalCleanNumbers.length}件, 除外: ${Object.values(invalidReasons).reduce((a, b) => a + b, 0)}件`);
+
+        // ==========================================
+        // デバッグ結果の構築
+        // ==========================================
+        const debugResult: UploadDebugResult = {
+          timestamp: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+          filename: file.name,
+          fileSize: file.size,
+          csvPreview,
+          totalMatched: matches.length,
+          validCount: finalCleanNumbers.length,
+          invalidCount: Object.values(invalidReasons).reduce((a, b) => a + b, 0),
+          invalidReasons,
+          firstFewValid: finalCleanNumbers.slice(0, 3).map(n => maskPhoneNumber(n)),
+          sampleRawMatches: matches.slice(0, 5),
+          validationDetails,
+          success: finalCleanNumbers.length > 0
+        };
+
+        if (finalCleanNumbers.length === 0) {
+          debugResult.success = false;
+          debugResult.errorMessage = matches.length === 0
+            ? '正規表現にマッチする電話番号がCSV内に見つかりませんでした'
+            : `正規表現マッチ ${matches.length} 件のうち、バリデーション通過が0件でした`;
+
+          // 失敗結果をKVに保存
+          await env.PHONE_STORE.put('last_upload_result', JSON.stringify(debugResult));
+          addLog(`[upload] ERROR: ${debugResult.errorMessage}`);
+
+          return new Response(
+            `<script>
+              alert("有効な電話番号が見つかりませんでした。\\n\\nマッチ数: ${matches.length}件\\n通過: 0件\\n\\nCSV先頭200文字:\\n${csvPreview.replace(/'/g, "\\'").replace(/\n/g, '\\n')}");
+              location.href="/";
+            </script>`,
+            { headers: { 'Content-Type': 'text/html' } }
+          );
         }
 
-        await env.PHONE_STORE.put('queue', JSON.stringify(cleanNumbers));
+        // 成功時: 正しい+81形式で保存
+        const zoomFormatNumbers = finalCleanNumbers.map(n => {
+          const digits = n.replace(/\D/g, ''); // 数字のみ
+          return '+81' + digits.slice(1); // 先頭の0を+81に
+        });
+
+        await env.PHONE_STORE.put('queue', JSON.stringify(zoomFormatNumbers));
         await env.PHONE_STORE.put('results', JSON.stringify([]));
         await env.PHONE_STORE.put('current_index', '0');
         await env.PHONE_STORE.put('system_status', 'running');
-        addLog(`[upload] KV保存完了: queue=${cleanNumbers.length}件, current_index=0, status=running`);
+        // 成功結果をKVに保存
+        await env.PHONE_STORE.put('last_upload_result', JSON.stringify(debugResult));
+        addLog(`[upload] KV保存完了: queue=${zoomFormatNumbers.length}件, current_index=0, status=running`);
 
         const token = await getZoomToken(env);
-        addLog(`[upload] 初回架電を開始: ${maskPhoneNumber(cleanNumbers[0])}`);
-        await triggerZoomCall(token, env.ZOOM_USER_ID, cleanNumbers[0]);
+        addLog(`[upload] 初回架電を開始: ${maskPhoneNumber(zoomFormatNumbers[0])}`);
+        await triggerZoomCall(token, env.ZOOM_USER_ID, zoomFormatNumbers[0]);
 
         addLog('[upload] 処理完了 → リダイレクト');
         return Response.redirect(url.origin, 303);
       } catch (err: any) {
         console.error('[ERROR] upload 処理で例外:', err.message, err.stack);
         addLog(`[upload] ERROR: ${err.message}`);
+
+        // エラー結果をKVに保存
+        const errorDebugResult: UploadDebugResult = {
+          timestamp: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+          filename: 'unknown',
+          fileSize: 0,
+          csvPreview: '',
+          totalMatched: 0,
+          validCount: 0,
+          invalidCount: 0,
+          invalidReasons: {},
+          firstFewValid: [],
+          sampleRawMatches: [],
+          validationDetails: [],
+          success: false,
+          errorMessage: err.message
+        };
+        await env.PHONE_STORE.put('last_upload_result', JSON.stringify(errorDebugResult));
+
         return new Response(
           `<script>alert("アップロード処理中にエラーが発生しました: ${err.message}"); location.href="/";</script>`,
           { headers: { 'Content-Type': 'text/html' }, status: 500 }
@@ -355,10 +505,93 @@ async function cryptoHmacSha256(plainToken: string, secret: string): Promise<str
   return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function getAdminDashboardHTML(total: number, current: number, status: string, results: any[]): string {
+function getAdminDashboardHTML(total: number, current: number, status: string, results: any[], uploadResult: UploadDebugResult | null = null): string {
   const statusLabels: Record<string, string> = { running: '🟢 稼働中 (自動発信中)', paused: '🟡 一時停止中', stopped: '⚪ 停止・未開始' };
   const statusBtnTexts: Record<string, string> = { running: '一時停止する', paused: '自動架電を再開する', stopped: 'リスト未読み込み' };
   const btnColor = status === 'running' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-500 hover:bg-emerald-600';
+
+  // 最終アップロード結果セクションのHTML生成
+  let uploadResultHTML = '';
+  if (uploadResult) {
+    const resultColor = uploadResult.success ? 'border-emerald-200 bg-emerald-50/30' : 'border-rose-200 bg-rose-50/30';
+    const resultIcon = uploadResult.success ? '✅' : '❌';
+    const resultTitle = uploadResult.success ? '最終アップロード結果（成功）' : '最終アップロード結果（失敗）';
+
+    // 除外理由の内訳
+    const invalidReasonsHTML = Object.keys(uploadResult.invalidReasons).length > 0
+      ? Object.entries(uploadResult.invalidReasons).map(([reason, count]) =>
+          `<span class="inline-block bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-xs mr-1 mb-1">${reason}: ${count}件</span>`
+        ).join('')
+      : '<span class="text-slate-400 text-xs">なし</span>';
+
+    // 有効番号サンプル
+    const firstFewValidHTML = uploadResult.firstFewValid.length > 0
+      ? uploadResult.firstFewValid.map(n => `<span class="inline-block bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs mr-1 mb-1 font-mono">${n}</span>`).join('')
+      : '<span class="text-slate-400 text-xs">なし</span>';
+
+    // マッチした生文字列サンプル
+    const sampleRawMatchesHTML = uploadResult.sampleRawMatches.length > 0
+      ? uploadResult.sampleRawMatches.map(n => `<span class="inline-block bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs mr-1 mb-1 font-mono">${n}</span>`).join('')
+      : '<span class="text-slate-400 text-xs">なし</span>';
+
+    uploadResultHTML = `
+      <div class="bg-white p-6 rounded-xl border ${resultColor} mb-8">
+        <h2 class="text-base font-bold mb-3 text-slate-900">${resultIcon} ${resultTitle}</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div>
+            <p class="text-slate-500 font-medium mb-1">実行日時</p>
+            <p class="text-slate-900">${uploadResult.timestamp}</p>
+          </div>
+          <div>
+            <p class="text-slate-500 font-medium mb-1">ファイル名</p>
+            <p class="text-slate-900">${uploadResult.filename} (${uploadResult.fileSize.toLocaleString()} bytes)</p>
+          </div>
+          <div>
+            <p class="text-slate-500 font-medium mb-1">正規表現マッチ総数</p>
+            <p class="text-slate-900 font-bold">${uploadResult.totalMatched} 件</p>
+          </div>
+          <div>
+            <p class="text-slate-500 font-medium mb-1">バリデーション結果</p>
+            <p class="text-slate-900">
+              <span class="text-emerald-600 font-bold">${uploadResult.validCount} 件通過</span>
+              ${uploadResult.invalidCount > 0 ? ` / <span class="text-rose-600 font-bold">${uploadResult.invalidCount} 件除外</span>` : ''}
+            </p>
+          </div>
+          <div class="md:col-span-2">
+            <p class="text-slate-500 font-medium mb-1">除外理由の内訳</p>
+            <div class="flex flex-wrap">${invalidReasonsHTML}</div>
+          </div>
+          <div class="md:col-span-2">
+            <p class="text-slate-500 font-medium mb-1">有効番号サンプル（先頭3件、マスク表示）</p>
+            <div class="flex flex-wrap">${firstFewValidHTML}</div>
+          </div>
+          <div class="md:col-span-2">
+            <p class="text-slate-500 font-medium mb-1">マッチした生文字列サンプル（先頭5件）</p>
+            <div class="flex flex-wrap">${sampleRawMatchesHTML}</div>
+          </div>
+          <div class="md:col-span-2">
+            <p class="text-slate-500 font-medium mb-1">CSV先頭200文字</p>
+            <pre class="bg-slate-100 p-2 rounded text-xs text-slate-700 overflow-x-auto whitespace-pre-wrap">${uploadResult.csvPreview || '(空)'}</pre>
+          </div>
+          ${uploadResult.errorMessage ? `
+          <div class="md:col-span-2">
+            <p class="text-slate-500 font-medium mb-1">エラーメッセージ</p>
+            <p class="text-rose-600">${uploadResult.errorMessage}</p>
+          </div>
+          ` : ''}
+          ${!uploadResult.success && uploadResult.totalMatched === 0 ? `
+          <div class="md:col-span-2">
+            <p class="text-slate-500 font-medium mb-1">推奨フォーマット</p>
+            <pre class="bg-slate-100 p-2 rounded text-xs text-slate-700">電話番号
+090-1234-5678
+080-9876-5432
+07012345678</pre>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
   
   return `
   <!DOCTYPE html>
@@ -417,6 +650,8 @@ function getAdminDashboardHTML(total: number, current: number, status: string, r
           </button>
         </form>
       </div>
+
+      ${uploadResultHTML}
 
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
