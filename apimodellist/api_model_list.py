@@ -64,8 +64,8 @@ API_CONFIGS = {
             "tokens": "x-ratelimit-limit-tokens-minute",
             "remaining_requests": "x-ratelimit-remaining-req-minute",
             "remaining_tokens": "x-ratelimit-remaining-tokens-minute",
-            "reset_requests": "x-ratelimit-reset-requests",
-            "reset_tokens": "x-ratelimit-reset-tokens",
+            "reset_requests": "x-ratelimit-reset-req-minute",
+            "reset_tokens": "x-ratelimit-reset-tokens-minute",
             "size_limit": "ratelimitbysize-limit",
             "size_remaining": "ratelimitbysize-remaining",
             "size_reset": "ratelimitbysize-reset",
@@ -597,18 +597,54 @@ def fetch_key_info_openrouter(api_name: str = "OpenRouter") -> Dict[str, Any]:
             "rpm_remaining": None,
             "tpm": None,
             "tpm_remaining": None,
-            "message": "APIキーが見つかりませんでした",
+            "message": "APIキーが見つかりませんでした。OpenRouterのレート制限情報を取得するには management key が必要です。通常のAPIキーでは取得できません。",
         }
-    # OpenRouter はレートリミット情報をAPIレスポンスに含めないため、
-    # ダッシュボードでの確認が必要です。
-    return {
-        "status": "unavailable",
-        "rpm": None,
-        "rpm_remaining": None,
-        "tpm": None,
-        "tpm_remaining": None,
-        "message": "OpenRouter のレートリミットはダッシュボード (https://openrouter.ai/keys) で確認してください。/v1/keys エンドポイントは management key が必要です。",
+    # /v1/keys エンドポイントにリクエストを送信
+    config = API_CONFIGS.get(api_name)
+    keyinfo_endpoint = config.get("keyinfo_endpoint", "/v1/keys")
+    url = f"{config['base_url'].rstrip('/')}/{keyinfo_endpoint.lstrip('/')}"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
     }
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        if resp.status_code == 401:
+            return {
+                "status": "error",
+                "rpm": None,
+                "rpm_remaining": None,
+                "tpm": None,
+                "tpm_remaining": None,
+                "message": "HTTP 401: /v1/keys への認証に失敗しました。OpenRouterのレート制限情報を取得するには management key が必要です。通常のAPIキーでは取得できません。",
+            }
+        if resp.status_code != 200:
+            return {
+                "status": "error",
+                "rpm": None,
+                "rpm_remaining": None,
+                "tpm": None,
+                "tpm_remaining": None,
+                "message": f"HTTP {resp.status_code}: {resp.text[:500]}",
+            }
+        # OpenRouter はレートリミット情報をAPIレスポンスに含めないため、
+        # ダッシュボードでの確認が必要です。
+        return {
+            "status": "unavailable",
+            "rpm": None,
+            "rpm_remaining": None,
+            "tpm": None,
+            "tpm_remaining": None,
+            "message": "OpenRouter のレートリミットはダッシュボード (https://openrouter.ai/keys) で確認してください。/v1/keys エンドポイントは management key が必要です。",
+        }
+    except (requests.exceptions.RequestException, ValueError) as e:
+        return {
+            "status": "error",
+            "rpm": None,
+            "rpm_remaining": None,
+            "tpm": None,
+            "tpm_remaining": None,
+            "message": f"ネットワークエラーが発生しました: {e}",
+        }
 
 
 def fetch_key_info_mistral(api_name: str = "Mistral") -> Dict[str, Any]:
@@ -711,18 +747,51 @@ def fetch_key_info_gemini(api_name: str = "Gemini") -> Dict[str, Any]:
             "rpm_remaining": None,
             "tpm": None,
             "tpm_remaining": None,
-            "message": "APIキーが見つかりませんでした",
+            "message": "APIキーが見つかりませんでした。Google Cloud Console または AI Studio でAPIキーを確認してください。",
         }
-    # Gemini API はレートリミット情報をレスポンスヘッダーに含まないため、
-    # Google Cloud Console または AI Studio での確認が必要です。
-    return {
-        "status": "unavailable",
-        "rpm": None,
-        "rpm_remaining": None,
-        "tpm": None,
-        "tpm_remaining": None,
-        "message": "Gemini API のレートリミットは Google Cloud Console または AI Studio (https://aistudio.google.com/apikey) で確認してください。",
-    }
+    # APIキーの有効性を確認するためにリクエストを送信
+    config = API_CONFIGS.get(api_name)
+    url = f"{config['base_url'].rstrip('/')}/{config['models_endpoint'].lstrip('/')}"
+    params = {"key": api_key}
+    try:
+        resp = requests.get(url, params=params, timeout=15)
+        if resp.status_code == 400:
+            return {
+                "status": "error",
+                "rpm": None,
+                "rpm_remaining": None,
+                "tpm": None,
+                "tpm_remaining": None,
+                "message": "HTTP 400: APIキーが無効です。Google Cloud Console または AI Studio でAPIキーを確認してください。",
+            }
+        if resp.status_code != 200:
+            return {
+                "status": "error",
+                "rpm": None,
+                "rpm_remaining": None,
+                "tpm": None,
+                "tpm_remaining": None,
+                "message": f"HTTP {resp.status_code}: {resp.text[:500]}",
+            }
+        # Gemini API はレートリミット情報をレスポンスヘッダーに含まないため、
+        # Google Cloud Console または AI Studio での確認が必要です。
+        return {
+            "status": "unavailable",
+            "rpm": None,
+            "rpm_remaining": None,
+            "tpm": None,
+            "tpm_remaining": None,
+            "message": "Gemini API のレートリミットは Google Cloud Console または AI Studio (https://aistudio.google.com/apikey) で確認してください。",
+        }
+    except (requests.exceptions.RequestException, ValueError) as e:
+        return {
+            "status": "error",
+            "rpm": None,
+            "rpm_remaining": None,
+            "tpm": None,
+            "tpm_remaining": None,
+            "message": f"ネットワークエラーが発生しました: {e}",
+        }
 
 
 # ──────────────────────────────────────────────
@@ -812,36 +881,25 @@ def display_models(models: List[Dict[str, Any]]) -> None:
         console.print("[yellow]No models found.[/yellow]")
         return
 
-    # 表の作成
-    table = Table(
-        title="API Model List",
-        box=box.ROUNDED,
-        show_header=True,
-        header_style="bold cyan",
-        show_lines=True,
-    )
-
-    # 列の追加
-    table.add_column("API Name(s)", style="magenta", width=20)
-    table.add_column("Model Name", style="green", width=25)
-    table.add_column("Max Tokens", justify="right", width=10)
-    table.add_column("RPM", justify="right", width=10)
-    table.add_column("TPM", justify="right", width=10)
-    table.add_column("Aliases", style="dim", width=20)
-
-    # データの追加
+    # プロバイダーごとにモデルをグループ化
+    provider_models: Dict[str, List[Dict[str, Any]]] = {}
     for model in models:
-        api_names = model.get("api_names", model.get("api_name", "N/A"))
-        model_name = model.get("name", model.get("id", "N/A"))
-        max_tokens = str(model.get("context_length", "N/A"))
-        rpm = str(model.get("rate_limit_requests") or "N/A")
-        tpm = str(model.get("rate_limit_tokens") or "N/A")
-        aliases = model.get("aliases", "-")
+        api_name = model.get("api_name", "Unknown")
+        if api_name not in provider_models:
+            provider_models[api_name] = []
+        provider_models[api_name].append(model)
 
-        table.add_row(api_names, model_name, max_tokens, rpm, tpm, aliases)
-
-    # 表の表示
-    console.print(Panel(table, title="[bold]Detected API Models[/bold]", border_style="blue"))
+    # Detected API Models セクション
+    console.print("[bold]Detected API Models[/bold]")
+    for api_name, api_models in provider_models.items():
+        console.print(f"\n[bold cyan]{api_name}[/bold cyan]")
+        for model in api_models:
+            model_name = model.get("name", model.get("id", "N/A"))
+            rpm = model.get("rate_limit_requests")
+            tpm = model.get("rate_limit_tokens")
+            rpm_str = f"RPM: {rpm}" if rpm and rpm != "N/A" else "RPM: N/A"
+            tpm_str = f"TPM: {tpm}" if tpm and tpm != "N/A" else "TPM: N/A"
+            console.print(f"  {model_name}    {rpm_str}    {tpm_str}")
 
 
 # ──────────────────────────────────────────────
