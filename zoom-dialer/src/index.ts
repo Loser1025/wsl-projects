@@ -442,14 +442,14 @@ function getDashboardHTML(
       <!-- 進捗 -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <div class="flex justify-between text-sm text-slate-500 mb-3">
-          <span>進捗</span><span class="font-bold text-slate-700 text-lg">${current} / ${total}</span>
+          <span>進捗</span><span class="font-bold text-slate-700 text-lg" id="progress-text">${current} / ${total}</span>
         </div>
         <div class="w-full bg-slate-200 rounded-full h-3 mb-5">
-          <div class="bg-blue-500 h-3 rounded-full transition-all duration-500" style="width:${progressPercent}%"></div>
+          <div class="bg-blue-500 h-3 rounded-full transition-all duration-500" id="progress-bar" style="width:${progressPercent}%"></div>
         </div>
         <div class="bg-blue-50 rounded-xl p-5 text-center">
           <p class="text-xs text-blue-400 mb-2 font-medium">次の番号</p>
-          <p class="text-3xl font-bold text-blue-700 tracking-widest">${displayPhone || '—'}</p>
+          <p class="text-3xl font-bold text-blue-700 tracking-widest" id="next-phone">${displayPhone || '—'}</p>
         </div>
       </div>
 
@@ -518,6 +518,27 @@ function getDashboardHTML(
         window.location.assign(url);
       }, 100);
     }
+  // 自動ポーリング：3秒ごとに状態を更新
+  setInterval(async () => {
+    try {
+      const res = await fetch('/next');
+      const data = await res.json();
+      if (!data.done && data.phone) {
+        // 次番号表示を更新
+        const phoneEl = document.getElementById('next-phone');
+        if (phoneEl) phoneEl.textContent = data.phone;
+        // 進捗表示を更新
+        const progressEl = document.getElementById('progress-text');
+        if (progressEl) progressEl.textContent = data.index + ' / ' + data.total;
+        // プログレスバーを更新
+        const barEl = document.getElementById('progress-bar');
+        if (barEl && data.total > 0) {
+          const pct = Math.round((data.index / data.total) * 100);
+          barEl.style.width = pct + '%';
+        }
+      }
+    } catch(e) { /* 無視 */ }
+  }, 3000);
   </script>
 </body>
 </html>`;
