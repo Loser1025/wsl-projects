@@ -73,6 +73,10 @@ web_modules/
 
 .stylelintcache
 
+# Vitest test cache
+
+.vitest-cache/
+
 # Microbundle cache
 
 .rpt2_cache/
