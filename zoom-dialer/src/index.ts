@@ -25,15 +25,13 @@ function addLog(message: string): void {
 }
 
 // KVにログを保存する関数（非同期、即座に実行）
-function saveLogToKV(env: Env, message: string): void {
+async function saveLogToKV(env: Env, message: string): Promise<void> {
   const entry = `[${formatTime(new Date())}] ${message}`;
-  // 即座にKVに保存（awaitしないでfire-and-forget）
-  env.PHONE_STORE.get('debug_logs').then(raw => {
-    const logs = raw ? JSON.parse(raw) : [];
-    logs.push(entry);
-    if (logs.length > 200) logs.shift();
-    env.PHONE_STORE.put('debug_logs', JSON.stringify(logs));
-  }).catch(() => {});
+  const raw = await env.PHONE_STORE.get('debug_logs');
+  const logs = raw ? JSON.parse(raw) : [];
+  logs.push(entry);
+  if (logs.length > 200) logs.shift();
+  await env.PHONE_STORE.put('debug_logs', JSON.stringify(logs));
 }
 
 // ==========================================
@@ -58,6 +56,54 @@ interface UploadDebugResult {
   errorMessage?: string;
 }
 
+interface LastEventInfo {
+  last_event: string | null;
+  last_result: string | null;
+  last_event_time: string | null;
+  call_phase: string | null;
+}
+
+function emptyLastEventInfo(): LastEventInfo {
+  return {
+    last_event: null,
+    last_result: null,
+    last_event_time: null,
+    call_phase: null
+  };
+}
+
+async function getLastEventInfoFromKV(env: Env): Promise<LastEventInfo> {
+  try {
+    const raw = await env.PHONE_STORE.get('last_event_info');
+    if (!raw) return emptyLastEventInfo();
+    const parsed = JSON.parse(raw) as Partial<LastEventInfo>;
+    return {
+      last_event: parsed.last_event ?? null,
+      last_result: parsed.last_result ?? null,
+      last_event_time: parsed.last_event_time ?? null,
+      call_phase: parsed.call_phase ?? null
+    };
+  } catch {
+    return emptyLastEventInfo();
+  }
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('ja-JP');
+}
+
 // ==========================================
 // メインハンドラ
 // ==========================================
@@ -79,11 +125,12 @@ export default {
         const results = JSON.parse(resultsRaw).reverse();
         const nextPhone = await env.PHONE_STORE.get('next_phone');
         const status = await env.PHONE_STORE.get('system_status') || 'stopped';
+        const lastEventInfo = await getLastEventInfoFromKV(env);
 
         addLog(`[dashboard] index=${currentIndex}/${queue.length}, next=${nextPhone || 'なし'}, results=${results.length}`);
-        saveLogToKV(env, `[dashboard] index=${currentIndex}/${queue.length}, next=${nextPhone || 'なし'}, results=${results.length}`);
+        await saveLogToKV(env, `[dashboard] index=${currentIndex}/${queue.length}, next=${nextPhone || 'なし'}, results=${results.length}`);
 
-        const html = getDashboardHTML(queue, currentIndex, results, nextPhone, status);
+        const html = getDashboardHTML(queue, currentIndex, results, nextPhone, status, lastEventInfo);
         return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       } catch (err: any) {
         return new Response('エラー: ' + err.message, { status: 500 });
@@ -136,16 +183,21 @@ export default {
         await env.PHONE_STORE.put('current_index', '0');
         await env.PHONE_STORE.put('results', '[]');
         await env.PHONE_STORE.put('system_status', 'running');
+        await env.PHONE_STORE.delete('last_event');
+        await env.PHONE_STORE.delete('last_result');
+        await env.PHONE_STORE.delete('last_event_time');
+        await env.PHONE_STORE.delete('call_phase');
+        await env.PHONE_STORE.delete('last_event_info');
         if (zoomCallUris.length > 0) {
           await env.PHONE_STORE.put('next_phone', '+81' + cleanNumbers[0].slice(1));
         }
 
         addLog(`[upload] ${zoomCallUris.length}件保存（${matches.length}件マッチ）`);
-        saveLogToKV(env, `[upload] ${zoomCallUris.length}件保存（${matches.length}件マッチ）`);
+        await saveLogToKV(env, `[upload] ${zoomCallUris.length}件保存（${matches.length}件マッチ）`);
         return new Response(null, { status: 302, headers: { 'Location': '/' } });
       } catch (err: any) {
         addLog(`[upload] ERROR: ${err.message}`);
-        saveLogToKV(env, `[upload] ERROR: ${err.message}`);
+        await saveLogToKV(env, `[upload] ERROR: ${err.message}`);
         return new Response('エラー: ' + err.message, { status: 500 });
       }
     }
@@ -161,6 +213,7 @@ export default {
         const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
         const currentIndex = parseInt(currentIndexRaw, 10);
         const status = await env.PHONE_STORE.get('system_status') || 'stopped';
+        const lastEventInfo = await getLastEventInfoFromKV(env);
 
         if (!nextPhone || currentIndex >= queue.length) {
           const data = JSON.stringify({
@@ -168,7 +221,9 @@ export default {
             phone: null,
             zoomphonecall_url: null,
             index: currentIndex,
-            total: queue.length
+            total: queue.length,
+            system_status: status,
+            ...lastEventInfo
           }, null, 2);
           return new Response(data, { headers: { 'Content-Type': 'application/json' } });
         }
@@ -181,7 +236,9 @@ export default {
           phone: normalizedPhone,
           zoomphonecall_url: zoomUrl,
           index: currentIndex,
-          total: queue.length
+          total: queue.length,
+          system_status: status,
+          ...lastEventInfo
         }, null, 2);
         return new Response(data, { headers: { 'Content-Type': 'application/json' } });
       } catch (err: any) {
@@ -196,7 +253,7 @@ export default {
       try {
         const body = await request.json() as any;
         const eventType = body.event;
-        saveLogToKV(env, '[webhook] event=' + eventType);
+        await saveLogToKV(env, '[webhook] event=' + eventType);
         console.log('[webhook] event=' + eventType);
 
         if (eventType === 'endpoint.url_validation') {
@@ -210,19 +267,32 @@ export default {
 
         if (eventType === 'phone.call_ended' || eventType === 'phone_call_ended' || eventType === 'phone.caller_ended' || eventType === 'phone_caller_ended') {
           const payload = body.payload?.object || body.payload || {};
-          saveLogToKV(env, '[webhook] payload=' + JSON.stringify(payload).slice(0, 200));
+          await saveLogToKV(env, '[webhook] payload=' + JSON.stringify(payload).slice(0, 200));
           console.log('[webhook] payload=' + JSON.stringify(payload).slice(0, 200));
 
           const calleeNumber = payload.callee_number_number || payload.callee?.phone_number || payload.to?.phone_number || '';
           const duration = payload.duration || payload.talk_time || 0;
           const resultStr = duration > 0 ? 'コネクト' : '不在/応答なし';
+          const eventTime = new Date().toISOString();
+          const lastEventInfo: LastEventInfo = {
+            last_event: eventType,
+            last_result: resultStr,
+            last_event_time: eventTime,
+            call_phase: 'ended'
+          };
 
           addLog('[webhook] call ended: ' + maskPhoneNumber(calleeNumber) + ', ' + resultStr + ', ' + duration + 's');
-          saveLogToKV(env, '[webhook] call ended: ' + maskPhoneNumber(calleeNumber) + ', ' + resultStr + ', ' + duration + 's');
+          await saveLogToKV(env, '[webhook] call ended: ' + maskPhoneNumber(calleeNumber) + ', ' + resultStr + ', ' + duration + 's');
+
+          await env.PHONE_STORE.put('last_event', eventType);
+          await env.PHONE_STORE.put('last_result', resultStr);
+          await env.PHONE_STORE.put('last_event_time', eventTime);
+          await env.PHONE_STORE.put('call_phase', 'ended');
+          await env.PHONE_STORE.put('last_event_info', JSON.stringify(lastEventInfo));
 
           const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
           const results = JSON.parse(resultsRaw);
-          results.push({ phone_number: calleeNumber, result: resultStr, time: new Date().toISOString() });
+          results.push({ phone_number: calleeNumber, result: resultStr, time: eventTime });
           await env.PHONE_STORE.put('results', JSON.stringify(results));
 
           const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
@@ -238,12 +308,12 @@ export default {
             nextPhone = '+81' + rawNum.replace('+81', '');
             await env.PHONE_STORE.put('next_phone', nextPhone);
             addLog('[webhook] next phone set: ' + maskPhoneNumber(nextPhone));
-            saveLogToKV(env, '[webhook] next phone set: ' + maskPhoneNumber(nextPhone));
+            await saveLogToKV(env, '[webhook] next phone set: ' + maskPhoneNumber(nextPhone));
           } else {
             await env.PHONE_STORE.put('system_status', 'stopped');
             await env.PHONE_STORE.delete('next_phone');
             addLog('[webhook] all done -> stopped');
-            saveLogToKV(env, '[webhook] all done -> stopped');
+            await saveLogToKV(env, '[webhook] all done -> stopped');
           }
 
           const respData = { ok: true, nextIndex: nextIndex, queueLen: queue.length, nextPhone: nextPhone };
@@ -253,7 +323,7 @@ export default {
         return new Response('OK');
       } catch (err: any) {
         addLog('[webhook] ERROR: ' + err.message);
-        saveLogToKV(env, '[webhook] ERROR: ' + err.message);
+        await saveLogToKV(env, '[webhook] ERROR: ' + err.message);
         console.error('[webhook] ERROR:', err.message);
         return new Response('OK');
       }
@@ -289,7 +359,7 @@ export default {
         }
 
         addLog(`[skip] index=${currentIndex}をスキップ → next=${nextIndex}`);
-        saveLogToKV(env, `[skip] index=${currentIndex}をスキップ → next=${nextIndex}`);
+        await saveLogToKV(env, `[skip] index=${currentIndex}をスキップ → next=${nextIndex}`);
         return new Response(null, { status: 302, headers: { 'Location': '/' } });
       } catch (err: any) {
         return new Response('エラー: ' + err.message, { status: 500 });
@@ -307,8 +377,13 @@ export default {
         await env.PHONE_STORE.put('results', '[]');
         await env.PHONE_STORE.put('system_status', 'stopped');
         await env.PHONE_STORE.delete('next_phone');
+        await env.PHONE_STORE.delete('last_event');
+        await env.PHONE_STORE.delete('last_result');
+        await env.PHONE_STORE.delete('last_event_time');
+        await env.PHONE_STORE.delete('call_phase');
+        await env.PHONE_STORE.delete('last_event_info');
         addLog('[reset] 完全リセット完了');
-        saveLogToKV(env, '[reset] 完全リセット完了');
+        await saveLogToKV(env, '[reset] 完全リセット完了');
         return new Response(null, { status: 302, headers: { 'Location': '/' } });
       } catch (err: any) {
         return new Response('エラー: ' + err.message, { status: 500 });
@@ -402,13 +477,24 @@ function getDashboardHTML(
   current: number,
   results: any[],
   nextPhone: string | null,
-  status: string
+  status: string,
+  lastEventInfo: LastEventInfo
 ): string {
   const total = queue.length;
   const progressPercent = total > 0 ? Math.round((current / total) * 100) : 0;
-  const isFinished = current >= total || status === 'stopped';
   const displayPhone = nextPhone || '+81' + (queue[current] || '').replace('zoomphonecall://+81', '') || '';
   const zoomUrl = queue[current] || '';
+  const initialData = {
+    done: total === 0 || !displayPhone || current >= total,
+    phone: displayPhone || null,
+    zoomphonecall_url: zoomUrl || null,
+    index: current,
+    total,
+    system_status: status,
+    ...lastEventInfo
+  };
+  const initialScreen: 'ready' | 'calling' | 'ended' | 'finished' = total > 0 && status === 'stopped' && current >= total ? 'finished' : 'ready';
+  const initialDataJson = JSON.stringify(initialData).replaceAll('</', '<\\/');
 
   return `<!DOCTYPE html>
 <html lang="ja">
@@ -426,50 +512,44 @@ function getDashboardHTML(
     </header>
 
     <div id="msg" class="hidden mb-4 p-3 rounded-lg text-sm font-medium"></div>
-
-    ${total === 0 ? `
-    <!-- 初期状態: CSVアップロード -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-      <p class="text-slate-400 mb-6">CSVファイルをアップロードしてください</p>
-      <form method="POST" action="/upload" enctype="multipart/form-data" class="space-y-4">
-        <input type="file" name="csv" accept=".csv,.txt" required class="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
-        <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">アップロード</button>
-      </form>
-    </div>
+    <div id="screen-root">${total === 0 ? `
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+        <p class="text-slate-400 mb-6">CSVファイルをアップロードしてください</p>
+        <form method="POST" action="/upload" enctype="multipart/form-data" class="space-y-4">
+          <input type="file" name="csv" accept=".csv,.txt" required class="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+          <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">アップロード</button>
+        </form>
+      </div>
     ` : `
-    <!-- 番号セット済み -->
-    <div class="space-y-5">
-      <!-- 進捗 -->
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <div class="flex justify-between text-sm text-slate-500 mb-3">
-          <span>進捗</span><span class="font-bold text-slate-700 text-lg" id="progress-text">${current} / ${total}</span>
+      <div class="space-y-5">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div class="flex justify-between text-sm text-slate-500 mb-3">
+            <span>進捗</span><span class="font-bold text-slate-700 text-lg" id="progress-text">${current} / ${total}</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-3 mb-5">
+            <div class="bg-blue-500 h-3 rounded-full transition-all duration-500" id="progress-bar" style="width:${progressPercent}%"></div>
+          </div>
+          <div class="bg-blue-50 rounded-xl p-5 text-center">
+            <p class="text-xs text-blue-400 mb-2 font-medium">次の番号</p>
+            <p class="text-3xl font-bold text-blue-700 tracking-widest" id="next-phone">${escapeHtml(displayPhone || '—')}</p>
+          </div>
         </div>
-        <div class="w-full bg-slate-200 rounded-full h-3 mb-5">
-          <div class="bg-blue-500 h-3 rounded-full transition-all duration-500" id="progress-bar" style="width:${progressPercent}%"></div>
-        </div>
-        <div class="bg-blue-50 rounded-xl p-5 text-center">
-          <p class="text-xs text-blue-400 mb-2 font-medium">次の番号</p>
-          <p class="text-3xl font-bold text-blue-700 tracking-widest" id="next-phone">${displayPhone || '—'}</p>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
+          ${zoomUrl && !(status === 'stopped' && current >= total) ? `
+            <a href="${escapeHtml(zoomUrl)}" target="_blank" onclick="handleCallClick(this.href); return false;" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 架電する（Zoom起動）</a>
+            <div class="grid grid-cols-2 gap-3">
+              <button onclick="doSkip()" class="py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-all">⏭ スキップ</button>
+              <button onclick="doReset()" class="py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all">🔄 リセット</button>
+            </div>
+          ` : `
+            <div class="text-center py-6">
+              <p class="text-2xl font-bold text-green-600 mb-4">✅ 完了</p>
+              <button onclick="doReset()" class="py-3 px-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">🔄 もう一度</button>
+            </div>
+          `}
         </div>
       </div>
-
-      <!-- 操作 -->
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
-        ${!isFinished && zoomUrl ? `
-        <a href="${zoomUrl}" target="_blank" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 架電する（Zoom起動）</a>
-        <div class="grid grid-cols-2 gap-3">
-          <button onclick="doSkip()" class="py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-all">⏭ スキップ</button>
-          <button onclick="doReset()" class="py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all">🔄 リセット</button>
-        </div>
-        ` : `
-        <div class="text-center py-6">
-          <p class="text-2xl font-bold text-green-600 mb-4">✅ 完了</p>
-          <button onclick="doReset()" class="py-3 px-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">🔄 もう一度</button>
-        </div>
-        `}
-      </div>
-    </div>
-    `}
+    `}</div>
 
     <!-- 結果履歴 -->
     ${results.length > 0 ? `
@@ -483,9 +563,9 @@ function getDashboardHTML(
         <tbody>
           ${results.slice(0, 50).map(r => `
           <tr class="border-b border-slate-50">
-            <td class="py-2 font-mono">${r.phone_number}</td>
-            <td class="py-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${r.result === 'コネクト' ? 'bg-green-100 text-green-700' : r.result === 'スキップ' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}">${r.result}</span></td>
-            <td class="py-2 text-right text-slate-400 text-xs">${r.time ? new Date(r.time).toLocaleString('ja-JP') : ''}</td>
+            <td class="py-2 font-mono">${escapeHtml(r.phone_number)}</td>
+            <td class="py-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${r.result === 'コネクト' ? 'bg-green-100 text-green-700' : r.result === 'スキップ' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}">${escapeHtml(r.result)}</span></td>
+            <td class="py-2 text-right text-slate-400 text-xs">${r.time ? formatDateTime(r.time) : ''}</td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -494,8 +574,28 @@ function getDashboardHTML(
   </div>
 
   <script>
+    const screenRoot = document.getElementById('screen-root');
+    const initialData = ${initialDataJson};
+    let latestData = initialData;
+    let screen = ${JSON.stringify(initialScreen)};
+    let lastEventTime = initialData.last_event_time;
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+    function formatDateTime(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ja-JP');
+    }
     function show(msg, type) {
       const el = document.getElementById('msg');
+      if (!el) return;
       el.textContent = msg;
       el.className = 'mb-4 p-3 rounded-lg text-sm font-medium ' + (type === 'ok' ? 'bg-green-100 text-green-700' : type === 'err' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700');
       el.classList.remove('hidden');
@@ -510,35 +610,163 @@ function getDashboardHTML(
       location.reload();
     }
     function makeCall(url) {
-      // 新しいウィンドウ/タブで開く（ポップアップブロッカーに引っかかる可能性あり）
-      window.open(url, '_blank');
-
-      // フォールバック: location.assignも試す
+      if (!url) return;
+      // zoomphonecall:// は window.open だけでは起動しない環境があるため、location.assign も試す
+      try {
+        window.open(url, '_blank');
+      } catch (e) {
+        // 無視
+      }
       setTimeout(() => {
         window.location.assign(url);
       }, 100);
     }
-  // 自動ポーリング：3秒ごとに状態を更新
-  setInterval(async () => {
-    try {
-      const res = await fetch('/next');
-      const data = await res.json();
-      if (!data.done && data.phone) {
-        // 次番号表示を更新
-        const phoneEl = document.getElementById('next-phone');
-        if (phoneEl) phoneEl.textContent = data.phone;
-        // 進捗表示を更新
-        const progressEl = document.getElementById('progress-text');
-        if (progressEl) progressEl.textContent = data.index + ' / ' + data.total;
-        // プログレスバーを更新
-        const barEl = document.getElementById('progress-bar');
-        if (barEl && data.total > 0) {
-          const pct = Math.round((data.index / data.total) * 100);
-          barEl.style.width = pct + '%';
-        }
+    function handleCallClick(url) {
+      screen = 'calling';
+      renderCalling(latestData);
+      makeCall(url);
+    }
+    function progressMarkup(data) {
+      const total = Number(data.total || 0);
+      const index = Number(data.index || 0);
+      const pct = total > 0 ? Math.round((index / total) * 100) : 0;
+      return \`
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div class="flex justify-between text-sm text-slate-500 mb-3">
+            <span>進捗</span><span class="font-bold text-slate-700 text-lg" id="progress-text">\${index} / \${total}</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-3 mb-5">
+            <div class="bg-blue-500 h-3 rounded-full transition-all duration-500" id="progress-bar" style="width:\${pct}%"></div>
+          </div>
+          <div class="bg-blue-50 rounded-xl p-5 text-center">
+            <p class="text-xs text-blue-400 mb-2 font-medium">次の番号</p>
+            <p class="text-3xl font-bold text-blue-700 tracking-widest" id="next-phone">\${escapeHtml(data.phone || '—')}</p>
+          </div>
+        </div>\`;
+    }
+    function actionButtons(finished) {
+      return finished ? \`
+        <div class="text-center py-6">
+          <p class="text-2xl font-bold text-green-600 mb-4">✅ 完了</p>
+          <button onclick="doReset()" class="py-3 px-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">🔄 もう一度</button>
+        </div>\` : \`
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="doSkip()" class="py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-all">⏭ スキップ</button>
+          <button onclick="doReset()" class="py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all">🔄 リセット</button>
+        </div>\`;
+    }
+    function renderReady(data) {
+      screen = 'ready';
+      if (!screenRoot) return;
+      if (Number(data.total || 0) === 0) {
+        screenRoot.innerHTML = \`
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+            <p class="text-slate-400 mb-6">CSVファイルをアップロードしてください</p>
+            <form method="POST" action="/upload" enctype="multipart/form-data" class="space-y-4">
+              <input type="file" name="csv" accept=".csv,.txt" required class="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+              <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">アップロード</button>
+            </form>
+          </div>\`;
+        return;
       }
-    } catch(e) { /* 無視 */ }
-  }, 3000);
+      const hasZoomUrl = !isFinished(data) && data.zoomphonecall_url;
+      screenRoot.innerHTML = \`
+        <div class="space-y-5">
+          \${progressMarkup(data)}
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
+            \${hasZoomUrl ? \`
+              <a href="\${escapeHtml(data.zoomphonecall_url)}" target="_blank" onclick="handleCallClick(this.href); return false;" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 架電する（Zoom起動）</a>
+              \${actionButtons(false)}
+            \` : actionButtons(true)}
+          </div>
+        </div>\`;
+    }
+    function renderCalling(data) {
+      screen = 'calling';
+      if (!screenRoot) return;
+      screenRoot.innerHTML = \`
+        <div class="space-y-5">
+          \${progressMarkup(data)}
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+            <div class="text-center py-6">
+              <p class="text-sm text-slate-400 mb-2">通話中</p>
+              <p class="text-3xl font-bold text-green-600 mb-4">\${escapeHtml(data.phone || '—')}</p>
+              <p class="text-slate-600">Zoom Phone の起動と通話終了Webhookを待っています。</p>
+            </div>
+            \${actionButtons(false)}
+          </div>
+        </div>\`;
+    }
+    function renderEnded(data) {
+      screen = 'ended';
+      if (!screenRoot) return;
+      const hasZoomUrl = !isFinished(data) && data.zoomphonecall_url;
+      screenRoot.innerHTML = \`
+        <div class="space-y-5">
+          \${progressMarkup(data)}
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+            <div class="text-center py-6">
+              <p class="text-sm text-slate-400 mb-2">通話終了を検知しました</p>
+              <p class="text-3xl font-bold text-green-600 mb-4">\${escapeHtml(data.last_result || '結果を確認中')}</p>
+              <p class="text-slate-600">\${escapeHtml(data.last_event || '')} / \${formatDateTime(data.last_event_time)}</p>
+            </div>
+            \${hasZoomUrl ? \`
+              <a href="\${escapeHtml(data.zoomphonecall_url)}" target="_blank" onclick="handleCallClick(this.href); return false;" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 次の番号を架電する（Zoom起動）</a>
+              \${actionButtons(false)}
+            \` : actionButtons(true)}
+          </div>
+        </div>\`;
+    }
+    function renderFinished(data) {
+      screen = 'finished';
+      if (!screenRoot) return;
+      screenRoot.innerHTML = \`
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center space-y-5">
+          <div>
+            <p class="text-sm text-slate-400 mb-2">全件完了</p>
+            <p class="text-3xl font-bold text-green-600 mb-4">✅ 完了</p>
+            \${data.last_result ? \`<p class="text-slate-600">最新結果: \${escapeHtml(data.last_result)}</p>\` : ''}
+          </div>
+          <button onclick="doReset()" class="py-3 px-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">🔄 もう一度</button>
+        </div>\`;
+    }
+    function isFinished(data) {
+      return data.system_status === 'stopped' && Number(data.index || 0) >= Number(data.total || 0) && Number(data.total || 0) > 0;
+    }
+    function renderScreen(data) {
+      latestData = data;
+      if (isFinished(data) && screen !== 'calling') {
+        renderFinished(data);
+        return;
+      }
+      if (screen === 'calling') {
+        renderCalling(data);
+        return;
+      }
+      if (screen === 'ended') {
+        renderEnded(data);
+        return;
+      }
+      renderReady(data);
+    }
+    async function refreshNext() {
+      try {
+        const res = await fetch('/next');
+        const data = await res.json();
+        if (data.last_event_time && data.last_event_time !== lastEventTime) {
+          lastEventTime = data.last_event_time;
+          screen = 'ended';
+        }
+        renderScreen(data);
+      } catch(e) {
+        // 無視
+      }
+    }
+
+    renderScreen(initialData);
+    refreshNext();
+    // 自動ポーリング：3秒ごとに状態を更新
+    setInterval(refreshNext, 3000);
   </script>
 </body>
 </html>`;
