@@ -60,10 +60,10 @@ API_CONFIGS = {
         "model_id_field": "id",
         "context_length_field": "max_context_length",
         "rate_limit_headers": {
-            "requests": "x-ratelimit-limit-requests",
-            "tokens": "x-ratelimit-limit-tokens",
-            "remaining_requests": "x-ratelimit-remaining-requests",
-            "remaining_tokens": "x-ratelimit-remaining-tokens",
+            "requests": "x-ratelimit-limit-req-minute",
+            "tokens": "x-ratelimit-limit-tokens-minute",
+            "remaining_requests": "x-ratelimit-remaining-req-minute",
+            "remaining_tokens": "x-ratelimit-remaining-tokens-minute",
             "reset_requests": "x-ratelimit-reset-requests",
             "reset_tokens": "x-ratelimit-reset-tokens",
             "size_limit": "ratelimitbysize-limit",
@@ -568,21 +568,24 @@ def fetch_api_details(api_name: str, api_key: str) -> Dict[str, Any]:
 
 
 def fetch_key_info_openrouter(api_name: str = "OpenRouter") -> Dict[str, Any]:
-    """OpenRouter /v1/keys からキー使用量・リミットを取得する。
+    """OpenRouter APIのレートリミット情報を取得する。
 
-    プロジェクト内のファイルからスキャンしたAPIキーを使用する。
+    OpenRouter の /v1/keys エンドポイントは management key（管理用キー）が必要なため、
+    通常のAPIキーではアクセスできません。
+    また、chat completions のレスポンスにもレートリミットヘッダーは含まれていません。
+
+    レートリミットは OpenRouter ダッシュボード (https://openrouter.ai/keys) で確認してください。
 
     Args:
         api_name: API名（デフォルト: "OpenRouter"）
 
     Returns:
         Dict[str, Any]: {
-            "status": "success" | "error",
+            "status": "success" | "error" | "unavailable",
             "rpm": int | None,
             "rpm_remaining": int | None,
             "tpm": int | None,
             "tpm_remaining": int | None,
-            "reset": str | None,
             "message": str | None
         }
     """
@@ -594,56 +597,18 @@ def fetch_key_info_openrouter(api_name: str = "OpenRouter") -> Dict[str, Any]:
             "rpm_remaining": None,
             "tpm": None,
             "tpm_remaining": None,
-            "reset": None,
             "message": "APIキーが見つかりませんでした",
         }
-    url = "https://openrouter.ai/api/v1/keys"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code != 200:
-            return {
-                "status": "error",
-                "rpm": None,
-                "rpm_remaining": None,
-                "tpm": None,
-                "tpm_remaining": None,
-                "reset": None,
-                "message": f"HTTP {resp.status_code}: {resp.text[:500]}",
-            }
-        data = resp.json()
-        if not isinstance(data, dict) or "rate_limit" not in data:
-            return {
-                "status": "error",
-                "rpm": None,
-                "rpm_remaining": None,
-                "tpm": None,
-                "tpm_remaining": None,
-                "reset": None,
-                "message": "不正なAPIキーです",
-            }
-        rate_limit = data["rate_limit"]
-        requests_info = rate_limit.get("requests", {})
-        tokens_info = rate_limit.get("tokens", {})
-        return {
-            "status": "success",
-            "rpm": requests_info.get("limit"),
-            "rpm_remaining": requests_info.get("remaining"),
-            "tpm": tokens_info.get("limit"),
-            "tpm_remaining": tokens_info.get("remaining"),
-            "reset": requests_info.get("reset"),
-            "message": None,
-        }
-    except requests.exceptions.RequestException as e:
-        return {
-            "status": "error",
-            "rpm": None,
-            "rpm_remaining": None,
-            "tpm": None,
-            "tpm_remaining": None,
-            "reset": None,
-            "message": f"ネットワークエラーが発生しました: {e}",
-        }
+    # OpenRouter はレートリミット情報をAPIレスポンスに含めないため、
+    # ダッシュボードでの確認が必要です。
+    return {
+        "status": "unavailable",
+        "rpm": None,
+        "rpm_remaining": None,
+        "tpm": None,
+        "tpm_remaining": None,
+        "message": "OpenRouter のレートリミットはダッシュボード (https://openrouter.ai/keys) で確認してください。/v1/keys エンドポイントは management key が必要です。",
+    }
 
 
 def fetch_key_info_mistral(api_name: str = "Mistral") -> Dict[str, Any]:
@@ -674,10 +639,18 @@ def fetch_key_info_mistral(api_name: str = "Mistral") -> Dict[str, Any]:
             "tpm_remaining": None,
             "message": "APIキーが見つかりませんでした",
         }
-    url = "https://api.mistral.ai/v1/models"
-    headers = {"Authorization": f"Bearer {api_key}"}
+    url = "https://api.mistral.ai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "mistral-small-latest",
+        "messages": [{"role": "user", "content": "Say hi"}],
+        "max_tokens": 10,
+    }
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = requests.post(url, headers=headers, json=payload, timeout=15)
         if resp.status_code != 200:
             return {
                 "status": "error",
@@ -688,10 +661,10 @@ def fetch_key_info_mistral(api_name: str = "Mistral") -> Dict[str, Any]:
                 "message": f"HTTP {resp.status_code}: {resp.text[:500]}",
             }
         resp_headers = resp.headers
-        rpm = resp_headers.get("x-ratelimit-limit-requests")
-        rpm_remaining = resp_headers.get("x-ratelimit-remaining-requests")
-        tpm = resp_headers.get("ratelimitbysize-limit-tokens")
-        tpm_remaining = resp_headers.get("ratelimitbysize-remaining-tokens")
+        rpm = resp_headers.get("x-ratelimit-limit-req-minute")
+        rpm_remaining = resp_headers.get("x-ratelimit-remaining-req-minute")
+        tpm = resp_headers.get("x-ratelimit-limit-tokens-minute")
+        tpm_remaining = resp_headers.get("x-ratelimit-remaining-tokens-minute")
         return {
             "status": "success",
             "rpm": int(rpm) if rpm is not None else None,
@@ -712,9 +685,10 @@ def fetch_key_info_mistral(api_name: str = "Mistral") -> Dict[str, Any]:
 
 
 def fetch_key_info_gemini(api_name: str = "Gemini") -> Dict[str, Any]:
-    """Gemini APIのレスポンスヘッダーからRPM/TPMを取得する。
+    """Gemini APIのレートリミット情報を取得する。
 
-    プロジェクト内のファイルからスキャンしたAPIキーを使用する。
+    Gemini API のレートリミットは、Google Cloud Console または
+    Google AI Studio (https://aistudio.google.com/apikey) で確認してください。
 
     Args:
         api_name: API名（デフォルト: "Gemini"）
@@ -739,40 +713,16 @@ def fetch_key_info_gemini(api_name: str = "Gemini") -> Dict[str, Any]:
             "tpm_remaining": None,
             "message": "APIキーが見つかりませんでした",
         }
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-    try:
-        resp = requests.get(url, timeout=10)
-        if resp.status_code != 200:
-            return {
-                "status": "error",
-                "rpm": None,
-                "rpm_remaining": None,
-                "tpm": None,
-                "tpm_remaining": None,
-                "message": f"HTTP {resp.status_code}: {resp.text[:500]}",
-            }
-        resp_headers = resp.headers
-        rpm = resp_headers.get("x-goog-quota-requests-per-minute")
-        rpm_remaining = resp_headers.get("x-goog-quota-remaining-requests")
-        tpm = resp_headers.get("x-goog-quota-tokens-per-minute")
-        tpm_remaining = resp_headers.get("x-goog-quota-remaining-tokens")
-        return {
-            "status": "success",
-            "rpm": int(rpm) if rpm is not None else None,
-            "rpm_remaining": int(rpm_remaining) if rpm_remaining is not None else None,
-            "tpm": int(tpm) if tpm is not None else None,
-            "tpm_remaining": int(tpm_remaining) if tpm_remaining is not None else None,
-            "message": None,
-        }
-    except (requests.exceptions.RequestException, ValueError) as e:
-        return {
-            "status": "error",
-            "rpm": None,
-            "rpm_remaining": None,
-            "tpm": None,
-            "tpm_remaining": None,
-            "message": f"ネットワークエラーが発生しました: {e}",
-        }
+    # Gemini API はレートリミット情報をレスポンスヘッダーに含まないため、
+    # Google Cloud Console または AI Studio での確認が必要です。
+    return {
+        "status": "unavailable",
+        "rpm": None,
+        "rpm_remaining": None,
+        "tpm": None,
+        "tpm_remaining": None,
+        "message": "Gemini API のレートリミットは Google Cloud Console または AI Studio (https://aistudio.google.com/apikey) で確認してください。",
+    }
 
 
 # ──────────────────────────────────────────────
@@ -1264,12 +1214,10 @@ def display_api_details(api_details: Dict[str, Any]) -> None:
     table.add_column("API Name", style="magenta", width=18)
     table.add_column("Models", style="green", width=8)
     table.add_column("Key Info", width=13)
-    table.add_column("Req Limit", justify="right", width=12)
-    table.add_column("Req Remaining", justify="right", width=14)
-    table.add_column("Req Reset", justify="right", width=12)
-    table.add_column("Tok Limit", justify="right", width=12)
-    table.add_column("Tok Remaining", justify="right", width=14)
-    table.add_column("Tok Reset", justify="right", width=12)
+    table.add_column("RPM", justify="right", width=10)
+    table.add_column("RPM Rem", justify="right", width=10)
+    table.add_column("TPM", justify="right", width=12)
+    table.add_column("TPM Rem", justify="right", width=12)
     table.add_column("Aliases", style="dim", width=25)
 
     api_name_val = api_details.get("api_name", "N/A")
@@ -1287,12 +1235,10 @@ def display_api_details(api_details: Dict[str, Any]) -> None:
         api_name_val,
         str(api_details.get("models_count", "N/A")),
         key_info_display,
-        str(api_details.get("rate_limit_requests", "N/A")),
-        str(api_details.get("rate_limit_remaining_requests", "N/A")),
-        str(api_details.get("rate_limit_reset_requests", "N/A")),
-        str(api_details.get("rate_limit_tokens", "N/A")),
-        str(api_details.get("rate_limit_remaining_tokens", "N/A")),
-        str(api_details.get("rate_limit_reset_tokens", "N/A")),
+        str(key_info.get("rpm", "N/A")),
+        str(key_info.get("rpm_remaining", "N/A")),
+        str(key_info.get("tpm", "N/A")),
+        str(key_info.get("tpm_remaining", "N/A")),
         api_details.get("aliases", "-"),
     )
 
