@@ -75,6 +75,11 @@ Workerが「ここまでに行った作業」の差分サマリが、元の指�
 - これまでの変更の中に、誤り・壊れたコード・指示と矛盾する内容・余計な副作用が無いか
   （read_file等の読み取り専用ツールでファイルの現状を確認し、該当ファイル名・箇所を
   具体的に特定すること）
+- 「[Workerの変更ファイル置き場]」が渡されている場合、対象ファイルの最新状態は
+  まずそこを確認すること。Workerの変更はこの時点ではまだ「[プロジェクト全体（変更前の
+  参照用）]」側に反映されていないため、プロジェクト全体側だけを見て「変更されていない」
+  と判定するのは誤り。変更ファイル置き場に対象ファイルが存在しない場合のみ、
+  「そのファイルは変更されていない」という意味になる
 - Workerの作業結果に「[検証コマンド実行結果]」が含まれている場合、終了コードが0以外で
   あれば原則として "retry" と判定し、feedbackの【修正】にその失敗内容（出力から読み取れる
   原因とファイル名・箇所）を具体的に書くこと。「[検証コマンド実行結果]」が無い場合は
@@ -181,17 +186,33 @@ def _run_isolated(config, tool_registry: ToolRegistry, system_prompt: str,
 
 
 def run_supervisor(task: str, work_result: SubagentResult, project_dir: str, config,
-                    label: str = "", prev_raw: str = "") -> dict:
+                    label: str = "", prev_raw: str = "", review_dir: Optional[Path] = None) -> dict:
     """Workerの結果をレビューし、{"status", "feedback", "raw"} を返す。
 
     `prev_raw` には前回のSupervisor呼び出しの生出力（あれば）を渡す。これにより
     今回のSupervisorは「前回何を指摘し、それが直っているか」を踏まえて判定できる。
+
+    `review_dir` にはWorkerのoverlay upperdir（新規作成・変更ファイルのみを含む）を渡す。
+    Workerの変更は"ok"判定が出るまでproject_dirには反映されないため、project_dirだけを
+    読んでも変更前の状態しか見えず、Supervisorが「変更されていない」と誤判定して
+    無限retryに陥る。review_dirを優先的に確認させることでこれを防ぐ。
     """
     registry = _build_readonly_registry()
-    prompt = (
-        f"[作業フォルダ] {Path(project_dir).resolve()}\n\n"
-        f"[最終目的（元の指示）]\n{task}\n\n"
-    )
+    resolved_project = Path(project_dir).resolve()
+    if review_dir is not None and review_dir != resolved_project:
+        prompt = (
+            f"[Workerの変更ファイル置き場] {review_dir}\n"
+            f"（ここにはWorkerが新規作成・変更したファイルのみが、変更後の最終状態として置かれています。\n"
+            f"対象ファイルが存在すればそれが最新版です。まずここを確認してください。\n"
+            f"存在しないファイルは変更されていないという意味で、{resolved_project} 側の元の内容のままです。）\n\n"
+            f"[プロジェクト全体（変更前の参照用）] {resolved_project}\n\n"
+            f"[最終目的（元の指示）]\n{task}\n\n"
+        )
+    else:
+        prompt = (
+            f"[作業フォルダ] {resolved_project}\n\n"
+            f"[最終目的（元の指示）]\n{task}\n\n"
+        )
     if prev_raw:
         prompt += f"[前回のSupervisor所見]\n{prev_raw}\n\n"
     prompt += f"[Workerの作業結果]\n{work_result.summary}\n"
@@ -277,6 +298,27 @@ def _format_team_result(task: str, last_result: SubagentResult,
     return "\n".join(lines)
 
 
+def _format_no_diff_result(task: str, last_result: SubagentResult, attempt: int) -> str:
+    """ファイル変更が無いまま完了したタスク（読み取り調査・コマンド実行のみ等）の結果を整形する。
+
+    Supervisorはファイル差分を前提に判定するため、差分が無いタスクに対しては
+    機能しない（必ず「変更されていない」=未完了と判定し、retryを無駄に繰り返す）。
+    変更が無くWorkerが完了報告(mark_task_done)済みの場合は、Supervisorを介さず
+    Workerの最終回答をそのままDirectorに返す。
+    """
+    lines = [
+        "[delegate_to_team: ✓ 完了（ファイル変更なし）]",
+        f"タスク: {task}",
+        f"試行回数: {attempt}/{MAX_TEAM_RETRIES}",
+        "",
+        "(コード変更を伴わないタスクと判断し、Supervisorのレビューを行わずWorkerの回答を"
+        "そのまま返します)",
+        "",
+        last_result.raw_tail,
+    ]
+    return "\n".join(lines)
+
+
 def run_team_task(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "") -> str:
     """Worker → Supervisor のレビュー付きループを最大 MAX_TEAM_RETRIES 回実行する。"""
     feedback = ""
@@ -305,8 +347,26 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
         _log_team_event({"event": "team_worker_start", "attempt": attempt, "task": task, "resumed": base is not None, "trace_id": trace_id})
         last_result, upper, base = run_subagent_reviewable(worker_task, project_dir, label=label or "single", base=base, trace_id=trace_id, verify_cmd=verify_cmd, provider=config.name, model=config.model)
 
+        if not last_result.changed_files:
+            if last_result.ok:
+                # ファイル変更を伴わないタスク（読み取り調査・コマンド実行のみ等）が
+                # 完了報告(mark_task_done)済み。Supervisorはdiff前提のため呼ばず、
+                # Workerの回答をそのまま返す。
+                safe_print(C.green(f"  {team_tag} ✓ 完了（ファイル変更なし、試行{attempt}/{MAX_TEAM_RETRIES}）"), flush=True)
+                if base is not None:
+                    cleanup_subagent(base)
+                return _format_no_diff_result(task, last_result, attempt)
+
+            # mark_task_done なしで終了 → Supervisorを介さず、同じoverlayから続行させる
+            safe_print(C.yellow(f"  {team_tag} ⚠ 変更なし・未完了 (試行{attempt}/{MAX_TEAM_RETRIES}) — Supervisorを介さず続行"), flush=True)
+            feedback = (
+                "前回の試行ではファイルの変更が行われず、また完了報告（mark_task_done）も"
+                "ありませんでした。タスクを完了させ、最後に必ずmark_task_doneを呼んでください。"
+            )
+            continue
+
         safe_print(C.gray(f"  {team_tag} 👁 Supervisorレビュー中..."), flush=True)
-        verdict = run_supervisor(task, last_result, project_dir, config, label=label, prev_raw=prev_raw)
+        verdict = run_supervisor(task, last_result, project_dir, config, label=label, prev_raw=prev_raw, review_dir=upper)
         prev_raw = verdict["raw"]
         _log_team_event({"event": "team_supervisor_verdict", "attempt": attempt,
                    "status": verdict["status"], "feedback": verdict["feedback"][:200],
@@ -402,9 +462,10 @@ def run_worker_once(task: str, project_dir: str, config, label: str = "", verify
     return _format_worker_result(result, applied=False, done=False, note=note)
 
 
-# 並列Worker/Researcher/Supervisorの出力がTUIで入り乱れて読めなくなるため、
-# 同時実行数を一時的に1に制限している（タスク自体は順番に処理される）。
-_MAX_PARALLEL_TEAM_TASKS = 1
+# 並列Worker/Researcher/Supervisorの出力はTUIで入り乱れるが、
+# /viewer のセッションツリー（実行状況バッジ付き）で各タスクの進行状況を
+# 個別に追えるため、同時実行数を3まで許可する。
+_MAX_PARALLEL_TEAM_TASKS = 3
 
 
 def run_team_tasks_parallel(tasks: list[str], project_dir: str, config, verify_cmd: str = "") -> list[str]:

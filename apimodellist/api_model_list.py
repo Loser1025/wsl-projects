@@ -893,13 +893,14 @@ def display_models(models: List[Dict[str, Any]]) -> None:
     console.print("[bold]Detected API Models[/bold]")
     for api_name, api_models in provider_models.items():
         console.print(f"\n[bold cyan]{api_name}[/bold cyan]")
+        # 各モデルの表示幅を計算
         for model in api_models:
             model_name = model.get("name", model.get("id", "N/A"))
             rpm = model.get("rate_limit_requests")
             tpm = model.get("rate_limit_tokens")
-            rpm_str = f"RPM: {rpm}" if rpm and rpm != "N/A" else "RPM: N/A"
-            tpm_str = f"TPM: {tpm}" if tpm and tpm != "N/A" else "TPM: N/A"
-            console.print(f"  {model_name}    {rpm_str}    {tpm_str}")
+            rpm_str = f"RPM: {rpm}" if rpm is not None else "RPM: N/A"
+            tpm_str = f"TPM: {tpm}" if tpm is not None else "TPM: N/A"
+            console.print(f"  {model_name:<50s} {rpm_str:<15s} {tpm_str}")
 
 
 # ──────────────────────────────────────────────

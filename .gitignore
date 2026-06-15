@@ -32,3 +32,6 @@ mimic_claude/.env.bak
 mimic_claude/.mimic/sessions/
 mimic_tui/.mimic/sessions/
 mimic_tui/mimic.log
+
+# Vitest test cache
+.vitest-cache/
