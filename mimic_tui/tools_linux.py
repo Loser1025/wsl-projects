@@ -234,7 +234,7 @@ def file_info(path: str) -> str:
     if isinstance(lines, int) and size_chars > 5000:
         advice = (
             f"\n[推奨] このファイルは大きいです。read_file より先に:\n"
-            f"  → search_in_file(pattern='キーワード', path='{path}') で絞り込む\n"
+            f"  → grep_codebase(pattern='キーワード', path='{path}') で絞り込む\n"
             f"  → run_pipeline('grep -n ...' ) でフィルタする"
         )
     return (
@@ -247,62 +247,56 @@ def file_info(path: str) -> str:
 
 
 @tools.register(
-    name="search_in_file",
-    description="ファイル内をパターン検索して該当行と前後N行を返す。read_file より先に試すこと。",
+    name="grep_codebase",
+    description=(
+        "パターン検索。path 指定でファイル内単一検索（旧 search_in_file）、"
+        "directory 指定でコードベース全体を再帰検索。read_file より先に試すこと。"
+    ),
+    short_desc="コードベース/ファイル内をパターン検索。",
     parameters={
         "type": "object",
         "properties": {
             "pattern":       {"type": "string",  "description": "検索パターン（正規表現可）"},
-            "path":          {"type": "string",  "description": "検索対象ファイルのパス"},
-            "context_lines": {"type": "integer", "description": "マッチ行の前後に表示する行数（デフォルト3）", "default": 3},
+            "path":          {"type": "string",  "description": "単一ファイル検索時のパス（指定するとファイル内検索モード）"},
+            "directory":     {"type": "string",  "description": "再帰検索対象ディレクトリ（pathが未指定の場合に使用、デフォルト: 作業フォルダ）"},
+            "file_type":     {"type": "string",  "description": "対象ファイル拡張子（例: py, js）デフォルト全ファイル（ファイル内検索時は無効）"},
             "ignore_case":   {"type": "boolean", "description": "大文字小文字を無視する（デフォルト false）", "default": False},
-        },
-        "required": ["pattern", "path"],
-    },
-)
-def search_in_file(pattern: str, path: str, context_lines: int = 3, ignore_case: bool = False) -> str:
-    p = Path(path)
-    if not p.exists():
-        return f"エラー: ファイルが見つかりません: {path}"
-    cmd = ["grep", "-n", "-C", str(context_lines)]
-    if ignore_case:
-        cmd.append("-i")
-    cmd.extend([pattern, str(p.resolve())])
-    result = subprocess.run(
-        cmd,
-        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
-    )
-    if result.returncode == 1:  # grep: no match
-        return f"「{pattern}」は {path} に見つかりませんでした。"
-    if result.returncode > 1:
-        return f"エラー: {result.stderr.strip()}"
-    out = result.stdout.strip()
-    lines = out.count("\n") + 1
-    return f"[search_in_file] {path} / pattern={repr(pattern)} / {lines}行マッチ\n{out}"
-
-
-@tools.register(
-    name="grep_codebase",
-    description="コードベース全体をキーワード検索し、ファイル名と行番号を返す。",
-    parameters={
-        "type": "object",
-        "properties": {
-            "pattern":     {"type": "string",  "description": "検索パターン（正規表現可）"},
-            "directory":   {"type": "string",  "description": "検索対象ディレクトリ（デフォルト: 作業フォルダ）"},
-            "file_type":   {"type": "string",  "description": "対象ファイル拡張子（例: py, js, ts）デフォルト全ファイル"},
-            "ignore_case": {"type": "boolean", "description": "大文字小文字を無視する（デフォルト false）", "default": False},
-            "max_results": {"type": "integer", "description": "最大表示件数（デフォルト 50）", "default": 50},
+            "context_lines": {"type": "integer", "description": "マッチ行の前後に表示する行数（ファイル内検索時のみ有効、デフォルト3）", "default": 3},
+            "max_results":   {"type": "integer", "description": "最大表示件数（再帰検索時のみ有効、デフォルト 50）", "default": 50},
         },
         "required": ["pattern"],
     },
 )
 def grep_codebase(
     pattern: str,
+    path: str = "",
     directory: str = ".",
     file_type: str = "",
     ignore_case: bool = False,
+    context_lines: int = 3,
     max_results: int = 50,
 ) -> str:
+    if path:
+        # 単一ファイル検索モード（旧 search_in_file）
+        p = Path(path)
+        if not p.exists():
+            return f"エラー: ファイルが見つかりません: {path}"
+        cmd = ["grep", "-n", "-C", str(context_lines)]
+        if ignore_case:
+            cmd.append("-i")
+        cmd.extend([pattern, str(p.resolve())])
+        result = subprocess.run(
+            cmd,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
+        )
+        if result.returncode == 1:
+            return f"「{pattern}」は {path} に見つかりませんでした。"
+        if result.returncode > 1:
+            return f"エラー: {result.stderr.strip()}"
+        out = result.stdout.strip()
+        lines = out.count("\n") + 1
+        return f"[grep_codebase] {path} / pattern={repr(pattern)} / {lines}行マッチ\n{out}"
+    # 再帰検索モード（旧 grep_codebase）
     cwd = str(Path.cwd())
     target = str(Path(directory).resolve()) if directory != "." else cwd
     include = f"--include='*.{file_type}'" if file_type else ""
@@ -321,6 +315,11 @@ def grep_codebase(
     lines = out.count("\n") + 1
     suffix = f"\n（上位 {max_results} 件を表示）" if lines >= max_results else ""
     return f"[grep_codebase] pattern={repr(pattern)} / {lines}件ヒット\n{out}{suffix}"
+
+
+def search_in_file(pattern: str, path: str, context_lines: int = 3, ignore_case: bool = False) -> str:
+    """後方互換: grep_codebase(path=...) に委譲。ツールとしては登録しない。"""
+    return grep_codebase(pattern=pattern, path=path, context_lines=context_lines, ignore_case=ignore_case)
 
 
 @tools.register(
@@ -368,7 +367,7 @@ def smart_read(path: str, focus: Optional[str] = None, context_lines: int = 5) -
     return (
         f"[警告] {path} は {size:,} 文字 ({lines}行) あります。\n"
         f"コンテキスト節約のため以下を推奨:\n"
-        f"  search_in_file(pattern='キーワード', path='{path}')  ← 特定箇所を探す\n"
+        f"  grep_codebase(pattern='キーワード', path='{path}')  ← 特定箇所を探す\n"
         f"  grep_codebase(pattern='...', directory='.')           ← 複数ファイルを横断検索\n"
         f"  smart_read(path='{path}', focus='関数名')             ← キーワード指定で絞り込む\n\n"
         f"--- 先頭 2,000文字（プレビュー）---\n{preview}"

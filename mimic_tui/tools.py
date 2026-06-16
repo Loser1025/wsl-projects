@@ -141,11 +141,12 @@ class ToolRegistry:
     def __init__(self):
         self._tools: dict[str, dict] = {}
 
-    def register(self, name: str, description: str, parameters: dict):
-        """ツールを登録（OpenAI tools 形式でネイティブ保存）"""
+    def register(self, name: str, description: str, parameters: dict, short_desc: str = ""):
+        """ツールを登録（OpenAI tools 形式でネイティブ保存）。short_desc はTPM制約時の短縮説明文。"""
         def decorator(fn):
             self._tools[name] = {
                 "fn": fn,
+                "short_desc": short_desc or description,
                 "spec": {
                     "type": "function",
                     "function": {
@@ -158,8 +159,19 @@ class ToolRegistry:
             return fn
         return decorator
 
-    def get_specs(self) -> list[dict]:
-        return [v["spec"] for v in self._tools.values()]
+    def get_specs(self, short: bool = False) -> list[dict]:
+        if not short:
+            return [v["spec"] for v in self._tools.values()]
+        result = []
+        for v in self._tools.values():
+            spec = v["spec"]
+            sd = v.get("short_desc", "")
+            if sd and sd != spec["function"]["description"]:
+                import copy
+                spec = copy.deepcopy(spec)
+                spec["function"]["description"] = sd
+            result.append(spec)
+        return result
 
     def unregister(self, name: str) -> bool:
         """ツールを登録解除する。存在しない場合は False を返す。"""
@@ -169,7 +181,7 @@ class ToolRegistry:
         """source レジストリからツール1件をコピーする。存在しない場合は False を返す。"""
         if name not in source._tools:
             return False
-        self._tools[name] = source._tools[name]
+        self._tools[name] = source._tools[name]  # short_desc も含めてコピー
         return True
 
     def execute(self, name: str, args: dict) -> Any:
@@ -216,7 +228,7 @@ def update_scratchpad(content: str) -> str:
     if len(content) > 800:
         content = content[:800] + "\n…（上限800字で切り捨て）"
     set_scratchpad(content)
-    return "✓ スクラッチパッドを更新しました。"
+    return f"スクラッチパッドを更新しました（{len(content)}文字）"
 
 
 def update_scratchpad_smart(content: str) -> str:
@@ -243,7 +255,7 @@ _READ_FILE_CHAR_CHUNK = _TOOL_CHUNK_SIZE
     name="read_file",
     description=(
         f"ファイルを{_READ_FILE_CHAR_CHUNK}文字単位で読む。offset で続きを読める。"
-        "大きいファイルは先に search_in_file / grep_codebase を試すこと。"
+        "大きいファイルは先に grep_codebase を試すこと。"
     ),
     parameters={
         "type": "object",
@@ -273,7 +285,7 @@ def read_file(path: str, offset: int = 0) -> str:
             f"[read_file: {path}]\n"
             f"⚠ このファイルは {total:,} 文字あります（推奨上限 {_LARGE_FILE_THRESHOLD:,} 文字）。\n"
             f"コンテキスト節約のため以下を先に検討してください:\n"
-            f"  • search_in_file(pattern='キーワード', path='{path}')  ← 特定箇所だけ取得\n"
+            f"  • grep_codebase(pattern='キーワード', path='{path}')  ← 特定箇所だけ取得\n"
             f"  • smart_read(path='{path}', focus='関数名')            ← focus 指定で絞り込み\n"
             f"  • grep_codebase(pattern='...')                         ← 複数ファイル横断検索\n"
             f"それでも全文が必要な場合は read_file(path='{path}', offset=0) を続けてください。\n"
@@ -467,7 +479,7 @@ def edit_file(path: str, old_string: str, new_string: str) -> str:
         f"{warning}エラー: 指定された 'old_string' がファイル内に見つかりません: {path}\n"
         f"検索対象（先頭120文字）: {preview}\n"
         f"対処法:\n"
-        f"  ① search_in_file や smart_read で現在のファイル内容を確認し、正確な文字列で再実行してください。\n"
+        f"  ① grep_codebase や smart_read で現在のファイル内容を確認し、正確な文字列で再実行してください。\n"
         f"  ② インデントのズレが疑われる場合は patch_file を明示的に指定してください。"
     )
 

@@ -50,12 +50,12 @@ _ISOLATED_MAX_ROUNDS = 8
 
 _SUPERVISOR_TOOLS = [
     "read_file", "read_tool_cache", "get_repo_map",
-    "search_in_file", "grep_codebase", "file_info", "smart_read",
+    "grep_codebase", "file_info", "smart_read",
 ]
 
 _RESEARCHER_TOOLS = [
     "read_file", "read_tool_cache", "get_repo_map",
-    "search_in_file", "grep_codebase", "file_info", "smart_read",
+    "grep_codebase", "file_info", "smart_read",
     "web_search", "fetch_webpage",
 ]
 _RESEARCHER_MAX_ROUNDS = 12
@@ -84,7 +84,7 @@ Workerが「ここまでに行った作業」の差分サマリが、元の指�
   あれば原則として "retry" と判定し、feedbackの【修正】にその失敗内容（出力から読み取れる
   原因とファイル名・箇所）を具体的に書くこと。「[検証コマンド実行結果]」が無い場合は
   従来通り差分内容のみで判断する
-- 必要であれば読み取り専用ツール（read_file, search_in_file, grep_codebase, file_info, smart_read, get_repo_map）で
+- 必要であれば読み取り専用ツール（read_file, grep_codebase, file_info, smart_read, get_repo_map）で
   プロジェクトの現状を確認してよい（書き込みは一切できない）
 - 「前回のSupervisor所見」が渡されている場合は、その指摘（特に【修正】）が今回の
   変更で実際に解消されているかを最優先で確認すること。解消されていなければ
@@ -114,7 +114,7 @@ Director（指示役）から渡された「元の指示」を実現するため
 その結果をもとに、Workerがそのまま着手できる具体的な設計ワークフローを作成してください。
 
 # 調査
-- read_file, search_in_file, grep_codebase, file_info, smart_read, get_repo_map で
+- read_file, grep_codebase, file_info, smart_read, get_repo_map で
   対象ファイル・関連コードの現状を確認する
 - 必要であれば web_search / fetch_webpage で外部の仕様・ドキュメント・ライブラリの
   使い方などを調べる（書き込みは一切できない）
@@ -130,6 +130,31 @@ Director（指示役）から渡された「元の指示」を実現するため
 
 元の指示の意図から外れた提案や、無関係な追加作業は書かないこと。
 """
+
+
+_COMPRESS_THRESHOLD = 3000  # この文字数を超えたResearcher出力は中間要約コールで圧縮する
+
+_COMPRESS_SYSTEM_PROMPT = """\
+あなたは技術テキスト圧縮役です。
+渡されたテキストを3000文字以内に要約してください。
+- コードサンプル・ファイルパス・変更手順を優先して保持する
+- 重複・冗長な説明・前置きを省く
+- 出力はMarkdownでよい。説明なしで要約本文だけを返すこと
+"""
+
+
+def _compress_for_context(text: str, config, label: str = "") -> str:
+    """Researcher出力が長すぎる場合、中間要約コールで3000文字以内に圧縮する。"""
+    if len(text) <= _COMPRESS_THRESHOLD:
+        return text
+    safe_print(C.gray(f"  [Team:{label}] ✂ Researcher出力圧縮中 ({len(text)}文字→3000文字以内)..."), flush=True)
+    empty_reg = ToolRegistry()
+    summary = _run_isolated(config, empty_reg, _COMPRESS_SYSTEM_PROMPT, text,
+                             max_rounds=1, label=label, role="Compressor")
+    if summary:
+        safe_print(C.gray(f"  [Team:{label}] ✂ 圧縮完了 ({len(summary)}文字)"), flush=True)
+        return summary
+    return text[:_COMPRESS_THRESHOLD] + "\n…（要約圧縮）"
 
 
 def _build_readonly_registry() -> ToolRegistry:
@@ -239,7 +264,7 @@ Director（指示役）から渡された「調べてほしいこと」につい
 その結果だけをユーザーへの回答として整理して返してください。
 
 # 調査
-- read_file, search_in_file, grep_codebase, file_info, smart_read, get_repo_map で
+- read_file, grep_codebase, file_info, smart_read, get_repo_map で
   プロジェクト内の関連情報を確認できる
 - 必要であれば web_search / fetch_webpage で外部の仕様・公式ドキュメント等を調べる
   （書き込みは一切できない）
@@ -333,6 +358,7 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
 
     safe_print(C.gray(f"  {team_tag} 🔍 Researcher調査中..."), flush=True)
     research = run_research(task, project_dir, config, label=label)
+    research = _compress_for_context(research, config, label=label)
     _log_team_event({"event": "team_research_done", "task": task, "research": research[:2000], "trace_id": trace_id})
 
     for attempt in range(1, MAX_TEAM_RETRIES + 1):

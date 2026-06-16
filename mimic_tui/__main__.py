@@ -60,7 +60,7 @@ def _build_components(base_dir: str, active_config=None):
     _EXTREME_EXCLUDED_TOOLS = {
         "write_file", "edit_file", "patch_file", "delete_file",
         "run_bash", "run_pipeline",
-        "read_file", "search_in_file", "grep_codebase", "file_info",
+        "read_file", "grep_codebase", "file_info",
         "smart_read", "get_repo_map", "read_tool_cache",
         "web_search", "fetch_webpage",
     }

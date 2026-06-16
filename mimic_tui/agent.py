@@ -186,6 +186,7 @@ def _build_openrouter_payload(
     tool_specs: list[dict],
     system_prompt: Optional[str],
     json_mode: bool,
+    prompt_cache_key: Optional[str] = None,
 ) -> tuple[dict, str]:
     """ペイロードと使用する API キーを返す。変換不要・全てネイティブ OpenAI 形式。"""
     send_messages = []
@@ -210,6 +211,9 @@ def _build_openrouter_payload(
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
 
+    if prompt_cache_key and isinstance(config, MistralConfig):
+        payload["prompt_cache_key"] = prompt_cache_key
+
     api_key = _acquire_key_with_wait(config)
     return payload, api_key
 
@@ -220,8 +224,9 @@ def _call_openrouter_api(
     tool_specs: list[dict],
     system_prompt: Optional[str] = None,
     json_mode: bool = False,
+    prompt_cache_key: Optional[str] = None,
 ) -> dict:
-    payload, api_key = _build_openrouter_payload(config, messages, tool_specs, system_prompt, json_mode)
+    payload, api_key = _build_openrouter_payload(config, messages, tool_specs, system_prompt, json_mode, prompt_cache_key)
     url = f"{config.api_base}/chat/completions"
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
@@ -258,13 +263,14 @@ def _stream_openrouter_api(
     system_prompt: Optional[str] = None,
     json_mode: bool = False,
     on_model=None,
+    prompt_cache_key: Optional[str] = None,
 ):
     """
     ストリーミング呼び出し。
     yields (text_chunk: str, tool_calls: list[dict], finish_reason: str)
     on_model(actual_model_id) は最初のチャンクで実際のモデルが判明した時点で1度だけ呼ばれる。
     """
-    payload, api_key = _build_openrouter_payload(config, messages, tool_specs, system_prompt, json_mode)
+    payload, api_key = _build_openrouter_payload(config, messages, tool_specs, system_prompt, json_mode, prompt_cache_key)
     payload["stream"] = True
 
     url = f"{config.api_base}/chat/completions"
@@ -438,6 +444,7 @@ class OpenRouterAgent:
         self._tool_cache_max = 128  # LRU 上限
         self.json_mode: bool = False
         self._overhead_cache: tuple[float, int] = (0.0, 0)  # (timestamp, value)
+        self._session_cache_key: str = uuid4().hex[:16]
         self._update_compaction_threshold()
 
     def set_system_prompt(self, prompt: str):
@@ -635,7 +642,8 @@ class OpenRouterAgent:
         messages: list[dict],
         override_tool_specs: Optional[list] = None,
     ) -> dict:
-        tool_specs = override_tool_specs if override_tool_specs is not None else self.tools.get_specs()
+        _short = isinstance(self._config, MistralConfig)
+        tool_specs = override_tool_specs if override_tool_specs is not None else self.tools.get_specs(short=_short)
         attempt = 0
         trim_count = 0
         working_messages = _repair_message_sequence(list(messages))
@@ -648,6 +656,7 @@ class OpenRouterAgent:
                     self._config, working_messages, tool_specs,
                     system_prompt=self.system_prompt,
                     json_mode=self.json_mode,
+                    prompt_cache_key=self._session_cache_key,
                 )
                 actual = result.get("model", "")
                 if actual and actual != self._config.model:
@@ -673,7 +682,8 @@ class OpenRouterAgent:
         queue.get(timeout=0.05) でポーリングするため Ctrl+C が確実に機能する。
         <think>/<thought> タグが閉じないまま _THINK_BUDGET_CHARS を超えた場合は自動停止する。
         """
-        tool_specs = self.tools.get_specs()
+        _short = isinstance(self._config, MistralConfig)
+        tool_specs = self.tools.get_specs(short=_short)
         attempt = 0
         trim_count = 0
         working_messages = _repair_message_sequence(list(messages))
@@ -700,6 +710,7 @@ class OpenRouterAgent:
                             self._config, working_messages, tool_specs,
                             self.system_prompt, json_mode=self.json_mode,
                             on_model=_on_actual_model,
+                            prompt_cache_key=self._session_cache_key,
                         ):
                             chunk_queue.put(item)
                             if cancel_event.is_set():

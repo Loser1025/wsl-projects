@@ -771,6 +771,25 @@ _TOOL_CHUNK_SIZE: int = 10000
 _TOOL_CACHE_MAX_ENTRIES: int = 50
 _tool_cache_lock = threading.Lock()
 
+def cache_obs(tool_name: str, result: str, threshold: int = 2000) -> str:
+    """observation短縮用: threshold文字超の結果をキャッシュして先頭+cache_keyを返す。"""
+    global _tool_cache_counter
+    if len(result) <= threshold:
+        return result
+    with _tool_cache_lock:
+        _tool_cache_counter += 1
+        cache_key = f"{tool_name}_{_tool_cache_counter:03d}"
+        _tool_output_cache[cache_key] = result
+        while len(_tool_output_cache) > _TOOL_CACHE_MAX_ENTRIES:
+            del _tool_output_cache[next(iter(_tool_output_cache))]
+    total = len(result)
+    sliced = result[:threshold]
+    remaining = total - threshold
+    header = f"[{tool_name} 全{total}文字  cache_key=\"{cache_key}\"]\n"
+    footer = f"\n…残り{remaining}文字: read_tool_cache(cache_key=\"{cache_key}\", offset={threshold})"
+    return header + sliced + footer
+
+
 def cache_tool_output(tool_name: str, result: str) -> str:
     """
     ツール出力が _TOOL_CHUNK_SIZE を超える場合はメモリにキャッシュし、

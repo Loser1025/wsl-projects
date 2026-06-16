@@ -6,11 +6,12 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
-from .utils import safe_print, C, log, PipelineTypewriter, cache_tool_output
+from .utils import safe_print, C, log, PipelineTypewriter, cache_tool_output, cache_obs
 from .agent import OpenRouterAgent, _CACHEABLE_TOOLS, _print_write_diff, _build_tool_call_entry
 from .tools import tools, UserRejectedWriteError
 from .autogit import AutoGit, ReactLog
 
+_OBS_MAX_CHARS = 2000  # conversation内のobservationをこの文字数に切り詰める（大出力はtool cacheに別保存済み）
 
 BASH_EXECUTOR_GUIDANCE = """\
 
@@ -46,10 +47,10 @@ REACT_SYSTEM_PROMPT = """
 ### 読む前に自問する
 | やりたいこと | 使うべきツール |
 |---|---|
-| キーワードを探したい | search_in_file(pattern, path) |
-| コードベース全体を検索 | grep_codebase(pattern, directory) |
+| キーワードを探したい | grep_codebase(pattern, path=path) |
+| コードベース全体を検索 | grep_codebase(pattern, directory=dir) |
 | ファイルの大きさを確認 | file_info(path) |
-| 関数・クラス一覧を把握 | search_in_file("^def \\|^class ", path) |
+| 関数・クラス一覧を把握 | grep_codebase("^def \\|^class ", path=path) |
 | ログを集計・フィルタ | run_pipeline("grep ERROR log | sort | uniq -c") |
 | 上記以外で 5,000文字以下 | read_file(path) |
 
@@ -60,12 +61,12 @@ REACT_SYSTEM_PROMPT = """
 
 ### read_file を使ってはいけない条件
 - 大きなファイルを「とりあえず読む」目的
-- キーワード検索が目的（→ search_in_file を使う）
-- 複数ファイル横断検索（→ grep_codebase を使う）
+- キーワード検索が目的（→ grep_codebase(pattern, path=path) を使う）
+- 複数ファイル横断検索（→ grep_codebase(pattern, directory=dir) を使う）
 
 ## ツール使用の原則
 - プロジェクト構造が不明なときは grep_codebase で検索してから把握する
-- ファイルを編集する前に search_in_file で対象箇所を確認する
+- ファイルを編集する前に grep_codebase(pattern, path=path) で対象箇所を確認する
 - 独立した読み取り操作は複数同時に呼び出して並列実行する
 - ツールは「言及する」だけでなく、必ず実際に呼び出す
 - エラーが出たら原因を特定し、代替手段を試みる
@@ -133,7 +134,7 @@ REACT_SYSTEM_PROMPT = """
   デプロイ・長時間コマンドはタイムアウトしても成功していることがあるため、途中出力から成否を判断する。
 
 ### Pipeline-First（コンテキスト節約・優先使用）
-file_info, search_in_file, grep_codebase, run_pipeline, run_bash
+file_info, grep_codebase, run_pipeline, run_bash
 
 ### ファイル操作
 read_file, read_tool_cache, write_file, edit_file, patch_file
@@ -193,7 +194,7 @@ Supervisor（レビュー、不十分なら修正/続きを指示して最大5�
    プロジェクトへ反映され、AutoGitでコミット済みである。**あなた自身でファイルを
    書き換えたりコミットし直したりする必要はない**。
 4. 【検証】このモードではファイルを直接読むツール（read_file/grep_codebase/
-   search_in_file/get_repo_map など）も取り上げられているため、delegate_to_team
+   get_repo_map など）も取り上げられているため、delegate_to_team
    が返す差分サマリの記述だけを根拠に、本当にユーザーの要求を満たしているか確認する。
    既存のテスト/ビルド/lintコマンドがあれば delegate_to_team の verify_cmd に
    指定すること。Worker実行後に同じ作業ディレクトリでそのコマンドが自動実行され、
@@ -344,6 +345,8 @@ class InteractiveOrchestrator:
         had_tool_call     = False
         error_counts: dict[str, int] = {}
         write_tools  = {"write_file", "edit_file", "patch_file", "delete_file"}
+        # path → list of call_ids: 消費済みread観測を追跡してwrite時に無効化する
+        _read_call_ids: dict[str, list[str]] = {}
 
         # ── 3. ReActループ ───────────────────────────────────────
         while step_count < self.MAX_REACT_STEPS:
@@ -458,11 +461,11 @@ class InteractiveOrchestrator:
                     obs_preview = r_str[:300].replace("\n", " ")
                     safe_print(C.cyan(f"  👁 {obs_preview}"), flush=True)
                     self.react_log.add("observation", tool=fn_n, result=r_str[:500], step=step_count)
-                    return idx, fn_n, r_str, call_id
+                    return idx, fn_n, r_str, call_id, fn_a.get("path", "")
 
                 with ThreadPoolExecutor(max_workers=len(tool_calls)) as tpool:
-                    for idx, fn_n, r_str, call_id in tpool.map(_par_exec, enumerate(tool_calls)):
-                        ordered[idx] = {"tool": fn_n, "result": r_str, "call_id": call_id}
+                    for idx, fn_n, r_str, call_id, _path in tpool.map(_par_exec, enumerate(tool_calls)):
+                        ordered[idx] = {"tool": fn_n, "result": r_str, "call_id": call_id, "path": _path}
                 tool_results = ordered  # type: ignore
             else:
                 # ── 逐次実行（書き込み系を含む場合・単一ツール）──────
@@ -512,14 +515,29 @@ class InteractiveOrchestrator:
                         "tool":    fn_name,
                         "result":  result_str,
                         "call_id": call_id,
+                        "path":    fn_args.get("path", ""),
                     })
 
             # ── Observation を OpenAI ネイティブ形式（role: tool）で追加 ──
             for r in tool_results:
+                fn_n = r["tool"]
+                path = r.get("path", "")
+                # 書き込み系: 同一ファイルの古いread観測を無効化
+                if fn_n in write_tools and path:
+                    for stale_id in _read_call_ids.pop(path, []):
+                        for m in messages:
+                            if m.get("role") == "tool" and m.get("tool_call_id") == stale_id:
+                                m["content"] = "[このread結果は後で上書きされました—省略]"
+                                break
+                obs = cache_obs(fn_n, r["result"], threshold=_OBS_MAX_CHARS)
+                cid = r["call_id"]
+                # 読み取り系: call_idを記録してあとで無効化できるようにする
+                if fn_n == "read_file" and path:
+                    _read_call_ids.setdefault(path, []).append(cid)
                 messages.append({
                     "role": "tool",
-                    "tool_call_id": r["call_id"],
-                    "content": r["result"],
+                    "tool_call_id": cid,
+                    "content": obs,
                 })
             if any(tc.get("name") == "mark_task_done" for tc in tool_calls):
                 self.task_done_signaled = True
