@@ -157,8 +157,8 @@ class MonitoringToolRegistry(ToolRegistry):
         self.current_tool: Optional[str] = None   # 実行中ツール名（ダッシュボード参照用）
 
     # specs は親クラスに委譲（_tools を参照共有しているため正しく動く）
-    def get_specs(self):
-        return super().get_specs()
+    def get_specs(self, short: bool = False):
+        return super().get_specs(short=short)
 
     def execute(self, tool_name: str, args: dict) -> str:
         """ツールを実行し、計測結果を ToolCallLog に記録する。"""

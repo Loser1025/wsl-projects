@@ -710,7 +710,8 @@ class OpenRouterAgent:
                             self._config, working_messages, tool_specs,
                             self.system_prompt, json_mode=self.json_mode,
                             on_model=_on_actual_model,
-                            prompt_cache_key=self._session_cache_key,
+                            # prompt_cache_key はマルチターンtool会話では使わない
+                            # （Mistralが処理済みtool_call_idを「予期しない」と拒否するため）
                         ):
                             chunk_queue.put(item)
                             if cancel_event.is_set():

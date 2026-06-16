@@ -61,7 +61,7 @@ def _build_components(base_dir: str, active_config=None):
         "write_file", "edit_file", "patch_file", "delete_file",
         "run_bash", "run_pipeline",
         "read_file", "grep_codebase", "file_info",
-        "smart_read", "get_repo_map", "read_tool_cache",
+        "smart_read", "get_repo_map",
         "web_search", "fetch_webpage",
     }
     _extreme_registry = ToolRegistry()
