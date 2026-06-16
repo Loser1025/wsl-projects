@@ -247,5 +247,6 @@ export default {
 
     // その他のエンドポイントは既存の処理を維持
     // ... 既存の処理 ...
+    return new Response('Not Found', { status: 404 });
   }
 };

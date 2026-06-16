@@ -1,6 +1,6 @@
 name = "zoom-dialer"
 main = "src/index.ts"
-compatibility_date = "2026-06-13"
+compatibility_date = "2024-06-13"
 
 [observability]
 enabled = true
@@ -9,3 +9,12 @@ head_sampling_rate = 1
 [[kv_namespaces]]
 binding = "PHONE_STORE"
 id = "df957e28ed894d09b824c5a6f938fdeb9"
+
+[assets]
+directory = "./src"
+binding = "ASSETS"
+
+[vars]
+ZOOM_WEBHOOK_SECRET = "@zoom-webhook-secret"
+
+
