@@ -1,0 +1,28 @@
+
+> zoom-dialer@0.0.0 deploy
+> wrangler deploy
+
+
+ ⛅️ wrangler 4.100.0
+────────────────────
+🌀 Building list of assets...
+✨ Read 2 files from the assets directory /tmp/deploy_temp/src
+🌀 Starting asset upload...
+🌀 Found 2 new or modified static assets to upload. Proceeding with upload...
++ /dashboard.html
++ /index.ts
+Uploaded 1 of 2 assets
+Uploaded 2 of 2 assets
+✨ Success! Uploaded 2 files (1.02 sec)
+
+Total Upload: 7.35 KiB / gzip: 2.44 KiB
+Your Worker has access to the following bindings:
+Binding                                                         Resource                  
+env.PHONE_STORE (077ff66b60ae43a2b5c16b9030e83dff)              KV Namespace              
+env.ASSETS                                                      Assets                    
+env.ZOOM_WEBHOOK_SECRET ("@zoom-webhook-secret")                Environment Variable      
+
+Uploaded zoom-dialer (5.19 sec)
+Deployed zoom-dialer triggers (0.86 sec)
+  https://zoom-dialer.zoom-dialer-drib189.workers.dev
+Current Version ID: d7fb87c3-bf40-4125-8f73-686c3fac334c

@@ -1,0 +1,6 @@
+
+ ⛅️ wrangler 4.100.0
+────────────────────
+? Are you sure you want to delete zoom-dialer? This action cannot be undone.
+🤖 Using fallback value in non-interactive context: yes
+Successfully deleted zoom-dialer

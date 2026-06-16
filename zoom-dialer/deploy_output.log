@@ -1,0 +1,22 @@
+
+> zoom-dialer@0.0.0 deploy
+> wrangler deploy
+
+
+ ⛅️ wrangler 4.100.0
+────────────────────
+🌀 Building list of assets...
+✨ Read 2 files from the assets directory /tmp/mimic_subagent_single_gc4bynp6/merged/src
+🌀 Starting asset upload...
+No updated asset files to upload. Proceeding with deployment...
+Total Upload: 7.35 KiB / gzip: 2.44 KiB
+Your Worker has access to the following bindings:
+Binding                                                         Resource                  
+env.PHONE_STORE (077ff66b60ae43a2b5c16b9030e83dff)              KV Namespace              
+env.ASSETS                                                      Assets                    
+env.ZOOM_WEBHOOK_SECRET ("@zoom-webhook-secret")                Environment Variable      
+
+Uploaded zoom-dialer (4.43 sec)
+Deployed zoom-dialer triggers (0.83 sec)
+  https://zoom-dialer.zoom-dialer-drib189.workers.dev
+Current Version ID: e6739c27-c6aa-4efd-b898-e6c241b71893

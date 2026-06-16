@@ -8,7 +8,7 @@ head_sampling_rate = 1
 
 [[kv_namespaces]]
 binding = "PHONE_STORE"
-id = "df957e28ed894d09b824c5a6f938fdeb9"
+id = "077ff66b60ae43a2b5c16b9030e83dff"
 
 [assets]
 directory = "./src"

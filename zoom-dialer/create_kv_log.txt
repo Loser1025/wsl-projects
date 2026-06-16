@@ -1,0 +1,17 @@
+
+ ⛅️ wrangler 4.100.0
+────────────────────
+Resource location: remote 
+
+🌀 Creating namespace with title "PHONE_STORE"
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mA KV namespace with the title "PHONE_STORE" already exists.[0m
+
+  
+  You can list existing namespaces with their IDs by running:
+    wrangler kv namespace list
+  
+  Or choose a different namespace name.
+
+
+🪵  Logs were written to "/home/loser/.config/.wrangler/logs/wrangler-2026-06-16_05-58-04_527.log"

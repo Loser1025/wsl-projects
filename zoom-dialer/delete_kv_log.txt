@@ -1,0 +1,12 @@
+
+ ⛅️ wrangler 4.100.0
+────────────────────
+Resource location: remote 
+
+About to delete remote KV namespace name: "PHONE_STORE" (id: "df957e28ed894d0b824c5a6f938fdeb9").
+This action is irreversible and will permanently delete all data in the KV namespace.
+
+? Ok to proceed?
+🤖 Using fallback value in non-interactive context: yes
+Deleting KV namespace name: "PHONE_STORE" (id: "df957e28ed894d0b824c5a6f938fdeb9").
+Deleted KV namespace name: "PHONE_STORE" (id: "df957e28ed894d0b824c5a6f938fdeb9").
