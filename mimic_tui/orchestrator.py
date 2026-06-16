@@ -385,6 +385,13 @@ class InteractiveOrchestrator:
                 final_text = text or "(応答なし)"
                 self.react_log.add("final_answer", content=self._strip_thinking(final_text))
 
+                # ターン内の複数checkpointコミットを1つにまとめる（git log を読みやすくする）。
+                # _checkpointsが空（書き込みなし）なら squash() は即リターンして何もしない。
+                _sq_msg = f"🤖 task: {user_message[:72].replace(chr(10), ' ')}"
+                _sq_result = self.auto_git.squash(self.agent.cwd, _sq_msg)
+                if _sq_result:
+                    safe_print(C.gray(f"  [AutoGit] {_sq_result}"), flush=True)
+
                 # ツール実行履歴を含む全ターンを conversation に保存（内部マーカーを除外）
                 self.agent.conversation.append({"role": "user", "content": user_message})
                 _save_msgs = [m for m in messages[old_conv_len + 1:] if not m.get("_skip_save")]

@@ -265,7 +265,27 @@ export default {
           return new Response(JSON.stringify({ plainToken, encryptedToken }), { headers: { 'Content-Type': 'application/json' } });
         }
 
-        if (eventType === 'phone.call_ended' || eventType === 'phone_call_ended' || eventType === 'phone.caller_ended' || eventType === 'phone_caller_ended') {
+        if (eventType === 'phone.call_started' || eventType === 'phone_call_started') {
+          const payload = body.payload?.object || body.payload || {};
+          const calleeNumber = payload.callee_number_number || payload.callee?.phone_number || payload.to?.phone_number || '';
+          const eventTime = new Date().toISOString();
+          const lastEventInfo: LastEventInfo = {
+            last_event: eventType,
+            last_result: null,
+            last_event_time: eventTime,
+            call_phase: 'calling'
+          };
+
+          addLog('[webhook] call started: ' + maskPhoneNumber(calleeNumber));
+          await saveLogToKV(env, '[webhook] call started: ' + maskPhoneNumber(calleeNumber));
+
+          await Promise.all([
+            env.PHONE_STORE.put('last_event', eventType),
+            env.PHONE_STORE.put('last_event_time', eventTime),
+            env.PHONE_STORE.put('call_phase', 'calling'),
+            env.PHONE_STORE.put('last_event_info', JSON.stringify(lastEventInfo))
+          ]);
+        } else if (eventType === 'phone.call_ended' || eventType === 'phone_call_ended' || eventType === 'phone.caller_ended' || eventType === 'phone_caller_ended') {
           const payload = body.payload?.object || body.payload || {};
           await saveLogToKV(env, '[webhook] payload=' + JSON.stringify(payload).slice(0, 200));
           console.log('[webhook] payload=' + JSON.stringify(payload).slice(0, 200));
@@ -274,6 +294,8 @@ export default {
           const duration = payload.duration || payload.talk_time || 0;
           const resultStr = duration > 0 ? 'コネクト' : '不在/応答なし';
           const eventTime = new Date().toISOString();
+          const currentIndex = (await env.PHONE_STORE.get('current_index')) || '0';
+          const nextIndex = String(Number(currentIndex) + 1);
           const lastEventInfo: LastEventInfo = {
             last_event: eventType,
             last_result: resultStr,
@@ -286,6 +308,19 @@ export default {
 
           await Promise.all([
             env.PHONE_STORE.put('last_event', eventType),
+            env.PHONE_STORE.put('last_result', resultStr),
+            env.PHONE_STORE.put('last_event_time', eventTime),
+            env.PHONE_STORE.put('call_phase', 'ended'),
+            env.PHONE_STORE.put('current_index', nextIndex),
+            env.PHONE_STORE.put('last_event_info', JSON.stringify(lastEventInfo))
+          ]);
+
+          // 次の番号を設定
+          const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
+          const queue = JSON.parse(queueRaw);
+          if (Number(nextIndex) < queue.length) {
+            await env.PHONE_STORE.put('next_phone', '+81' + queue[nextIndex].replace('zoomphonecall://+81', ''));
+          }
             env.PHONE_STORE.put('last_result', resultStr),
             env.PHONE_STORE.put('last_event_time', eventTime),
             env.PHONE_STORE.put('call_phase', 'ended'),
@@ -646,16 +681,22 @@ function getDashboardHTML(
           </div>
         </div>\`;
     }
-    function actionButtons(finished) {
-      return finished ? \`
-        <div class="text-center py-6">
-          <p class="text-2xl font-bold text-green-600 mb-4">✅ 完了</p>
-          <button onclick="doReset()" class="py-3 px-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">🔄 もう一度</button>
-        </div>\` : \`
+    function actionButtons(callPhase) {
+      if (callPhase === "calling") {
+        return ""; // 通話中はボタンを非表示
+      } else if (callPhase === "ended") {
+        return `
         <div class="grid grid-cols-2 gap-3">
           <button onclick="doSkip()" class="py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-all">⏭ スキップ</button>
           <button onclick="doReset()" class="py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all">🔄 リセット</button>
-        </div>\`;
+        </div>`;
+      } else {
+        return `
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="doSkip()" class="py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-all">⏭ スキップ</button>
+          <button onclick="doReset()" class="py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all">🔄 リセット</button>
+        </div>`;
+      }
     }
     function renderReady(data) {
       screen = 'ready';
@@ -678,8 +719,8 @@ function getDashboardHTML(
           <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
             \${hasZoomUrl ? \`
               <a href="\${escapeHtml(data.zoomphonecall_url)}" target="_blank" onclick="handleCallClick(this.href); return false;" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 架電する（Zoom起動）</a>
-              \${actionButtons(false)}
-            \` : actionButtons(true)}
+              \${actionButtons(data.call_phase || "ready")}
+            \` : actionButtons(data.call_phase || "ready")}
           </div>
         </div>\`;
     }
@@ -695,7 +736,7 @@ function getDashboardHTML(
               <p class="text-3xl font-bold text-green-600 mb-4">\${escapeHtml(data.phone || '—')}</p>
               <p class="text-slate-600">Zoom Phone の起動と通話終了Webhookを待っています。</p>
             </div>
-            \${actionButtons(false)}
+            \${actionButtons(data.call_phase || "ready")}
           </div>
         </div>\`;
     }
@@ -714,8 +755,8 @@ function getDashboardHTML(
             </div>
             \${hasZoomUrl ? \`
               <a href="\${escapeHtml(data.zoomphonecall_url)}" target="_blank" onclick="handleCallClick(this.href); return false;" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 次の番号を架電する（Zoom起動）</a>
-              \${actionButtons(false)}
-            \` : actionButtons(true)}
+              \${actionButtons(data.call_phase || "ended")}
+            \` : actionButtons(data.call_phase || "ended")}
           </div>
         </div>\`;
     }
@@ -741,6 +782,66 @@ function getDashboardHTML(
         renderFinished(data);
         return;
       }
+
+      // call_phaseに応じた表示切り替え
+      if (data.call_phase === 'calling') {
+        renderCalling(data);
+        return;
+      } else if (data.call_phase === 'ended') {
+        renderEnded(data);
+        return;
+      }
+
+      // デフォルトはready画面
+      renderReady(data);
+    }
+
+    function renderCalling(data) {
+      screen = 'calling';
+      if (!screenRoot) return;
+      screenRoot.innerHTML = `
+        <div class="space-y-5">
+          
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+            <div class="text-center py-6">
+              <p class="text-sm text-slate-400 mb-2">通話中</p>
+              <p class="text-3xl font-bold text-green-600 mb-4">
+                
+                ${escapeHtml(data.phone || '—')}
+                
+              </p>
+              <p class="text-slate-600">通話が終了するまでお待ちください。</p>
+            </div>
+            ${actionButtons('calling')}
+          </div>
+        </div>`;
+    }
+
+    function renderEnded(data) {
+      screen = 'ended';
+      if (!screenRoot) return;
+      const hasZoomUrl = !isFinished(data) && data.zoomphonecall_url;
+      screenRoot.innerHTML = `
+        <div class="space-y-5">
+          
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+            <div class="text-center py-6">
+              <p class="text-sm text-slate-400 mb-2">通話終了</p>
+              <p class="text-3xl font-bold text-green-600 mb-4">
+                
+                ${escapeHtml(data.phone || '—')}
+                
+              </p>
+              <p class="text-slate-600">${escapeHtml(data.last_result || '結果を確認中')}</p>
+              <p class="text-slate-600">${escapeHtml(data.last_event || '')} / ${formatDateTime(data.last_event_time)}</p>
+            </div>
+            ${hasZoomUrl ? `
+              <a href="${escapeHtml(data.zoomphonecall_url)}" target="_blank" onclick="handleCallClick(this.href); return false;" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 次の番号を架電する（Zoom起動）</a>
+              ${actionButtons('ended')}
+            ` : actionButtons('ended')}
+          </div>
+        </div>`;
+    }
       if (screen === 'calling') {
         renderCalling(data);
         return;

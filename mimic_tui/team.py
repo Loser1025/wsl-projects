@@ -381,7 +381,7 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
                     if last_result.changed_files:
                         with _apply_lock:
                             apply_subagent_changes(upper, Path(resolved_dir), last_result.changed_files)
-                            AutoGit().checkpoint(resolved_dir, "delegate_to_team")
+                            _get_team_autogit().checkpoint(resolved_dir, "delegate_to_team")
                         applied = True
                 finally:
                     cleanup_subagent(base)
@@ -453,7 +453,7 @@ def run_worker_once(task: str, project_dir: str, config, label: str = "", verify
         if result.changed_files:
             with _apply_lock:
                 apply_subagent_changes(upper, Path(resolved_dir), result.changed_files)
-                AutoGit().checkpoint(resolved_dir, "delegate_to_worker")
+                _get_team_autogit().checkpoint(resolved_dir, "delegate_to_worker")
             applied = True
         cleanup_subagent(base)
         return _format_worker_result(result, applied=applied, done=True)
@@ -483,6 +483,26 @@ def run_team_tasks_parallel(tasks: list[str], project_dir: str, config, verify_c
         for th in batch:
             th.join()
     return results  # type: ignore[return-value]
+
+
+# ── Director の AutoGit インスタンス共有 ──────────────────────────
+# team.py が都度 AutoGit() を生成すると、Orchestrator の _checkpoints スタック
+# に委任コミットが積まれず、/rollback やターン末スカッシュが機能しない。
+# set_team_autogit() で Orchestrator の auto_git を共有し、checkpoint() を
+# 同一インスタンスに向けることで不整合を解消する。
+
+_team_autogit: Optional["AutoGit"] = None
+
+
+def set_team_autogit(autogit) -> None:
+    """Orchestratorが使用中のAutoGitインスタンスをteam.py内の委任チェックポイントと共有する。"""
+    global _team_autogit
+    _team_autogit = autogit
+
+
+def _get_team_autogit() -> "AutoGit":
+    """共有AutoGitインスタンスを返す。未設定なら新規インスタンスにフォールバック。"""
+    return _team_autogit if _team_autogit is not None else AutoGit()
 
 
 # ── アクティブモデル設定の共有 ────────────────────────────────────

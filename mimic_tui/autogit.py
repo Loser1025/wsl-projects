@@ -125,6 +125,32 @@ class AutoGit:
             return f"ロールバック完了: {h[:8] if h else '?'} へ戻しました"
         return f"ロールバック失敗: {err}"
 
+    def squash(self, cwd: str, message: str) -> str:
+        """このターンのチェックポイント群を1コミットにまとめる。
+
+        _last_backup_hash（タスク開始時のバックアップ）から現在HEADまでの
+        複数checkpointコミットをgit reset --soft + re-commitで1つに圧縮する。
+        _checkpointsが空（チェックポイントが存在しない）場合は何もしない。
+        rollback用の_last_backup_hashは変更しない（squash後もundo可能にするため）。
+        """
+        if not self._checkpoints:
+            return ""
+        if not self._is_git_repo(cwd):
+            return "Gitリポジトリが見つかりません。"
+        target = self._last_backup_hash
+        if not target:
+            return "バックアップハッシュが見つかりません。squashをスキップ。"
+        rc, _, err = self._run_git(["reset", "--soft", target], cwd)
+        if rc != 0:
+            return f"squash失敗（reset --soft）: {err}"
+        self._ensure_git_user(cwd)
+        rc, _, err = self._run_git(["commit", "-m", message], cwd)
+        if rc != 0:
+            return f"squash失敗（commit）: {err}"
+        h = self._get_head(cwd)
+        self._checkpoints = []
+        return f"squash完了: {h[:8] if h else '?'} — {message}"
+
     def diff(self, cwd: str) -> str:
         """バックアップ以降の差分統計を返す"""
         if not self._is_git_repo(cwd):

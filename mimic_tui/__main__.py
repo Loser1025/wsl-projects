@@ -33,7 +33,7 @@ def _build_components(base_dir: str, active_config=None):
     if active_config is None:
         active_config = or_config or gemini_config or mistral_config
 
-    from .team import set_team_config
+    from .team import set_team_config, set_team_autogit
     set_team_config(active_config)
 
     tool_log = ToolCallLog()
@@ -77,6 +77,7 @@ def _build_components(base_dir: str, active_config=None):
     rotator      = AccountRotator(active_config)
     agent        = OpenRouterAgent(rotator, mon_tools)
     auto_git     = AutoGit()
+    set_team_autogit(auto_git)
 
     def _on_sigterm(signum, frame):
         safe_print(C.yellow("\n  [SIGTERM] シャットダウンします..."), flush=True)
@@ -191,9 +192,10 @@ def main():
             if _wanted_model:
                 active_config.model = _wanted_model
 
-        from .team import set_team_config
+        from .team import set_team_config, set_team_autogit
         set_team_config(active_config)
-
+        # auto_gitはNullAutoGit（MIMIC_NO_AUTOGIT=1の場合）またはAutoGit()。
+        # NullAutoGitの場合もset_team_autogitで渡し、team.pyのcheckpointをno-opにする。
         # Worker（delegate_to_team経由のサブエージェント、MIMIC_NO_AUTOGIT=1で起動）には
         # delegate_to_team[_parallel]/delegate_researchを与えない。与えると、Workerが
         # さらに自分のWorkerを再帰的に委任し続け、サブエージェントが無限増殖してしまう。
@@ -218,6 +220,7 @@ def main():
         agent.set_system_prompt(react_prompt)
         # サブエージェント（delegate_to_subagent）として起動された場合は Git に触れない
         auto_git = NullAutoGit() if os.environ.get("MIMIC_NO_AUTOGIT") else AutoGit()
+        set_team_autogit(auto_git)
         interactive_orch = InteractiveOrchestrator(agent, auto_git)
 
         trace_id = os.environ.get("MIMIC_TRACE_ID")
