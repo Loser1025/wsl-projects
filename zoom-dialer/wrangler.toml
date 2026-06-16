@@ -8,4 +8,4 @@ head_sampling_rate = 1
 
 [[kv_namespaces]]
 binding = "PHONE_STORE"
-id = "df957e28ed894d0b824c5a6f938fdeb9"
+id = "df957e28ed894d09b824c5a6f938fdeb9"
