@@ -284,11 +284,13 @@ export default {
           addLog('[webhook] call ended: ' + maskPhoneNumber(calleeNumber) + ', ' + resultStr + ', ' + duration + 's');
           await saveLogToKV(env, '[webhook] call ended: ' + maskPhoneNumber(calleeNumber) + ', ' + resultStr + ', ' + duration + 's');
 
-          await env.PHONE_STORE.put('last_event', eventType);
-          await env.PHONE_STORE.put('last_result', resultStr);
-          await env.PHONE_STORE.put('last_event_time', eventTime);
-          await env.PHONE_STORE.put('call_phase', 'ended');
-          await env.PHONE_STORE.put('last_event_info', JSON.stringify(lastEventInfo));
+          await Promise.all([
+            env.PHONE_STORE.put('last_event', eventType),
+            env.PHONE_STORE.put('last_result', resultStr),
+            env.PHONE_STORE.put('last_event_time', eventTime),
+            env.PHONE_STORE.put('call_phase', 'ended'),
+            env.PHONE_STORE.put('last_event_info', JSON.stringify(lastEventInfo))
+          ]);
 
           const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
           const results = JSON.parse(resultsRaw);
@@ -749,24 +751,29 @@ function getDashboardHTML(
       }
       renderReady(data);
     }
-    async function refreshNext() {
-      try {
-        const res = await fetch('/next');
-        const data = await res.json();
-        if (data.last_event_time && data.last_event_time !== lastEventTime) {
-          lastEventTime = data.last_event_time;
-          screen = 'ended';
-        }
-        renderScreen(data);
-      } catch(e) {
-        // 無視
-      }
-    }
+
 
     renderScreen(initialData);
-    refreshNext();
-    // 自動ポーリング：3秒ごとに状態を更新
-    setInterval(refreshNext, 3000);
+
+    const eventSource = new EventSource('/events');
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.last_event_time && data.last_event_time !== lastEventTime) {
+        lastEventTime = data.last_event_time;
+        renderScreen(data); // 画面更新
+      }
+    };
+
+    eventSource.onerror = () => {
+      console.error('SSE接続エラー');
+      // 再接続ロジック（例：5秒後に再接続）
+      setTimeout(() => {
+        eventSource.close();
+        const newEventSource = new EventSource('/events');
+        newEventSource.onmessage = eventSource.onmessage;
+        newEventSource.onerror = eventSource.onerror;
+      }, 5000);
+    };
   </script>
 </body>
 </html>`;
