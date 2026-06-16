@@ -1,11 +1,8 @@
 name = "zoom-dialer"
-type = "javascript"
-account_id = ""
+account_id = "your-account-id"  # 仮の値（ユーザーに確認が必要）
 workers_dev = true
-route = ""
-zone_id = ""
 compatibility_date = "2023-10-01"
+main = "workers-site/index.js"
 
 [site]
 bucket = "./public"
-entry-point = "workers-site"
