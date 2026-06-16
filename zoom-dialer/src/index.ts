@@ -321,26 +321,14 @@ export default {
           if (Number(nextIndex) < queue.length) {
             await env.PHONE_STORE.put('next_phone', '+81' + queue[nextIndex].replace('zoomphonecall://+81', ''));
           }
-            env.PHONE_STORE.put('last_result', resultStr),
-            env.PHONE_STORE.put('last_event_time', eventTime),
-            env.PHONE_STORE.put('call_phase', 'ended'),
-            env.PHONE_STORE.put('last_event_info', JSON.stringify(lastEventInfo))
-          ]);
 
           const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
           const results = JSON.parse(resultsRaw);
           results.push({ phone_number: calleeNumber, result: resultStr, time: eventTime });
           await env.PHONE_STORE.put('results', JSON.stringify(results));
 
-          const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
-          const nextIndex = parseInt(currentIndexRaw, 10) + 1;
-          await env.PHONE_STORE.put('current_index', String(nextIndex));
-
-          const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
-          const queue = JSON.parse(queueRaw);
-
           let nextPhone = null;
-          if (nextIndex < queue.length) {
+          if (Number(nextIndex) < queue.length) {
             const rawNum = queue[nextIndex].replace('zoomphonecall://+81', '');
             nextPhone = '+81' + rawNum.replace('+81', '');
             await env.PHONE_STORE.put('next_phone', nextPhone);
