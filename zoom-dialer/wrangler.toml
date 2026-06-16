@@ -1,5 +1,5 @@
 name = "zoom-dialer"
-account_id = "your-account-id"  # 仮の値（ユーザーに確認が必要）
+account_id = "5971da36b2a3b6fec11f642d3ce4e9cd"
 workers_dev = true
 compatibility_date = "2023-10-01"
 main = "workers-site/index.js"
