@@ -309,6 +309,8 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
             verify_status = " ✓検証通過"
         elif result.verify_exit is not None:
             verify_status = f" ✗検証失敗(exit={result.verify_exit}, {MAX_VERIFY_RETRIES}回試行後)"
+        else:
+            verify_status = " ?(検証結果取得失敗)"
 
     status_label = f"{'✓ 完了・適用済み' if applied else '✓ 完了（変更なし）'}{verify_status}"
     lines = [
@@ -389,6 +391,8 @@ def run_worker_once(task: str, project_dir: str, config, label: str = "", verify
             verify_status = " ✓検証通過"
         elif result.verify_exit is not None:
             verify_status = f" ✗検証失敗(exit={result.verify_exit}, {MAX_VERIFY_RETRIES}回試行後)"
+        else:
+            verify_status = " ?(検証結果取得失敗)"
 
     status_label = f"{'✓ 完了・適用済み' if applied else '✓ 完了（変更なし）'}{verify_status}"
     lines = [f"[delegate_to_worker: {status_label}]", "", result.summary]
@@ -408,7 +412,10 @@ def run_team_tasks_parallel(tasks: list[str], project_dir: str, config, verify_c
     results: list[Optional[str]] = [None] * len(tasks)
 
     def _worker(i: int, t: str):
-        results[i] = run_team_task(t, project_dir, config, label=f"#{i + 1}", verify_cmd=verify_cmd)
+        try:
+            results[i] = run_team_task(t, project_dir, config, label=f"#{i + 1}", verify_cmd=verify_cmd)
+        except Exception as exc:
+            results[i] = f"[delegate_to_team: ⚠ 予期しないエラー]\n{exc}"
 
     threads = [threading.Thread(target=_worker, args=(i, t)) for i, t in enumerate(tasks)]
     for batch_start in range(0, len(threads), _MAX_PARALLEL_TEAM_TASKS):

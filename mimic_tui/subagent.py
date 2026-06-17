@@ -309,6 +309,18 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
         ok = completed
         changed = _changed_files(upper)
         summary = _summarize(lower, upper, changed)
+
+        # Worker の最終回答テキストを stdout から抽出してサマリーに前置する。
+        # ファイル変更がない読み取り専用タスクでも回答内容が Director に届くようにする。
+        _marker_line = _FINAL_MARKER + "\n"
+        if _marker_line in stdout:
+            _after_final = stdout.partition(_marker_line)[2]
+            if (_VERIFY_MARKER + "\n") in _after_final:
+                _after_final = _after_final.partition(_VERIFY_MARKER + "\n")[0]
+            _final_text = _after_final.strip()
+            if _final_text:
+                summary = "[Workerの最終回答]\n" + _final_text + "\n\n" + summary
+
         if not ok:
             attempts_info = (
                 f"再開試行: {resume_attempt}/{_MAX_RESUME_ATTEMPTS}回、"

@@ -49,6 +49,7 @@ def auto_mode(
             return
         answer_sent.set()
         sys.stdout.write(_FINAL_MARKER + "\n")
+        sys.stdout.write((final_text or "") + "\n")
         sys.stdout.flush()
 
     error_holder: list = [None]
