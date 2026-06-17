@@ -16,6 +16,15 @@ from typing import Optional
 
 from .tools import tools
 
+# grep_codebase 再帰検索時の除外設定
+_GREP_EXCLUDE_DIRS = (
+    "node_modules", ".git", "__pycache__", ".venv", "venv", "env",
+    "dist", "build", ".next", ".nuxt", ".cache", "coverage",
+    ".mypy_cache", ".pytest_cache", ".tox", "target", "vendor",
+)
+_GREP_EXCLUDE_FILES = ("*.min.js", "*.min.css", "*.map", "*.bundle.js", "*.lock", "package-lock.json")
+_GREP_MAX_LINE_CHARS = 300   # 1行あたりの表示上限文字数（minified対策）
+
 # PTY 出力から端末状態変更シーケンスを除去するパターン
 # DEC プライベートモード（代替画面・マウストラッキング・カーソルキーモード等）
 # これらが親ターミナルに送信されると端末状態が破壊される
@@ -299,11 +308,14 @@ def grep_codebase(
     # 再帰検索モード（旧 grep_codebase）
     cwd = str(Path.cwd())
     target = str(Path(directory).resolve()) if directory != "." else cwd
-    include = f"--include='*.{file_type}'" if file_type else ""
-    flag    = "-i " if ignore_case else ""
+    include      = f"--include='*.{file_type}'" if file_type else ""
+    flag         = "-i " if ignore_case else ""
+    exclude_dirs  = " ".join(f"--exclude-dir={d}" for d in _GREP_EXCLUDE_DIRS)
+    exclude_files = " ".join(f"--exclude={f}" for f in _GREP_EXCLUDE_FILES)
     cmd = (
-        f"grep -rn {flag}{include} {_shell_quote(pattern)} {_shell_quote(target)} "
-        f"| head -{max_results}"
+        f"grep -rn {flag}{include} {exclude_dirs} {exclude_files} "
+        f"{_shell_quote(pattern)} {_shell_quote(target)} "
+        f"| head -{max_results} | cut -c1-{_GREP_MAX_LINE_CHARS}"
     )
     result = subprocess.run(
         ["bash", "-c", cmd],
@@ -313,7 +325,7 @@ def grep_codebase(
     if not out:
         return f"「{pattern}」は {target} 内に見つかりませんでした。"
     lines = out.count("\n") + 1
-    suffix = f"\n（上位 {max_results} 件を表示）" if lines >= max_results else ""
+    suffix = f"\n（上位 {max_results} 件を表示、各行 {_GREP_MAX_LINE_CHARS} 文字で打ち切り）" if lines >= max_results else f"\n（各行 {_GREP_MAX_LINE_CHARS} 文字で打ち切り）"
     return f"[grep_codebase] pattern={repr(pattern)} / {lines}件ヒット\n{out}{suffix}"
 
 

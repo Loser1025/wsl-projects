@@ -227,6 +227,16 @@ def _build_openrouter_payload(
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
 
+    if isinstance(config, GoogleAIConfig) and config.thinking_setting is not None:
+        _ts = config.thinking_setting.strip().lower()
+        if not _ts.lstrip("-").isdigit():
+            # レベル指定 → OpenAI互換エンドポイントは reasoning_effort を使う
+            # minimal は low にフォールバック（OpenAI互換仕様にない）
+            _effort_map = {"none": "none", "minimal": "low", "low": "low", "medium": "medium", "high": "high"}
+            _effort = _effort_map.get(_ts, _ts)
+            payload["reasoning_effort"] = _effort
+        # 数値指定はOpenAI互換エンドポイント非対応のためスキップ
+
     if prompt_cache_key and isinstance(config, MistralConfig):
         payload["prompt_cache_key"] = prompt_cache_key
 
