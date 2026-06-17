@@ -6,6 +6,8 @@ import sys
 import threading
 import traceback
 
+_FINAL_MARKER = "===MIMIC_FINAL==="
+
 from .utils import log
 from .agent import OpenRouterAgent
 from .orchestrator import InteractiveOrchestrator
@@ -30,8 +32,6 @@ def pipe_mode(agent: OpenRouterAgent, prompt: str):
                    "traceback": traceback.format_exc()})
         sys.exit(1)
 
-_MIMIC_DONE_MARKER = "===MIMIC_DONE==="
-
 def auto_mode(
     interactive_orch: "InteractiveOrchestrator",
     prompt: str,
@@ -48,11 +48,8 @@ def auto_mode(
         if answer_sent.is_set():
             return
         answer_sent.set()
-        # mark_task_done が呼ばれていない場合は「完了サインなし」として
-        # 完了マーカーを出さない（subagent.py 側でその場での再実行対象になる）
-        if interactive_orch.task_done_signaled:
-            sys.stdout.write(_MIMIC_DONE_MARKER + "\n")
-            sys.stdout.flush()
+        sys.stdout.write(_FINAL_MARKER + "\n")
+        sys.stdout.flush()
 
     error_holder: list = [None]
 

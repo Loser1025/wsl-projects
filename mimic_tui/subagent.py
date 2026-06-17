@@ -33,17 +33,11 @@ from typing import Optional
 
 from .utils import log, safe_print, C
 
-_DONE_MARKER  = "===MIMIC_DONE==="
-_VERIFY_MARKER = "===MIMIC_VERIFY_START==="
-_TIMEOUT_SEC  = 1800  # 30分
+_VERIFY_MARKER    = "===MIMIC_VERIFY_START==="
+_FINAL_MARKER     = "===MIMIC_FINAL==="
+_TIMEOUT_SEC      = 1800   # 30分
 _VERIFY_TIMEOUT_SEC = 300  # 5分
-_MAX_RESUME_ATTEMPTS = 2  # 完了サイン(mark_task_done)なしで終了した場合のその場再開回数
-_RESUME_NOTE = (
-    "\n\n[システム通知] 前回の実行は完了報告（mark_task_doneツール呼び出し）を行わずに"
-    "終了しました。ツール呼び出しの失敗等で停止した可能性があります。これまでの変更内容を"
-    "確認し、残りの作業を続けてください。タスクが完了したら、最終回答を返す前に必ず"
-    "mark_task_done を呼んでください。"
-)
+_MAX_RESUME_ATTEMPTS = 3
 
 # mimic_tui パッケージの実体があるディレクトリ（python3 -m mimic_tui の起点）
 _LAUNCHER_DIR = Path(__file__).resolve().parent.parent
@@ -210,7 +204,11 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
         for d in (upper, work, merged):
             d.mkdir(parents=True, exist_ok=True)
 
+        # workdir は毎回クリーンな状態でないとマウントが失敗するため、
+        # スクリプト内で削除・再作成してからマウントする（upper/merged は保持）。
         mount_cmd = (
+            f"rm -rf {shlex.quote(str(work))} && "
+            f"mkdir -p {shlex.quote(str(work))} && "
             f"mount -t overlay overlay "
             f"-o lowerdir={shlex.quote(str(lower))},"
             f"upperdir={shlex.quote(str(upper))},"
@@ -228,26 +226,38 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
                 f"MIMIC_MODEL={shlex.quote(model)} "
             )
 
-        current_task = task
-        signaled = False
-        for resume_attempt in range(_MAX_RESUME_ATTEMPTS + 1):
-            agent_cmd = (
-                f"cd {shlex.quote(str(merged))} && "
-                f"PYTHONPATH={shlex.quote(str(_LAUNCHER_DIR))}:$PYTHONPATH "
-                f"MIMIC_NO_AUTOGIT=1 "
-                f"{trace_env}"
-                f"{model_env}"
-                f"python3 -m mimic_tui --auto-prompt {shlex.quote(current_task)}"
+        agent_cmd = (
+            f"cd {shlex.quote(str(merged))} && "
+            f"PYTHONPATH={shlex.quote(str(_LAUNCHER_DIR))}:$PYTHONPATH "
+            f"MIMIC_NO_AUTOGIT=1 "
+            f"{trace_env}"
+            f"{model_env}"
+            f"python3 -m mimic_tui --auto-prompt {shlex.quote(task)}"
+        )
+        inner_cmd = f"{agent_cmd}; agent_exit=$?"
+        if verify_cmd:
+            inner_cmd += (
+                f"; echo {_VERIFY_MARKER}"
+                f"; timeout {_VERIFY_TIMEOUT_SEC} bash -c {shlex.quote(verify_cmd)}"
+                f"; echo MIMIC_VERIFY_EXIT=$?"
             )
-            inner_cmd = f"{agent_cmd}; agent_exit=$?"
-            if verify_cmd:
-                inner_cmd += (
-                    f"; echo {_VERIFY_MARKER}"
-                    f"; timeout {_VERIFY_TIMEOUT_SEC} bash -c {shlex.quote(verify_cmd)}"
-                    f"; echo MIMIC_VERIFY_EXIT=$?"
-                )
-            inner_cmd += "; exit $agent_exit"
-            script = f"{mount_cmd} && {inner_cmd}"
+        inner_cmd += "; exit $agent_exit"
+        script = f"{mount_cmd} && {inner_cmd}"
+
+        # ── 実行（クラッシュ時は _MAX_RESUME_ATTEMPTS 回まで再開）──
+        prefix = f"  {C.gray(f'[Worker:{label}]')} "
+        stdout_all: list[str] = []
+        timed_out = threading.Event()
+        completed = False
+
+        for resume_attempt in range(_MAX_RESUME_ATTEMPTS + 1):
+            if resume_attempt > 0:
+                safe_print(C.yellow(
+                    f"{prefix}⚠ 予期せず終了 → チェックポイントから再開"
+                    f" ({resume_attempt}/{_MAX_RESUME_ATTEMPTS})"
+                ), flush=True)
+                # overlay を再マウントして同一 base/upper の続きから起動
+                timed_out.clear()
 
             proc = subprocess.Popen(
                 ["unshare", "-U", "-m", "-r", "bash", "-c", script],
@@ -255,58 +265,59 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
                 bufsize=1, start_new_session=True,
             )
 
-            # ── ハングアップ対策: 別スレッドでタイムアウト監視 ──
-            timed_out = threading.Event()
             proc_done = threading.Event()
 
-            def _watchdog():
-                if not proc_done.wait(_TIMEOUT_SEC):
+            def _watchdog(p=proc, pd=proc_done):
+                if not pd.wait(_TIMEOUT_SEC):
                     timed_out.set()
                     try:
-                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                        os.killpg(os.getpgid(p.pid), signal.SIGKILL)
                     except ProcessLookupError:
                         pass
 
-            watchdog = threading.Thread(target=_watchdog, daemon=True)
-            watchdog.start()
+            threading.Thread(target=_watchdog, daemon=True).start()
 
-            # ── Workerの出力をリアルタイムでそのまま転送 ──
-            prefix = f"  {C.gray(f'[Worker:{label}]')} "
             stdout_chunks: list[str] = []
             for raw_line in proc.stdout:
                 stdout_chunks.append(raw_line)
                 safe_print(prefix + raw_line.rstrip("\n"), flush=True)
             proc.wait()
             proc_done.set()
-            stdout = "".join(stdout_chunks)
+
+            stdout_all.extend(stdout_chunks)
+            run_stdout = "".join(stdout_chunks)
+            completed = _FINAL_MARKER in run_stdout
 
             if timed_out.is_set():
-                _force_rmtree(base)
-                return SubagentResult(
-                    task=task, ok=False,
-                    summary=f"タイムアウト（{_TIMEOUT_SEC}秒）のため強制終了しました。",
-                ), None, None
-
-            signaled = _DONE_MARKER in stdout
-            if signaled or resume_attempt == _MAX_RESUME_ATTEMPTS:
+                break
+            if completed:
+                break
+            # チェックポイントがなければ再開しても意味がない
+            cp_file = merged / ".mimic_checkpoint.json"
+            if not cp_file.exists():
                 break
 
-            safe_print(C.yellow(
-                f"  [Worker:{label}] ⚠ 完了サイン(mark_task_done)なしで終了 → "
-                f"その場で再開します ({resume_attempt + 1}/{_MAX_RESUME_ATTEMPTS})"
-            ), flush=True)
-            current_task = task + _RESUME_NOTE
+        stdout = "".join(stdout_all)
 
-        ok = signaled and proc.returncode == 0
+        if timed_out.is_set():
+            _force_rmtree(base)
+            return SubagentResult(
+                task=task, ok=False,
+                summary=f"タイムアウト（{_TIMEOUT_SEC}秒）のため強制終了しました。",
+            ), None, None
+
+        ok = completed
         changed = _changed_files(upper)
         summary = _summarize(lower, upper, changed)
-        if not signaled:
-            summary = (
-                f"⚠ {_MAX_RESUME_ATTEMPTS}回再開しても完了サイン(mark_task_done)が"
-                f"得られませんでした（最終exit={proc.returncode}）。\n" + summary
+        if not ok:
+            attempts_info = (
+                f"再開試行: {resume_attempt}/{_MAX_RESUME_ATTEMPTS}回、"
+                if resume_attempt > 0 else ""
             )
-        elif not ok:
-            summary = f"⚠ サブエージェントは正常終了しませんでした（exit={proc.returncode}）。\n" + summary
+            summary = (
+                f"⚠ Workerが完了シグナルなしで終了しました"
+                f"（{attempts_info}exit={proc.returncode}）。\n" + summary
+            )
 
         verify_exit: Optional[int] = None
         verify_output = ""

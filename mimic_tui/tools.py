@@ -193,25 +193,6 @@ class ToolRegistry:
 tools = ToolRegistry()
 _browser_registry = ToolRegistry()
 
-@tools.register(
-    name="mark_task_done",
-    description=(
-        "タスクが完了したことを明示的に報告する。サブエージェント(Worker)として実行している"
-        "場合、これを呼ばずに終了すると「完了サインなし」として、続きの作業を行うために"
-        "その場で自動的に再実行される。指示されたタスクを完了したと判断したら、最終回答を"
-        "返す直前に必ず一度呼ぶこと。途中で諦める／エラーで進められなくなった場合は呼ばないこと。"
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "summary": {"type": "string", "description": "完了した作業内容の簡潔な要約（任意）"}
-        },
-        "required": []
-    }
-)
-def mark_task_done(summary: str = "") -> str:
-    return "✓ 完了として記録しました。最終回答で作業内容を報告してください。"
-
 
 @tools.register(
     name="update_scratchpad",
@@ -773,13 +754,12 @@ def patch_file(path: str, search: str, replace: str) -> str:
 @tools.register(
     name="delegate_to_team",
     description=(
-        "Workerに実装/修正を委任し、その差分サマリをSupervisor（読み取り専用・フレッシュなコンテキスト）が"
-        "レビューして、不十分なら最大5回までやり直しを繰り返すレビュー付き委任ツール。"
+        "Researcher（調査・設計ワークフロー作成）→ Worker（実装）の順に実行し、"
+        "変更を即時適用・AutoGitコミットして差分サマリをDirectorに返す委任ツール。"
+        "Directorが結果を見てさらに修正が必要なら再度呼べばよい。"
         "【重要】指示文(task)は必ず自分(Director)で事前にgrep_codebase等で調査したうえで、"
-        "対象ファイル・変更内容を具体的に書くこと。曖昧な指示はWorkerの手戻りに直結する。"
-        "対象に既存のテスト/ビルド/lintがある場合は verify_cmd にそのコマンドを指定すること。"
-        "指定すると、Worker実行後に同じ作業ディレクトリでこのコマンドが実行され、"
-        "終了コードと出力がSupervisorの判定材料になる（省略時は差分内容のみで判定される）。"
+        "対象ファイル・変更内容を具体的に書くこと。Researcherも追加調査を行うが、"
+        "曖昧な指示はWorkerの手戻りに直結する。"
     ),
     parameters={
         "type": "object",
@@ -811,15 +791,12 @@ def delegate_to_team(task: str, project_dir: str = ".", verify_cmd: str = "") ->
 @tools.register(
     name="delegate_to_worker",
     description=(
-        "Researcher/Supervisorを介さず、Workerを1回だけ実行する軽量版の委任ツール。"
+        "Researcherを介さず、Workerを1回だけ実行する軽量版の委任ツール。"
         "対象ファイル・変更内容が既に明確で自己完結している、単純なタスク向け"
         "（例: 指定箇所の小さな修正、決まったコマンドの実行と結果確認）。"
-        "Workerが mark_task_done を呼んで完了報告し、かつ verify_cmd を指定した場合は"
-        "その終了コードが0であった場合のみ、変更が自動的にプロジェクトへ適用・コミットされる。"
-        "完了報告が無い、またはverify_cmdが失敗した場合は変更は適用されず、"
-        "差分・検証結果がそのまま返るので、再度delegate_to_workerを呼ぶか"
-        "delegate_to_team にエスカレートすること。"
-        "調査が必要・曖昧・大規模な変更には delegate_to_team を使うこと。"
+        "Worker実行後、変更は自動的にプロジェクトへ適用・コミットされ、差分サマリが返る。"
+        "結果を見てさらに修正が必要なら再度 delegate_to_worker を呼ぶか、"
+        "調査が必要・複雑な変更には delegate_to_team を使うこと。"
     ),
     parameters={
         "type": "object",
@@ -852,7 +829,7 @@ def delegate_to_worker(task: str, project_dir: str = ".", verify_cmd: str = "") 
     name="delegate_to_team_parallel",
     description=(
         "互いに依存しない複数のタスクを、それぞれ delegate_to_team と同じ"
-        "Worker→Supervisorレビュー付きループで並列実行する。"
+        "Researcher→Worker パイプラインで並列実行する。"
         "各タスクの指示文(tasks)は事前に自分(Director)で調査し具体的に書くこと。"
         "【重要】tasks は必ず文字列の配列（list[str]）で渡すこと（例: [\"タスク1の説明\", \"タスク2の説明\"]）。"
         "1つのタスクを\"###\"等の区切りで連結した単一の文字列として渡してはならない"

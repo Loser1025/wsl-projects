@@ -2,10 +2,119 @@
 # Original: V4.py
 from __future__ import annotations
 
+import json as _json
+import os as _os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from pathlib import Path as _Path
 from typing import Optional
+
+_CHECKPOINT_FILE = ".mimic_checkpoint.json"
+_CHECKPOINT_RESUME_NOTE = (
+    "[システム通知] 前回の実行が予期せず終了しました。"
+    "overlay上の変更は保持されています。続きから再開してください。"
+)
+
+# モデルがXML形式でツール呼び出しをテキストに埋め込んだ場合に検知するパターン
+_XML_TOOL_PATTERN = re.compile(
+    r'<tool_call\b|<function=|<invoke\b|<function_calls\b|\[TOOL_CALL\]',
+    re.IGNORECASE,
+)
+_MAX_XML_TOOL_RETRIES = 3
+
+
+def _parse_xml_tool_calls(text: str) -> list[dict]:
+    """テキスト内のXML形式ツール呼び出しをパースして tool_calls リストに変換する。
+
+    対応フォーマット:
+      A. <tool_call>{"name":"fn","arguments":{...}}</tool_call>   (Qwen/Hermes JSON標準)
+      B. <tool_call>                                               (nex-n2-pro等の実測形式)
+           <function=fn>
+             <parameter=key1>value1</parameter>
+             <parameter=key2>value2</parameter>
+           </function>
+         </tool_call>
+      C. 上記BのB外側 <tool_call> なしの単独 <function=...> 形式
+    """
+    results: list[dict] = []
+
+    def _coerce(val: str) -> object:
+        """数値文字列は int/float に変換する。"""
+        s = val.strip()
+        try:
+            return int(s)
+        except ValueError:
+            pass
+        try:
+            return float(s)
+        except ValueError:
+            pass
+        return s
+
+    def _extract_params(fn_body: str) -> dict:
+        """<parameter=NAME>VALUE</parameter> を全て抽出して dict に変換する。"""
+        params: dict = {}
+        for pm in re.finditer(
+            r'<parameter=([^>]+)>([\s\S]*?)</parameter>', fn_body, re.IGNORECASE
+        ):
+            params[pm.group(1).strip()] = _coerce(pm.group(2))
+        if params:
+            return params
+        # フォールバック: <parameters>{JSON}</parameters>
+        jm = re.search(r'<parameters?>([\s\S]*?)</parameters?>', fn_body, re.IGNORECASE)
+        if jm:
+            try:
+                obj = _json.loads(jm.group(1).strip())
+                if isinstance(obj, dict):
+                    return obj
+            except _json.JSONDecodeError:
+                pass
+        # フォールバック: 本文全体がJSON
+        try:
+            obj = _json.loads(fn_body.strip())
+            if isinstance(obj, dict):
+                return obj
+        except _json.JSONDecodeError:
+            pass
+        return {}
+
+    def _add(name: str, args: dict) -> None:
+        results.append({
+            "id":   f"xml_call_{len(results)}",
+            "name": name.strip(),
+            "args": args,
+        })
+
+    # ── フォーマットA/B: <tool_call>...</tool_call> ────────────
+    for m in re.finditer(r'<tool_call\b[^>]*>([\s\S]*?)</tool_call>', text, re.IGNORECASE):
+        body = m.group(1).strip()
+
+        # A: 中身がそのままJSON
+        try:
+            obj = _json.loads(body)
+            if isinstance(obj, dict) and "name" in obj:
+                raw_args = obj.get("arguments") or obj.get("parameters") or obj.get("args") or {}
+                _add(obj["name"], raw_args if isinstance(raw_args, dict) else {})
+                continue
+        except _json.JSONDecodeError:
+            pass
+
+        # B: <function=NAME>...</function>
+        fn_m = re.search(
+            r'<function=([^>]+)>([\s\S]*?)(?:</function>|$)', body, re.IGNORECASE
+        )
+        if fn_m:
+            _add(fn_m.group(1), _extract_params(fn_m.group(2)))
+
+    # ── フォーマットC: <function=...> 単独 (tool_call なし) ────
+    if not results:
+        for m in re.finditer(
+            r'<function=([^>]+)>([\s\S]*?)(?:</function>|$)', text, re.IGNORECASE
+        ):
+            _add(m.group(1), _extract_params(m.group(2)))
+
+    return results
 from .utils import safe_print, C, log, PipelineTypewriter, cache_tool_output, cache_obs
 from .agent import OpenRouterAgent, _CACHEABLE_TOOLS, _print_write_diff, _build_tool_call_entry
 from .tools import tools, UserRejectedWriteError
@@ -70,6 +179,9 @@ REACT_SYSTEM_PROMPT = """
 - 独立した読み取り操作は複数同時に呼び出して並列実行する
 - ツールは「言及する」だけでなく、必ず実際に呼び出す
 - エラーが出たら原因を特定し、代替手段を試みる
+- **ツール呼び出しは必ずAPIのtool_calls機能（JSON形式）で行うこと。**
+  テキスト内に `<tool_call>`, `<function=...>`, `<invoke>` などのXML形式で
+  ツール名を書いても実行されない（最終回答として打ち切られる）。
 
 ## 完了と停止
 - 依頼されたことをすべて完了したら即座に最終回答を出力して停止する
@@ -85,36 +197,25 @@ REACT_SYSTEM_PROMPT = """
   続いてWorkerがそのワークフローに沿って、OverlayFS隔離された専用の作業部屋（仮想合成ビュー）
   の中で実装を行う（Gitには一切触れない。プロジェクト本体は変更されず、失敗しても自動的に
   作業部屋ごと破棄される）
-- Workerの実装結果を、フレッシュな文脈の監視役（Supervisor）が指示文(task)に対してレビューする。
-  不十分な場合も最初からやり直すのではなく、Workerは**今ある変更を保持したまま**Supervisorの
-  フィードバック（修正点／続きの作業）に従って続きを行う（最大5回まで内部で繰り返す）
-- 戻り値は「最終的な差分サマリ」であり、サブエージェントの感想文ではない
-- **委任して終わりではない**: 戻り値が"完了・適用済み"なら変更は既にプロジェクトへ反映・
-  コミット済みである。差分サマリを読み、目的を達成しているか自分で確認すること。
-  "未解決"の場合は、判明した事実を踏まえて指示文を見直し、再度委任すること
+- Researcher（調査・設計ワークフロー作成）→ Worker（実装）の順に実行し、
+  変更を即時適用・AutoGitコミットして差分サマリをDirectorに返す。
+- 戻り値は「差分サマリ」。**委任して終わりではない**: 差分サマリを読み、目的を達成しているか
+  自分で判断すること。不十分なら指示文を見直して再度委任すること。
 - **指示文(task)の書き方**: Researcherが詳細調査・設計を行うため、ファイル単位の網羅的な
   事前調査は不要。ただし「目的・対象範囲・制約条件（既存仕様との整合性、互換性など）」は
   自分(Director)が把握している情報を漏れなく書くこと。曖昧な目的設定はResearcherの調査の
   方向性を誤らせる。
 - **delegate_to_team_parallel**: 互いに依存しない複数タスクを、それぞれ独立した
-  Researcher→Worker→Supervisorループとして並列実行する。少しでも独立性があるタスクは
+  Researcher→Workerパイプラインとして並列実行する。少しでも独立性があるタスクは
   積極的に並列委任すること。
-- **verify_cmd（任意）**: 対象に既存のテスト/ビルド/lintコマンドがある場合は
-  verify_cmd に指定すること。Worker実行後に同じ作業ディレクトリでそのコマンドが
-  実行され、終了コードと出力がSupervisorの判定材料になる（指定しなければ差分内容
-  のみで判定される）。
 
 ## 単発委任（delegate_to_worker）
-- 対象ファイル・変更内容が既に明確で、調査やレビューが不要な単純なタスク
+- 対象ファイル・変更内容が既に明確で、調査が不要な単純なタスク
   （例: 指定箇所の小さな修正、決まったコマンドの実行と結果確認）には、
-  Researcher/Supervisorを介さない delegate_to_worker を使うこと。delegate_to_team
-  より高速・低コストだが、第三者レビューが無い。
-- Workerが完了報告（mark_task_done）し、かつ verify_cmd を指定していればその終了コードが
-  0の場合のみ、変更が自動的に適用・コミットされる。それ以外（完了報告なし、または
-  verify_cmd失敗）は変更は適用されず、差分・検証結果がそのまま返るので、内容を確認した上で
-  delegate_to_worker を再度呼ぶか、delegate_to_team にエスカレートすること。
-- 曖昧・大規模・複数ファイルにまたがる変更や、第三者レビューが欲しい場合は
-  delegate_to_team を使うこと。
+  Researcherを介さない delegate_to_worker を使うこと。delegate_to_team
+  より高速・低コスト。変更は即時適用・コミットされ、差分サマリが返る。
+- 結果を見てさらに修正が必要なら再度 delegate_to_worker を呼ぶか、
+  複雑・大規模な場合は delegate_to_team を使うこと。
 
 ## 調べ物の委任（delegate_research）
 - 外部の公式ドキュメント・API仕様・ライブラリの使い方など、複数回の
@@ -152,16 +253,13 @@ delegate_to_worker
 delegate_research（本格的な調べ物はこちら）, web_search, fetch_webpage（軽い確認用）
 """
 
-# delegate_to_team の Worker（サブエージェント、MIMIC_NO_AUTOGIT=1で起動）にのみ
-# 追加で付与するガイダンス。Directorには付与しない（毎ターンの追加往復を避けるため）。
+# delegate_to_team/delegate_to_worker の Worker（サブエージェント、MIMIC_NO_AUTOGIT=1で起動）に
+# のみ追加で付与するガイダンス。Directorには付与しない（毎ターンの追加往復を避けるため）。
 WORKER_COMPLETION_GUIDANCE = """
 
-## 完了報告（重要・Workerとして実行中）
-- 指示されたタスクを完了したと判断したら、最終回答を返す**直前に必ず一度**
-  mark_task_done を呼ぶこと。これを呼ばずに終了すると「完了サインなし」とみなされ、
-  続きの作業を行うためにその場で自動的に再実行される。
-- ツール呼び出しの失敗等で完了できない場合は mark_task_done を呼ばず、状況を
-  日本語テキストで報告して停止する（無理に呼ばない）。
+## Workerとして実行中
+- タスクを完了したら、作業内容を最終回答として報告して終了すること。
+- 完了できない場合も、何をどこまで行ったか・何が問題だったかを日本語で報告して停止すること。
 """
 
 EXTREME_REACT_SYSTEM_PROMPT = """
@@ -172,9 +270,8 @@ EXTREME_REACT_SYSTEM_PROMPT = """
 コードへの変更・テスト実行・動作確認が必要な作業は、すべて delegate_to_team /
 delegate_to_team_parallel への委任を通じて行います。
 
-delegate_to_teamは内部で Researcher（調査・設計ワークフロー作成）→ Worker（実装）→
-Supervisor（レビュー、不十分なら修正/続きを指示して最大5回継続）まで自動で完結させ、
-"完了・適用済み"ならAutoGitコミットまで済んだ状態で結果が返ります。
+delegate_to_teamは内部で Researcher（調査・設計ワークフロー作成）→ Worker（実装）を
+自動で実行し、変更を即時適用・AutoGitコミットして差分サマリが返ります。
 **あなたの役割はファイル単位の詳細設計を作ることではなく、プロジェクト全体の
 管理者・検証者として、何を・どの粒度で委任し、結果が要求を満たしているかを
 確認し、ユーザーに報告することです。**
@@ -188,18 +285,15 @@ Supervisor（レビュー、不十分なら修正/続きを指示して最大5�
    まとめて並列委任する。指示文(task)には、自分が把握している目的・対象範囲・
    制約条件を漏れなく書く（ファイル単位の詳細はResearcherが調査するので不要）。
    対象が既に明確で自己完結している単純なタスクのみ delegate_to_worker
-   （Researcher/Supervisor無し）も使えるが、このモードではファイルを直接読めず
-   Supervisorのレビューも無いため、必ず verify_cmd を指定すること。
+   （Researcher無し、即時適用）も使えるが、このモードではファイルを直接読めないため
+   指示文に対象ファイルと変更内容を具体的に書くこと。
 3. 【適用は自動】delegate_to_teamが"完了・適用済み"を返した場合、変更は既に
    プロジェクトへ反映され、AutoGitでコミット済みである。**あなた自身でファイルを
    書き換えたりコミットし直したりする必要はない**。
 4. 【検証】このモードではファイルを直接読むツール（read_file/grep_codebase/
    get_repo_map など）も取り上げられているため、delegate_to_team
    が返す差分サマリの記述だけを根拠に、本当にユーザーの要求を満たしているか確認する。
-   既存のテスト/ビルド/lintコマンドがあれば delegate_to_team の verify_cmd に
-   指定すること。Worker実行後に同じ作業ディレクトリでそのコマンドが自動実行され、
-   終了コード・出力がSupervisorの判定材料になる（あなた自身はテストを実行できない
-   ため、これが構造的な検証手段になる）。コードの内容そのものを確認したい場合は
+   コードの内容そのものを確認したい場合は
    delegate_research に調査を依頼する。不足や問題があれば、判明した事実を踏まえて
    追加の delegate_to_team を発行する。
 5. 【報告】最終的に行われた変更内容と検証結果を日本語で簡潔にユーザーへ報告する。
@@ -218,6 +312,11 @@ Supervisor（レビュー、不十分なら修正/続きを指示して最大5�
 【調査で判明した事実】対象ファイル・現状の実装
 【委任結果】これまでのdelegate_to_team呼び出しと適用結果
 【次の一手】次に委任する内容、または最終報告の準備
+
+## ツール呼び出しの形式（必須）
+**ツール呼び出しは必ずAPIのtool_calls機能（JSON形式）で行うこと。**
+テキスト内に `<tool_call>`, `<function=...>`, `<invoke>` などのXML形式で
+ツール名を書いても実行されない（最終回答として打ち切られる）。
 """
 
 class InteractiveOrchestrator:
@@ -239,7 +338,6 @@ class InteractiveOrchestrator:
         self.agent    = agent
         self.auto_git = auto_git
         self.react_log = ReactLog()
-        self.task_done_signaled = False  # mark_task_done が呼ばれたら True
 
     @staticmethod
     def _fmt_args(args: dict) -> str:
@@ -321,7 +419,27 @@ class InteractiveOrchestrator:
     def _run_react_inner(self, user_message: str, on_done=None) -> str:
         from .tools import clear_read_files_registry
         clear_read_files_registry()
-        self.task_done_signaled = False
+
+        # ── 0. チェックポイント確認（Worker/Researcher サブエージェントのみ）──
+        _is_subagent = bool(_os.environ.get("MIMIC_NO_AUTOGIT"))
+        _cp_path: Optional[_Path] = (
+            _Path(self.agent.cwd) / _CHECKPOINT_FILE if _is_subagent else None
+        )
+
+        _from_checkpoint = False
+        if _cp_path and _cp_path.exists():
+            try:
+                _cp = _json.loads(_cp_path.read_text(encoding="utf-8"))
+                _cp_messages      = _cp.get("messages", [])
+                _cp_step          = int(_cp.get("step", 0))
+                _cp_read_call_ids = _cp.get("_read_call_ids", {})
+                _cp_user_message  = _cp.get("user_message", user_message)
+                _from_checkpoint = True
+                safe_print(C.yellow(
+                    f"  [Checkpoint] ステップ {_cp_step} から復元します"
+                ), flush=True)
+            except Exception as _e:
+                safe_print(C.yellow(f"  [Checkpoint] 読み込み失敗: {_e}"), flush=True)
 
         # ── 1. Auto-Git バックアップ ──────────────────────────────
         backup_result = self.auto_git.backup(self.agent.cwd)
@@ -329,24 +447,36 @@ class InteractiveOrchestrator:
 
         # ── 2. メッセージ構築 ─────────────────────────────────────
         self.react_log.add("user_input", content=user_message)
-        self.agent._compact_if_needed()
 
-        ctx    = self.agent._build_context_header()
-        task   = self.agent._task_context()
-        prefix = "\n\n".join(p for p in [ctx, task] if p)
-        aug_message = f"{prefix}\n\n{user_message}" if prefix else user_message
+        if _from_checkpoint:
+            messages: list[dict]          = list(_cp_messages)
+            step_count                    = _cp_step
+            _read_call_ids: dict[str, list[str]] = dict(_cp_read_call_ids)
+            old_conv_len                  = len(self.agent.conversation)
+            user_message                  = _cp_user_message
+            messages.append({
+                "role": "user",
+                "content": _CHECKPOINT_RESUME_NOTE,
+                "_skip_save": True,
+            })
+        else:
+            self.agent._compact_if_needed()
+            ctx    = self.agent._build_context_header()
+            task   = self.agent._task_context()
+            prefix = "\n\n".join(p for p in [ctx, task] if p)
+            aug_message = f"{prefix}\n\n{user_message}" if prefix else user_message
 
-        messages: list[dict] = list(self.agent.conversation)
-        old_conv_len = len(self.agent.conversation)  # ツール実行履歴保存用
-        messages.append({"role": "user", "content": aug_message})
+            messages: list[dict] = list(self.agent.conversation)
+            old_conv_len = len(self.agent.conversation)  # ツール実行履歴保存用
+            messages.append({"role": "user", "content": aug_message})
+            step_count        = 0
+            _read_call_ids: dict[str, list[str]] = {}
 
-        step_count        = 0
-        empty_retry_count = 0
-        had_tool_call     = False
+        empty_retry_count   = 0
+        xml_tool_retry_count = 0
+        had_tool_call       = False
         error_counts: dict[str, int] = {}
         write_tools  = {"write_file", "edit_file", "patch_file", "delete_file"}
-        # path → list of call_ids: 消費済みread観測を追跡してwrite時に無効化する
-        _read_call_ids: dict[str, list[str]] = {}
 
         # ── 3. ReActループ ───────────────────────────────────────
         while step_count < self.MAX_REACT_STEPS:
@@ -368,6 +498,16 @@ class InteractiveOrchestrator:
                 if thought:
                     self.react_log.add("thought", content=thought, step=step_count)
 
+            # ── XML形式ツール呼び出し救済 ────────────────────────
+            # tool_callsが空でもテキストにXML形式の呼び出しが含まれていればパースして実行する
+            if not tool_calls and text and _XML_TOOL_PATTERN.search(text):
+                _xml_parsed = _parse_xml_tool_calls(text)
+                if _xml_parsed:
+                    safe_print(C.yellow(
+                        f"  ⚠ XML形式ツール呼び出しを検知 → {len(_xml_parsed)}件をtool_callsとして実行"
+                    ), flush=True)
+                    tool_calls = _xml_parsed
+
             # ── ツールなし = 最終回答候補 ──────────────────────────
             if not tool_calls:
                 # 空レスポンス検知: ツール実行後に空テキストが返された場合に報告を促す
@@ -380,6 +520,28 @@ class InteractiveOrchestrator:
                     messages.append({"role": "assistant", "content": "（思考中...）", "_skip_save": True})
                     messages.append({"role": "user",
                         "content": "ツール実行結果を踏まえて、作業内容と結果を日本語で報告してください。",
+                        "_skip_save": True,
+                    })
+                    step_count += 1
+                    continue
+
+                # XML検知したがパース失敗 → tool_calls形式で再送を促す
+                if (text and _XML_TOOL_PATTERN.search(text)
+                        and xml_tool_retry_count < _MAX_XML_TOOL_RETRIES):
+                    xml_tool_retry_count += 1
+                    safe_print(C.yellow(
+                        f"  ⚠ XMLツール呼び出しのパース失敗 → 修正を促します"
+                        f" ({xml_tool_retry_count}/{_MAX_XML_TOOL_RETRIES})"
+                    ), flush=True)
+                    messages.append({"role": "assistant", "content": text, "_skip_save": True})
+                    messages.append({"role": "user",
+                        "content": (
+                            "[システム] ツール呼び出しがXML形式でテキストに含まれていましたが、"
+                            "パースできませんでした。\n"
+                            "ツールを呼び出す場合は、テキスト内に書かず、"
+                            "APIのtool_calls機能（JSON形式）を使ってください。\n"
+                            "直前のツール呼び出し意図をtool_calls形式で再送してください。"
+                        ),
                         "_skip_save": True,
                     })
                     step_count += 1
@@ -400,6 +562,13 @@ class InteractiveOrchestrator:
                 _save_msgs = [m for m in messages[old_conv_len + 1:] if not m.get("_skip_save")]
                 self.agent.conversation.extend(_save_msgs)
                 self.agent.conversation.append({"role": "assistant", "content": final_text})
+
+                # チェックポイント削除（正常完了）
+                if _cp_path:
+                    try:
+                        _cp_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
 
                 if on_done:
                     try:
@@ -539,13 +708,39 @@ class InteractiveOrchestrator:
                     "tool_call_id": cid,
                     "content": obs,
                 })
-            if any(tc.get("name") == "mark_task_done" for tc in tool_calls):
-                self.task_done_signaled = True
-
             had_tool_call = True
             step_count += 1
 
-        # ループ上限到達
+            # ── チェックポイント保存 ─────────────────────────────
+            if _cp_path:
+                try:
+                    _cp_path.write_text(
+                        _json.dumps({
+                            "messages": [m for m in messages if not m.get("_skip_save")],
+                            "step": step_count,
+                            "_read_call_ids": _read_call_ids,
+                            "user_message": user_message,
+                        }, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+                except Exception:
+                    pass  # overlay I/O エラーは無視
+
+        # ループ上限到達 → チェックポイントを保存して再開可能にする
+        if _cp_path:
+            try:
+                _cp_path.write_text(
+                    _json.dumps({
+                        "messages": [m for m in messages if not m.get("_skip_save")],
+                        "step": step_count,
+                        "_read_call_ids": _read_call_ids,
+                        "user_message": user_message,
+                    }, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+            except Exception:
+                pass
+
         fallback = f"(ReActループ上限 {self.MAX_REACT_STEPS} ステップに達しました)"
         self.agent.conversation.append({"role": "user", "content": user_message})
         _save_msgs = [m for m in messages[old_conv_len + 1:] if not m.get("_skip_save")]

@@ -21,8 +21,8 @@ from urllib.parse import unquote
 
 _TRACE_ID_RE = re.compile(r"'trace_id':\s*'([0-9a-f]+)'")
 
-# team.py の MAX_TEAM_RETRIES と同じ値（循環import回避のためここでは複製）。
-_MAX_TEAM_RETRIES = 5
+# ビューア表示用の上限（実際のリトライは廃止済みだがバッジ表示に使用）。
+_MAX_TEAM_RETRIES = 1
 
 # この秒数以内に更新されたセッションファイルは「実行中」とみなす。
 _RUNNING_THRESHOLD_SEC = 90
