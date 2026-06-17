@@ -105,17 +105,45 @@ function formatDateTime(value: string | null): string {
 }
 
 // ==========================================
-// メインハンドラ
+// メインハンドラ（111行目の処理を統合）
 // ==========================================
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     // ==========================================
     // 1. 管理画面 GET /
     // ==========================================
     if (url.pathname === '/' && request.method === 'GET') {
+      try {
+        const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
+        const queue = JSON.parse(queueRaw);
+        const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
+        const currentIndex = parseInt(currentIndexRaw, 10);
+        const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
+        const results = JSON.parse(resultsRaw);
+        const nextPhone = await env.PHONE_STORE.get('next_phone');
+        const status = await env.PHONE_STORE.get('system_status') || 'stopped';
+        const lastEventInfo = await getLastEventInfoFromKV(env);
+
+        addLog(`[dashboard] index=${currentIndex}/${queue.length}, next=${nextPhone || 'なし'}, results=${results.length}`);
+        await saveLogToKV(env, `[dashboard] index=${currentIndex}/${queue.length}, next=${nextPhone || 'なし'}, results=${results.length}`);
+
+        const html = getDashboardHTML(queue, currentIndex, results, nextPhone, status, lastEventInfo);
+        return new Response(html, {
+          headers: { "Content-Type": "text/html;charset=UTF-8" },
+        });
+      } catch (err: any) {
+        addLog(`[dashboard] ERROR: ${err.message}`);
+        return new Response('ERROR: ' + err.message, { status: 500 });
+      }
+    }
+
+    // ==========================================
+    // 2. ダッシュボードデータを提供するエンドポイント GET /api/dashboard-data
+    // ==========================================
+    if (url.pathname === '/api/dashboard-data' && request.method === 'GET') {
       try {
         const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
         const queue = JSON.parse(queueRaw);
@@ -446,39 +474,20 @@ export default {
       const recentLogs = kvLogs.slice(-50).reverse();
       const errorLogs = kvLogs.filter((l: string) => l.includes('[ERROR]')).slice(-20);
 
-      const html = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8"><title>デバッグ - zoomphonecall</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-</head>
-<body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-8">
-  <div class="max-w-5xl mx-auto">
-    <h1 class="text-2xl font-bold mb-6">🔧 デバッグダッシュボード</h1>
-    <a href="/" class="text-blue-400 hover:text-blue-300 text-sm">← 管理画面</a>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 mb-8">
-      <div class="bg-slate-800 rounded-lg p-5">
-        <p class="text-slate-400 text-sm">状態</p>
-        <p class="text-2xl font-bold ${status === 'running' ? 'text-green-400' : 'text-yellow-400'}">${status}</p>
-      </div>
-      <div class="bg-slate-800 rounded-lg p-5">
-        <p class="text-slate-400 text-sm">進捗</p>
-        <p class="text-2xl font-bold">${currentIndex} / ${queue.length} (${progressPercent}%)</p>
-      </div>
-      <div class="bg-slate-800 rounded-lg p-5">
-        <p class="text-slate-400 text-sm">次番号</p>
-        <p class="text-xl font-mono text-green-400">${nextPhone || 'なし'}</p>
-      </div>
-    </div>
-    <div class="bg-slate-800 rounded-lg p-5 mb-6">
-      <h2 class="font-semibold mb-3">最新ログ</h2>
-      <pre class="bg-slate-950 p-4 rounded text-xs font-mono max-h-64 overflow-y-auto">${recentLogs.join('\n') || 'ログなし'}</pre>
-      <button onclick="fetch('/debug/clear-logs',{method:'POST'}).then(()=>location.reload())" class="mt-3 px-4 py-2 bg-red-700 hover:bg-red-600 rounded text-sm">ログクリア</button>
-    </div>
-    ${errorLogs.length > 0 ? `<div class="bg-red-900/30 border border-red-700 rounded-lg p-5"><h2 class="font-semibold text-red-400 mb-3">エラー (${errorLogs.length}件)</h2><pre class="bg-slate-950 p-4 rounded text-xs font-mono max-h-48 overflow-y-auto text-red-300">${errorLogs.join('\n')}</pre></div>` : ''}
-  </div>
-</body>
-</html>`;
+      function generateHtml(): string {
+        return `<!DOCTYPE html>`
+      }
+      const fs = require('fs');
+      const path = require('path');
+      let html = fs.readFileSync(path.join(__dirname, 'debug.html'), 'utf8');
+      html = html.replace('${status}', status)
+                 .replace('${currentIndex}', currentIndex.toString())
+                 .replace('${queue.length}', queue.length.toString())
+                 .replace('${progressPercent}', progressPercent.toString())
+                 .replace('${nextPhone || \'なし\'}', nextPhone || 'なし')
+                 .replace('${recentLogs.join(\'\\n\') || \'ログなし\'}', recentLogs.join('\n') || 'ログなし')
+                 .replace('${errorLogs.length}', errorLogs.length.toString())
+                 .replace('${errorLogs.join(\'\\n\')}', errorLogs.join('\n'));;
       return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
 
@@ -521,97 +530,17 @@ function getDashboardHTML(
   const initialScreen: 'ready' | 'calling' | 'ended' | 'finished' = total > 0 && status === 'stopped' && current >= total ? 'finished' : 'ready';
   const initialDataJson = JSON.stringify(initialData).replaceAll('</', '<\\/');
 
-  return `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Zoom Phone クリックToコール</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-</head>
-<body class="bg-slate-50 font-sans min-h-screen">
-  <div class="max-w-2xl mx-auto px-4 py-8">
-    <header class="mb-8 flex justify-between items-center">
-      <h1 class="text-2xl font-bold text-slate-700">📞 クリックToコール</h1>
-      <a href="/debug" class="text-sm text-blue-500 hover:text-blue-700">🔧 デバッグ</a>
-    </header>
-
-    <div id="msg" class="hidden mb-4 p-3 rounded-lg text-sm font-medium"></div>
-    <div id="screen-root">${total === 0 ? `
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-        <p class="text-slate-400 mb-6">CSVファイルをアップロードしてください</p>
-        <form method="POST" action="/upload" enctype="multipart/form-data" class="space-y-4">
-          <input type="file" name="csv" accept=".csv,.txt" required class="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
-          <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">アップロード</button>
-        </form>
-      </div>
-    ` : `
-      <div class="space-y-5">
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-          <div class="flex justify-between text-sm text-slate-500 mb-3">
-            <span>進捗</span><span class="font-bold text-slate-700 text-lg" id="progress-text">${current} / ${total}</span>
-          </div>
-          <div class="w-full bg-slate-200 rounded-full h-3 mb-5">
-            <div class="bg-blue-500 h-3 rounded-full transition-all duration-500" id="progress-bar" style="width:${progressPercent}%"></div>
-          </div>
-          <div class="bg-blue-50 rounded-xl p-5 text-center">
-            <p class="text-xs text-blue-400 mb-2 font-medium">次の番号</p>
-            <p class="text-3xl font-bold text-blue-700 tracking-widest" id="next-phone">${escapeHtml(displayPhone || '—')}</p>
-          </div>
-        </div>
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
-          ${zoomUrl && !(status === 'stopped' && current >= total) ? `
-            <a href="${escapeHtml(zoomUrl)}" target="_blank" onclick="handleCallClick(this.href); return false;" class="block w-full py-5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-xl rounded-xl text-center shadow-lg shadow-green-100 transition-all">📞 架電する（Zoom起動）</a>
-            <div class="grid grid-cols-2 gap-3">
-              <button onclick="doSkip()" class="py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-all">⏭ スキップ</button>
-              <button onclick="doReset()" class="py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all">🔄 リセット</button>
-            </div>
-          ` : `
-            <div class="text-center py-6">
-              <p class="text-2xl font-bold text-green-600 mb-4">✅ 完了</p>
-              <button onclick="doReset()" class="py-3 px-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg">🔄 もう一度</button>
-            </div>
-          `}
-        </div>
-      </div>
-    `}</div>
-
-    <!-- 結果履歴 -->
-    ${results.length > 0 ? `
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mt-6">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="font-semibold text-slate-700">📋 履歴 (${results.length}件)</h2>
-        <a href="/results" class="text-sm text-blue-500 hover:text-blue-700">CSV ↓</a>
-      </div>
-      <table class="w-full text-sm">
-        <thead><tr class="border-b border-slate-100 text-slate-400"><th class="py-2 text-left">番号</th><th class="py-2 text-left">結果</th><th class="py-2 text-right">日時</th></tr></thead>
-        <tbody>
-          ${results.slice(0, 50).map(r => `
-          <tr class="border-b border-slate-50">
-            <td class="py-2 font-mono">${escapeHtml(r.phone_number)}</td>
-            <td class="py-2"><span class="px-2 py-0.5 rounded text-xs font-medium ${r.result === 'コネクト' ? 'bg-green-100 text-green-700' : r.result === 'スキップ' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}">${escapeHtml(r.result)}</span></td>
-            <td class="py-2 text-right text-slate-400 text-xs">${r.time ? formatDateTime(r.time) : ''}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-    ` : ''}
-  </div>
-
-  <script>
-    const screenRoot = document.getElementById('screen-root');
-    const initialData = ${initialDataJson};
-    let latestData = initialData;
-    let screen = ${JSON.stringify(initialScreen)};
-    let lastEventTime = initialData.last_event_time;
-
-    function escapeHtml(value) {
-      return String(value ?? '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
+  const fs = require('fs');
+  const path = require('path');
+  let html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  html = html.replace('${total}', total.toString())
+             .replace('${current}', current.toString())
+             .replace('${progressPercent}', progressPercent.toString())
+             .replace('${nextPhone || \'完了\'}', nextPhone || '完了')
+             .replace('${results.filter(r => r.result === \'success\').length}', results.filter(r => r.result === 'success').length.toString())
+             .replace('${results.filter(r => r.result === \'failure\').length}', results.filter(r => r.result === 'failure').length.toString())
+             .replace('${results.filter(r => r.result === \'skip\').length}', results.filter(r => r.result === 'skip').length.toString());
+  return html;
     }
     function formatDateTime(value) {
       if (!value) return '';
@@ -852,61 +781,6 @@ function getDashboardHTML(
         renderScreen(data); // 画面更新
       }
     };
-
-    eventSource.onerror = () => {
-      console.error('SSE接続エラー');
-      // 再接続ロジック（例：5秒後に再接続）
-      setTimeout(() => {
-        eventSource.close();
-        const newEventSource = new EventSource('/events');
-        newEventSource.onmessage = eventSource.onmessage;
-        newEventSource.onerror = eventSource.onerror;
-      }, 5000);
-    };
-  </script>
-</body>
-</html>`;
-}
-
-// ==========================================
-// メインハンドラ
-// ==========================================
-
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-
-    // ==========================================
-    // 1. ダッシュボードデータを提供するエンドポイント GET /api/dashboard-data
-    // ==========================================
-    if (url.pathname === '/api/dashboard-data' && request.method === 'GET') {
-      try {
-        const queueRaw = await env.PHONE_STORE.get('queue') || '[]';
-        const queue = JSON.parse(queueRaw);
-        const currentIndexRaw = await env.PHONE_STORE.get('current_index') || '0';
-        const currentIndex = parseInt(currentIndexRaw, 10);
-        const resultsRaw = await env.PHONE_STORE.get('results') || '[]';
-        const results = JSON.parse(resultsRaw);
-        const nextPhone = await env.PHONE_STORE.get('next_phone');
-        const status = await env.PHONE_STORE.get('system_status') || 'stopped';
-        const lastEventInfo = await getLastEventInfoFromKV(env);
-
-        const initialData = {
-          queue,
-          currentIndex,
-          results,
-          nextPhone,
-          statusDisplay: getStatusDisplay(status, currentIndex, queue.length, nextPhone),
-          logsHtml: getLogsHtml(results),
-        };
-        return new Response(JSON.stringify(initialData), {
-          headers: { 'Content-Type': 'application/json' },
-        });
-      } catch (err: any) {
-        return new Response('エラー: ' + err.message, { status: 500 });
-      }
-    }
-
     // ==========================================
     // 2. 管理画面 GET /
     // ==========================================

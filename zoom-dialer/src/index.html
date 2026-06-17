@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Zoom Phone クリックToコール</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-50 font-sans min-h-screen">
+  <div class="max-w-2xl mx-auto px-4 py-8">
+    <header class="mb-8 flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-slate-700">📞 クリックToコール</h1>
+      <a href="/debug" class="text-sm text-blue-500 hover:text-blue-700">🔧 デバッグ</a>
+    </header>
+
+    <div id="msg" class="hidden mb-4 p-3 rounded-lg text-sm font-medium"></div>
+    <div id="screen-root">${total === 0 ? `
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+        <p class="text-slate-400 mb-6">CSVファイルをアップロードしてください</p>
+        <form method="POST" action="/upload" enctype="multipart/form-data" class="space-y-4">
+          <input type="file" name="csv" accept=".csv,.txt" required class="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+          <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">アップロード</button>
+        </form>
+      </div>
+    ` : `
+      <div class="space-y-5">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div class="flex justify-between text-sm text-slate-500 mb-3">
+            <span>進捗</span><span class="font-bold text-slate-700 text-lg" id="progress-text">${current} / ${total}</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-3">
+            <div id="progress-bar" class="bg-blue-600 h-3 rounded-full" style="width: ${progressPercent}%"></div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold text-slate-700">次の番号</h2>
+            <button id="skip-btn" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm">スキップ</button>
+          </div>
+          <p id="next-phone" class="text-3xl font-bold text-center text-slate-800 font-mono">${nextPhone || '完了'}</p>
+          <div class="flex justify-center mt-6">
+            <button id="call-btn" class="w-24 h-24 rounded-full bg-green-500 hover:bg-green-600 text-white text-2xl flex items-center justify-center shadow-lg">📞</button>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <h2 class="text-lg font-semibold text-slate-700 mb-4">結果</h2>
+          <div class="space-y-3">
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">成功</span>
+              <span class="font-bold text-green-600" id="success-count">${results.filter(r => r.result === 'success').length}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">失敗</span>
+              <span class="font-bold text-red-600" id="failure-count">${results.filter(r => r.result === 'failure').length}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">スキップ</span>
+              <span class="font-bold text-yellow-600" id="skip-count">${results.filter(r => r.result === 'skip').length}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `}</div>
+  </div>
+
+  <script>
+    // SSE接続
+    const eventSource = new EventSource('/events');
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'progress') {
+        document.getElementById('progress-text').textContent = `${data.current} / ${data.total}`;
+        document.getElementById('progress-bar').style.width = `${Math.round((data.current / data.total) * 100)}%`;
+      }
+      if (data.type === 'next') {
+        document.getElementById('next-phone').textContent = data.phone || '完了';
+      }
+      if (data.type === 'result') {
+        document.getElementById('success-count').textContent = data.successCount;
+        document.getElementById('failure-count').textContent = data.failureCount;
+        document.getElementById('skip-count').textContent = data.skipCount;
+      }
+      if (data.type === 'status') {
+        if (data.status === 'stopped' && data.current >= data.total) {
+          document.getElementById('next-phone').textContent = '完了';
+          document.getElementById('call-btn').style.display = 'none';
+        }
+      }
+    };
+    eventSource.onerror = () => {
+      console.error('SSE接続エラー');
+      // 再接続ロジック（例：5秒後に再接続）
+      setTimeout(() => {
+        eventSource.close();
+        const newEventSource = new EventSource('/events');
+        newEventSource.onmessage = eventSource.onmessage;
+        newEventSource.onerror = eventSource.onerror;
+      }, 5000);
+    };
+
+    // スキップボタン
+    document.getElementById('skip-btn').addEventListener('click', () => {
+      fetch('/skip', { method: 'POST' });
+    });
+
+    // コールボタン
+    document.getElementById('call-btn').addEventListener('click', () => {
+      const phone = document.getElementById('next-phone').textContent;
+      if (phone && phone !== '完了') {
+        window.open(`zoomphonecall://${phone}`, '_self');
+      }
+    });
+  </script>
+</body>
+</html>
