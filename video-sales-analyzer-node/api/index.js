@@ -328,6 +328,7 @@ app.post('/api/analyze/drive', async (req, res) => {
     }
 
     // 空ファイル検出
+    console.log(`[DEBUG] ダウンロード完了。パス: ${videoPath}, サイズ: ${fs.statSync(videoPath).size} bytes`);
     const stat = fs.statSync(videoPath);
     if (stat.size < 1024) {
       throw new Error('動画ファイルのダウンロードに失敗しました（ファイルが空または無効です）。共有設定を確認してください。');
@@ -337,28 +338,44 @@ app.post('/api/analyze/drive', async (req, res) => {
     if (!apiKey) throw new Error('利用可能なAPIキーがありません');
 
     const mimeType = 'video/mp4';
+    console.log(`[DEBUG] Geminiへアップロード開始: ${videoPath}`);
     const geminiFile = await uploadToGemini(videoPath, mimeType, apiKey);
+    console.log(`[DEBUG] アップロード完了: ${geminiFile.name}`);
 
     let result;
     try {
       const prompt = buildPrompt();
+      console.log(`[DEBUG] 分析開始 (Gemini)`);
       result = await analyzeUriWithFallback(prompt, geminiFile.uri, mimeType);
+      console.log(`[DEBUG] 分析完了`);
+    } catch (error) {
+      console.error(`[ERROR] 分析中のエラー:`, error);
+      throw error;
     } finally {
       try {
+        console.log(`[DEBUG] Geminiファイル削除: ${geminiFile.name}`);
         const ai = new GoogleGenAI({ apiKey });
         await ai.files.delete({ name: geminiFile.name });
-      } catch (e) {}
+      } catch (e) {
+        console.error(`[ERROR] ファイル削除失敗:`, e);
+      }
     }
 
     result.source = 'drive';
     result.drive_url = drive_url;
     res.json(result);
   } catch (error) {
-    console.error('分析エラー:', error);
-    res.status(500).json({ error: error.message });
+    console.error(`[ERROR] API処理失敗:`, error);
+    console.error(`Stack Trace:`, error.stack);
+    res.status(500).json({ error: 'サーバー内部エラー: ' + error.message });
   } finally {
     if (videoPath) {
-      try { fs.unlinkSync(videoPath); } catch (e) {}
+      try {
+        console.log(`[DEBUG] 一時ファイル削除: ${videoPath}`);
+        fs.unlinkSync(videoPath);
+      } catch (e) {
+        console.error(`[ERROR] 一時ファイル削除失敗:`, e);
+      }
     }
   }
 });
@@ -369,5 +386,3 @@ if (require.main === module) {
     console.log(`サーバーが起動しました: http://localhost:${PORT}`);
   });
 }
-
-module.exports = app;
