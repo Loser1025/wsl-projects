@@ -107,18 +107,33 @@ def _trim_messages_smart(messages: list[dict]) -> list[dict]:
     if not body:
         return messages
     target_remove = max(2, len(body) // 4)
-    # role=="tool" のメッセージを削除候補とする（OpenAI ネイティブ形式）
-    tool_indices = [i for i, m in enumerate(body) if m.get("role") == "tool"]
-    removed = 0
+
+    # assistant+tool_calls とそれに続く全 role=="tool" を原子ブロックとして識別する。
+    # 並列ツール呼び出し（1 assistant に複数 tool result）でも部分削除が起きないようにする。
+    blocks: list[tuple[int, int]] = []  # (start_idx, count) — assistant 含む
+    i = 0
+    while i < len(body):
+        m = body[i]
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            j = i + 1
+            while j < len(body) and body[j].get("role") == "tool":
+                j += 1
+            blocks.append((i, j - i))
+            i = j
+        else:
+            i += 1
+
+    # 古いブロックから順に丸ごと削除して target_remove に達するまで続ける
     indices_to_remove: set[int] = set()
-    for idx in tool_indices:
+    removed = 0
+    for start, count in blocks:
         if removed >= target_remove:
             break
-        indices_to_remove.add(idx)
-        removed += 1
-        # 直前の assistant+tool_calls メッセージも一緒に削除（孤立防止）
-        if idx > 0 and body[idx - 1].get("tool_calls") and idx - 1 not in indices_to_remove:
-            indices_to_remove.add(idx - 1)
+        for k in range(start, start + count):
+            indices_to_remove.add(k)
+        removed += count
+
+    # ブロック削除だけでは足りない場合は非ブロックメッセージを個別に削除
     if removed < target_remove:
         for i in range(len(body)):
             if removed >= target_remove:
@@ -126,6 +141,7 @@ def _trim_messages_smart(messages: list[dict]) -> list[dict]:
             if i not in indices_to_remove:
                 indices_to_remove.add(i)
                 removed += 1
+
     return protected + [m for i, m in enumerate(body) if i not in indices_to_remove]
 
 
