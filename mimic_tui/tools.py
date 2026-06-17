@@ -756,17 +756,19 @@ def patch_file(path: str, search: str, replace: str) -> str:
     description=(
         "Researcher（調査・設計ワークフロー作成）→ Worker（実装）の順に実行し、"
         "変更を即時適用・AutoGitコミットして差分サマリをDirectorに返す委任ツール。"
-        "Directorが結果を見てさらに修正が必要なら再度呼べばよい。"
-        "【重要】指示文(task)は必ず自分(Director)で事前にgrep_codebase等で調査したうえで、"
-        "対象ファイル・変更内容を具体的に書くこと。Researcherも追加調査を行うが、"
-        "曖昧な指示はWorkerの手戻りに直結する。"
+        "verify_cmdを指定すると Worker 実行後に検証を実行し、失敗した場合は"
+        "同じOverlay上で Worker が自動的に修正再試行する（最大3回）。"
+        "verify_cmdを省略した場合でも Researcher が適切なテストコマンドを提案すれば自動採用される。"
+        "【重要】指示文(task)は目的・対象範囲・制約条件を具体的に書くこと。"
+        "Researcherが詳細調査・設計を行うため、ファイル単位の網羅的な事前調査は不要だが、"
+        "曖昧な目的設定はResearcherの調査方向を誤らせる。"
     ),
     parameters={
         "type": "object",
         "properties": {
             "task": {
                 "type": "string",
-                "description": "Workerへの具体的・詳細な指示（対象ファイル・変更内容を含む）",
+                "description": "Workerへの具体的・詳細な指示（目的・対象範囲・制約条件を含む）",
             },
             "project_dir": {
                 "type": "string",
@@ -775,8 +777,11 @@ def patch_file(path: str, search: str, replace: str) -> str:
             },
             "verify_cmd": {
                 "type": "string",
-                "description": "変更を検証するテスト/ビルド/lintコマンド（例: \"pytest tests/test_x.py -q\"）。"
-                                "省略可。指定すると終了コード・出力がSupervisorに渡される。",
+                "description": (
+                    "Worker完了後に同じOverlay上で実行する検証コマンド（例: 'pytest tests/test_x.py -q'）。"
+                    "失敗(exit!=0)の場合、出力をフィードバックとしてWorkerが修正再試行する（最大3回）。"
+                    "省略時はResearcherが推奨コマンドを自動提案する場合がある。"
+                ),
                 "default": "",
             },
         },
@@ -791,11 +796,11 @@ def delegate_to_team(task: str, project_dir: str = ".", verify_cmd: str = "") ->
 @tools.register(
     name="delegate_to_worker",
     description=(
-        "Researcherを介さず、Workerを1回だけ実行する軽量版の委任ツール。"
-        "対象ファイル・変更内容が既に明確で自己完結している、単純なタスク向け"
+        "Researcherを介さず Worker だけを実行する軽量委任ツール。"
+        "対象ファイル・変更内容が既に明確で自己完結している単純なタスク向け"
         "（例: 指定箇所の小さな修正、決まったコマンドの実行と結果確認）。"
-        "Worker実行後、変更は自動的にプロジェクトへ適用・コミットされ、差分サマリが返る。"
-        "結果を見てさらに修正が必要なら再度 delegate_to_worker を呼ぶか、"
+        "verify_cmdを指定すると Worker 完了後に検証を実行し、失敗した場合は"
+        "同じOverlay上で Worker が自動的に修正再試行する（最大3回）。"
         "調査が必要・複雑な変更には delegate_to_team を使うこと。"
     ),
     parameters={
@@ -812,8 +817,10 @@ def delegate_to_team(task: str, project_dir: str = ".", verify_cmd: str = "") ->
             },
             "verify_cmd": {
                 "type": "string",
-                "description": "変更を検証するテスト/ビルド/lintコマンド（例: \"pytest tests/test_x.py -q\"）。"
-                                "省略可。指定した場合、終了コード0でのみ変更が適用される。",
+                "description": (
+                    "Worker完了後に同じOverlay上で実行する検証コマンド（例: 'pytest tests/test_x.py -q'）。"
+                    "失敗(exit!=0)の場合、出力をフィードバックとしてWorkerが修正再試行する（最大3回）。"
+                ),
                 "default": "",
             },
         },
@@ -834,9 +841,9 @@ def delegate_to_worker(task: str, project_dir: str = ".", verify_cmd: str = "") 
         "【重要】tasks は必ず文字列の配列（list[str]）で渡すこと（例: [\"タスク1の説明\", \"タスク2の説明\"]）。"
         "1つのタスクを\"###\"等の区切りで連結した単一の文字列として渡してはならない"
         "（文字列を渡すと1文字ごとに大量のWorkerが起動してしまう）。要素数は最大10件まで。"
-        "verify_cmdを指定すると、各タスクのWorker実行後に同じ作業ディレクトリ（タスクごとに"
-        "独立したoverlay）でこのコマンドが実行され、終了コードと出力が各Supervisorの判定材料になる"
-        "（全タスク共通の1コマンドのみ。省略時は差分内容のみで判定される）。"
+        "verify_cmdを指定すると、各タスクのWorker実行後に同じOverlay上でこのコマンドが実行され、"
+        "失敗した場合は各Workerがそれぞれ自動修正再試行する（全タスク共通・最大3回）。"
+        "省略時でも各タスクのResearcherが適切なコマンドを提案すれば自動採用される。"
     ),
     parameters={
         "type": "object",

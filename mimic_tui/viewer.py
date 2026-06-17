@@ -550,3 +550,29 @@ def start_viewer_server(sessions_dir: Path, port: int = 0) -> str:
     _server = server
     _server_url = f"http://127.0.0.1:{server.server_address[1]}"
     return _server_url
+
+
+def open_viewer_in_browser(url: str) -> None:
+    """WSL/Linux/Macに応じてブラウザでビューアを開く（ベストエフォート）。"""
+    import subprocess
+    try:
+        with open("/proc/version") as _f:
+            _is_wsl = "microsoft" in _f.read().lower()
+    except Exception:
+        _is_wsl = False
+
+    if _is_wsl:
+        for _cmd in (
+            ["wslview", url],
+            ["cmd.exe", "/c", "start", "", url],
+            ["powershell.exe", "-c", f'Start-Process "{url}"'],
+        ):
+            try:
+                subprocess.Popen(_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
+            except (FileNotFoundError, OSError):
+                continue
+        return
+
+    import webbrowser
+    webbrowser.open(url)

@@ -116,6 +116,9 @@ def _build_components(base_dir: str, active_config=None):
     register_viewer_command(lambda: sessions_dir)
     set_sessions_dir(sessions_dir)
 
+    from .viewer import start_viewer_server as _start_viewer
+    _viewer_url = _start_viewer(sessions_dir)
+
     from .commands import cmd_registry
     @cmd_registry.register("stats", "ツール呼び出し統計を表示")
     def _cmd_stats(agent_obj, args: str):
@@ -136,6 +139,7 @@ def _build_components(base_dir: str, active_config=None):
         react_prompt     = react_prompt,
         plan_prompt      = plan_prompt,
         sessions_dir     = sessions_dir,
+        viewer_url       = _viewer_url,
     )
 
 

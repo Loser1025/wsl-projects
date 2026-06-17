@@ -33,6 +33,8 @@ def _log_team_event(event: dict) -> None:
 
 _apply_lock = threading.Lock()
 
+MAX_VERIFY_RETRIES = 3   # verify失敗時のWorker自動再試行上限
+
 _ISOLATED_MAX_ROUNDS = 8
 
 _RESEARCHER_TOOLS = [
@@ -64,11 +66,47 @@ Director（指示役）から渡された「元の指示」を実現するため
 - 完了の判定基準（Supervisorが確認できる程度に具体的に）
 
 元の指示の意図から外れた提案や、無関係な追加作業は書かないこと。
+
+# 検証コマンドの提案（任意）
+今回の変更スコープに対応するテスト・ビルド・Lint コマンドを特定できた場合は、
+最終回答の末尾に以下の形式で1行だけ記載すること（Directorが未指定の場合に自動採用される）:
+
+[推奨verify_cmd] <コマンド>
+
+例: pytest tests/test_auth.py -q  /  npm run test:unit  /  go test ./pkg/auth/...
+- 今回の変更スコープに絞った最小限のコマンドにすること（フルスイートは避ける）
+- 実行に数分以上かかるものは不適切
+- 適切なコマンドが特定できない場合はこのセクションを省略してよい
 """
 
 
 
 
+
+
+def _extract_suggested_verify_cmd(research: str) -> str:
+    """Researcherのワークフロー出力から [推奨verify_cmd] を抽出する。"""
+    import re
+    m = re.search(r'\[推奨verify_cmd\]\s*[:`]?\s*(.+?)(?:\n|$)', research, re.IGNORECASE)
+    if not m:
+        return ""
+    return m.group(1).strip().strip('`').strip()
+
+
+def _build_verify_retry_task(original_task: str, verify_cmd: str, verify_exit: int,
+                               verify_output: str, attempt: int) -> str:
+    """verify失敗フィードバックを含む、Workerへの修正指示文を生成する。"""
+    tail = verify_output[-3000:]
+    if len(verify_output) > 3000:
+        tail = f"…（出力省略、末尾3000文字のみ表示）\n{tail}"
+    return (
+        f"{original_task}\n\n"
+        f"[検証失敗 — 修正してください（試行 {attempt}/{MAX_VERIFY_RETRIES}）]\n"
+        f"検証コマンド: {verify_cmd}\n"
+        f"終了コード: {verify_exit}\n"
+        f"出力:\n{tail}\n\n"
+        f"前回の変更内容はOverlay上に残っています。エラーを修正し、検証が通るようにしてください。"
+    )
 
 
 def _build_researcher_registry() -> ToolRegistry:
@@ -192,7 +230,7 @@ def run_research(task: str, project_dir: str, config, label: str = "") -> str:
 
 
 def run_team_task(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "") -> str:
-    """Researcher → Worker を1回実行し、変更を即時適用してサマリをDirectorに返す。"""
+    """Researcher → Worker を実行し、verify失敗時は自動リトライ後に変更を適用してサマリを返す。"""
     resolved_dir = str(Path(project_dir).resolve())
     team_tag = f"[Team:{label}]" if label else "[Team]"
     trace_id = uuid.uuid4().hex[:8]
@@ -200,6 +238,12 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
     safe_print(C.gray(f"  {team_tag} 🔍 Researcher調査中..."), flush=True)
     research = run_research(task, project_dir, config, label=label)
     _log_team_event({"event": "team_research_done", "task": task, "research": research[:2000], "trace_id": trace_id})
+
+    # Directorがverify_cmdを指定していない場合、Researcherの提案を自動採用する
+    if not verify_cmd:
+        verify_cmd = _extract_suggested_verify_cmd(research)
+        if verify_cmd:
+            safe_print(C.gray(f"  {team_tag} 🧪 Researcher推奨verify_cmd: {verify_cmd}"), flush=True)
 
     worker_task = f"{task}\n\n[Researcherによる設計ワークフロー]\n{research}" if research else task
 
@@ -210,6 +254,41 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
         trace_id=trace_id, verify_cmd=verify_cmd,
         provider=config.name, model=config.model,
     )
+
+    # verify失敗ループ: 同じOverlay上でWorkerが修正再試行する
+    for verify_attempt in range(1, MAX_VERIFY_RETRIES + 1):
+        if result.verify_exit is None or result.verify_exit == 0:
+            break  # 検証通過 or verify_cmd未指定
+        if upper is None or base is None:
+            break  # 直前のWorkerが実行エラー → リトライ不可
+        safe_print(C.yellow(
+            f"  {team_tag} ⚠ 検証失敗(exit={result.verify_exit})"
+            f" → 修正再試行 {verify_attempt}/{MAX_VERIFY_RETRIES}"
+        ), flush=True)
+        _log_team_event({
+            "event": "team_worker_start", "attempt": verify_attempt + 1,
+            "task": task, "resumed": True, "trace_id": trace_id,
+            "reason": "verify_failed", "verify_exit": result.verify_exit,
+        })
+        retry_task = _build_verify_retry_task(
+            task, verify_cmd, result.verify_exit, result.verify_output, verify_attempt
+        )
+        new_result, new_upper, new_base = run_subagent_reviewable(
+            retry_task, project_dir, label=label or "single",
+            base=base,  # 前回のOverlayを引き継いで続きから作業
+            trace_id=trace_id, verify_cmd=verify_cmd,
+            provider=config.name, model=config.model,
+        )
+        if new_upper is None or new_base is None:
+            # リトライ自体が失敗（baseも削除済み）→ 直前の結果で打ち切り
+            safe_print(C.yellow(
+                f"  {team_tag} ⚠ 修正試行 {verify_attempt} が失敗 → 前回の変更を適用します"
+            ), flush=True)
+            result = new_result
+            upper = None
+            base = None
+            break
+        result, upper, base = new_result, new_upper, new_base
 
     if upper is None or base is None:
         return f"[delegate_to_team: ⚠ 実行エラー]\nタスク: {task}\n\n{result.summary}"
@@ -224,7 +303,14 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
     finally:
         cleanup_subagent(base)
 
-    status_label = "✓ 完了・適用済み" if applied else "✓ 完了（変更なし）"
+    verify_status = ""
+    if verify_cmd:
+        if result.verify_exit == 0:
+            verify_status = " ✓検証通過"
+        elif result.verify_exit is not None:
+            verify_status = f" ✗検証失敗(exit={result.verify_exit}, {MAX_VERIFY_RETRIES}回試行後)"
+
+    status_label = f"{'✓ 完了・適用済み' if applied else '✓ 完了（変更なし）'}{verify_status}"
     lines = [
         f"[delegate_to_team: {status_label}]",
         f"タスク: {task}",
@@ -237,7 +323,7 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
 
 
 def run_worker_once(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "") -> str:
-    """Researcher/Supervisorを介さず、Workerを1回だけ実行して変更を即時適用する。"""
+    """Researcherを介さずWorkerを実行し、verify失敗時は自動リトライ後に変更を適用する。"""
     resolved_dir = str(Path(project_dir).resolve())
     trace_id = uuid.uuid4().hex[:8]
 
@@ -249,6 +335,40 @@ def run_worker_once(task: str, project_dir: str, config, label: str = "", verify
         task, project_dir, label=label or "single", trace_id=trace_id,
         verify_cmd=verify_cmd, provider=config.name, model=config.model,
     )
+
+    # verify失敗ループ
+    for verify_attempt in range(1, MAX_VERIFY_RETRIES + 1):
+        if result.verify_exit is None or result.verify_exit == 0:
+            break
+        if upper is None or base is None:
+            break
+        safe_print(C.yellow(
+            f"  [Worker] ⚠ 検証失敗(exit={result.verify_exit})"
+            f" → 修正再試行 {verify_attempt}/{MAX_VERIFY_RETRIES}"
+        ), flush=True)
+        _log_team_event({
+            "event": "team_worker_start", "attempt": verify_attempt + 1,
+            "task": task, "resumed": True, "trace_id": trace_id,
+            "reason": "verify_failed", "verify_exit": result.verify_exit,
+        })
+        retry_task = _build_verify_retry_task(
+            task, verify_cmd, result.verify_exit, result.verify_output, verify_attempt
+        )
+        new_result, new_upper, new_base = run_subagent_reviewable(
+            retry_task, project_dir, label=label or "single",
+            base=base,
+            trace_id=trace_id, verify_cmd=verify_cmd,
+            provider=config.name, model=config.model,
+        )
+        if new_upper is None or new_base is None:
+            safe_print(C.yellow(
+                f"  [Worker] ⚠ 修正試行 {verify_attempt} が失敗 → 前回の変更を適用します"
+            ), flush=True)
+            result = new_result
+            upper = None
+            base = None
+            break
+        result, upper, base = new_result, new_upper, new_base
 
     if upper is None or base is None:
         return f"[delegate_to_worker: ⚠ 実行エラー]\n\n{result.summary}"
@@ -263,7 +383,14 @@ def run_worker_once(task: str, project_dir: str, config, label: str = "", verify
     finally:
         cleanup_subagent(base)
 
-    status_label = "✓ 完了・適用済み" if applied else "✓ 完了（変更なし）"
+    verify_status = ""
+    if verify_cmd:
+        if result.verify_exit == 0:
+            verify_status = " ✓検証通過"
+        elif result.verify_exit is not None:
+            verify_status = f" ✗検証失敗(exit={result.verify_exit}, {MAX_VERIFY_RETRIES}回試行後)"
+
+    status_label = f"{'✓ 完了・適用済み' if applied else '✓ 完了（変更なし）'}{verify_status}"
     lines = [f"[delegate_to_worker: {status_label}]", "", result.summary]
     if applied:
         lines += ["", "(変更はプロジェクトに適用され、AutoGitでコミット済みです)"]

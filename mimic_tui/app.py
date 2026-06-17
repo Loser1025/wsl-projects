@@ -269,6 +269,16 @@ class MimicApp(App):
         self.query_one("#title-art", Static).update(art_text)
 
         self._write_direct(f"作業Dir: {cwd}\n")
+
+        viewer_url = self._ctx.get("viewer_url")
+        if viewer_url:
+            self._write_direct(f"ビューア: {viewer_url}\n")
+            try:
+                from .viewer import open_viewer_in_browser
+                open_viewer_in_browser(viewer_url)
+            except Exception:
+                pass
+
         self._write_direct("─" * 60 + "\n")
 
         self._refresh_system_panel()
