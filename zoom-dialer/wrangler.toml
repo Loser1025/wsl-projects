@@ -1,11 +1,10 @@
 name = "zoom-dialer"
-account_id = "5971da36b2a3b6fec11f642d3ce4e9cd"
-workers_dev = true
-compatibility_date = "2023-10-01"
 main = "src/index.ts"
+compatibility_date = "2026-06-13"
 
-[site]
-bucket = "./public"
+[observability]
+enabled = true
+head_sampling_rate = 1
 
 [[kv_namespaces]]
 binding = "PHONE_STORE"
