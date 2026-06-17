@@ -4,30 +4,43 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
 
+process.env.GEMINI_KEY_1 = 'AIzaSyBaWBGu5jWgZnvYcMwnbPX_uEzbDBfIYHU';
+process.env.GEMINI_KEY_2 = 'AIzaSyBSKMJKgDzHtYVxCMl0ftQFRoPOqJmNl1Y';
+process.env.GEMINI_KEY_3 = 'AIzaSyCd9WZdcnv_ycWf-YE_IaAEm22revgv49w';
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const publicPath = path.join(__dirname, '..', 'public');
 
 // ミドルウェア
+app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.url}`);
+  next();
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(publicPath));
 
-// APIキー管理
+  // APIキー管理
 class APIKeyManager {
   constructor() {
     this.keys = [];
+    console.log('[DEBUG] APIキー読み込み開始');
     for (let i = 1; i <= 10; i++) {
       const key = process.env[`GEMINI_KEY_${i}`];
-      if (key) this.keys.push(key);
+      if (key) {
+        this.keys.push(key);
+        console.log(`[DEBUG] GEMINI_KEY_${i} 読み込み成功`);
+      }
     }
     this.currentIndex = 0;
     this.failedKeys = new Set();
     this.usage = {};
     // デバッグログ
-    console.log(`APIキー読み込み: ${this.keys.length}個検出`);
+    console.log(`[DEBUG] APIキー総数: ${this.keys.length}個`);
     if (this.keys.length > 0) {
-      console.log(`最初のキー: ${this.keys[0].substring(0, 8)}...`);
+      console.log(`[DEBUG] 最初のキーの頭: ${this.keys[0].substring(0, 8)}...`);
     }
   }
 
@@ -125,7 +138,7 @@ function parseResponse(text) {
     
     // デバッグログ: 元のレスポンスをファイルに保存
     const fs = require('fs');
-    const debugDir = path.join(__dirname, '..', 'debug-responses');
+    const debugDir = '/tmp/debug-responses';
     try {
       if (!fs.existsSync(debugDir)) {
         fs.mkdirSync(debugDir, { recursive: true });
@@ -134,7 +147,7 @@ function parseResponse(text) {
       fs.writeFileSync(`${debugDir}/response_${timestamp}.txt`, text);
       console.log(`デバッグファイル保存: ${debugDir}/response_${timestamp}.txt`);
     } catch (e) {
-      console.error('デバッグファイル保存エラー:', e.message);
+      console.warn(`[WARN] デバッグ用ディレクトリ作成失敗: ${debugDir}, エラー: ${e.message}`);
     }
     
     // コードブロックの抽出（より堅牢な処理）
@@ -280,23 +293,35 @@ app.get('/api/status', (req, res) => {
 
 // Google Drive分析
 app.post('/api/analyze/drive', async (req, res) => {
-  const { drive_url } = req.body;
-  if (!drive_url) {
-    return res.status(400).json({ error: 'Google DriveのURLを入力してください' });
+  // 1. 受信ログと環境変数チェック
+  console.log('--- Request received: /api/analyze/drive ---');
+  console.log('[DEBUG] 環境変数の確認:');
+  for (let i = 1; i <= 3; i++) {
+    console.log(`GEMINI_KEY_${i}: ${process.env[`GEMINI_KEY_${i}`] ? '設定済み' : '未設定'}`);
   }
 
-  const match = drive_url.match(/\/d\/([a-zA-Z0-9_-]+)|id=([a-zA-Z0-9_-]+)/);
-  const fileId = match ? (match[1] || match[2]) : null;
-
-  if (!fileId) {
-    return res.status(400).json({ error: '無効なGoogle Drive URLです' });
-  }
-
-  let videoPath;
+  // 2. 全体を try-catch でラップ
+  let videoPath; // スコープ修正
   try {
+    const { drive_url } = req.body;
+    if (!drive_url) {
+      return res.status(400).json({ error: 'Google DriveのURLを入力してください' });
+    }
+
+    const match = drive_url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    const fileId = match ? match[1] : null;
+
+    if (!fileId) {
+      return res.status(400).json({ error: '無効なGoogle Drive URLです' });
+    }
+
     const axios = require('axios');
     videoPath = `/tmp/drive_${Date.now()}.mp4`;
-    const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+    // 改善：ダウンロード用URL生成
+    let downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+    console.log(`[DEBUG] 変換後のダウンロード用URL: ${downloadUrl}`);
 
     // axios はリダイレクトを自動的に追跡する
     const dlResponse = await axios.get(downloadUrl, {
@@ -306,22 +331,34 @@ app.post('/api/analyze/drive', async (req, res) => {
       headers: { 'User-Agent': 'Mozilla/5.0' },
     });
 
+    console.log(`[DEBUG] HTTPステータスコード: ${dlResponse.status}`);
+    console.log(`[DEBUG] レスポンスデータ長: ${dlResponse.data.length}`);
+
     // Google Drive の確認ページ（大容量ファイル）検出
+
     const ct = dlResponse.headers['content-type'] || '';
     if (ct.includes('text/html')) {
-      // confirm トークンを探して再ダウンロード
+      console.log(`[DEBUG] Google Drive HTMLレスポンス: ステータス=${dlResponse.status}`);
+      console.log(`[DEBUG] レスポンスヘッダー: ${JSON.stringify(dlResponse.headers)}`);
+      
       const html = Buffer.from(dlResponse.data).toString('utf8');
-      const confirmMatch = html.match(/confirm=([0-9A-Za-z_-]+)/);
+      console.log(`[DEBUG] HTMLの内容(先頭2000文字): ${html.substring(0, 2000)}`);
+      
+      const confirmMatch = html.match(/name="confirm" value="([0-9A-Za-z_-]+)"/) || html.match(/confirm=([0-9A-Za-z_-]+)/);
+      
       if (!confirmMatch) {
         throw new Error('Google Drive のダウンロード確認ページを処理できませんでした。共有設定を確認してください。');
       }
-      const confirmUrl = `${downloadUrl}&confirm=${confirmMatch[1]}`;
+      const token = confirmMatch[1];
+      const confirmUrl = `${downloadUrl}&confirm=${token}`;
+      
       const confirmed = await axios.get(confirmUrl, {
         responseType: 'arraybuffer',
         maxRedirects: 10,
         timeout: 120000,
         headers: { 'User-Agent': 'Mozilla/5.0' },
       });
+      console.log(`[DEBUG] 確認後のHTTPステータスコード: ${confirmed.status}`);
       fs.writeFileSync(videoPath, confirmed.data);
     } else {
       fs.writeFileSync(videoPath, dlResponse.data);
@@ -386,3 +423,5 @@ if (require.main === module) {
     console.log(`サーバーが起動しました: http://localhost:${PORT}`);
   });
 }
+
+module.exports = app;
