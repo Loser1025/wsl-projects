@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Optional
 
 from .agent import OpenRouterAgent, AccountRotator, _build_tool_call_entry
+from .orchestrator import _parse_xml_tool_calls, _XML_TOOL_PATTERN, _MAX_XML_TOOL_RETRIES
 from .autogit import AutoGit
 from .config import OpenRouterConfig, GoogleAIConfig, MistralConfig
 from .subagent import (apply_subagent_changes, cleanup_subagent,
@@ -66,29 +67,7 @@ Director（指示役）から渡された「元の指示」を実現するため
 """
 
 
-_COMPRESS_THRESHOLD = 3000  # この文字数を超えたResearcher出力は中間要約コールで圧縮する
 
-_COMPRESS_SYSTEM_PROMPT = """\
-あなたは技術テキスト圧縮役です。
-渡されたテキストを3000文字以内に要約してください。
-- コードサンプル・ファイルパス・変更手順を優先して保持する
-- 重複・冗長な説明・前置きを省く
-- 出力はMarkdownでよい。説明なしで要約本文だけを返すこと
-"""
-
-
-def _compress_for_context(text: str, config, label: str = "") -> str:
-    """Researcher出力が長すぎる場合、中間要約コールで3000文字以内に圧縮する。"""
-    if len(text) <= _COMPRESS_THRESHOLD:
-        return text
-    safe_print(C.gray(f"  [Team:{label}] ✂ Researcher出力圧縮中 ({len(text)}文字→3000文字以内)..."), flush=True)
-    empty_reg = ToolRegistry()
-    summary = _run_isolated(config, empty_reg, _COMPRESS_SYSTEM_PROMPT, text,
-                             max_rounds=1, label=label, role="Compressor")
-    if summary:
-        safe_print(C.gray(f"  [Team:{label}] ✂ 圧縮完了 ({len(summary)}文字)"), flush=True)
-        return summary
-    return text[:_COMPRESS_THRESHOLD] + "\n…（要約圧縮）"
 
 
 
@@ -108,6 +87,7 @@ def _run_isolated(config, tool_registry: ToolRegistry, system_prompt: str,
     agent.set_system_prompt(system_prompt)
     messages: list[dict] = [{"role": "user", "content": user_message}]
     prefix = f"  {C.gray(f'[{role}:{label}]' if label else f'[{role}]')} "
+    xml_tool_retry_count = 0
 
     for _ in range(max_rounds):
         response = agent._api_call_with_retry(messages)
@@ -117,8 +97,38 @@ def _run_isolated(config, tool_registry: ToolRegistry, system_prompt: str,
             for line in text.splitlines():
                 if line.strip():
                     safe_print(prefix + line, flush=True)
+
+        # ── XML形式ツール呼び出し救済 ────────────────────────────
+        if not tool_calls and text and _XML_TOOL_PATTERN.search(text):
+            _xml_parsed = _parse_xml_tool_calls(text)
+            if _xml_parsed:
+                safe_print(C.yellow(
+                    f"{prefix}⚠ XML形式ツール呼び出しを検知 → {len(_xml_parsed)}件をtool_callsとして実行"
+                ), flush=True)
+                tool_calls = _xml_parsed
+
         if not tool_calls:
+            # XML検知したがパース失敗 → tool_calls形式で再送を促す
+            if (text and _XML_TOOL_PATTERN.search(text)
+                    and xml_tool_retry_count < _MAX_XML_TOOL_RETRIES):
+                xml_tool_retry_count += 1
+                safe_print(C.yellow(
+                    f"{prefix}⚠ XMLツール呼び出しのパース失敗 → 修正を促します"
+                    f" ({xml_tool_retry_count}/{_MAX_XML_TOOL_RETRIES})"
+                ), flush=True)
+                messages.append({"role": "assistant", "content": text})
+                messages.append({"role": "user",
+                    "content": (
+                        "[システム] ツール呼び出しがXML形式でテキストに含まれていましたが、"
+                        "パースできませんでした。\n"
+                        "ツールを呼び出す場合は、テキスト内に書かず、"
+                        "APIのtool_calls機能（JSON形式）を使ってください。\n"
+                        "直前のツール呼び出し意図をtool_calls形式で再送してください。"
+                    ),
+                })
+                continue
             return text or ""
+
         messages.append({
             "role": "assistant",
             "content": text or None,
@@ -189,7 +199,6 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
 
     safe_print(C.gray(f"  {team_tag} 🔍 Researcher調査中..."), flush=True)
     research = run_research(task, project_dir, config, label=label)
-    research = _compress_for_context(research, config, label=label)
     _log_team_event({"event": "team_research_done", "task": task, "research": research[:2000], "trace_id": trace_id})
 
     worker_task = f"{task}\n\n[Researcherによる設計ワークフロー]\n{research}" if research else task
