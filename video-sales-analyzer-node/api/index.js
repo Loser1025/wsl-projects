@@ -319,7 +319,7 @@ const client = axios.create();
     videoPath = `/tmp/drive_${Date.now()}.mp4`;
 
     // 改善：ダウンロード用URL生成
-    let downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    let downloadUrl = `https://drive.google.com/uc?export=downloadlet downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;id=${fileId}`; console.log(`[DEBUG] ダウンロード URL: ${downloadUrl}`);
 
     console.log(`[DEBUG] 変換後のダウンロード用URL: ${downloadUrl}`);
 
@@ -365,7 +365,7 @@ const client = axios.create();
         responseType: 'arraybuffer',
         maxRedirects: 10,
         timeout: 120000,
-        headers: { 'User-Agent': 'Mozilla/5.0' },
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://drive.google.com/' },
       });
       console.log(`[DEBUG] 確認後のHTTPステータスコード: ${confirmed.status}`);
       fs.writeFileSync(videoPath, confirmed.data);
