@@ -261,6 +261,16 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
             break  # 検証通過 or verify_cmd未指定
         if upper is None or base is None:
             break  # 直前のWorkerが実行エラー → リトライ不可
+        if result.verify_exit in (2, 126, 127):
+            # bash構文エラー(2) / 権限なし(126) / コマンド不明(127) はWorkerが修正できないためリトライ中止
+            safe_print(C.yellow(
+                f"  {team_tag} ⚠ verify_cmdが無効なコマンドです(exit={result.verify_exit}) → リトライ中止"
+            ), flush=True)
+            _log_team_event({
+                "event": "verify_cmd_invalid", "verify_exit": result.verify_exit,
+                "verify_cmd": verify_cmd, "trace_id": trace_id,
+            })
+            break
         safe_print(C.yellow(
             f"  {team_tag} ⚠ 検証失敗(exit={result.verify_exit})"
             f" → 修正再試行 {verify_attempt}/{MAX_VERIFY_RETRIES}"
@@ -343,6 +353,15 @@ def run_worker_once(task: str, project_dir: str, config, label: str = "", verify
         if result.verify_exit is None or result.verify_exit == 0:
             break
         if upper is None or base is None:
+            break
+        if result.verify_exit in (2, 126, 127):
+            safe_print(C.yellow(
+                f"  [Worker] ⚠ verify_cmdが無効なコマンドです(exit={result.verify_exit}) → リトライ中止"
+            ), flush=True)
+            _log_team_event({
+                "event": "verify_cmd_invalid", "verify_exit": result.verify_exit,
+                "verify_cmd": verify_cmd, "trace_id": trace_id,
+            })
             break
         safe_print(C.yellow(
             f"  [Worker] ⚠ 検証失敗(exit={result.verify_exit})"
