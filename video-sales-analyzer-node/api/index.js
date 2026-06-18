@@ -83,24 +83,34 @@ const GRADE_THRESHOLDS = [
 ];
 
 // 分析プロンプト
-function buildPrompt() {
+function buildPrompt(expressionItems, voiceItems) {
+  const defaultExpressionItems = [
+    "笑顔の強さ・自然さ",
+    "アイコンタクト（カメラ目線）",
+    "表情の反応性",
+    "ポジティブな表情（頷き、共感表現）",
+    "プロフェッショナルな印象",
+    "表情の一貫性"
+  ];
+  const defaultVoiceItems = [
+    "明瞭さ（聞き取りやすさ）",
+    "元気・生命力（声の張り）",
+    "話速のコントロール",
+    "感情表現の適切さ",
+    "自信の印象"
+  ];
+  const expressionArray = Array.isArray(expressionItems) && expressionItems.length > 0 ? expressionItems : defaultExpressionItems;
+  const voiceArray = Array.isArray(voiceItems) && voiceItems.length > 0 ? voiceItems : defaultVoiceItems;
+  const expressionList = expressionArray.map(item => `-- ${item}`).join('\n');
+  const voiceList = voiceArray.map(item => `-- ${item}`).join('\n');
   return `あなたはオンライン商談の専門アナリストです。
 提供された動画フレーム画像を分析し、以下の観点で0-100点のスコアを付けてください。
 
 ## 表情分析 (50%)
-- 笑顔の強さ・自然さ
-- アイコンタクト（カメラ目線）
-- 表情の反応性
-- ポジティブな表情（頷き、共感表現）
-- プロフェッショナルな印象
-- 表情の一貫性
+${expressionList}
 
 ## 声のトーン分析 (50%)
-- 明瞭さ（聞き取りやすさ）
-- 元気・生命力（声の張り）
-- 話速のコントロール
-- 感情表現の適切さ
-- 自信の印象
+${voiceList}
 
 以下のJSON形式で回答してください：
 {
@@ -299,7 +309,7 @@ app.post('/api/analyze/drive', async (req, res) => {
   // 2. 全体を try-catch でラップ
   let videoPath; // スコープ修正
   try {
-    const { drive_url } = req.body;
+    const { drive_url, expression_items, voice_items } = req.body;
     if (!drive_url) {
       return res.status(400).json({ error: 'Google DriveのURLを入力してください' });
     }
@@ -417,7 +427,7 @@ const client = axios.create({
 
     let result;
     try {
-      const prompt = buildPrompt();
+      const prompt = buildPrompt(expression_items, voice_items);
       console.log(`[DEBUG] 分析開始 (Gemini)`);
       result = await analyzeUriWithFallback(prompt, geminiFile.uri, mimeType);
       console.log(`[DEBUG] 分析完了`);
