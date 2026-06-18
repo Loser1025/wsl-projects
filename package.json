@@ -1,0 +1,23 @@
+{
+  "name": "merged",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Loser1025/wsl-projects.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Loser1025/wsl-projects/issues"
+  },
+  "homepage": "https://github.com/Loser1025/wsl-projects#readme",
+  "dependencies": {
+    "axios": "^1.18.0"
+  }
+}
