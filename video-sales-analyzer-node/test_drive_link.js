@@ -4,9 +4,6 @@ const FormData = require('form-data');
 const fs = require('fs');
 
 // 環境変数の設定
-process.env.GEMINI_KEY_1 = 'AIzaSyBaWBGu5jWgZnvYcMwnbPX_uEzbDBfIYHU';
-process.env.GEMINI_KEY_2 = 'AIzaSyBSKMJKgDzHtYVxCMl0ftQFRoPOqJmNl1Y';
-process.env.GEMINI_KEY_3 = 'AIzaSyCd9WZdcnv_ycWf-YE_IaAEm22revgv49w';
 
 // サーバーの起動を待つ
 setTimeout(async () => {

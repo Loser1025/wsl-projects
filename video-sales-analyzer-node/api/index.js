@@ -4,10 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
 
-process.env.GEMINI_KEY_1 = 'AIzaSyBaWBGu5jWgZnvYcMwnbPX_uEzbDBfIYHU';
-process.env.GEMINI_KEY_2 = 'AIzaSyBSKMJKgDzHtYVxCMl0ftQFRoPOqJmNl1Y';
-process.env.GEMINI_KEY_3 = 'AIzaSyCd9WZdcnv_ycWf-YE_IaAEm22revgv49w';
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 const publicPath = path.join(__dirname, '..', 'public');

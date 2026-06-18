@@ -2,7 +2,6 @@
 const { GoogleGenAI } = require('@google/genai');
 
 // 環境変数の設定
-process.env.GEMINI_KEY_1 = 'AIzaSyBaWBGu5jWgZnvYcMwnbPX_uEzbDBfIYHU';
 
 // APIキー管理
 class APIKeyManager {
