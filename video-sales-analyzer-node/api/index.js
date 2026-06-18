@@ -320,7 +320,11 @@ app.post('/api/analyze/drive', async (req, res) => {
     console.log(`[DEBUG] 変換後のダウンロード用URL: ${downloadUrl}`);
 
     // axios はリダイレクトを自動的に追跡する
-    const dlResponse = await axios.get(downloadUrl, {
+    // 修正: confirm=no_virus_check を初期リクエストに追加し、トークンを確実に取得する
+    let initialUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=no_virus_check`;
+    console.log(`[DEBUG] 初回リクエスト URL: ${initialUrl}`);
+    
+    const dlResponse = await axios.get(initialUrl, {
       responseType: 'arraybuffer',
       maxRedirects: 10,
       timeout: 120000,
@@ -328,25 +332,14 @@ app.post('/api/analyze/drive', async (req, res) => {
     });
 
     console.log(`[DEBUG] HTTPステータスコード: ${dlResponse.status}`);
-    console.log(`[DEBUG] レスポンスデータ長: ${dlResponse.data.length}`);
-
-    // Google Drive の確認ページ（大容量ファイル）検出
-
-    const ct = dlResponse.headers['content-type'] || '';
-    if (ct.includes('text/html')) {
-      console.log(`[DEBUG] Google Drive HTMLレスポンス: ステータス=${dlResponse.status}`);
-      console.log(`[DEBUG] レスポンスヘッダー: ${JSON.stringify(dlResponse.headers)}`);
-      
-      const html = Buffer.from(dlResponse.data).toString('utf8');
-      console.log(`[DEBUG] HTMLの内容(先頭2000文字): ${html.substring(0, 2000)}`);
-      
-      const confirmMatch = html.match(/name="confirm" value="([0-9A-Za-z_-]+)"/) || html.match(/confirm=([0-9A-Za-z_-]+)/);
-      
-      if (!confirmMatch) {
-        throw new Error('Google Drive のダウンロード確認ページを処理できませんでした。共有設定を確認してください。');
-      }
+    
+    const html = Buffer.from(dlResponse.data).toString('utf8');
+    const confirmMatch = html.match(/name="confirm" value="([0-9A-Za-z_-]+)"/);
+    
+    if (confirmMatch) {
       const token = confirmMatch[1];
-      const confirmUrl = `${downloadUrl}&confirm=${token}`;
+      console.log(`[DEBUG] confirm token 発見: ${token}`);
+      const confirmUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=${token}`;
       
       const confirmed = await axios.get(confirmUrl, {
         responseType: 'arraybuffer',
@@ -357,6 +350,7 @@ app.post('/api/analyze/drive', async (req, res) => {
       console.log(`[DEBUG] 確認後のHTTPステータスコード: ${confirmed.status}`);
       fs.writeFileSync(videoPath, confirmed.data);
     } else {
+      console.log(`[DEBUG] トークンなし、dlResponse.dataを使用`);
       fs.writeFileSync(videoPath, dlResponse.data);
     }
 
