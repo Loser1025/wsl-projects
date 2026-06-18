@@ -319,7 +319,7 @@ const client = axios.create();
     videoPath = `/tmp/drive_${Date.now()}.mp4`;
 
     // 改善：ダウンロード用URL生成
-    let downloadUrl = `https://drive.google.com/uc?export=downloadlet downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;id=${fileId}`; console.log(`[DEBUG] ダウンロード URL: ${downloadUrl}`);
+    let downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`; console.log(`[DEBUG] ダウンロード URL: ${downloadUrl}`);
 
     console.log(`[DEBUG] 変換後のダウンロード用URL: ${downloadUrl}`);
 
