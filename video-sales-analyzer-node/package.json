@@ -10,11 +10,13 @@
   "dependencies": {
     "@google/genai": "^1.0.0",
     "axios": "^1.17.0",
+    "axios-cookiejar-support": "^7.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.0",
     "express": "^4.18.0",
     "form-data": "^4.0.5",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "tough-cookie": "^6.0.1"
   },
   "devDependencies": {
     "vercel": "^34.0.0"

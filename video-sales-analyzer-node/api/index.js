@@ -312,6 +312,11 @@ app.post('/api/analyze/drive', async (req, res) => {
     }
 
     const axios = require('axios');
+const { wrapper } = require('axios-cookiejar-support');
+const { CookieJar } = require('tough-cookie');
+
+const jar = new CookieJar();
+const client = wrapper(axios.create({ jar }));
     videoPath = `/tmp/drive_${Date.now()}.mp4`;
 
     // 改善：ダウンロード用URL生成
@@ -324,12 +329,14 @@ app.post('/api/analyze/drive', async (req, res) => {
     let initialUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=no_virus_check`;
     console.log(`[DEBUG] 初回リクエスト URL: ${initialUrl}`);
     
-    const dlResponse = await axios.get(initialUrl, {
+    const dlResponse = await client.get(initialUrl, {
       responseType: 'arraybuffer',
       maxRedirects: 10,
       timeout: 120000,
       headers: { 'User-Agent': 'Mozilla/5.0' },
     });
+    console.log(`[DEBUG] 初回リクエスト後、保存されたCookie: ${JSON.stringify(await jar.getCookies(initialUrl))}`);
+
 
     console.log(`[DEBUG] HTTPステータスコード: ${dlResponse.status}`);
     
@@ -340,8 +347,10 @@ app.post('/api/analyze/drive', async (req, res) => {
       const token = confirmMatch[1];
       console.log(`[DEBUG] confirm token 発見: ${token}`);
       const confirmUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=${token}`;
+      console.log(`[DEBUG] 再リクエスト実行URL: ${confirmUrl}`);
+      console.log(`[DEBUG] 送信するCookie: ${JSON.stringify(await jar.getCookies(confirmUrl))}`);
       
-      const confirmed = await axios.get(confirmUrl, {
+      const confirmed = await client.get(confirmUrl, {
         responseType: 'arraybuffer',
         maxRedirects: 10,
         timeout: 120000,
@@ -349,6 +358,9 @@ app.post('/api/analyze/drive', async (req, res) => {
       });
       console.log(`[DEBUG] 確認後のHTTPステータスコード: ${confirmed.status}`);
       fs.writeFileSync(videoPath, confirmed.data);
+      const stats = fs.statSync(videoPath);
+      console.log(`[INFO] ダウンロード完了: ファイルサイズ = ${stats.size} bytes`);
+
     } else {
       console.log(`[DEBUG] トークンなし、dlResponse.dataを使用`);
       fs.writeFileSync(videoPath, dlResponse.data);
