@@ -315,7 +315,10 @@ app.post('/api/analyze/drive', async (req, res) => {
 const { CookieJar } = require('tough-cookie');
 
 const jar = new CookieJar();
-const client = axios.create();
+const client = axios.create({
+    maxRedirects: 10,
+    headers: { 'User-Agent': 'Mozilla/5.0' }
+});
     videoPath = `/tmp/drive_${Date.now()}.mp4`;
 
     // 改善：ダウンロード用URL生成
@@ -357,7 +360,7 @@ const client = axios.create();
       const uuid = uuidMatch ? uuidMatch[1] : '';
       console.log(`[DEBUG] confirm token 発見: ${token}, uuid 発見: ${uuid}`);
       // Google Driveのダウンロード用URL構造を再現
-      const confirmUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=${token}&uuid=${uuid}`;
+      const confirmUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=${token}&uuid=${uuid}`;
       console.log(`[DEBUG] 再リクエスト実行URL: ${confirmUrl}`);
       console.log(`[DEBUG] 送信するCookie: ${JSON.stringify(await jar.getCookies(confirmUrl))}`);
       
@@ -365,15 +368,35 @@ const client = axios.create();
         responseType: 'arraybuffer',
         maxRedirects: 10,
         timeout: 120000,
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://drive.google.com/' },
+        headers: { 
+          'User-Agent': 'Mozilla/5.0', 
+          'Referer': 'https://drive.google.com/',
+          'Cookie': jar.getCookieStringSync(confirmUrl) 
+        },
       });
       console.log(`[DEBUG] 確認後のHTTPステータスコード: ${confirmed.status}`);
+      
+      // 2436 bytes (警告HTML) チェック
+      if (Buffer.byteLength(confirmed.data) === 2436) {
+          console.error("DEBUG: 警告HTMLがダウンロードされました。中身の一部:");
+          console.error(confirmed.data.toString().substring(0, 500));
+          throw new Error("Download failed: Received warning page instead of file.");
+      }
+      
       fs.writeFileSync(videoPath, confirmed.data);
       const stats = fs.statSync(videoPath);
       console.log(`[INFO] ダウンロード完了: ファイルサイズ = ${stats.size} bytes`);
 
     } else {
       console.log(`[DEBUG] トークンなし、dlResponse.dataを使用`);
+      
+      // トークンなしの場合もサイズチェック
+      if (Buffer.byteLength(dlResponse.data) === 2436) {
+          console.error("DEBUG: 警告HTMLがダウンロードされました(tokenなし)。中身の一部:");
+          console.error(dlResponse.data.toString().substring(0, 500));
+          throw new Error("Download failed: Received warning page instead of file.");
+      }
+      
       fs.writeFileSync(videoPath, dlResponse.data);
     }
 
