@@ -350,11 +350,14 @@ const client = axios.create();
     
     const html = Buffer.from(dlResponse.data).toString('utf8');
     const confirmMatch = html.match(/name="confirm" value="([0-9A-Za-z_-]+)"/);
+    const uuidMatch = html.match(/name="uuid" value="([0-9A-Fa-f-]+)"/);
     
     if (confirmMatch) {
       const token = confirmMatch[1];
-      console.log(`[DEBUG] confirm token 発見: ${token}`);
-      const confirmUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=${token}`;
+      const uuid = uuidMatch ? uuidMatch[1] : '';
+      console.log(`[DEBUG] confirm token 発見: ${token}, uuid 発見: ${uuid}`);
+      // Google Driveのダウンロード用URL構造を再現
+      const confirmUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=${token}&uuid=${uuid}`;
       console.log(`[DEBUG] 再リクエスト実行URL: ${confirmUrl}`);
       console.log(`[DEBUG] 送信するCookie: ${JSON.stringify(await jar.getCookies(confirmUrl))}`);
       
