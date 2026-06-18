@@ -64,10 +64,19 @@ async function startAnalysis() {
 }
 
 async function analyzeDrive() {
+    const expressionItems = Array.from(document.querySelectorAll('.expression-item:checked'))
+        .map(cb => cb.value);
+    const voiceItems = Array.from(document.querySelectorAll('.voice-item:checked'))
+        .map(cb => cb.value);
+
     const response = await fetch("/api/analyze/drive", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ drive_url: state.driveUrl })
+        body: JSON.stringify({
+            drive_url: state.driveUrl,
+            expression_items: expressionItems,
+            voice_items: voiceItems
+        })
     });
     if (!response.ok) {
         const error = await response.json();
