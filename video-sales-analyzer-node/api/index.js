@@ -312,11 +312,10 @@ app.post('/api/analyze/drive', async (req, res) => {
     }
 
     const axios = require('axios');
-const { wrapper } = require('axios-cookiejar-support');
 const { CookieJar } = require('tough-cookie');
 
 const jar = new CookieJar();
-const client = wrapper(axios.create({ jar }));
+const client = axios.create();
     videoPath = `/tmp/drive_${Date.now()}.mp4`;
 
     // 改善：ダウンロード用URL生成
@@ -333,8 +332,17 @@ const client = wrapper(axios.create({ jar }));
       responseType: 'arraybuffer',
       maxRedirects: 10,
       timeout: 120000,
-      headers: { 'User-Agent': 'Mozilla/5.0' },
+      headers: { 
+        'User-Agent': 'Mozilla/5.0',
+        'Cookie': jar.getCookieStringSync(initialUrl)
+      },
     });
+
+    // レスポンスからCookieを保存
+    const setCookies = dlResponse.headers['set-cookie'];
+    if (setCookies) {
+      setCookies.forEach(cookie => jar.setCookieSync(cookie, initialUrl));
+    }
     console.log(`[DEBUG] 初回リクエスト後、保存されたCookie: ${JSON.stringify(await jar.getCookies(initialUrl))}`);
 
 
