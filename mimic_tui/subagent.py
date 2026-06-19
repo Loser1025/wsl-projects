@@ -65,12 +65,16 @@ def _force_rmtree(path: Path) -> None:
     shutil.rmtree(path, ignore_errors=True)
 
 
+_APPLY_EXCLUDED_FILES = {".mimic_checkpoint.json"}
+
 def _changed_files(upper: Path) -> list[str]:
-    """upperdir を走査し、変更/新規ファイルの相対パス一覧を返す（削除マーカーは除外）。"""
+    """upperdir を走査し、変更/新規ファイルの相対パス一覧を返す（削除マーカー・内部管理ファイルは除外）。"""
     changed = []
     for p in sorted(upper.rglob("*")):
         if p.is_dir():
             continue
+        if p.name in _APPLY_EXCLUDED_FILES:
+            continue  # Worker 内部管理ファイルを実プロジェクトに持ち込まない
         try:
             st = p.lstat()
         except OSError:
