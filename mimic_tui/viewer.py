@@ -45,6 +45,61 @@ def _load_entries(path: Path) -> list[dict]:
     return entries
 
 
+def get_session_trace_text(sessions_dir: Path, trace_id: str, max_steps: int = 20) -> str:
+    """sessions_dir内からsession_start.trace_idが一致するセッションを探し、
+    そのThought/Action/Observation/最終回答を読みやすく整形して返す。
+
+    delegate_to_team/delegate_to_worker が起動するWorkerは --auto-prompt 時に
+    MIMIC_TRACE_ID 経由でこのtrace_idを自身のsession_startイベントに記録している
+    （__main__.py参照）。Researcher(_run_isolated)は独自のセッションjsonlを持たないため
+    対象外（見つからない場合はその旨を返す）。
+    """
+    target_file: Optional[Path] = None
+    target_meta: dict = {}
+    for jf in sorted(sessions_dir.glob("*.jsonl"), reverse=True):
+        hit = next(
+            (e for e in _load_entries(jf)
+             if e.get("type") == "session_start" and e.get("trace_id") == trace_id),
+            None,
+        )
+        if hit:
+            target_file, target_meta = jf, hit
+            break
+
+    if target_file is None:
+        return (
+            f"trace_id={trace_id} に対応するWorker実行ログが見つかりませんでした"
+            "（Researcherの実行はトレース対象外です）。"
+        )
+
+    lines = [
+        f"[trace_id={trace_id} のWorker実行トレース]",
+        f"モデル: {target_meta.get('provider', '')}/{target_meta.get('model', '')}",
+        "",
+    ]
+    seen_steps: set = set()
+    truncated = False
+    for e in _load_entries(target_file):
+        t = e.get("type")
+        step = e.get("step")
+        if t in ("thought", "action", "observation") and step is not None:
+            seen_steps.add(step)
+            if len(seen_steps) > max_steps:
+                if not truncated:
+                    lines.append(f"…（{max_steps}ステップを超えたため以降省略。最終回答のみ末尾に表示）")
+                    truncated = True
+                continue  # 最終回答は省略後も拾うため break ではなく continue する
+        if t == "thought":
+            lines.append(f"── ステップ{step} ──\nThought: {e.get('content', '')}")
+        elif t == "action":
+            lines.append(f"Action: {e.get('tool', '?')}({str(e.get('args', ''))[:200]})")
+        elif t == "observation":
+            lines.append(f"Observation: {e.get('result', '')[:500]}")
+        elif t == "final_answer":
+            lines.append(f"\n[最終回答]\n{e.get('content', '')}")
+    return "\n".join(lines)
+
+
 def _session_meta(path: Path, entries: list[dict]) -> dict:
     model = provider = cwd = own_trace_id = ""
     first_user = ""

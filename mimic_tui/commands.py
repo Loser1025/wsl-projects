@@ -376,3 +376,66 @@ def register_sessions_command(sessions_dir_getter):
         else:
             safe_print(C.gray(f"  「{arg}」に一致するセッションが見つかりません。"))
 
+
+def register_delegations_command():
+    """Directorプロセスのクラッシュ等で中断された delegate_to_team/delegate_to_worker
+    の一覧表示・再開・破棄を行う /delegations を登録する。
+    Worker（--auto-prompt サブエージェント）側では登録しないこと。
+    """
+
+    @cmd_registry.register(
+        "delegations",
+        "中断された委任タスクの一覧・再開・破棄 (/delegations | /delegations resume <番号> | /delegations discard <番号>)",
+    )
+    def cmd_delegations(agent: OpenRouterAgent, args: str):
+        from .team import list_orphaned_delegations, resume_delegation, discard_delegation
+
+        entries = list_orphaned_delegations()
+        parts = args.strip().split(maxsplit=1)
+        action = parts[0].lower() if parts else ""
+
+        if not action:
+            if not entries:
+                safe_print(C.gray("  中断中の委任タスクはありません。"))
+                return
+            safe_print(f"\n  {C.bold_green('中断中の委任タスク')}  ({len(entries)} 件)\n")
+            for i, e in enumerate(entries, 1):
+                age = e.get("checkpoint_age_sec")
+                if age is None:
+                    age_str = "進行状況不明"
+                elif age < 90:
+                    age_str = f"{age:.0f}秒前に更新（まだ実行中の可能性あり）"
+                else:
+                    age_str = f"{age/60:.0f}分前に更新"
+                task_preview = e.get("task", "")[:80].replace("\n", " ")
+                safe_print(
+                    C.green_dim(f"  [{i}] ") + f"trace_id={e['trace_id']}  "
+                    + C.gray(f"({e.get('kind', '?')}, {age_str})")
+                )
+                safe_print(f"      {task_preview}")
+            safe_print(C.gray("\n  再開: /delegations resume <番号>   破棄: /delegations discard <番号>\n"))
+            return
+
+        if action not in ("resume", "discard"):
+            safe_print(C.gray(
+                "  使い方: /delegations | /delegations resume <番号> | /delegations discard <番号>"
+            ))
+            return
+
+        if len(parts) < 2 or not parts[1].strip().isdigit():
+            safe_print(C.gray(f"  使い方: /delegations {action} <番号>"))
+            return
+
+        idx = int(parts[1].strip()) - 1
+        if not entries or not (0 <= idx < len(entries)):
+            safe_print(C.red(f"  番号 {parts[1]} のタスクが見つかりません（/delegations で一覧を確認してください）。"))
+            return
+
+        trace_id = entries[idx]["trace_id"]
+        if action == "resume":
+            safe_print(C.gray(f"  trace_id={trace_id} を再開しています..."))
+            result = resume_delegation(trace_id)
+        else:
+            result = discard_delegation(trace_id)
+        safe_print(result)
+

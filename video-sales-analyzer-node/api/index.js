@@ -75,63 +75,51 @@ const keyManager = new APIKeyManager();
 
 // グレード判定
 const GRADE_THRESHOLDS = [
-  { grade: 'S', min: 90, label: '優秀', color: '#4CAF50' },
-  { grade: 'A', min: 80, label: '良好', color: '#8BC34A' },
-  { grade: 'B', min: 70, label: '標準', color: '#FFC107' },
-  { grade: 'C', min: 60, label: 'やや改善必要', color: '#FF9800' },
-  { grade: 'D', min: 0, label: '改善必要', color: '#F44336' }
+  { grade: 'S', min: 90, label: '優秀', color: '#ffd400' },
+  { grade: 'A', min: 80, label: '良好', color: '#ff5a1e' },
+  { grade: 'B', min: 70, label: '標準', color: '#ff8a3d' },
+  { grade: 'C', min: 60, label: 'やや改善必要', color: '#ff1233' },
+  { grade: 'D', min: 0, label: '改善必要', color: '#ff1233' }
 ];
 
-// 分析プロンプト
-function buildPrompt(expressionItems, voiceItems) {
-  const defaultExpressionItems = [
-    "笑顔の強さ・自然さ",
-    "アイコンタクト（カメラ目線）",
-    "表情の反応性",
-    "ポジティブな表情（頷き、共感表現）",
-    "プロフェッショナルな印象",
-    "表情の一貫性"
-  ];
-  const defaultVoiceItems = [
-    "明瞭さ（聞き取りやすさ）",
-    "元気・生命力（声の張り）",
-    "話速のコントロール",
-    "感情表現の適切さ",
-    "自信の印象"
-  ];
-  const expressionArray = Array.isArray(expressionItems) && expressionItems.length > 0 ? expressionItems : defaultExpressionItems;
-  const voiceArray = Array.isArray(voiceItems) && voiceItems.length > 0 ? voiceItems : defaultVoiceItems;
-  const expressionList = expressionArray.map(item => `-- ${item}`).join('\n');
-  const voiceList = voiceArray.map(item => `-- ${item}`).join('\n');
-  return `あなたはオンライン商談の専門アナリストです。
-提供された動画フレーム画像を分析し、以下の観点で0-100点のスコアを付けてください。
+// 採点項目の最大数
+const MAX_CRITERIA_ITEMS = 10;
 
-## 表情分析 (50%)
-${expressionList}
+// 既定の採点項目（ユーザーが項目を指定しなかった場合に使用）
+const DEFAULT_CRITERIA_ITEMS = [
+  "笑顔の強さ・自然さ",
+  "アイコンタクト（カメラ目線）",
+  "表情の反応性",
+  "ポジティブな表情（頷き、共感表現）",
+  "プロフェッショナルな印象",
+  "明瞭さ（聞き取りやすさ）",
+  "元気・生命力（声の張り）",
+  "話速のコントロール",
+  "感情表現の適切さ",
+  "自信の印象"
+];
 
-## 声のトーン分析 (50%)
-${voiceList}
+// 分析プロンプト（最大10個の採点項目を動的に組み込む）
+function buildPrompt(criteriaItems) {
+  const items = (Array.isArray(criteriaItems) && criteriaItems.length > 0
+    ? criteriaItems
+    : DEFAULT_CRITERIA_ITEMS).slice(0, MAX_CRITERIA_ITEMS);
+  const itemsList = items.map((item, i) => `${i + 1}. ${item}`).join('\n');
+  const scoresExample = items
+    .map(item => `    {"item": "${item}", "score": <0-100>, "comment": "<理由>"}`)
+    .join(',\n');
+  return `あなたは動画分析の専門アナリストです。
+提供された動画フレーム画像を分析し、以下の採点項目それぞれについて0-100点のスコアを付けてください。
 
-以下のJSON形式で回答してください：
+## 採点項目
+${itemsList}
+
+以下のJSON形式で回答してください（scoresは採点項目と同じ順序・同じ件数で返してください）：
 {
-  "expression": {
-    "smile_intensity": {"score": <0-100>, "comment": "<理由>"},
-    "eye_contact": {"score": <0-100>, "comment": "<理由>"},
-    "facial_responsiveness": {"score": <0-100>, "comment": "<理由>"},
-    "positive_engagement": {"score": <0-100>, "comment": "<理由>"},
-    "professional_appearance": {"score": <0-100>, "comment": "<理由>"},
-    "consistency": {"score": <0-100>, "comment": "<理由>"},
-    "total_score": <0-100>
-  },
-  "voice_tone": {
-    "clarity": {"score": <0-100>, "comment": "<理由>"},
-    "energy_level": {"score": <0-100>, "comment": "<理由>"},
-    "pace_control": {"score": <0-100>, "comment": "<理由>"},
-    "emotional_appropriateness": {"score": <0-100>, "comment": "<理由>"},
-    "confidence": {"score": <0-100>, "comment": "<理由>"},
-    "total_score": <0-100>
-  },
-  "overall_score": <0-100>,
+  "scores": [
+${scoresExample}
+  ],
+  "overall_score": <0-100（各項目を踏まえた総合点）>,
   "summary": "<総合評価コメント>",
   "improvements": ["<改善点1>", "<改善点2>", "<改善点3>"]
 }`;
@@ -182,6 +170,14 @@ function parseResponse(text) {
     const result = JSON.parse(jsonText);
 
     result.overall_score = Math.max(0, Math.min(100, parseInt(result.overall_score) || 0));
+    if (!Array.isArray(result.scores)) {
+      result.scores = [];
+    }
+    result.scores = result.scores.map(s => ({
+      item: String((s && s.item) || ''),
+      score: Math.max(0, Math.min(100, parseInt(s && s.score) || 0)),
+      comment: String((s && s.comment) || ''),
+    }));
 
     for (const grade of GRADE_THRESHOLDS) {
       if (result.overall_score >= grade.min) {
@@ -203,8 +199,7 @@ function parseResponse(text) {
       error: true,
       message: 'レスポンスの解析に失敗しました: ' + error.message,
       error_type: error.constructor.name,
-      expression: { total_score: 0 },
-      voice_tone: { total_score: 0 },
+      scores: [],
       overall_score: 0,
       grade: GRADE_THRESHOLDS[GRADE_THRESHOLDS.length - 1],
       debug_info: {
@@ -271,7 +266,7 @@ async function uploadToGemini(filePath, mimeType, apiKey) {
   });
 
   let retries = 0;
-  while (file.state === 'PROCESSING' && retries < 30) {
+  while (file.state === 'PROCESSING' && retries < 90) {
     await new Promise(r => setTimeout(r, 3000));
     file = await ai.files.get({ name: file.name });
     retries++;
@@ -309,10 +304,13 @@ app.post('/api/analyze/drive', async (req, res) => {
   // 2. 全体を try-catch でラップ
   let videoPath; // スコープ修正
   try {
-    const { drive_url, expression_items, voice_items } = req.body;
+    const { drive_url, criteria } = req.body;
     if (!drive_url) {
       return res.status(400).json({ error: 'Google DriveのURLを入力してください' });
     }
+    const criteriaItems = Array.isArray(criteria)
+      ? criteria.map(c => String(c).trim()).filter(c => c.length > 0).slice(0, MAX_CRITERIA_ITEMS)
+      : [];
 
     const match = drive_url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     const fileId = match ? match[1] : null;
@@ -427,7 +425,7 @@ const client = axios.create({
 
     let result;
     try {
-      const prompt = buildPrompt(expression_items, voice_items);
+      const prompt = buildPrompt(criteriaItems);
       console.log(`[DEBUG] 分析開始 (Gemini)`);
       result = await analyzeUriWithFallback(prompt, geminiFile.uri, mimeType);
       console.log(`[DEBUG] 分析完了`);

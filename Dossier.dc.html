@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  :root,[data-theme="paper"]{
+    --paper:#e7e1d3; --panel:#ddd6c4; --ink:#1a1712; --ink-soft:rgba(26,23,18,0.52);
+    --rule:rgba(26,23,18,0.20); --rule-mid:rgba(26,23,18,0.42); --red:#cf3a1c;
+    --grain-blend:multiply; --grain-op:0.10;
+  }
+  [data-theme="noir"]{
+    --paper:#131210; --panel:#1b1916; --ink:#e9e3d4; --ink-soft:rgba(233,227,212,0.5);
+    --rule:rgba(233,227,212,0.16); --rule-mid:rgba(233,227,212,0.34); --red:#ff4a2b;
+    --grain-blend:screen; --grain-op:0.07;
+  }
+  ::selection{background:var(--red);color:var(--paper);}
+  @keyframes blink{0%,49%{opacity:1;}50%,100%{opacity:0;}}
+  [data-sel="false"]{color:var(--ink-soft)!important;}
+  [data-on="false"] [data-lbl]{text-decoration:line-through;color:var(--ink-soft)!important;}
+  [data-on="false"] [data-box]{background:transparent!important;}
+  [data-step="todo"]{opacity:0.32;}
+  [data-step="done"] [data-cur]{display:none;}
+  [data-step="todo"] [data-cur]{display:none;}
+  [data-step="todo"] [data-val]{display:none;}
+  ::placeholder{color:var(--ink-soft);}
+  input:focus{outline:none;border-bottom-color:var(--red)!important;}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100vh;background:var(--paper);color:var(--ink);font-family:'Shippori Mincho',serif;position:relative;">
+
+  <div style="position:fixed;inset:0;z-index:0;pointer-events:none;mix-blend-mode:var(--grain-blend);opacity:var(--grain-op);background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E&quot;);"></div>
+
+  <div style="position:relative;z-index:1;max-width:1120px;margin:0 auto;padding:30px 40px 80px;">
+
+    <!-- masthead -->
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding-bottom:12px;">
+      <div style="display:flex;align-items:baseline;gap:14px;">
+        <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:13px;letter-spacing:0.34em;">PITCHLENS</span>
+        <span style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.2em;color:var(--ink-soft);">商談分析調書</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.18em;">
+        <button data-sel="{{ paperSel }}" onClick="{{ onPaper }}" style="background:none;border:none;padding:0;cursor:pointer;color:var(--ink);font-family:inherit;font-size:inherit;letter-spacing:inherit;">PAPER</button>
+        <span style="color:var(--ink-soft);">/</span>
+        <button data-sel="{{ noirSel }}" onClick="{{ onNoir }}" style="background:none;border:none;padding:0;cursor:pointer;color:var(--ink);font-family:inherit;font-size:inherit;letter-spacing:inherit;">NOIR</button>
+      </div>
+    </div>
+    <div style="height:2px;background:var(--ink);"></div>
+    <div style="display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.18em;color:var(--ink-soft);padding:7px 0 0;">
+      <span>{{ docMeta }}</span>
+      <span>EXPRESSION 50% · VOICE 50%</span>
+    </div>
+
+    <!-- ================= INPUT ================= -->
+    <sc-if value="{{ isInput }}" hint-placeholder-val="{{ true }}">
+      <div style="padding-top:54px;">
+        <div style="font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.3em;color:var(--red);margin-bottom:18px;">FORM 01 — 入力</div>
+        <h1 style="font-family:'Shippori Mincho',serif;font-weight:800;font-size:62px;line-height:1.06;letter-spacing:0.01em;margin:0 0 22px;max-width:14em;">商談動画を、<br>一本の調書に計測する。</h1>
+        <p style="font-family:'Shippori Mincho',serif;font-size:16px;line-height:1.95;color:var(--ink-soft);max-width:34em;margin:0 0 52px;">Google Drive の共有リンクを指定すると、表情と声のトーンを各 50% で採点し、改善の注記まで一枚の調書に綴じます。</p>
+
+        <div style="font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.24em;color:var(--ink-soft);margin-bottom:12px;">SOURCE — GOOGLE DRIVE URL</div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:22px;align-items:end;margin-bottom:64px;">
+          <input value="{{ driveUrl }}" onInput="{{ onUrlInput }}" placeholder="https://drive.google.com/file/d/…/view" style="width:100%;background:transparent;border:none;border-bottom:2px solid var(--rule-mid);color:var(--ink);font-family:'Space Mono',monospace;font-size:16px;padding:12px 2px;transition:border-color .2s;" />
+          <button onClick="{{ onStart }}" style="background:var(--ink);color:var(--paper);border:none;cursor:pointer;font-family:'Space Mono',monospace;font-weight:700;font-size:13px;letter-spacing:0.22em;padding:17px 30px;transition:background .18s;" style-hover="background:var(--red);">計測を開始 →</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule);">
+          <div style="padding:28px 36px 28px 0;border-right:1px solid var(--rule);">
+            <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:18px;">
+              <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:12px;letter-spacing:0.2em;">01</span>
+              <span style="font-family:'Shippori Mincho',serif;font-weight:700;font-size:18px;">表情</span>
+              <span style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.2em;color:var(--ink-soft);">EXPRESSION / 50%</span>
+            </div>
+            <sc-for list="{{ exprChips }}" as="c" hint-placeholder-count="6">
+              <button data-on="{{ c.active }}" onClick="{{ c.on }}" style="display:flex;align-items:center;gap:13px;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--rule);padding:13px 0;cursor:pointer;color:var(--ink);">
+                <span style="font-family:'Space Mono',monospace;font-size:11px;color:var(--ink-soft);">{{ c.idx }}</span>
+                <span data-box style="width:10px;height:10px;background:var(--ink);border:1.5px solid var(--ink);flex:none;"></span>
+                <span data-lbl style="font-family:'Shippori Mincho',serif;font-size:15px;">{{ c.label }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="padding:28px 0 28px 36px;">
+            <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:18px;">
+              <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:12px;letter-spacing:0.2em;">02</span>
+              <span style="font-family:'Shippori Mincho',serif;font-weight:700;font-size:18px;">声のトーン</span>
+              <span style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.2em;color:var(--ink-soft);">VOICE / 50%</span>
+            </div>
+            <sc-for list="{{ voiceChips }}" as="c" hint-placeholder-count="5">
+              <button data-on="{{ c.active }}" onClick="{{ c.on }}" style="display:flex;align-items:center;gap:13px;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--rule);padding:13px 0;cursor:pointer;color:var(--ink);">
+                <span style="font-family:'Space Mono',monospace;font-size:11px;color:var(--ink-soft);">{{ c.idx }}</span>
+                <span data-box style="width:10px;height:10px;background:var(--ink);border:1.5px solid var(--ink);flex:none;"></span>
+                <span data-lbl style="font-family:'Shippori Mincho',serif;font-size:15px;">{{ c.label }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.16em;color:var(--ink-soft);margin-top:16px;">行をクリックすると計測対象から外せます。</div>
+      </div>
+    </sc-if>
+
+    <!-- ================= ANALYZING ================= -->
+    <sc-if value="{{ isAnalyzing }}" hint-placeholder-val="{{ false }}">
+      <div style="padding-top:54px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:30px;margin-bottom:40px;">
+          <div>
+            <div style="font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.3em;color:var(--red);margin-bottom:14px;">PROCESS 02 — 計測中</div>
+            <h1 style="font-family:'Shippori Mincho',serif;font-weight:800;font-size:54px;line-height:1.05;margin:0;">解析しています<span style="color:var(--red);">_</span></h1>
+          </div>
+          <div style="text-align:right;font-family:'Space Mono',monospace;">
+            <div style="font-weight:700;font-size:84px;line-height:0.9;letter-spacing:-0.03em;">{{ progressPad }}<span style="font-size:30px;">%</span></div>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:8px 0;margin-bottom:14px;">
+          <sc-for list="{{ steps }}" as="st" hint-placeholder-count="5">
+            <div data-step="{{ st.state }}" style="display:grid;grid-template-columns:36px 1fr auto;align-items:center;gap:16px;font-family:'Space Mono',monospace;font-size:14px;padding:11px 0;">
+              <span style="color:var(--ink-soft);font-size:11px;">{{ st.idx }}</span>
+              <span style="letter-spacing:0.04em;">&gt; {{ st.label }}<span data-cur style="color:var(--red);animation:blink 1s step-end infinite;">▋</span></span>
+              <span data-val style="color:var(--red);letter-spacing:0.12em;">{{ st.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="height:6px;background:var(--rule);position:relative;">
+          <div style="position:absolute;left:0;top:0;bottom:0;background:var(--ink);width:{{ progressBar }};"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.18em;color:var(--ink-soft);margin-top:8px;">
+          <span>{{ currentStep }}</span><span>GEMINI · MULTIMODAL</span>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ================= RESULTS ================= -->
+    <sc-if value="{{ isResults }}" hint-placeholder-val="{{ false }}">
+      <div style="padding-top:46px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:30px;">
+          <div style="font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.3em;color:var(--red);">DOSSIER 03 — 結果</div>
+          <button onClick="{{ onReset }}" style="background:none;border:none;border-bottom:2px solid var(--ink);padding:2px 0;cursor:pointer;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.18em;color:var(--ink);">↺ 別の動画を計測</button>
+        </div>
+
+        <!-- hero -->
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:56px;align-items:start;padding-bottom:34px;border-bottom:2px solid var(--ink);">
+          <div>
+            <div style="font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.26em;color:var(--ink-soft);margin-bottom:4px;">総合 OVERALL</div>
+            <div style="display:flex;align-items:flex-start;gap:6px;">
+              <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:168px;line-height:0.82;letter-spacing:-0.04em;">{{ overallDisplay }}</span>
+              <span style="font-family:'Space Mono',monospace;font-size:22px;color:var(--ink-soft);margin-top:14px;">/100</span>
+            </div>
+          </div>
+          <div style="padding-top:8px;">
+            <div style="display:inline-block;border:2px solid var(--red);color:var(--red);padding:10px 18px;transform:rotate(-4deg) scale({{ stampScale }});opacity:{{ stampOpacity }};margin-bottom:22px;">
+              <div style="font-family:'Space Mono',monospace;font-weight:700;font-size:11px;letter-spacing:0.3em;border-bottom:1px solid var(--red);padding-bottom:4px;margin-bottom:4px;">GRADE</div>
+              <div style="display:flex;align-items:baseline;gap:10px;">
+                <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:40px;line-height:1;">{{ gradeLetter }}</span>
+                <span style="font-family:'Shippori Mincho',serif;font-weight:700;font-size:19px;">{{ gradeLabel }}</span>
+              </div>
+            </div>
+            <p style="font-family:'Shippori Mincho',serif;font-size:21px;line-height:1.85;margin:0;border-left:3px solid var(--red);padding-left:20px;max-width:30em;">{{ summary }}</p>
+          </div>
+        </div>
+
+        <!-- two ledgers -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+          <div style="padding:30px 40px 10px 0;border-right:1px solid var(--rule);">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px;">
+              <div style="display:flex;align-items:baseline;gap:11px;">
+                <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:12px;letter-spacing:0.2em;">01</span>
+                <span style="font-family:'Shippori Mincho',serif;font-weight:700;font-size:20px;">表情</span>
+                <span style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.18em;color:var(--ink-soft);">EXPRESSION</span>
+              </div>
+              <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:24px;">{{ exprTotalDisplay }}</span>
+            </div>
+            <sc-for list="{{ exprRows }}" as="r" hint-placeholder-count="6">
+              <div style="padding:14px 0;border-top:1px solid var(--rule);">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:9px;">
+                  <span style="font-family:'Shippori Mincho',serif;font-size:15.5px;"><span style="font-family:'Space Mono',monospace;font-size:11px;color:var(--ink-soft);margin-right:9px;">{{ r.idx }}</span>{{ r.label }}</span>
+                  <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:15px;flex:none;">{{ r.score }}</span>
+                </div>
+                <div style="position:relative;height:2px;background:var(--rule);">
+                  <div style="position:absolute;left:0;top:0;bottom:0;background:var(--ink);width:{{ r.barW }};"></div>
+                  <div style="position:absolute;top:-4px;width:2px;height:10px;background:var(--red);left:{{ r.barW }};"></div>
+                </div>
+                <sc-if value="{{ showReasons }}" hint-placeholder-val="{{ true }}">
+                  <div style="font-family:'Shippori Mincho',serif;font-size:12.5px;line-height:1.7;color:var(--ink-soft);margin-top:9px;">{{ r.comment }}</div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:30px 0 10px 40px;">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px;">
+              <div style="display:flex;align-items:baseline;gap:11px;">
+                <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:12px;letter-spacing:0.2em;">02</span>
+                <span style="font-family:'Shippori Mincho',serif;font-weight:700;font-size:20px;">声のトーン</span>
+                <span style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.18em;color:var(--ink-soft);">VOICE</span>
+              </div>
+              <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:24px;">{{ voiceTotalDisplay }}</span>
+            </div>
+            <sc-for list="{{ voiceRows }}" as="r" hint-placeholder-count="5">
+              <div style="padding:14px 0;border-top:1px solid var(--rule);">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:9px;">
+                  <span style="font-family:'Shippori Mincho',serif;font-size:15.5px;"><span style="font-family:'Space Mono',monospace;font-size:11px;color:var(--ink-soft);margin-right:9px;">{{ r.idx }}</span>{{ r.label }}</span>
+                  <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:15px;flex:none;">{{ r.score }}</span>
+                </div>
+                <div style="position:relative;height:2px;background:var(--rule);">
+                  <div style="position:absolute;left:0;top:0;bottom:0;background:var(--ink);width:{{ r.barW }};"></div>
+                  <div style="position:absolute;top:-4px;width:2px;height:10px;background:var(--red);left:{{ r.barW }};"></div>
+                </div>
+                <sc-if value="{{ showReasons }}" hint-placeholder-val="{{ true }}">
+                  <div style="font-family:'Shippori Mincho',serif;font-size:12.5px;line-height:1.7;color:var(--ink-soft);margin-top:9px;">{{ r.comment }}</div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- notes -->
+        <div style="border-top:2px solid var(--ink);margin-top:18px;padding-top:26px;">
+          <div style="font-family:'Space Mono',monospace;font-size:11px;letter-spacing:0.26em;color:var(--ink-soft);margin-bottom:22px;">注記 — NEXT ACTIONS</div>
+          <sc-for list="{{ improvements }}" as="imp" hint-placeholder-count="3">
+            <div style="display:grid;grid-template-columns:64px 1fr;gap:8px;padding:16px 0;border-top:1px solid var(--rule);">
+              <span style="font-family:'Space Mono',monospace;font-weight:700;font-size:26px;color:var(--red);line-height:1;">{{ imp.no }}</span>
+              <span style="font-family:'Shippori Mincho',serif;font-size:16px;line-height:1.85;">{{ imp.text }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="text-align:center;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.4em;color:var(--ink-soft);margin-top:40px;">— 以 上 —</div>
+      </div>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1120,&quot;height&quot;:900},&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;paper&quot;,&quot;noir&quot;],&quot;default&quot;:&quot;paper&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;showReasons&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.RESULT = {
+      overall: 83, exprTotal: 84, voiceTotal: 82,
+      summary: '豊かな表情と落ち着いた佇まいが強み。声からも自信が伝わる、総じて好印象な商談である。話速の制御と「間」の設計を加えれば、説得力は一段上がる。',
+      expression: [
+        { label: '笑顔の強さ・自然さ', score: 88, comment: '終始やわらかい笑顔が保たれ、相手に安心感を与えている。' },
+        { label: 'アイコンタクト', score: 79, comment: 'カメラ目線は概ね良好。資料説明時に視線が下がる場面あり。' },
+        { label: '表情の反応性', score: 84, comment: '相手の発言への表情の反応が自然で好印象。' },
+        { label: 'ポジティブな表情', score: 90, comment: '頷き・共感の表情が豊かで、前向きな姿勢が伝わる。' },
+        { label: 'プロフェッショナルな印象', score: 85, comment: '落ち着いた表情で信頼感のある佇まい。' },
+        { label: '表情の一貫性', score: 80, comment: '全体を通して表情のトーンが安定している。' },
+      ],
+      voice: [
+        { label: '明瞭さ', score: 86, comment: '発音がはっきりしており聞き取りやすい。' },
+        { label: '元気・生命力', score: 78, comment: '声の張りは十分。後半でややトーンが落ちる傾向。' },
+        { label: '話速のコントロール', score: 74, comment: 'やや早口になる場面あり。間を取ると効果的。' },
+        { label: '感情表現の適切さ', score: 85, comment: '場面に応じた抑揚があり説得力がある。' },
+        { label: '自信の印象', score: 88, comment: '言い切る話し方で自信が感じられる。' },
+      ],
+      improvements: [
+        '重要な提案の前に1〜2秒の「間」を置き、相手が咀嚼する時間を作る。',
+        '資料説明中も2〜3秒ごとにカメラへ視線を戻し、誠実さを担保する。',
+        '後半でトーンが落ちやすい。クロージングは意識的に声を張る。',
+      ],
+    };
+    this.GRADES = [
+      { grade: 'S', min: 90, label: '優秀' }, { grade: 'A', min: 80, label: '良好' },
+      { grade: 'B', min: 70, label: '標準' }, { grade: 'C', min: 60, label: 'やや改善' },
+      { grade: 'D', min: 0, label: '要改善' },
+    ];
+    this.LOG = ['SOURCE FETCH', 'FRAME EXTRACTION', 'FACIAL VECTOR', 'VOICE SPECTRUM', 'SCORING'];
+    this.LOGVAL = ['OK', '1,240f', 'OK', 'OK', 'DONE'];
+    this.state = {
+      theme: null, screen: 'input',
+      driveUrl: 'https://drive.google.com/file/d/1aBcDeFgHiJkLmNoPqRsTuVwXyZ/view',
+      offExpr: {}, offVoice: {}, progress: 0, anim: 0,
+    };
+  }
+  componentWillUnmount() {
+    cancelAnimationFrame(this._lt); cancelAnimationFrame(this._rt);
+    clearTimeout(this._ltFallback); clearTimeout(this._rtFallback);
+  }
+  setTheme(id) { this.setState({ theme: id }); }
+  toggle(group, i) {
+    const key = group === 'expr' ? 'offExpr' : 'offVoice';
+    const next = Object.assign({}, this.state[key]); next[i] = !next[i];
+    this.setState({ [key]: next });
+  }
+  onUrlInput(e) { this.setState({ driveUrl: e.target.value }); }
+  startAnalysis() {
+    if (this.state.screen !== 'input') return;
+    this.setState({ screen: 'analyzing', progress: 0 });
+    const dur = 3800, t0 = performance.now();
+    const tick = (now) => {
+      const p = Math.min(1, (now - t0) / dur);
+      this.setState({ progress: Math.round(p * 100) });
+      if (p < 1) this._lt = requestAnimationFrame(tick); else this.gotoResults();
+    };
+    this._lt = requestAnimationFrame(tick);
+    clearTimeout(this._ltFallback);
+    this._ltFallback = setTimeout(() => {
+      if (this.state.screen === 'analyzing') { cancelAnimationFrame(this._lt); this.setState({ progress: 100 }); this.gotoResults(); }
+    }, dur + 400);
+  }
+  gotoResults() {
+    this.setState({ screen: 'results', anim: 0 });
+    const dur = 1700, t0 = performance.now();
+    const ease = x => 1 - Math.pow(1 - x, 3);
+    const tick = (now) => {
+      const p = Math.min(1, (now - t0) / dur);
+      this.setState({ anim: ease(p) });
+      if (p < 1) this._rt = requestAnimationFrame(tick); else this.setState({ anim: 1 });
+    };
+    this._rt = requestAnimationFrame(tick);
+    clearTimeout(this._rtFallback);
+    this._rtFallback = setTimeout(() => { cancelAnimationFrame(this._rt); this.setState({ anim: 1 }); }, dur + 400);
+  }
+  reset() {
+    cancelAnimationFrame(this._lt); cancelAnimationFrame(this._rt);
+    clearTimeout(this._ltFallback); clearTimeout(this._rtFallback);
+    this.setState({ screen: 'input', progress: 0, anim: 0 });
+  }
+  grade(v) { for (const g of this.GRADES) if (v >= g.min) return g; return this.GRADES[this.GRADES.length - 1]; }
+
+  renderVals() {
+    const s = this.state, R = this.RESULT, p = s.anim;
+    const theme = s.theme || this.props.defaultTheme || 'paper';
+    const showReasons = this.props.showReasons !== false;
+    const cnt = v => Math.round(v * p);
+    const pad2 = n => String(n).padStart(2, '0');
+    const exprChips = R.expression.map((it, i) => ({ idx: pad2(i + 1), label: it.label, active: !s.offExpr[i], on: () => this.toggle('expr', i) }));
+    const voiceChips = R.voice.map((it, i) => ({ idx: pad2(i + 1), label: it.label, active: !s.offVoice[i], on: () => this.toggle('voice', i) }));
+    const idx = Math.min(4, Math.floor(s.progress / 20));
+    const steps = this.LOG.map((label, i) => ({
+      idx: pad2(i + 1), label,
+      value: this.LOGVAL[i],
+      state: i < idx ? 'done' : i === idx ? 'active' : 'todo',
+    }));
+    const g = this.grade(R.overall);
+    const row = (it, i) => ({ idx: pad2(i + 1), label: it.label, score: cnt(it.score), barW: (it.score * p) + '%', comment: it.comment });
+    return {
+      theme, showReasons,
+      paperSel: theme === 'paper', noirSel: theme === 'noir',
+      onPaper: () => this.setTheme('paper'), onNoir: () => this.setTheme('noir'),
+      isInput: s.screen === 'input', isAnalyzing: s.screen === 'analyzing', isResults: s.screen === 'results',
+      docMeta: s.screen === 'results' ? 'NO.0931 / 2026 · CONFIDENTIAL' : s.screen === 'analyzing' ? 'RUNNING · DO NOT CLOSE' : 'FORM v3.1 · READY',
+      driveUrl: s.driveUrl, onUrlInput: (e) => this.onUrlInput(e),
+      onStart: () => this.startAnalysis(), onReset: () => this.reset(),
+      exprChips, voiceChips,
+      progressPad: String(s.progress).padStart(3, '0'),
+      progressBar: s.progress + '%',
+      currentStep: (steps[idx] ? steps[idx].label : 'SCORING'),
+      steps,
+      overallDisplay: cnt(R.overall), exprTotalDisplay: cnt(R.exprTotal), voiceTotalDisplay: cnt(R.voiceTotal),
+      stampScale: (1.18 - 0.18 * p).toFixed(3),
+      stampOpacity: Math.min(1, p * 2.5).toFixed(3),
+      gradeLetter: g.grade, gradeLabel: g.label, summary: R.summary,
+      exprRows: R.expression.map(row), voiceRows: R.voice.map(row),
+      improvements: R.improvements.map((text, i) => ({ no: pad2(i + 1), text })),
+    };
+  }
+}
+</script>
+</body>
+</html>

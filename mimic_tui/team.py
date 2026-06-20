@@ -11,8 +11,12 @@ delegate_to_team / delegate_to_worker / delegate_to_team_parallel から呼ば�
 """
 from __future__ import annotations
 
+import json
+import tempfile
 import threading
+import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -34,6 +38,86 @@ def _log_team_event(event: dict) -> None:
 _apply_lock = threading.Lock()
 
 MAX_VERIFY_RETRIES = 3   # verify失敗時のWorker自動再試行上限
+
+
+# ── 中断委任マニフェスト ──────────────────────────────────────────
+# Directorプロセス自体がクラッシュ/killされた場合、進行中の委任タスクの
+# Overlay作業ディレクトリ（base）が孤立する。base をteam.py側で先に作って
+# ここに登録しておき、正常完了時（finally節）に解除することで、
+# 「マニフェストに残っている＝中断扱い」として後から検出・再開できる。
+
+_INFLIGHT_LOCK = threading.Lock()
+
+
+def _manifest_path() -> Path:
+    p = Path(__file__).parent / ".mimic" / "inflight_delegations.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _load_manifest() -> dict:
+    p = _manifest_path()
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_manifest(data: dict) -> None:
+    _manifest_path().write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _register_inflight(trace_id: str, base: Path, project_dir: str, task: str,
+                        label: str, verify_cmd: str, kind: str,
+                        provider: str, model: str) -> None:
+    with _INFLIGHT_LOCK:
+        data = _load_manifest()
+        data[trace_id] = {
+            "base": str(base), "project_dir": project_dir, "task": task,
+            "label": label, "verify_cmd": verify_cmd, "kind": kind,
+            "provider": provider, "model": model,
+            "started_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        _save_manifest(data)
+
+
+def _unregister_inflight(trace_id: str) -> None:
+    with _INFLIGHT_LOCK:
+        data = _load_manifest()
+        if data.pop(trace_id, None) is not None:
+            _save_manifest(data)
+
+
+def list_orphaned_delegations() -> list[dict]:
+    """マニフェストのうち base が現存するエントリのみ返す（消えているものは自動で除去する）。
+
+    各エントリに checkpoint_age_sec（merged/.mimic_checkpoint.json の最終更新からの
+    経過秒数。短いほど「まだ実行中かもしれない」目安になる）を付与する。
+    """
+    with _INFLIGHT_LOCK:
+        data = _load_manifest()
+        alive: dict = {}
+        pruned = False
+        for tid, entry in data.items():
+            if Path(entry["base"]).exists():
+                alive[tid] = entry
+            else:
+                pruned = True
+        if pruned:
+            _save_manifest(alive)
+
+    out = []
+    for tid, entry in alive.items():
+        e = dict(entry, trace_id=tid)
+        cp = Path(entry["base"]) / "merged" / ".mimic_checkpoint.json"
+        try:
+            e["checkpoint_age_sec"] = time.time() - cp.stat().st_mtime
+        except OSError:
+            e["checkpoint_age_sec"] = None
+        out.append(e)
+    return out
 
 _ISOLATED_MAX_ROUNDS = 8
 
@@ -229,28 +313,21 @@ def run_research(task: str, project_dir: str, config, label: str = "") -> str:
                           max_rounds=_RESEARCHER_MAX_ROUNDS, label=label, role="Researcher")
 
 
-def run_team_task(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "") -> str:
-    """Researcher → Worker を実行し、verify失敗時は自動リトライ後に変更を適用してサマリを返す。"""
+def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_id: str,
+                          label: str, verify_cmd: str, tag: str, print_tag: str) -> str:
+    """base 上でWorkerを実行し、verify失敗リトライ→適用→マニフェスト解除までを行う共通処理。
+
+    新規実行（base は空のOverlay）・再開（base に前回までの変更が残っている）の
+    どちらからも呼ばれる。呼び出し側は事前に base を作成し _register_inflight 済みであること。
+    正常終了時（適用成功/不要/実行エラーでの打ち切りいずれも）は必ず _unregister_inflight する
+    ため、ここに到達せずプロセスが落ちた場合だけがマニフェストに残り、中断扱いとして検出できる。
+    """
     resolved_dir = str(Path(project_dir).resolve())
-    team_tag = f"[Team:{label}]" if label else "[Team]"
-    trace_id = uuid.uuid4().hex[:8]
 
-    safe_print(C.gray(f"  {team_tag} 🔍 Researcher調査中..."), flush=True)
-    research = run_research(task, project_dir, config, label=label)
-    _log_team_event({"event": "team_research_done", "task": task, "research": research[:2000], "trace_id": trace_id})
-
-    # Directorがverify_cmdを指定していない場合、Researcherの提案を自動採用する
-    if not verify_cmd:
-        verify_cmd = _extract_suggested_verify_cmd(research)
-        if verify_cmd:
-            safe_print(C.gray(f"  {team_tag} 🧪 Researcher推奨verify_cmd: {verify_cmd}"), flush=True)
-
-    worker_task = f"{task}\n\n[Researcherによる設計ワークフロー]\n{research}" if research else task
-
-    safe_print(C.gray(f"  {team_tag} ⚙ Worker実行..."), flush=True)
+    safe_print(C.gray(f"  {print_tag} ⚙ Worker実行..."), flush=True)
     _log_team_event({"event": "team_worker_start", "attempt": 1, "task": task, "resumed": False, "trace_id": trace_id})
     result, upper, base = run_subagent_reviewable(
-        worker_task, project_dir, label=label or "single",
+        task, project_dir, label=label or "single", base=base,
         trace_id=trace_id, verify_cmd=verify_cmd,
         provider=config.name, model=config.model,
     )
@@ -264,7 +341,7 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
         if result.verify_exit in (2, 126, 127):
             # bash構文エラー(2) / 権限なし(126) / コマンド不明(127) はWorkerが修正できないためリトライ中止
             safe_print(C.yellow(
-                f"  {team_tag} ⚠ verify_cmdが無効なコマンドです(exit={result.verify_exit}) → リトライ中止"
+                f"  {print_tag} ⚠ verify_cmdが無効なコマンドです(exit={result.verify_exit}) → リトライ中止"
             ), flush=True)
             _log_team_event({
                 "event": "verify_cmd_invalid", "verify_exit": result.verify_exit,
@@ -272,7 +349,7 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
             })
             break
         safe_print(C.yellow(
-            f"  {team_tag} ⚠ 検証失敗(exit={result.verify_exit})"
+            f"  {print_tag} ⚠ 検証失敗(exit={result.verify_exit})"
             f" → 修正再試行 {verify_attempt}/{MAX_VERIFY_RETRIES}"
         ), flush=True)
         _log_team_event({
@@ -292,7 +369,7 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
         if new_upper is None or new_base is None:
             # リトライ自体が失敗（baseも削除済み）→ 直前の結果で打ち切り
             safe_print(C.yellow(
-                f"  {team_tag} ⚠ 修正試行 {verify_attempt} が失敗 → 前回の変更を適用します"
+                f"  {print_tag} ⚠ 修正試行 {verify_attempt} が失敗 → 前回の変更を適用します"
             ), flush=True)
             result = new_result
             upper = None
@@ -301,17 +378,19 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
         result, upper, base = new_result, new_upper, new_base
 
     if upper is None or base is None:
-        return f"[delegate_to_team: ⚠ 実行エラー]\nタスク: {task}\n\n{result.summary}"
+        _unregister_inflight(trace_id)
+        return f"[{tag}: ⚠ 実行エラー] (trace_id={trace_id})\nタスク: {task}\n\n{result.summary}"
 
     applied = False
     try:
         if result.changed_files:
             with _apply_lock:
                 apply_subagent_changes(upper, Path(resolved_dir), result.changed_files)
-                _get_team_autogit().checkpoint(resolved_dir, "delegate_to_team")
+                _get_team_autogit().checkpoint(resolved_dir, tag)
             applied = True
     finally:
         cleanup_subagent(base)
+        _unregister_inflight(trace_id)
 
     verify_status = ""
     if verify_cmd:
@@ -324,7 +403,7 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
 
     status_label = f"{'✓ 完了・適用済み' if applied else '✓ 完了（変更なし）'}{verify_status}"
     lines = [
-        f"[delegate_to_team: {status_label}]",
+        f"[{tag}: {status_label}] (trace_id={trace_id})",
         f"タスク: {task}",
         "",
         result.summary,
@@ -334,90 +413,78 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
     return "\n".join(lines)
 
 
+def run_team_task(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "") -> str:
+    """Researcher → Worker を実行し、verify失敗時は自動リトライ後に変更を適用してサマリを返す。"""
+    resolved_dir = str(Path(project_dir).resolve())
+    team_tag = f"[Team:{label}]" if label else "[Team]"
+    trace_id = uuid.uuid4().hex[:8]
+
+    safe_print(C.gray(f"  {team_tag} 🔍 Researcher調査中..."), flush=True)
+    research = run_research(task, project_dir, config, label=label)
+    _log_team_event({"event": "team_research_done", "task": task, "research": research[:2000], "trace_id": trace_id})
+
+    # Directorがverify_cmdを指定していない場合、Researcherの提案を自動採用する
+    if not verify_cmd:
+        verify_cmd = _extract_suggested_verify_cmd(research)
+        if verify_cmd:
+            safe_print(C.gray(f"  {team_tag} 🧪 Researcher推奨verify_cmd: {verify_cmd}"), flush=True)
+
+    worker_task = f"{task}\n\n[Researcherによる設計ワークフロー]\n{research}" if research else task
+
+    # base をここで先に作って登録してから run_subagent_reviewable に渡す。
+    # こうしないと、Worker実行中にDirectorプロセスが落ちた場合 base の存在をどこにも
+    # 記録できず、Overlay作業ディレクトリが孤立したまま再開も破棄もできなくなる。
+    base = Path(tempfile.mkdtemp(prefix=f"mimic_subagent_{label or 'single'}_"))
+    _register_inflight(trace_id, base, resolved_dir, worker_task, label, verify_cmd,
+                        "team", config.name, config.model)
+    return _run_delegation_core(worker_task, project_dir, config, base, trace_id, label,
+                                 verify_cmd, "delegate_to_team", team_tag)
+
+
 def run_worker_once(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "") -> str:
     """Researcherを介さずWorkerを実行し、verify失敗時は自動リトライ後に変更を適用する。"""
     resolved_dir = str(Path(project_dir).resolve())
     trace_id = uuid.uuid4().hex[:8]
 
-    _log_team_event({
-        "event": "team_worker_start", "attempt": 1, "task": task,
-        "resumed": False, "trace_id": trace_id, "mode": "single",
-    })
-    result, upper, base = run_subagent_reviewable(
-        task, project_dir, label=label or "single", trace_id=trace_id,
-        verify_cmd=verify_cmd, provider=config.name, model=config.model,
+    base = Path(tempfile.mkdtemp(prefix=f"mimic_subagent_{label or 'single'}_"))
+    _register_inflight(trace_id, base, resolved_dir, task, label, verify_cmd,
+                        "worker", config.name, config.model)
+    return _run_delegation_core(task, project_dir, config, base, trace_id, label,
+                                 verify_cmd, "delegate_to_worker", "[Worker]")
+
+
+def resume_delegation(trace_id: str) -> str:
+    """中断された委任タスクを、保存済みOverlay(base)の続きから再開する。
+
+    run_subagent_reviewable に既存baseを渡すことで、orchestrator.py側の既存の
+    チェックポイント検知ロジック（.mimic_checkpoint.json があれば再開メッセージ付きで
+    継続）がそのまま機能する。新規の再開ロジックはここでは作らない。
+    """
+    entry = _load_manifest().get(trace_id)
+    if entry is None:
+        return f"trace_id={trace_id} の中断タスクは見つかりませんでした。"
+    base = Path(entry["base"])
+    if not base.exists():
+        _unregister_inflight(trace_id)
+        return f"trace_id={trace_id} の作業ディレクトリが既に存在しないため再開できません（manifestから削除しました）。"
+
+    config = _get_team_config()
+    tag = "delegate_to_team" if entry.get("kind") == "team" else "delegate_to_worker"
+    safe_print(C.gray(f"  [Resume] trace_id={trace_id} のタスクを再開します..."), flush=True)
+    return _run_delegation_core(
+        entry["task"], entry["project_dir"], config, base, trace_id,
+        entry.get("label", ""), entry.get("verify_cmd", ""), tag, "[Resume]",
     )
 
-    # verify失敗ループ
-    for verify_attempt in range(1, MAX_VERIFY_RETRIES + 1):
-        if result.verify_exit is None or result.verify_exit == 0:
-            break
-        if upper is None or base is None:
-            break
-        if result.verify_exit in (2, 126, 127):
-            safe_print(C.yellow(
-                f"  [Worker] ⚠ verify_cmdが無効なコマンドです(exit={result.verify_exit}) → リトライ中止"
-            ), flush=True)
-            _log_team_event({
-                "event": "verify_cmd_invalid", "verify_exit": result.verify_exit,
-                "verify_cmd": verify_cmd, "trace_id": trace_id,
-            })
-            break
-        safe_print(C.yellow(
-            f"  [Worker] ⚠ 検証失敗(exit={result.verify_exit})"
-            f" → 修正再試行 {verify_attempt}/{MAX_VERIFY_RETRIES}"
-        ), flush=True)
-        _log_team_event({
-            "event": "team_worker_start", "attempt": verify_attempt + 1,
-            "task": task, "resumed": True, "trace_id": trace_id,
-            "reason": "verify_failed", "verify_exit": result.verify_exit,
-        })
-        retry_task = _build_verify_retry_task(
-            task, verify_cmd, result.verify_exit, result.verify_output, verify_attempt
-        )
-        new_result, new_upper, new_base = run_subagent_reviewable(
-            retry_task, project_dir, label=label or "single",
-            base=base,
-            trace_id=trace_id, verify_cmd=verify_cmd,
-            provider=config.name, model=config.model,
-        )
-        if new_upper is None or new_base is None:
-            safe_print(C.yellow(
-                f"  [Worker] ⚠ 修正試行 {verify_attempt} が失敗 → 前回の変更を適用します"
-            ), flush=True)
-            result = new_result
-            upper = None
-            base = None
-            break
-        result, upper, base = new_result, new_upper, new_base
 
-    if upper is None or base is None:
-        return f"[delegate_to_worker: ⚠ 実行エラー]\n\n{result.summary}"
-
-    applied = False
-    try:
-        if result.changed_files:
-            with _apply_lock:
-                apply_subagent_changes(upper, Path(resolved_dir), result.changed_files)
-                _get_team_autogit().checkpoint(resolved_dir, "delegate_to_worker")
-            applied = True
-    finally:
-        cleanup_subagent(base)
-
-    verify_status = ""
-    if verify_cmd:
-        if result.verify_exit == 0:
-            verify_status = " ✓検証通過"
-        elif result.verify_exit is not None:
-            verify_status = f" ✗検証失敗(exit={result.verify_exit}, {MAX_VERIFY_RETRIES}回試行後)"
-        else:
-            verify_status = " ?(検証結果取得失敗)"
-
-    status_label = f"{'✓ 完了・適用済み' if applied else '✓ 完了（変更なし）'}{verify_status}"
-    lines = [f"[delegate_to_worker: {status_label}]", "", result.summary]
-    if applied:
-        lines += ["", "(変更はプロジェクトに適用され、AutoGitでコミット済みです)"]
-    return "\n".join(lines)
+def discard_delegation(trace_id: str) -> str:
+    """中断された委任タスクを、変更を適用せずに破棄する。"""
+    entry = _load_manifest().get(trace_id)
+    if entry is None:
+        return f"trace_id={trace_id} の中断タスクは見つかりませんでした。"
+    cleanup_subagent(Path(entry["base"]))
+    _unregister_inflight(trace_id)
+    return f"trace_id={trace_id} の中断タスクを破棄しました（変更は適用されていません）。"
 
 
 # 並列Worker/Researcher/Supervisorの出力はTUIで入り乱れるが、

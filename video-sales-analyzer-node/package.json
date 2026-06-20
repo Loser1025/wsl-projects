@@ -1,7 +1,7 @@
 {
   "name": "video-sales-analyzer",
   "version": "1.0.0",
-  "description": "オンライン商談動画から表情・声トーンをスコア化するWebアプリ",
+  "description": "任意の動画を、ユーザーが決めた採点項目でAIがスコア化するWebアプリ",
   "main": "api/index.js",
   "scripts": {
     "start": "node api/index.js",

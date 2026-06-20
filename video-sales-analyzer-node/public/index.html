@@ -3,149 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>商談動画アナライザー - AI表情・声トーン分析</title>
+    <title>CRITIQ - AI動画採点アナライザー</title>
     <link rel="stylesheet" href="/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:ital,wght@0,700;0,800;1,700;1,800&family=Saira:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <div class="energy-field" aria-hidden="true">
+        <div class="glow glow--red"></div>
+        <div class="glow glow--yellow"></div>
+        <div class="streaks">
+            <span></span><span></span><span></span><span></span>
+        </div>
+    </div>
+
     <div class="app-container">
         <!-- ヘッダー -->
         <header class="app-header">
-            <div class="header-content">
-                <h1><i class="fas fa-video"></i> 商談動画アナライザー</h1>
-                <p class="subtitle">AIが表情と声のトーンを100点満点でスコア化</p>
+            <div class="brand">
+                <div class="logo-mark">
+                    <svg class="logo-icon" viewBox="0 0 48 48" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="logo-grad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#ff1233"></stop>
+                                <stop offset="55%" stop-color="#ff5a1e"></stop>
+                                <stop offset="100%" stop-color="#ffd400"></stop>
+                            </linearGradient>
+                        </defs>
+                        <circle cx="24" cy="24" r="20" class="logo-icon__track"></circle>
+                        <circle cx="24" cy="24" r="20" class="logo-icon__ring" transform="rotate(-45 24 24)"></circle>
+                        <path d="M19 15 L34 24 L19 33 Z" class="logo-icon__play"></path>
+                    </svg>
+                    <span class="logo-mark__pulse"></span>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title">CRITIQ</div>
+                    <div class="brand-sub">AI動画採点アナライザー</div>
+                </div>
             </div>
-            <div class="api-status" id="apiStatus">
-                <span class="status-dot"></span>
-                <span class="status-text">接続確認中...</span>
+            <div class="engine-badge" id="apiStatus">
+                <span class="engine-dot status-dot"></span>
+                <span class="engine-label">AI Vision Engine</span>
+                <span class="engine-version status-text">接続確認中...</span>
             </div>
         </header>
 
         <!-- メインコンテンツ -->
         <main class="main-content">
             <!-- 入力セクション -->
-            <section class="input-section">
-                <div class="drive-input">
-                    <div class="input-group">
-                        <label for="driveUrl">
-                            <i class="fab fa-google-drive"></i> Google Drive URL
-                        </label>
-                        <input type="text" id="driveUrl"
-                               placeholder="https://drive.google.com/file/d/...">
-                        <p class="input-hint">
-                            <i class="fas fa-info-circle"></i>
-                            リンク共有が「リンクを知っている全員」に設定されている必要があります
-                        </p>
-                    </div>
-                <!-- 評価項目 -->
-                <div class="evaluation-items">
-                    <h3>評価項目</h3>
-                    <div class="expression-items">
-                        <h4>表情分析</h4>
-                        <label><input type="checkbox" class="expression-item" value="笑顔"> 笑顔</label>
-                        <label><input type="checkbox" class="expression-item" value="眼差し"> 眼差し</label>
-                        <label><input type="checkbox" class="expression-item" value="姿勢"> 姿勢</label>
-                        <label><input type="checkbox" class="expression-item" value="ジェスチャー"> ジェスチャー</label>
-                        <label><input type="checkbox" class="expression-item" value="表情の変化"> 表情の変化</label>
-                    </div>
-                    <div class="voice-items">
-                        <h4>声のトーン分析</h4>
-                        <label><input type="checkbox" class="voice-item" value="抑揚"> 抑揚</label>
-                        <label><input type="checkbox" class="voice-item" value="スピード"> スピード</label>
-                        <label><input type="checkbox" class="voice-item" value="クリアさ"> クリアさ</label>
-                        <label><input type="checkbox" class="voice-item" value="トーン"> トーン</label>
-                        <label><input type="checkbox" class="voice-item" value="ボリューム"> ボリューム</label>
-                    </div>
-                </div>
+            <section class="input-section panel panel--cut-lg" id="inputSection">
+                <div class="ghost-text">WIN</div>
+                <div class="panel__accent"></div>
+
+                <div class="section-eyebrow">
+                    <span class="eyebrow-label">Step 01 / Launch</span>
+                    <span class="eyebrow-line"></span>
+                    <span class="eyebrow-note">動画を指定して分析</span>
                 </div>
 
-                <!-- 分析開始ボタン -->
+                <h1 class="hero-title">動画を、<span class="grad-text">採点する。</span></h1>
+                <p class="hero-desc">Google Drive の共有リンクを貼り付けるだけ。あなたが決めた採点項目に沿って、AIが動画を0〜100点でスコアリングし、改善のヒントまで提示します。</p>
+
+                <label class="field-label" for="driveUrl">Google Drive 動画リンク</label>
+                <div class="url-field">
+                    <span class="url-field__dot"></span>
+                    <input type="text" id="driveUrl" placeholder="https://drive.google.com/file/d/.../view">
+                </div>
+                <p class="input-hint">リンク共有が「リンクを知っている全員」に設定されている必要があります</p>
+
+                <div class="criteria-section">
+                    <div class="criteria-header">
+                        <span class="criteria-marker"></span>
+                        <span class="criteria-title">採点項目（最大10個・自由入力）</span>
+                    </div>
+                    <div class="criteria-list" id="criteriaList">
+                        <!-- 動的に生成される -->
+                    </div>
+                    <button type="button" class="add-criteria-btn" id="addCriteriaBtn">＋ 項目を追加</button>
+                    <p class="input-hint" id="criteriaCountHint">すべて空欄の場合は既定の採点項目で評価します</p>
+                </div>
+
                 <button class="analyze-btn" id="analyzeBtn" disabled>
-                    <i class="fas fa-magic"></i> 分析開始
+                    分析を開始 <span class="analyze-btn__arrow">▶</span>
                 </button>
             </section>
 
             <!-- ローディング -->
             <section class="loading-section" id="loadingSection" style="display: none;">
-                <div class="loading-spinner">
-                    <div class="spinner"></div>
-                    <p class="loading-text" id="loadingText">AI分析中...</p>
-                    <p class="loading-subtext" id="loadingSubtext">動画から表情と声の特徴を分析しています</p>
+                <div class="loading-eyebrow">● Analyzing</div>
+                <div class="spinner-wrap">
+                    <div class="spinner-core"></div>
+                    <div class="spinner-ring spinner-ring--a"></div>
+                    <div class="spinner-ring spinner-ring--b"></div>
+                    <div class="spinner-pct" id="loadingPct">0%</div>
+                </div>
+                <div class="loading-step-label" id="loadingStepLabel">動画を取得中</div>
+                <p class="loading-text" id="loadingSubtext">AIが映像と音声をフル解析しています…</p>
+
+                <div class="step-panel panel panel--cut-xs">
+                    <div class="step-list" id="stepList"></div>
+                    <div class="step-progress-track">
+                        <div class="step-progress-fill" id="stepProgressFill"></div>
+                    </div>
                 </div>
             </section>
 
             <!-- 結果セクション -->
             <section class="results-section" id="resultsSection" style="display: none;">
-                <h2><i class="fas fa-chart-bar"></i> 分析結果</h2>
-                
+                <div class="section-eyebrow">
+                    <span class="eyebrow-label">Result / Scorecard</span>
+                    <span class="eyebrow-line"></span>
+                    <button class="reanalyze-btn" id="reanalyzeBtn">↺ 別の動画を分析</button>
+                </div>
+
                 <!-- 総合スコア -->
-                <div class="overall-score-card">
-                    <div class="score-circle" id="overallScoreCircle">
-                        <svg viewBox="0 0 100 100">
-                            <circle class="score-bg" cx="50" cy="50" r="45"></circle>
-                            <circle class="score-progress" id="scoreProgress" cx="50" cy="50" r="45"></circle>
+                <div class="hero-card panel panel--cut-lg">
+                    <div class="panel__accent panel__accent--vertical"></div>
+                    <div class="gauge-wrap">
+                        <svg viewBox="0 0 280 280" class="gauge-svg">
+                            <defs>
+                                <linearGradient id="pl-grad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop offset="0%" stop-color="#ff1233"></stop>
+                                    <stop offset="55%" stop-color="#ff5a1e"></stop>
+                                    <stop offset="100%" stop-color="#ffd400"></stop>
+                                </linearGradient>
+                            </defs>
+                            <circle cx="140" cy="140" r="120" class="gauge-track"></circle>
+                            <circle cx="140" cy="140" r="120" class="gauge-fill" id="overallGaugeFill"></circle>
                         </svg>
-                        <div class="score-value">
-                            <span class="score-number" id="overallScore">0</span>
-                            <span class="score-label">点</span>
+                        <div class="gauge-center">
+                            <div class="gauge-label">総合スコア</div>
+                            <div class="gauge-number" id="overallScore">0</div>
+                            <div class="gauge-unit">/ 100</div>
                         </div>
                     </div>
-                    <div class="score-details">
-                        <span class="grade-badge" id="gradeBadge">-</span>
-                        <p class="grade-label" id="gradeLabel">-</p>
-                    </div>
-                </div>
-
-                <!-- 詳細スコア -->
-                <div class="detail-scores">
-                    <!-- 表情スコア -->
-                    <div class="score-card expression-card">
-                        <div class="card-header">
-                            <h3><i class="fas fa-smile"></i> 表情分析</h3>
-                            <span class="card-score" id="expressionScore">0点</span>
+                    <div class="hero-info">
+                        <div class="grade-chip">
+                            <span class="grade-letter" id="gradeBadge">-</span>
+                            <span class="grade-text-label" id="gradeLabel">-</span>
                         </div>
-                        <div class="score-bars" id="expressionBars">
-                            <!-- 動的に生成 -->
-                        </div>
-                    </div>
-
-                    <!-- 声トーンスコア -->
-                    <div class="score-card voice-card">
-                        <div class="card-header">
-                            <h3><i class="fas fa-microphone"></i> 声のトーン分析</h3>
-                            <span class="card-score" id="voiceScore">0点</span>
-                        </div>
-                        <div class="score-bars" id="voiceBars">
-                            <!-- 動的に生成 -->
-                        </div>
+                        <p class="summary-text" id="summaryText">-</p>
                     </div>
                 </div>
 
-                <!-- 総合評価 -->
-                <div class="summary-card">
-                    <h3><i class="fas fa-comment-dots"></i> AI総合評価</h3>
-                    <p class="summary-text" id="summaryText">-</p>
+                <!-- 採点項目別スコア -->
+                <div class="score-card panel panel--cut-md">
+                    <div class="score-card__header">
+                        <div class="mini-gauge-wrap">
+                            <svg viewBox="0 0 140 140" class="mini-gauge-svg">
+                                <circle cx="70" cy="70" r="58" class="gauge-track"></circle>
+                                <circle cx="70" cy="70" r="58" class="gauge-fill" id="avgGaugeFill"></circle>
+                            </svg>
+                            <div class="mini-gauge-center" id="avgScoreLabel">0</div>
+                        </div>
+                        <div>
+                            <div class="score-card__title">採点項目別スコア</div>
+                            <div class="score-card__subtitle" id="criteriaCountLabel">0 項目を総合評価</div>
+                        </div>
+                    </div>
+                    <div class="score-bars" id="criteriaBars">
+                        <!-- 動的に生成 -->
+                    </div>
                 </div>
 
                 <!-- 改善点 -->
-                <div class="improvements-card">
-                    <h3><i class="fas fa-lightbulb"></i> 改善ポイント</h3>
+                <div class="improvements-card panel panel--cut-lg">
+                    <div class="improvements-header">
+                        <span class="improvements-marker"></span>
+                        <span class="improvements-title">次のスコアアップに向けた改善ポイント</span>
+                    </div>
                     <ul class="improvements-list" id="improvementsList">
                         <!-- 動的に生成 -->
                     </ul>
                 </div>
-
-                <!-- 再分析ボタン -->
-                <button class="reanalyze-btn" id="reanalyzeBtn">
-                    <i class="fas fa-redo"></i> 新しい動画を分析
-                </button>
             </section>
         </main>
 
         <!-- フッター -->
         <footer class="app-footer">
-            <p>Powered by Gemini 3.1 Flash Lite</p>
+            あなたが決めた採点項目でAIが動画を評価し、改善のヒントを提示します。<br>
+            Powered by Gemini
         </footer>
     </div>
 

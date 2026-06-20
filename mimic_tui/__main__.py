@@ -13,7 +13,8 @@ def _build_components(base_dir: str, active_config=None):
     省略時は .env の最初の設定を使用する。
     """
     from .utils import safe_print, C, set_log_sink, set_team_event_sink, log
-    from .commands import register_search_command, register_sessions_command, register_viewer_command
+    from .commands import (register_search_command, register_sessions_command,
+                            register_viewer_command, register_delegations_command)
     from .tools import set_sessions_dir, tools as _base_tools, ToolRegistry
     from . import config as _cfg
     from .config import load_config
@@ -114,6 +115,7 @@ def _build_components(base_dir: str, active_config=None):
     register_search_command(lambda: sessions_dir)
     register_sessions_command(lambda: sessions_dir)
     register_viewer_command(lambda: sessions_dir)
+    register_delegations_command()
     set_sessions_dir(sessions_dir)
 
     from .viewer import start_viewer_server as _start_viewer

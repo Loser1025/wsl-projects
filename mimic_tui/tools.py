@@ -914,6 +914,39 @@ def delegate_research(question: str, project_dir: str = ".") -> str:
     return run_research_qa(question, project_dir, _get_team_config())
 
 
+@tools.register(
+    name="get_delegation_trace",
+    description=(
+        "delegate_to_team / delegate_to_worker の実行結果に含まれるtrace_idを指定し、"
+        "そのWorkerが実際に行ったThought/Action/Observationの実行トレースを取得する。"
+        "差分サマリだけでは判断が難しい場合に、Workerが本当に意図通りの手順で"
+        "作業したかを検証する用途に使う。"
+        "Researcher（delegate_research / delegate_to_team内の調査フェーズ）の"
+        "トレースは対象外（調査結果は委任結果の中に既に含まれている）。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "trace_id": {
+                "type": "string",
+                "description": "delegate_to_team/delegate_to_workerの結果文字列に含まれる trace_id",
+            },
+            "max_steps": {
+                "type": "integer",
+                "description": "表示する最大ステップ数（デフォルト20）",
+                "default": 20,
+            },
+        },
+        "required": ["trace_id"],
+    },
+)
+def get_delegation_trace(trace_id: str, max_steps: int = 20) -> str:
+    from .viewer import get_session_trace_text
+    if not _sessions_dir_for_tool or not _sessions_dir_for_tool.exists():
+        return "セッションログがまだありません。"
+    return get_session_trace_text(_sessions_dir_for_tool, trace_id, max_steps)
+
+
 # ── search_history ツール ──────────────────────────────────────────
 _sessions_dir_for_tool: "Optional[Path]" = None
 

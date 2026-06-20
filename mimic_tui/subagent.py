@@ -65,7 +65,7 @@ def _force_rmtree(path: Path) -> None:
     shutil.rmtree(path, ignore_errors=True)
 
 
-_APPLY_EXCLUDED_FILES = {".mimic_checkpoint.json"}
+_APPLY_EXCLUDED_PATHS = {".mimic_checkpoint.json"}  # upperdir ルート直下からの相対パスで指定する
 
 def _changed_files(upper: Path) -> list[str]:
     """upperdir を走査し、変更/新規ファイルの相対パス一覧を返す（削除マーカー・内部管理ファイルは除外）。"""
@@ -73,15 +73,16 @@ def _changed_files(upper: Path) -> list[str]:
     for p in sorted(upper.rglob("*")):
         if p.is_dir():
             continue
-        if p.name in _APPLY_EXCLUDED_FILES:
-            continue  # Worker 内部管理ファイルを実プロジェクトに持ち込まない
+        rel = str(p.relative_to(upper))
+        if rel in _APPLY_EXCLUDED_PATHS:
+            continue  # Worker内部管理ファイル（ルート直下のみ対象。プロジェクト内の同名ファイルは除外しない）
         try:
             st = p.lstat()
         except OSError:
             continue
         if stat.S_ISCHR(st.st_mode):
             continue  # overlay の whiteout（削除マーカー）
-        changed.append(str(p.relative_to(upper)))
+        changed.append(rel)
     return changed
 
 
