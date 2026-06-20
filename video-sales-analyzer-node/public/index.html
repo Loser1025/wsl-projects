@@ -72,6 +72,18 @@
                 </div>
                 <p class="input-hint">リンク共有が「リンクを知っている全員」に設定されている必要があります</p>
 
+                <div class="compare-add-row">
+                    <button type="button" class="compare-toggle-btn" id="compareToggleBtn">＋ 比較する動画を追加（最大2本）</button>
+                </div>
+                <div class="compare-url-block" id="compareUrlBlock" style="display: none;">
+                    <label class="field-label" for="driveUrl2">比較する動画のリンク</label>
+                    <div class="url-field">
+                        <span class="url-field__dot url-field__dot--b"></span>
+                        <input type="text" id="driveUrl2" placeholder="https://drive.google.com/file/d/.../view">
+                    </div>
+                    <button type="button" class="compare-remove-btn" id="compareRemoveBtn">× 比較を解除</button>
+                </div>
+
                 <div class="criteria-section">
                     <div class="criteria-header">
                         <span class="criteria-marker"></span>
@@ -81,7 +93,7 @@
                         <!-- 動的に生成される -->
                     </div>
                     <button type="button" class="add-criteria-btn" id="addCriteriaBtn">＋ 項目を追加</button>
-                    <p class="input-hint" id="criteriaCountHint">すべて空欄の場合は既定の採点項目で評価します</p>
+                    <p class="input-hint" id="criteriaCountHint">すべて空欄の場合は、動画の内容に合わせてAIが採点項目自体を考えて評価します</p>
                 </div>
 
                 <button class="analyze-btn" id="analyzeBtn" disabled>
@@ -117,53 +129,112 @@
                     <button class="reanalyze-btn" id="reanalyzeBtn">↺ 別の動画を分析</button>
                 </div>
 
-                <!-- 総合スコア -->
-                <div class="hero-card panel panel--cut-lg">
-                    <div class="panel__accent panel__accent--vertical"></div>
-                    <div class="gauge-wrap">
-                        <svg viewBox="0 0 280 280" class="gauge-svg">
-                            <defs>
-                                <linearGradient id="pl-grad" x1="0" y1="0" x2="1" y2="1">
-                                    <stop offset="0%" stop-color="#ff1233"></stop>
-                                    <stop offset="55%" stop-color="#ff5a1e"></stop>
-                                    <stop offset="100%" stop-color="#ffd400"></stop>
-                                </linearGradient>
-                            </defs>
-                            <circle cx="140" cy="140" r="120" class="gauge-track"></circle>
-                            <circle cx="140" cy="140" r="120" class="gauge-fill" id="overallGaugeFill"></circle>
-                        </svg>
-                        <div class="gauge-center">
-                            <div class="gauge-label">総合スコア</div>
-                            <div class="gauge-number" id="overallScore">0</div>
-                            <div class="gauge-unit">/ 100</div>
+                <!-- 単体分析の結果 -->
+                <div id="singleResultBlock">
+                    <!-- 総合スコア -->
+                    <div class="hero-card panel panel--cut-lg">
+                        <div class="panel__accent panel__accent--vertical"></div>
+                        <div class="gauge-wrap">
+                            <svg viewBox="0 0 280 280" class="gauge-svg">
+                                <defs>
+                                    <linearGradient id="pl-grad" x1="0" y1="0" x2="1" y2="1">
+                                        <stop offset="0%" stop-color="#ff1233"></stop>
+                                        <stop offset="55%" stop-color="#ff5a1e"></stop>
+                                        <stop offset="100%" stop-color="#ffd400"></stop>
+                                    </linearGradient>
+                                </defs>
+                                <circle cx="140" cy="140" r="120" class="gauge-track"></circle>
+                                <circle cx="140" cy="140" r="120" class="gauge-fill" id="overallGaugeFill"></circle>
+                            </svg>
+                            <div class="gauge-center">
+                                <div class="gauge-label">総合スコア</div>
+                                <div class="gauge-number" id="overallScore">0</div>
+                                <div class="gauge-unit">/ 100</div>
+                            </div>
+                        </div>
+                        <div class="hero-info">
+                            <div class="grade-chip">
+                                <span class="grade-letter" id="gradeBadge">-</span>
+                                <span class="grade-text-label" id="gradeLabel">-</span>
+                            </div>
+                            <p class="summary-text" id="summaryText">-</p>
                         </div>
                     </div>
-                    <div class="hero-info">
-                        <div class="grade-chip">
-                            <span class="grade-letter" id="gradeBadge">-</span>
-                            <span class="grade-text-label" id="gradeLabel">-</span>
+
+                    <!-- 採点項目別スコア -->
+                    <div class="score-card panel panel--cut-md">
+                        <div class="score-card__header">
+                            <div class="mini-gauge-wrap">
+                                <svg viewBox="0 0 140 140" class="mini-gauge-svg">
+                                    <circle cx="70" cy="70" r="58" class="gauge-track"></circle>
+                                    <circle cx="70" cy="70" r="58" class="gauge-fill" id="avgGaugeFill"></circle>
+                                </svg>
+                                <div class="mini-gauge-center" id="avgScoreLabel">0</div>
+                            </div>
+                            <div>
+                                <div class="score-card__title">採点項目別スコア</div>
+                                <div class="score-card__subtitle" id="criteriaCountLabel">0 項目を総合評価</div>
+                            </div>
                         </div>
-                        <p class="summary-text" id="summaryText">-</p>
+                        <div class="score-bars" id="criteriaBars">
+                            <!-- 動的に生成 -->
+                        </div>
                     </div>
                 </div>
 
-                <!-- 採点項目別スコア -->
-                <div class="score-card panel panel--cut-md">
-                    <div class="score-card__header">
-                        <div class="mini-gauge-wrap">
-                            <svg viewBox="0 0 140 140" class="mini-gauge-svg">
-                                <circle cx="70" cy="70" r="58" class="gauge-track"></circle>
-                                <circle cx="70" cy="70" r="58" class="gauge-fill" id="avgGaugeFill"></circle>
-                            </svg>
-                            <div class="mini-gauge-center" id="avgScoreLabel">0</div>
+                <!-- 比較分析の結果 -->
+                <div id="compareResultBlock" style="display: none;">
+                    <!-- A/B 総合スコア比較 -->
+                    <div class="compare-hero panel panel--cut-lg">
+                        <div class="panel__accent panel__accent--vertical"></div>
+                        <svg width="0" height="0" style="position:absolute;">
+                            <defs>
+                                <linearGradient id="pl-grad-b" x1="0" y1="0" x2="1" y2="1">
+                                    <stop offset="0%" stop-color="#00b8ff"></stop>
+                                    <stop offset="55%" stop-color="#5a8cff"></stop>
+                                    <stop offset="100%" stop-color="#8effd4"></stop>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="compare-versus">
+                            <div class="compare-side">
+                                <div class="compare-label compare-label--a">動画A</div>
+                                <div class="compare-gauge-wrap">
+                                    <svg viewBox="0 0 160 160" class="compare-gauge-svg">
+                                        <circle cx="80" cy="80" r="68" class="gauge-track"></circle>
+                                        <circle cx="80" cy="80" r="68" class="gauge-fill gauge-fill--a" id="compareGaugeA"></circle>
+                                    </svg>
+                                    <div class="compare-gauge-center" id="compareScoreA">0</div>
+                                </div>
+                                <div class="winner-badge" id="winnerBadgeA" style="display: none;">WINNER</div>
+                            </div>
+                            <div class="compare-vs-mark">VS</div>
+                            <div class="compare-side">
+                                <div class="compare-label compare-label--b">動画B</div>
+                                <div class="compare-gauge-wrap">
+                                    <svg viewBox="0 0 160 160" class="compare-gauge-svg">
+                                        <circle cx="80" cy="80" r="68" class="gauge-track"></circle>
+                                        <circle cx="80" cy="80" r="68" class="gauge-fill gauge-fill--b" id="compareGaugeB"></circle>
+                                    </svg>
+                                    <div class="compare-gauge-center" id="compareScoreB">0</div>
+                                </div>
+                                <div class="winner-badge" id="winnerBadgeB" style="display: none;">WINNER</div>
+                            </div>
                         </div>
-                        <div>
-                            <div class="score-card__title">採点項目別スコア</div>
-                            <div class="score-card__subtitle" id="criteriaCountLabel">0 項目を総合評価</div>
-                        </div>
+                        <p class="summary-text compare-summary-text" id="compareSummaryText">-</p>
                     </div>
-                    <div class="score-bars" id="criteriaBars">
-                        <!-- 動的に生成 -->
+
+                    <!-- 採点項目別 A/B 比較 -->
+                    <div class="score-card panel panel--cut-md">
+                        <div class="score-card__header">
+                            <div>
+                                <div class="score-card__title">採点項目別スコア比較</div>
+                                <div class="score-card__subtitle" id="compareCriteriaCountLabel">0 項目を比較</div>
+                            </div>
+                        </div>
+                        <div class="compare-bars" id="compareBars">
+                            <!-- 動的に生成 -->
+                        </div>
                     </div>
                 </div>
 

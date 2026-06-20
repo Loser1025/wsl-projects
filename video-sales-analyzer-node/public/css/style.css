@@ -24,6 +24,7 @@
     --field: rgba(190,204,244,0.07);
     --field-brd: rgba(180,198,238,0.26);
     --grad: linear-gradient(100deg,#ff1233 0%,#ff5a1e 46%,#ffd400 100%);
+    --grad-b: linear-gradient(100deg,#00b8ff 0%,#5a8cff 46%,#8effd4 100%);
     --track: rgba(190,204,244,0.14);
     --radius: 0;
     --shadow: 0 40px 90px -50px #000, inset 0 1px 0 var(--hi);
@@ -324,6 +325,51 @@ input:focus { outline: none; }
     font-size: 0.85rem;
     color: var(--muted);
 }
+
+/* --- 比較動画の追加 --- */
+.compare-add-row { margin-top: 14px; }
+
+.compare-toggle-btn {
+    padding: 9px 16px;
+    border: 1px dashed var(--field-brd);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Saira Condensed', sans-serif;
+    font-size: 12.5px; font-weight: 700;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: all 0.2s;
+    clip-path: polygon(0 0,100% 0,100% 100%,8px 100%,0 calc(100% - 8px));
+}
+
+.compare-toggle-btn:hover {
+    color: var(--text);
+    border-color: #5a8cff;
+}
+
+.compare-url-block {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--field-brd);
+}
+
+.url-field__dot--b::before {
+    background: #5a8cff;
+    box-shadow: 0 0 12px #5a8cff;
+}
+
+.compare-remove-btn {
+    margin-top: 8px;
+    padding: 7px 14px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.compare-remove-btn:hover { color: var(--red); }
 
 /* --- 採点項目（自由入力） --- */
 .criteria-section { margin-top: 36px; }
@@ -681,6 +727,115 @@ input:focus { outline: none; }
 }
 
 .no-data-text { font-size: 13px; color: var(--muted); }
+
+/* --- 比較分析の結果 --- */
+.compare-hero { margin-bottom: 22px; }
+
+.compare-versus {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 24px;
+}
+
+.compare-side {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.compare-label {
+    font-family: 'Saira Condensed', sans-serif;
+    font-weight: 700; font-size: 14px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+}
+
+.compare-label--a { color: #ff5a1e; }
+.compare-label--b { color: #5a8cff; }
+
+.compare-gauge-wrap { position: relative; width: 160px; height: 160px; }
+.compare-gauge-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+.gauge-fill--a { stroke: url(#pl-grad); }
+.gauge-fill--b { stroke: url(#pl-grad-b); filter: drop-shadow(0 0 12px rgba(90,140,255,0.55)); }
+
+.compare-gauge-center {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Saira Condensed', sans-serif;
+    font-weight: 800; font-size: 42px; font-style: italic;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+.compare-vs-mark {
+    font-family: 'Saira Condensed', sans-serif;
+    font-weight: 800; font-size: 22px; font-style: italic;
+    color: var(--muted); letter-spacing: 0.05em;
+}
+
+.winner-badge {
+    padding: 5px 14px;
+    background: var(--yellow);
+    color: #0a0f33;
+    font-family: 'Saira Condensed', sans-serif;
+    font-weight: 800; font-size: 11px;
+    letter-spacing: 0.18em;
+    clip-path: polygon(0 0,100% 0,100% 100%,6px 100%,0 calc(100% - 6px));
+}
+
+.compare-summary-text { text-align: center; margin: 0 auto; }
+
+.compare-bars { display: block; }
+
+.compare-bar-item {
+    margin-bottom: 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--line);
+}
+
+.compare-bar-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+.compare-bar-label {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 10px;
+}
+
+.compare-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.compare-bar-tag {
+    flex: none;
+    width: 20px;
+    text-align: center;
+    font-family: 'Saira Condensed', sans-serif;
+    font-weight: 800; font-size: 12px; font-style: italic;
+}
+
+.compare-bar-tag--a { color: #ff5a1e; }
+.compare-bar-tag--b { color: #5a8cff; }
+
+.compare-bar-row .bar-track { flex: 1; }
+
+.compare-bar-row .bar-fill--a { background: var(--grad); }
+.compare-bar-row .bar-fill--b { background: var(--grad-b); }
+
+.compare-bar-row .bar-score { width: 28px; text-align: right; flex: none; }
+
+.compare-bar-comment {
+    font-size: 11px;
+    color: var(--muted);
+    margin: 2px 0 0 30px;
+    line-height: 1.5;
+}
 
 /* --- 改善ポイント --- */
 .improvements-header {

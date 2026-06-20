@@ -2,18 +2,24 @@ const MAX_CRITERIA_ITEMS = 10;
 const INITIAL_CRITERIA_ROWS = 3;
 const GAUGE_CIRCUMFERENCE_MAIN = 2 * Math.PI * 120;   // 総合スコアの円周
 const GAUGE_CIRCUMFERENCE_MINI = 2 * Math.PI * 58;    // 項目平均スコアの円周
+const GAUGE_CIRCUMFERENCE_COMPARE = 2 * Math.PI * 68; // 比較画面のA/Bゲージの円周
 const LOADING_STEPS = ["動画を取得中", "AIエンジンへアップロード中", "映像と音声を解析中", "スコアを集計中"];
 const ESTIMATED_DURATION_MS = 70000; // 見込み所要時間（実際の完了で即座に100%へ）
 const PROGRESS_CAP_PERCENT = 92;     // 完了までは92%で待機させ、最後に100%へ
 
 const state = {
     driveUrl: "",
+    compareEnabled: false,
     isAnalyzing: false,
     results: null
 };
 
 const elements = {
     driveUrl:          document.getElementById("driveUrl"),
+    compareToggleBtn:  document.getElementById("compareToggleBtn"),
+    compareUrlBlock:   document.getElementById("compareUrlBlock"),
+    driveUrl2:         document.getElementById("driveUrl2"),
+    compareRemoveBtn:  document.getElementById("compareRemoveBtn"),
     criteriaList:      document.getElementById("criteriaList"),
     addCriteriaBtn:    document.getElementById("addCriteriaBtn"),
     analyzeBtn:        document.getElementById("analyzeBtn"),
@@ -25,6 +31,8 @@ const elements = {
     loadingStepLabel:  document.getElementById("loadingStepLabel"),
     stepList:          document.getElementById("stepList"),
     stepProgressFill:  document.getElementById("stepProgressFill"),
+    singleResultBlock: document.getElementById("singleResultBlock"),
+    compareResultBlock:document.getElementById("compareResultBlock"),
     overallScore:      document.getElementById("overallScore"),
     overallGaugeFill:  document.getElementById("overallGaugeFill"),
     avgGaugeFill:      document.getElementById("avgGaugeFill"),
@@ -35,6 +43,15 @@ const elements = {
     criteriaBars:      document.getElementById("criteriaBars"),
     summaryText:       document.getElementById("summaryText"),
     improvementsList:  document.getElementById("improvementsList"),
+    compareGaugeA:     document.getElementById("compareGaugeA"),
+    compareGaugeB:     document.getElementById("compareGaugeB"),
+    compareScoreA:     document.getElementById("compareScoreA"),
+    compareScoreB:     document.getElementById("compareScoreB"),
+    winnerBadgeA:      document.getElementById("winnerBadgeA"),
+    winnerBadgeB:       document.getElementById("winnerBadgeB"),
+    compareSummaryText:document.getElementById("compareSummaryText"),
+    compareCriteriaCountLabel: document.getElementById("compareCriteriaCountLabel"),
+    compareBars:       document.getElementById("compareBars"),
     apiStatus:         document.getElementById("apiStatus")
 };
 
@@ -55,6 +72,28 @@ function updateAnalyzeButton() {
 function initAnalyzeButton() {
     elements.analyzeBtn.addEventListener("click", startAnalysis);
     elements.reanalyzeBtn.addEventListener("click", resetAnalysis);
+}
+
+// =========================================================
+// 比較動画（任意・最大2本目）
+// =========================================================
+function initCompareToggle() {
+    elements.compareToggleBtn.addEventListener("click", () => {
+        state.compareEnabled = true;
+        elements.compareUrlBlock.style.display = "block";
+        elements.compareToggleBtn.style.display = "none";
+        elements.driveUrl2.focus();
+    });
+    elements.compareRemoveBtn.addEventListener("click", () => {
+        state.compareEnabled = false;
+        elements.compareUrlBlock.style.display = "none";
+        elements.compareToggleBtn.style.display = "inline-block";
+        elements.driveUrl2.value = "";
+    });
+}
+
+function getCompareUrl() {
+    return state.compareEnabled ? elements.driveUrl2.value.trim() : "";
 }
 
 // =========================================================
@@ -139,14 +178,20 @@ async function startAnalysis() {
 
 async function analyzeDrive() {
     const criteria = getCriteriaItems();
+    const compareUrl = getCompareUrl();
+
+    const body = {
+        drive_url: state.driveUrl,
+        criteria: criteria
+    };
+    if (compareUrl) {
+        body.drive_url_2 = compareUrl;
+    }
 
     const response = await fetch("/api/analyze/drive", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            drive_url: state.driveUrl,
-            criteria: criteria
-        })
+        body: JSON.stringify(body)
     });
     if (!response.ok) {
         const error = await response.json();
@@ -211,6 +256,23 @@ function renderLoadingSteps(progress) {
 function displayResults(data) {
     state.results = data;
 
+    if (data.mode === "compare") {
+        elements.singleResultBlock.style.display = "none";
+        elements.compareResultBlock.style.display = "block";
+        displayCompareResults(data);
+    } else {
+        elements.compareResultBlock.style.display = "none";
+        elements.singleResultBlock.style.display = "block";
+        displaySingleResults(data);
+    }
+
+    renderImprovements(data.improvements);
+
+    elements.resultsSection.style.display = "block";
+    elements.resultsSection.scrollIntoView({ behavior: "smooth" });
+}
+
+function displaySingleResults(data) {
     const overall = data.overall_score || 0;
     animateNumber(elements.overallScore, overall);
     elements.overallGaugeFill.style.strokeDashoffset =
@@ -232,11 +294,34 @@ function displayResults(data) {
     }
 
     elements.criteriaBars.innerHTML = renderCriteriaBars(scores);
-
     elements.summaryText.textContent = data.summary || "評価データがありません";
+}
 
-    if (data.improvements && data.improvements.length > 0) {
-        elements.improvementsList.innerHTML = data.improvements
+function displayCompareResults(data) {
+    const videoA = data.videoA || { overall_score: 0, scores: [] };
+    const videoB = data.videoB || { overall_score: 0, scores: [] };
+    const scoresA = Array.isArray(videoA.scores) ? videoA.scores : [];
+    const scoresB = Array.isArray(videoB.scores) ? videoB.scores : [];
+
+    animateNumber(elements.compareScoreA, videoA.overall_score || 0);
+    animateNumber(elements.compareScoreB, videoB.overall_score || 0);
+    elements.compareGaugeA.style.strokeDashoffset =
+        GAUGE_CIRCUMFERENCE_COMPARE * (1 - (videoA.overall_score || 0) / 100);
+    elements.compareGaugeB.style.strokeDashoffset =
+        GAUGE_CIRCUMFERENCE_COMPARE * (1 - (videoB.overall_score || 0) / 100);
+
+    const winner = String(data.winner || "TIE").toUpperCase();
+    elements.winnerBadgeA.style.display = winner === "A" ? "block" : "none";
+    elements.winnerBadgeB.style.display = winner === "B" ? "block" : "none";
+
+    elements.compareCriteriaCountLabel.textContent = `${Math.max(scoresA.length, scoresB.length)} 項目を比較`;
+    elements.compareBars.innerHTML = renderCompareBars(scoresA, scoresB);
+    elements.compareSummaryText.textContent = data.summary || "比較データがありません";
+}
+
+function renderImprovements(improvements) {
+    if (improvements && improvements.length > 0) {
+        elements.improvementsList.innerHTML = improvements
             .map((text, i) => `
                 <li class="improvement-item">
                     <span class="improvement-no">${String(i + 1).padStart(2, "0")}</span>
@@ -246,9 +331,6 @@ function displayResults(data) {
     } else {
         elements.improvementsList.innerHTML = '<li class="no-data-text">特に改善点はありません</li>';
     }
-
-    elements.resultsSection.style.display = "block";
-    elements.resultsSection.scrollIntoView({ behavior: "smooth" });
 }
 
 function renderCriteriaBars(scores) {
@@ -271,6 +353,38 @@ function renderCriteriaBars(scores) {
                 </div>`;
         })
         .join("");
+}
+
+function renderCompareBars(scoresA, scoresB) {
+    if ((!scoresA || scoresA.length === 0) && (!scoresB || scoresB.length === 0)) {
+        return '<p class="no-data-text">比較データがありません</p>';
+    }
+    const count = Math.max(scoresA.length, scoresB.length);
+    const rows = [];
+    for (let i = 0; i < count; i++) {
+        const a = scoresA[i] || {};
+        const b = scoresB[i] || {};
+        const itemName = a.item || b.item || "";
+        const sA = a.score || 0;
+        const sB = b.score || 0;
+        rows.push(`
+            <div class="compare-bar-item">
+                <div class="compare-bar-label">${escapeHtml(itemName)}</div>
+                <div class="compare-bar-row">
+                    <span class="compare-bar-tag compare-bar-tag--a">A</span>
+                    <div class="bar-track"><div class="bar-fill bar-fill--a" style="width: ${sA}%;"></div></div>
+                    <span class="bar-score">${sA}</span>
+                </div>
+                ${a.comment ? `<p class="compare-bar-comment">${escapeHtml(a.comment)}</p>` : ""}
+                <div class="compare-bar-row">
+                    <span class="compare-bar-tag compare-bar-tag--b">B</span>
+                    <div class="bar-track"><div class="bar-fill bar-fill--b" style="width: ${sB}%;"></div></div>
+                    <span class="bar-score">${sB}</span>
+                </div>
+                ${b.comment ? `<p class="compare-bar-comment">${escapeHtml(b.comment)}</p>` : ""}
+            </div>`);
+    }
+    return rows.join("");
 }
 
 function escapeHtml(text) {
@@ -318,6 +432,7 @@ async function checkApiStatus() {
 // =========================================================
 document.addEventListener("DOMContentLoaded", () => {
     initDriveInput();
+    initCompareToggle();
     initCriteriaInputs();
     initAnalyzeButton();
     checkApiStatus();

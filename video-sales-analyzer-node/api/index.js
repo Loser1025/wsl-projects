@@ -85,25 +85,29 @@ const GRADE_THRESHOLDS = [
 // 採点項目の最大数
 const MAX_CRITERIA_ITEMS = 10;
 
-// 既定の採点項目（ユーザーが項目を指定しなかった場合に使用）
-const DEFAULT_CRITERIA_ITEMS = [
-  "笑顔の強さ・自然さ",
-  "アイコンタクト（カメラ目線）",
-  "表情の反応性",
-  "ポジティブな表情（頷き、共感表現）",
-  "プロフェッショナルな印象",
-  "明瞭さ（聞き取りやすさ）",
-  "元気・生命力（声の張り）",
-  "話速のコントロール",
-  "感情表現の適切さ",
-  "自信の印象"
-];
-
-// 分析プロンプト（最大10個の採点項目を動的に組み込む）
+// 分析プロンプト（最大10個の採点項目を動的に組み込む。未入力時はAI自身に項目を考えさせる）
 function buildPrompt(criteriaItems) {
-  const items = (Array.isArray(criteriaItems) && criteriaItems.length > 0
-    ? criteriaItems
-    : DEFAULT_CRITERIA_ITEMS).slice(0, MAX_CRITERIA_ITEMS);
+  const items = Array.isArray(criteriaItems) && criteriaItems.length > 0
+    ? criteriaItems.slice(0, MAX_CRITERIA_ITEMS)
+    : null;
+
+  if (!items) {
+    return `あなたは動画分析の専門アナリストです。
+提供された動画フレーム画像の内容をよく理解し、この動画を評価するのに最も適した採点項目を、あなた自身で最大${MAX_CRITERIA_ITEMS}個考えてください（動画の種類・目的に応じて柔軟に選んでください。例: 商談動画なら表情や説明の分かりやすさ、プレゼン動画なら構成や話し方、スポーツ動画ならフォームや技術など）。
+その上で、考案した採点項目それぞれについて0-100点のスコアを付けてください。
+
+以下のJSON形式で回答してください：
+{
+  "scores": [
+    {"item": "<あなたが考えた採点項目1>", "score": <0-100>, "comment": "<理由>"}
+    ... (動画の内容に応じて適切な数、最大${MAX_CRITERIA_ITEMS}個)
+  ],
+  "overall_score": <0-100（各項目を踏まえた総合点）>,
+  "summary": "<総合評価コメント。どのような観点で評価したかにも触れる>",
+  "improvements": ["<改善点1>", "<改善点2>", "<改善点3>"]
+}`;
+  }
+
   const itemsList = items.map((item, i) => `${i + 1}. ${item}`).join('\n');
   const scoresExample = items
     .map(item => `    {"item": "${item}", "score": <0-100>, "comment": "<理由>"}`)
@@ -125,25 +129,129 @@ ${scoresExample}
 }`;
 }
 
+// 比較分析プロンプト（2本の動画を「動画A」「動画B」として比較させる。未入力時はAI自身に項目を考えさせる）
+function buildComparePrompt(criteriaItems) {
+  const items = Array.isArray(criteriaItems) && criteriaItems.length > 0
+    ? criteriaItems.slice(0, MAX_CRITERIA_ITEMS)
+    : null;
+
+  if (!items) {
+    return `あなたは動画分析の専門アナリストです。
+これから2本の動画を提示します。1本目を「動画A」、2本目を「動画B」とします。
+まず両方の動画の内容をよく理解し、この2本を比較するのに最も適した採点項目を、あなた自身で最大${MAX_CRITERIA_ITEMS}個考えてください。
+その上で、考案した採点項目それぞれについて、A・B個別に0-100点のスコアを付け、さらにどちらが総合的に優れているかを比較してください。
+
+以下のJSON形式で回答してください（videoAとvideoBのscoresは必ず同じ採点項目・同じ順序・同じ件数にしてください）：
+{
+  "videoA": {
+    "scores": [
+      {"item": "<あなたが考えた採点項目1>", "score": <0-100>, "comment": "<理由>"}
+      ... (内容に応じて適切な数、最大${MAX_CRITERIA_ITEMS}個)
+    ],
+    "overall_score": <0-100>
+  },
+  "videoB": {
+    "scores": [
+      {"item": "<videoAと同じ採点項目1>", "score": <0-100>, "comment": "<理由>"}
+      ...
+    ],
+    "overall_score": <0-100>
+  },
+  "winner": "<総合的に優れている方。'A' か 'B'、ほぼ同等なら 'tie'>",
+  "summary": "<2本を比較した総合コメント。どのような観点で評価したか、それぞれの強み・弱みの違いも含める>",
+  "improvements": ["<比較から見えた改善点1>", "<改善点2>", "<改善点3>"]
+}`;
+  }
+
+  const itemsList = items.map((item, i) => `${i + 1}. ${item}`).join('\n');
+  const scoresExample = items
+    .map(item => `      {"item": "${item}", "score": <0-100>, "comment": "<理由>"}`)
+    .join(',\n');
+  return `あなたは動画分析の専門アナリストです。
+これから2本の動画を提示します。1本目を「動画A」、2本目を「動画B」として、以下の採点項目それぞれについて0-100点でA・B個別に採点し、さらにどちらが総合的に優れているかを比較してください。
+
+## 採点項目
+${itemsList}
+
+以下のJSON形式で回答してください（scoresは採点項目と同じ順序・同じ件数で、A・Bそれぞれ返してください）：
+{
+  "videoA": {
+    "scores": [
+${scoresExample}
+    ],
+    "overall_score": <0-100>
+  },
+  "videoB": {
+    "scores": [
+${scoresExample}
+    ],
+    "overall_score": <0-100>
+  },
+  "winner": "<総合的に優れている方。'A' か 'B'、ほぼ同等なら 'tie'>",
+  "summary": "<2本を比較した総合コメント。それぞれの強み・弱みの違いを含める>",
+  "improvements": ["<比較から見えた改善点1>", "<改善点2>", "<改善点3>"]
+}`;
+}
+
+// 比較レスポンス解析
+function parseCompareResponse(text) {
+  try {
+    let jsonText = text.trim();
+
+    if (jsonText.includes('```json')) {
+      const match = jsonText.match(/```json\s*([\s\S]*?)\s*```/);
+      if (match && match[1]) jsonText = match[1].trim();
+    } else if (jsonText.includes('```')) {
+      const match = jsonText.match(/```\s*([\s\S]*?)\s*```/);
+      if (match && match[1]) jsonText = match[1].trim();
+    }
+
+    const result = JSON.parse(jsonText);
+
+    const normalizeSide = (side) => {
+      const overall = Math.max(0, Math.min(100, parseInt(side && side.overall_score) || 0));
+      const scores = Array.isArray(side && side.scores) ? side.scores.map(s => ({
+        item: String((s && s.item) || ''),
+        score: Math.max(0, Math.min(100, parseInt(s && s.score) || 0)),
+        comment: String((s && s.comment) || ''),
+      })) : [];
+      return { overall_score: overall, scores };
+    };
+
+    const videoA = normalizeSide(result.videoA);
+    const videoB = normalizeSide(result.videoB);
+    let winner = String(result.winner || '').trim().toUpperCase();
+    if (winner !== 'A' && winner !== 'B') winner = 'TIE';
+
+    return {
+      mode: 'compare',
+      videoA,
+      videoB,
+      winner,
+      summary: String(result.summary || ''),
+      improvements: Array.isArray(result.improvements) ? result.improvements : [],
+    };
+  } catch (error) {
+    console.error('比較レスポンス解析エラー:', error);
+    return {
+      mode: 'compare',
+      error: true,
+      message: '比較結果の解析に失敗しました: ' + error.message,
+      videoA: { overall_score: 0, scores: [] },
+      videoB: { overall_score: 0, scores: [] },
+      winner: 'TIE',
+      summary: '',
+      improvements: [],
+    };
+  }
+}
+
 // レスポンス解析
 function parseResponse(text) {
   try {
     let jsonText = text.trim();
-    
-    // デバッグログ: 元のレスポンスをファイルに保存
-    const fs = require('fs');
-    const debugDir = '/tmp/debug-responses';
-    try {
-      if (!fs.existsSync(debugDir)) {
-        fs.mkdirSync(debugDir, { recursive: true });
-      }
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      fs.writeFileSync(`${debugDir}/response_${timestamp}.txt`, text);
-      console.log(`デバッグファイル保存: ${debugDir}/response_${timestamp}.txt`);
-    } catch (e) {
-      console.warn(`[WARN] デバッグ用ディレクトリ作成失敗: ${debugDir}, エラー: ${e.message}`);
-    }
-    
+
+
     // コードブロックの抽出（より堅牢な処理）
     if (jsonText.includes('```json')) {
       const match = jsonText.match(/```json\s*([\s\S]*?)\s*```/);
@@ -211,17 +319,27 @@ function parseResponse(text) {
   }
 }
 
+// 長尺動画でもトークン量を抑えるため、解像度を下げ（mediaResolution、最低のLOW=64トークン/フレーム）、
+// フレームサンプリングを間引く（videoMetadata.fps, 既定1.0→0.2 = 5秒に1フレーム）。
+// 動画自体の再エンコードや分割は行わず、Gemini側の取り込み設定のみで容量を削減する。
+function makeVideoPart(fileUri, mimeType) {
+  const { createPartFromUri } = require('@google/genai');
+  return Object.assign(
+    createPartFromUri(fileUri, mimeType, 'MEDIA_RESOLUTION_LOW'),
+    { videoMetadata: { fps: 0.2 } }
+  );
+}
+
 // URI を使って分析
 async function analyzeWithUri(prompt, fileUri, mimeType, apiKey) {
   if (!apiKey) throw new Error('利用可能なAPIキーがありません');
-  const { GoogleGenAI, createPartFromUri } = require('@google/genai');
   const ai = new GoogleGenAI({ apiKey });
 
   const generateTimeout = 180000;
   const response = await Promise.race([
     ai.models.generateContent({
       model: 'gemini-3.1-flash-lite',
-      contents: [prompt, createPartFromUri(fileUri, mimeType)],
+      contents: [prompt, makeVideoPart(fileUri, mimeType)],
     }),
     new Promise((_, reject) =>
       setTimeout(() => reject(new Error('コンテンツ生成タイムアウト')), generateTimeout)
@@ -254,6 +372,52 @@ async function analyzeUriWithFallback(prompt, fileUri, mimeType) {
   throw lastError || new Error('分析に失敗しました');
 }
 
+// 2本の動画を1回のリクエストに同時に渡して比較分析する
+async function compareWithUri(prompt, fileUriA, fileUriB, mimeType, apiKey) {
+  if (!apiKey) throw new Error('利用可能なAPIキーがありません');
+  const ai = new GoogleGenAI({ apiKey });
+
+  const generateTimeout = 180000;
+  const response = await Promise.race([
+    ai.models.generateContent({
+      model: 'gemini-3.1-flash-lite',
+      contents: [
+        prompt,
+        makeVideoPart(fileUriA, mimeType),
+        makeVideoPart(fileUriB, mimeType),
+      ],
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('コンテンツ生成タイムアウト')), generateTimeout)
+    ),
+  ]);
+  return response.text;
+}
+
+async function compareUriWithFallback(prompt, fileUriA, fileUriB, mimeType) {
+  let lastError = null;
+  while (keyManager.hasAvailableKey) {
+    const apiKey = keyManager.currentKey;
+    if (!apiKey) break;
+    try {
+      const text = await compareWithUri(prompt, fileUriA, fileUriB, mimeType, apiKey);
+      keyManager.recordUsage(apiKey);
+      return parseCompareResponse(text);
+    } catch (error) {
+      console.error(`比較分析エラー: ${error.message}`);
+      if (/quota|rate|429/i.test(error.message)) {
+        keyManager.markFailed(apiKey);
+        keyManager.rotateKey();
+        lastError = error;
+        continue;
+      }
+      lastError = error;
+      break;
+    }
+  }
+  throw lastError || new Error('比較分析に失敗しました');
+}
+
 // バッファを Gemini Files API にアップロードして ACTIVE になるまで待つ
 async function uploadToGemini(filePath, mimeType, apiKey) {
   const ai = new GoogleGenAI({ apiKey });
@@ -278,6 +442,83 @@ async function uploadToGemini(filePath, mimeType, apiKey) {
   return file;
 }
 
+// Google Drive の共有リンクから動画をダウンロードし、ローカルの一時ファイルパスを返す
+async function downloadDriveVideo(driveUrl) {
+  const match = driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  const fileId = match ? match[1] : null;
+  if (!fileId) {
+    throw new Error('無効なGoogle Drive URLです');
+  }
+
+  const axios = require('axios');
+  const { CookieJar } = require('tough-cookie');
+  const jar = new CookieJar();
+  const client = axios.create({
+    maxRedirects: 10,
+    headers: { 'User-Agent': 'Mozilla/5.0' }
+  });
+
+  const videoPath = `/tmp/drive_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.mp4`;
+
+  const initialUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=no_virus_check`;
+  console.log(`[DEBUG] 初回リクエスト URL: ${initialUrl}`);
+
+  const dlResponse = await client.get(initialUrl, {
+    responseType: 'arraybuffer',
+    maxRedirects: 10,
+    timeout: 120000,
+    headers: {
+      'User-Agent': 'Mozilla/5.0',
+      'Cookie': jar.getCookieStringSync(initialUrl)
+    },
+  });
+
+  const setCookies = dlResponse.headers['set-cookie'];
+  if (setCookies) {
+    setCookies.forEach(cookie => jar.setCookieSync(cookie, initialUrl));
+  }
+
+  const html = Buffer.from(dlResponse.data).toString('utf8');
+  const confirmMatch = html.match(/name="confirm" value="([0-9A-Za-z_-]+)"/);
+  const uuidMatch = html.match(/name="uuid" value="([0-9A-Fa-f-]+)"/);
+
+  if (confirmMatch) {
+    const token = confirmMatch[1];
+    const uuid = uuidMatch ? uuidMatch[1] : '';
+    const confirmUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=${token}&uuid=${uuid}`;
+    console.log(`[DEBUG] 再リクエスト実行URL: ${confirmUrl}`);
+
+    const confirmed = await client.get(confirmUrl, {
+      responseType: 'arraybuffer',
+      maxRedirects: 10,
+      timeout: 120000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Referer': 'https://drive.google.com/',
+        'Cookie': jar.getCookieStringSync(confirmUrl)
+      },
+    });
+
+    if (Buffer.byteLength(confirmed.data) === 2436) {
+      throw new Error('Download failed: Received warning page instead of file.');
+    }
+    fs.writeFileSync(videoPath, confirmed.data);
+  } else {
+    if (Buffer.byteLength(dlResponse.data) === 2436) {
+      throw new Error('Download failed: Received warning page instead of file.');
+    }
+    fs.writeFileSync(videoPath, dlResponse.data);
+  }
+
+  const stat = fs.statSync(videoPath);
+  if (stat.size < 1024) {
+    fs.unlinkSync(videoPath);
+    throw new Error('動画ファイルのダウンロードに失敗しました（ファイルが空または無効です）。共有設定を確認してください。');
+  }
+  console.log(`[INFO] ダウンロード完了: ${videoPath}, サイズ = ${stat.size} bytes`);
+  return videoPath;
+}
+
 // ルート
 app.get('/', (req, res) => {
   res.sendFile(path.join(publicPath, 'index.html'));
@@ -292,7 +533,7 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Google Drive分析
+// Google Drive分析（1本=単体分析 / 2本=比較分析）
 app.post('/api/analyze/drive', async (req, res) => {
   // 1. 受信ログと環境変数チェック
   console.log('--- Request received: /api/analyze/drive ---');
@@ -301,159 +542,106 @@ app.post('/api/analyze/drive', async (req, res) => {
     console.log(`GEMINI_KEY_${i}: ${process.env[`GEMINI_KEY_${i}`] ? '設定済み' : '未設定'}`);
   }
 
-  // 2. 全体を try-catch でラップ
-  let videoPath; // スコープ修正
+  const videoPaths = [];   // 後始末対象の一時ファイル（成功分のみ随時追加）
+  const geminiFiles = [];  // 後始末対象のGeminiアップロード済みファイル（成功分のみ随時追加）
+  let uploadApiKey = null;
+
   try {
-    const { drive_url, criteria } = req.body;
+    const { drive_url, drive_url_2, criteria } = req.body;
     if (!drive_url) {
       return res.status(400).json({ error: 'Google DriveのURLを入力してください' });
+    }
+    if (!/\/d\/([a-zA-Z0-9_-]+)/.test(drive_url)) {
+      return res.status(400).json({ error: '無効なGoogle Drive URLです' });
     }
     const criteriaItems = Array.isArray(criteria)
       ? criteria.map(c => String(c).trim()).filter(c => c.length > 0).slice(0, MAX_CRITERIA_ITEMS)
       : [];
-
-    const match = drive_url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    const fileId = match ? match[1] : null;
-
-    if (!fileId) {
-      return res.status(400).json({ error: '無効なGoogle Drive URLです' });
+    const compareUrl = typeof drive_url_2 === 'string' ? drive_url_2.trim() : '';
+    if (compareUrl && !/\/d\/([a-zA-Z0-9_-]+)/.test(compareUrl)) {
+      return res.status(400).json({ error: '無効なGoogle Drive URLです（比較動画）' });
     }
+    const isCompare = compareUrl.length > 0;
 
-    const axios = require('axios');
-const { CookieJar } = require('tough-cookie');
-
-const jar = new CookieJar();
-const client = axios.create({
-    maxRedirects: 10,
-    headers: { 'User-Agent': 'Mozilla/5.0' }
-});
-    videoPath = `/tmp/drive_${Date.now()}.mp4`;
-
-    // 改善：ダウンロード用URL生成
-    let downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`; console.log(`[DEBUG] ダウンロード URL: ${downloadUrl}`);
-
-    console.log(`[DEBUG] 変換後のダウンロード用URL: ${downloadUrl}`);
-
-    // axios はリダイレクトを自動的に追跡する
-    // 修正: confirm=no_virus_check を初期リクエストに追加し、トークンを確実に取得する
-    let initialUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=no_virus_check`;
-    console.log(`[DEBUG] 初回リクエスト URL: ${initialUrl}`);
-    
-    const dlResponse = await client.get(initialUrl, {
-      responseType: 'arraybuffer',
-      maxRedirects: 10,
-      timeout: 120000,
-      headers: { 
-        'User-Agent': 'Mozilla/5.0',
-        'Cookie': jar.getCookieStringSync(initialUrl)
-      },
-    });
-
-    // レスポンスからCookieを保存
-    const setCookies = dlResponse.headers['set-cookie'];
-    if (setCookies) {
-      setCookies.forEach(cookie => jar.setCookieSync(cookie, initialUrl));
-    }
-    console.log(`[DEBUG] 初回リクエスト後、保存されたCookie: ${JSON.stringify(await jar.getCookies(initialUrl))}`);
-
-
-    console.log(`[DEBUG] HTTPステータスコード: ${dlResponse.status}`);
-    
-    const html = Buffer.from(dlResponse.data).toString('utf8');
-    const confirmMatch = html.match(/name="confirm" value="([0-9A-Za-z_-]+)"/);
-    const uuidMatch = html.match(/name="uuid" value="([0-9A-Fa-f-]+)"/);
-    
-    if (confirmMatch) {
-      const token = confirmMatch[1];
-      const uuid = uuidMatch ? uuidMatch[1] : '';
-      console.log(`[DEBUG] confirm token 発見: ${token}, uuid 発見: ${uuid}`);
-      // Google Driveのダウンロード用URL構造を再現
-      const confirmUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=${token}&uuid=${uuid}`;
-      console.log(`[DEBUG] 再リクエスト実行URL: ${confirmUrl}`);
-      console.log(`[DEBUG] 送信するCookie: ${JSON.stringify(await jar.getCookies(confirmUrl))}`);
-      
-      const confirmed = await client.get(confirmUrl, {
-        responseType: 'arraybuffer',
-        maxRedirects: 10,
-        timeout: 120000,
-        headers: { 
-          'User-Agent': 'Mozilla/5.0', 
-          'Referer': 'https://drive.google.com/',
-          'Cookie': jar.getCookieStringSync(confirmUrl) 
-        },
-      });
-      console.log(`[DEBUG] 確認後のHTTPステータスコード: ${confirmed.status}`);
-      
-      // 2436 bytes (警告HTML) チェック
-      if (Buffer.byteLength(confirmed.data) === 2436) {
-          console.error("DEBUG: 警告HTMLがダウンロードされました。中身の一部:");
-          console.error(confirmed.data.toString().substring(0, 500));
-          throw new Error("Download failed: Received warning page instead of file.");
-      }
-      
-      fs.writeFileSync(videoPath, confirmed.data);
-      const stats = fs.statSync(videoPath);
-      console.log(`[INFO] ダウンロード完了: ファイルサイズ = ${stats.size} bytes`);
-
-    } else {
-      console.log(`[DEBUG] トークンなし、dlResponse.dataを使用`);
-      
-      // トークンなしの場合もサイズチェック
-      if (Buffer.byteLength(dlResponse.data) === 2436) {
-          console.error("DEBUG: 警告HTMLがダウンロードされました(tokenなし)。中身の一部:");
-          console.error(dlResponse.data.toString().substring(0, 500));
-          throw new Error("Download failed: Received warning page instead of file.");
-      }
-      
-      fs.writeFileSync(videoPath, dlResponse.data);
-    }
-
-    // 空ファイル検出
-    console.log(`[DEBUG] ダウンロード完了。パス: ${videoPath}, サイズ: ${fs.statSync(videoPath).size} bytes`);
-    const stat = fs.statSync(videoPath);
-    if (stat.size < 1024) {
-      throw new Error('動画ファイルのダウンロードに失敗しました（ファイルが空または無効です）。共有設定を確認してください。');
-    }
-
-    const apiKey = keyManager.currentKey;
-    if (!apiKey) throw new Error('利用可能なAPIキーがありません');
-
+    uploadApiKey = keyManager.currentKey;
+    if (!uploadApiKey) throw new Error('利用可能なAPIキーがありません');
     const mimeType = 'video/mp4';
-    console.log(`[DEBUG] Geminiへアップロード開始: ${videoPath}`);
-    const geminiFile = await uploadToGemini(videoPath, mimeType, apiKey);
-    console.log(`[DEBUG] アップロード完了: ${geminiFile.name}`);
 
-    let result;
-    try {
+    if (!isCompare) {
+      // ── 単体分析 ──────────────────────────────
+      console.log(`[DEBUG] ダウンロード開始: ${drive_url}`);
+      const videoPath = await downloadDriveVideo(drive_url);
+      videoPaths.push(videoPath);
+
+      console.log(`[DEBUG] Geminiへアップロード開始: ${videoPath}`);
+      const geminiFile = await uploadToGemini(videoPath, mimeType, uploadApiKey);
+      geminiFiles.push(geminiFile);
+      console.log(`[DEBUG] アップロード完了: ${geminiFile.name}`);
+
       const prompt = buildPrompt(criteriaItems);
-      console.log(`[DEBUG] 分析開始 (Gemini)`);
-      result = await analyzeUriWithFallback(prompt, geminiFile.uri, mimeType);
-      console.log(`[DEBUG] 分析完了`);
-    } catch (error) {
-      console.error(`[ERROR] 分析中のエラー:`, error);
-      throw error;
-    } finally {
-      try {
-        console.log(`[DEBUG] Geminiファイル削除: ${geminiFile.name}`);
-        const ai = new GoogleGenAI({ apiKey });
-        await ai.files.delete({ name: geminiFile.name });
-      } catch (e) {
-        console.error(`[ERROR] ファイル削除失敗:`, e);
-      }
-    }
+      console.log('[DEBUG] 分析開始 (Gemini)');
+      const result = await analyzeUriWithFallback(prompt, geminiFile.uri, mimeType);
+      console.log('[DEBUG] 分析完了');
 
-    result.source = 'drive';
-    result.drive_url = drive_url;
-    res.json(result);
+      result.source = 'drive';
+      result.drive_url = drive_url;
+      res.json(result);
+    } else {
+      // ── 比較分析（2本を並列でダウンロード・アップロードし、1回のリクエストで比較）──
+      console.log(`[DEBUG] 比較モード: 2本の動画を並列処理します (${drive_url} / ${compareUrl})`);
+
+      const trackedDownload = async (url) => {
+        const p = await downloadDriveVideo(url);
+        videoPaths.push(p); // 成功した時点で即座に後始末対象へ（片方失敗時も漏れなく削除するため）
+        return p;
+      };
+      const trackedUpload = async (videoPath) => {
+        const f = await uploadToGemini(videoPath, mimeType, uploadApiKey);
+        geminiFiles.push(f);
+        return f;
+      };
+
+      const [pathA, pathB] = await Promise.all([
+        trackedDownload(drive_url),
+        trackedDownload(compareUrl),
+      ]);
+
+      console.log('[DEBUG] Geminiへ並列アップロード開始');
+      const [fileA, fileB] = await Promise.all([
+        trackedUpload(pathA),
+        trackedUpload(pathB),
+      ]);
+      console.log(`[DEBUG] アップロード完了: ${fileA.name}, ${fileB.name}`);
+
+      const prompt = buildComparePrompt(criteriaItems);
+      console.log('[DEBUG] 比較分析開始 (Gemini)');
+      const result = await compareUriWithFallback(prompt, fileA.uri, fileB.uri, mimeType);
+      console.log('[DEBUG] 比較分析完了');
+
+      result.drive_url = drive_url;
+      result.drive_url_2 = compareUrl;
+      res.json(result);
+    }
   } catch (error) {
     console.error(`[ERROR] API処理失敗:`, error);
     console.error(`Stack Trace:`, error.stack);
     res.status(500).json({ error: 'サーバー内部エラー: ' + error.message });
   } finally {
-    if (videoPath) {
+    if (uploadApiKey) {
+      for (const gf of geminiFiles) {
+        try {
+          console.log(`[DEBUG] Geminiファイル削除: ${gf.name}`);
+          const ai = new GoogleGenAI({ apiKey: uploadApiKey });
+          await ai.files.delete({ name: gf.name });
+        } catch (e) {
+          console.error(`[ERROR] Geminiファイル削除失敗:`, e);
+        }
+      }
+    }
+    for (const vp of videoPaths) {
       try {
-        console.log(`[DEBUG] 一時ファイル削除: ${videoPath}`);
-        fs.unlinkSync(videoPath);
+        console.log(`[DEBUG] 一時ファイル削除: ${vp}`);
+        fs.unlinkSync(vp);
       } catch (e) {
         console.error(`[ERROR] 一時ファイル削除失敗:`, e);
       }
@@ -470,3 +658,4 @@ if (require.main === module) {
 
 module.exports = app;
 module.exports.buildPrompt = buildPrompt;
+module.exports.buildComparePrompt = buildComparePrompt;
