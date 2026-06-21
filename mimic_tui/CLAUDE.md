@@ -23,7 +23,10 @@ browser tools — degrades gracefully if not installed).
 
 Configuration lives in `.env` (gitignored) at the package root: API keys for up to 3 providers
 (`OPENROUTER_KEY_*`, `GEMINI_KEY_*`, `MISTRAL_KEY_*`), model selection, RPM limits, `MAX_TOKENS`,
-`SYSTEM_PROMPT`, `ENABLE_CONFIDENCE_CHECK`. Parsed in `config.py::load_config`.
+`SYSTEM_PROMPT`, `ENABLE_CONFIDENCE_CHECK`, `GEMINI_THINKING_LEVEL`
+(`none`/`minimal`/`low`/`medium`/`high`, mapped to `reasoning_effort` in the OpenAI-compatible
+payload — see `GoogleAIConfig.thinking_setting` / `_build_openrouter_payload` in `agent.py`).
+Parsed in `config.py::load_config`.
 
 There is no test suite, linter, or build step configured for this project.
 
@@ -102,14 +105,17 @@ mode, described above).
   via `set_write_approval_handler`; raises `UserRejectedWriteError` on rejection) and warn if the
   file wasn't `read_file`'d this turn (`_check_read_warning`).
 - Shell/search (`tools_linux.py`): `run_bash` (pty-based), `file_info`, `search_in_file`,
-  `grep_codebase`, `smart_read`.
+  `grep_codebase`, `smart_read`. `grep_codebase`'s recursive mode excludes common noise
+  directories/files (`node_modules`, `.git`, `.venv`, `dist`, lockfiles, etc. —
+  `_GREP_EXCLUDE_DIRS`/`_GREP_EXCLUDE_FILES`) and truncates each matched line to
+  `_GREP_MAX_LINE_CHARS = 300` to avoid blowing context on minified files.
 - `run_pipeline` (`pipeline.py`): non-pty streaming shell execution for high-volume output
   (registers itself onto the same `tools` registry from `tools.py`).
 - Web/browser: `web_search`, `fetch_webpage`, and Playwright-backed `browser_*` tools (no-op if
   `playwright` isn't installed; toggled via `enable_browser_tools`/`disable_browser_tools`).
 - Team delegation: `delegate_to_team`, `delegate_to_worker`, `delegate_to_team_parallel`,
-  `delegate_research` (see below). **These are removed from the Worker's registry** when started
-  with `MIMIC_NO_AUTOGIT=1` to prevent infinite sub-agent recursion.
+  `delegate_research`, `get_delegation_trace` (see below). **These are removed from the Worker's
+  registry** when started with `MIMIC_NO_AUTOGIT=1` to prevent infinite sub-agent recursion.
 - Large tool outputs (>10000 chars) are auto-cached (`cache_tool_output`); the agent is told to
   page through them with `read_tool_cache(cache_key, offset)`.
 
@@ -141,25 +147,58 @@ mode, described above).
    - `verify_cmd`: after the Worker exits, runs `timeout 300 bash -c <verify_cmd>` inside the
      same overlay; exit code and output are stored in `SubagentResult.verify_exit/verify_output`.
 
-3. **Verify retry loop** (`MAX_VERIFY_RETRIES = 3`): if `verify_exit != 0`, `run_team_task`
-   calls `_build_verify_retry_task()` to build a new task string that includes the original task,
-   the verify failure output (up to 3000 chars), and an instruction to fix the error. It then
-   re-runs `run_subagent_reviewable` with the **same `base`** (so `upper` carries forward all
-   previous changes — this is a continuation, not a restart). Repeats until verify passes,
-   retries are exhausted, or a retry itself errors out. On retry error the previous `base` is
-   already cleaned up by the sub-process; the loop breaks and reports the error.
+3. **Verify retry loop** (`MAX_VERIFY_RETRIES = 3`, shared via `_run_delegation_core`): if
+   `verify_exit != 0`, `_build_verify_retry_task()` builds a new task string that includes the
+   original task, the verify failure output (up to 3000 chars), and an instruction to fix the
+   error. It then re-runs `run_subagent_reviewable` with the **same `base`** (so `upper` carries
+   forward all previous changes — this is a continuation, not a restart). Repeats until verify
+   passes, retries are exhausted, or a retry itself errors out. **Aborts immediately** (no retry)
+   if `verify_exit` is `2`/`126`/`127` (bash syntax error / permission denied / command not
+   found) since these indicate a broken `verify_cmd` the Worker cannot fix. On retry error the
+   previous `base` is already cleaned up by the sub-process; the loop breaks and reports the
+   error.
 
 4. **Apply**: if `result.changed_files` is non-empty, `apply_subagent_changes()` copies the
-   `upperdir` diff onto the real project dir (including deletions via overlay whiteout markers),
-   serialized through `_apply_lock`. Then `_get_team_autogit().checkpoint()` commits the changes.
+   `upperdir` diff onto the real project dir (including deletions via overlay whiteout markers,
+   excluding the internal `.mimic_checkpoint.json` via `_APPLY_EXCLUDED_PATHS`), serialized
+   through `_apply_lock`. Then `_get_team_autogit().checkpoint()` commits the changes.
    Changes are applied regardless of final verify status (so partial work is not lost); the
-   status label shows `✓検証通過` or `✗検証失敗(exit=N, 3回試行後)`.
-   The temp dir is always cleaned up via `cleanup_subagent(base)`.
+   status label shows `✓検証通過` or `✗検証失敗(exit=N, 3回試行後)`. The Worker's own final-answer
+   text (captured from stdout after the `===MIMIC_FINAL===` marker in `subagent.py`) is prepended
+   to the summary as `[Workerの最終回答]`, so read-only/no-diff tasks still surface an answer to
+   the Director. The temp dir is always cleaned up via `cleanup_subagent(base)`.
 
 #### `delegate_to_worker` — Worker only (no Researcher)
-`run_worker_once` skips the Researcher phase and runs one Worker directly. Has the same
-verify retry loop (`MAX_VERIFY_RETRIES = 3`) as `delegate_to_team`. Useful for self-contained
-tasks where the target file and change are already known.
+`run_worker_once` skips the Researcher phase and runs one Worker directly. Shares the same
+`_run_delegation_core` (verify retry loop, apply, inflight bookkeeping) as `delegate_to_team`.
+Useful for self-contained tasks where the target file and change are already known.
+
+#### Orphaned delegation recovery (`/delegations`, `team.py` inflight manifest)
+If the Director process itself crashes/is killed mid-delegation, the Worker's overlay `base`
+dir is orphaned with no record of its existence. To make this recoverable, `team.py` maintains
+a JSON manifest at `.mimic/inflight_delegations.json` (`_register_inflight`/`_unregister_inflight`,
+guarded by `_INFLIGHT_LOCK`): the `base` is created and registered with `trace_id` *before*
+`run_subagent_reviewable` is called, and unregistered once `_run_delegation_core` reaches its
+`finally` — so an entry surviving in the manifest after a restart means that delegation never
+finished and is offered for recovery.
+- `list_orphaned_delegations()` returns manifest entries whose `base` still exists (pruning stale
+  ones), annotated with `checkpoint_age_sec` (mtime of `merged/.mimic_checkpoint.json`, a proxy
+  for "might still be running").
+- The TUI `/delegations` command (`commands.py::register_delegations_command`, Director-only —
+  never registered for Worker sub-processes) lists these and supports
+  `/delegations resume <番号>` (`resume_delegation`: re-enters `_run_delegation_core` with the
+  saved `base`/task/verify_cmd, relying on `orchestrator.py`'s existing
+  `.mimic_checkpoint.json`-resume logic) and `/delegations discard <番号>` (`discard_delegation`:
+  `cleanup_subagent(base)` + unregister, no changes applied).
+
+#### Verifying what a Worker actually did (`get_delegation_trace`)
+Every `delegate_to_team`/`delegate_to_worker` result string includes its `trace_id`. The
+`get_delegation_trace` tool (`tools.py`, backed by `viewer.py::get_session_trace_text`) looks up
+the Worker's own session JSONL (matched via `session_start.trace_id`, set from `MIMIC_TRACE_ID`
+in `__main__.py`) and renders its Thought/Action/Observation/final-answer trace (capped at
+`max_steps`, default 20) — for when a diff summary alone isn't enough to confirm the Worker
+followed the intended steps. Researcher runs (`_run_isolated`) have no session JSONL and are not
+coverable by this tool.
 
 #### `delegate_to_team_parallel`
 `run_team_tasks_parallel` runs independent tasks in batches of `_MAX_PARALLEL_TEAM_TASKS = 3`
@@ -196,8 +235,9 @@ and the inline `_inline_display` callback in `__main__.py`.
 ### TUI & commands (`app.py`, `commands.py`)
 `MimicApp` (Textual) is a 2-pane app with tabs (Chat / Files / Scratchpad / Log), an Enter-to-send
 `ChatInput`, and key bindings F1–F4 for tab switching. Slash commands (`/status`, `/clear`,
-`/model`, `/mode`, `/cd`, `/scratchpad`, `/help`, `/search`, `/sessions`, `/viewer`, `/stats`)
-are registered on `cmd_registry` (in `commands.py`) and routed from `on_chat_input_submit`.
+`/model`, `/mode`, `/cd`, `/scratchpad`, `/help`, `/search`, `/sessions`, `/viewer`, `/stats`,
+`/delegations`) are registered on `cmd_registry` (in `commands.py`) and routed from
+`on_chat_input_submit`.
 `/viewer` opens a session tree viewer showing past sessions with execution status badges.
 
 ### Shared utilities (`utils.py`)

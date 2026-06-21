@@ -1,26 +1,158 @@
+/* src/app/globals.css */
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* === @theme: 和風カラーパレット === */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ink: oklch(0.15 0.02 270);       /* 墨色 */
+  --color-ai: oklch(0.55 0.18 250);         /* 藍色 */
+  --color-shu: oklch(0.55 0.20 30);         /* 朱色 */
+  --color-gold: oklch(0.80 0.15 90);        /* 金色 */
+  --color-gold-deep: oklch(0.65 0.15 80);   /* 深金色 */
+  --color-paper: oklch(0.95 0.01 90);       /* 紙色 */
+  --font-serif-jp: var(--font-noto-serif-jp), serif;
 }
 
-@media (prefers-color-scheme: dark) {
+/* === @layer base === */
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: var(--color-ink);
+    --foreground: var(--color-paper);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-serif-jp), serif;
+    overflow-x: hidden;
+  }
+
+  /* スクロールバー装飾 */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: oklch(0.12 0.02 270);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.35 0.05 270);
+    border-radius: 3px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* === @layer components === */
+@layer components {
+  /* 背景の金色粒子 */
+  .gold-particles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+  }
+
+  .gold-particles::before,
+  .gold-particles::after {
+    content: '';
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, oklch(0.80 0.15 90 / 0.08) 0%, transparent 70%);
+    animation: float-particle 12s ease-in-out infinite;
+  }
+
+  .gold-particles::after {
+    width: 200px;
+    height: 200px;
+    right: 10%;
+    top: 40%;
+    animation-delay: -6s;
+    background: radial-gradient(circle, oklch(0.55 0.18 250 / 0.06) 0%, transparent 70%);
+  }
+
+  /* ヘッダーの光彩効果 */
+  .title-glow {
+    text-shadow:
+      0 0 20px oklch(0.80 0.15 90 / 0.6),
+      0 0 40px oklch(0.80 0.15 90 / 0.3),
+      0 0 80px oklch(0.80 0.15 90 / 0.15);
+  }
+
+  /* 和風罫線 */
+  .washi-border {
+    border-image: repeating-linear-gradient(
+      90deg,
+      oklch(0.80 0.15 90 / 0.3) 0px,
+      oklch(0.80 0.15 90 / 0.3) 8px,
+      transparent 8px,
+      transparent 12px
+    ) 1;
+  }
+}
+
+/* === @layer utilities === */
+@layer utilities {
+  .text-gold {
+    color: var(--color-gold);
+  }
+  .bg-ink {
+    background-color: var(--color-ink);
+  }
+}
+
+/* === キーフレームアニメーション === */
+@keyframes float-particle {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.6;
+  }
+  25% {
+    transform: translate(30px, -40px) scale(1.1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(-20px, -80px) scale(0.95);
+    opacity: 0.5;
+  }
+  75% {
+    transform: translate(40px, -30px) scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+/* === @starting-style: エントランス === */
+@starting-style {
+  .animate-enter {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+}
+
+/* === Container Queries === */
+@container (max-width: 640px) {
+  .card-responsive {
+    padding: 1rem;
+  }
+}
+
+@container (min-width: 641px) {
+  .card-responsive {
+    padding: 1.5rem;
+  }
+}
+
+/* === :has() セレクター === */
+.team-a-wrapper:has(.group:hover) .group:not(:hover) {
+  opacity: 0.7;
+  filter: brightness(0.8);
+  transition: opacity 0.3s, filter 0.3s;
+}
+
+.team-b-wrapper:has(.group:hover) .group:not(:hover) {
+  opacity: 0.8;
+  transition: opacity 0.3s;
 }
