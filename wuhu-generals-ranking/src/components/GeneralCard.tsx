@@ -3,6 +3,8 @@
 import { General } from '@/data/generals';
 import { motion } from 'framer-motion';
 import { Shield, Brain, Crown } from 'lucide-react';
+import Image from 'next/image';
+import { useState } from 'react';
 
 const titleColors: Record<string, string> = {
   '大将軍': 'bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500 text-black',
@@ -19,6 +21,7 @@ const statConfig = [
 
 export default function GeneralCard({ general, index }: { general: General; index: number }) {
   const isTeamA = general.team === 'A';
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   return (
     <motion.div
@@ -45,33 +48,70 @@ export default function GeneralCard({ general, index }: { general: General; inde
         }}
       />
 
-      {/* 順位バッジ */}
-      <div className="absolute top-3 left-3 z-10">
-        <div className={`
-          flex items-center justify-center w-10 h-10 rounded-full font-bold text-lg
-          ${isTeamA
-            ? 'bg-gradient-to-br from-yellow-400 to-amber-600 text-black shadow-lg shadow-yellow-500/30'
-            : 'bg-gradient-to-br from-gray-600 to-gray-700 text-gray-200 shadow-md'
-          }
-        `}>
-          {general.rank}
+      {/* ===== 画像エリア ===== */}
+      <div className="relative w-full h-[200px] overflow-hidden rounded-t-[12px]">
+        {/* スケルトンスクリーン */}
+        {!imgLoaded && (
+          <div className="absolute inset-0 z-0 animate-pulse bg-gradient-to-br from-gray-800 via-gray-700 to-gray-800" />
+        )}
+
+        {/* 画像 */}
+        <div className="relative w-full h-full overflow-hidden">
+          <Image
+            src={general.imageUrl}
+            alt={general.name}
+            width={400}
+            height={250}
+            className={`
+              object-cover w-full h-full
+              transition-transform duration-500 ease-out
+              group-hover:scale-105
+              ${imgLoaded ? 'opacity-100' : 'opacity-0'}
+            `}
+            style={{ transition: 'opacity 0.5s, transform 0.5s ease-out' }}
+            onLoad={() => setImgLoaded(true)}
+            priority={index < 3}
+          />
         </div>
+
+        {/* 画像オーバーレイグラデーション（上: 透明 → 下: 暗い） */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-gray-900/90 pointer-events-none" />
+
+        {/* 武将名オーバーレイ（画像下部） */}
+        <div className="absolute bottom-2 left-0 right-0 text-center pointer-events-none z-10">
+          <span className={`text-lg font-bold tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] ${isTeamA ? 'text-yellow-100' : 'text-gray-200'}`}>
+            {general.name}
+          </span>
+        </div>
+
+        {/* 順位バッジ（画像上に重ねる） */}
+        <div className="absolute top-3 left-3 z-10">
+          <div className={`
+            flex items-center justify-center w-10 h-10 rounded-full font-bold text-lg
+            ${isTeamA
+              ? 'bg-gradient-to-br from-yellow-400 to-amber-600 text-black shadow-lg shadow-yellow-500/30'
+              : 'bg-gradient-to-br from-gray-600 to-gray-700 text-gray-200 shadow-md'
+            }
+          `}>
+            {general.rank}
+          </div>
+        </div>
+
+        {/* 称号バッジ（画像上に重ねる） */}
+        <div className="absolute top-3 right-3 z-10">
+          <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider ${titleColors[general.title]}`}>
+            {general.title}
+          </span>
+        </div>
+
+        {/* 金色の光彩（A隊のみ） */}
+        {isTeamA && (
+          <div className="absolute inset-0 rounded-t-[12px] pointer-events-none shadow-[inset_0_0_20px_rgba(234,179,8,0.15)]" />
+        )}
       </div>
 
-      {/* 称号バッジ */}
-      <div className="absolute top-3 right-3 z-10">
-        <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider ${titleColors[general.title]}`}>
-          {general.title}
-        </span>
-      </div>
-
-      {/* カード本体 */}
-      <div className="p-6 pt-16">
-        {/* 武将名 */}
-        <h3 className={`text-center font-bold mb-5 tracking-widest ${isTeamA ? 'text-2xl text-yellow-100' : 'text-xl text-gray-200'}`}>
-          {general.name}
-        </h3>
-
+      {/* ===== カード本体（ステータス） ===== */}
+      <div className="p-6">
         {/* ステータス */}
         <div className="space-y-3">
           {statConfig.map(({ key, label, icon: Icon, gradient, bg }) => (

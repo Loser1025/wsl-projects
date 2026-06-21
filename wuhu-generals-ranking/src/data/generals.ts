@@ -11,6 +11,7 @@ export interface General {
   team: 'A' | 'B';
   stats: GeneralStats;
   avatar?: string;
+  imageUrl: string;
 }
 
 export const mockGenerals: General[] = [
@@ -20,6 +21,7 @@ export const mockGenerals: General[] = [
     title: "大将軍",
     team: 'A',
     stats: { military: 97, intelligence: 75, leadership: 90 },
+    imageUrl: "https://picsum.photos/seed/guanyu/400/250",
   },
   {
     rank: 2,
@@ -27,6 +29,7 @@ export const mockGenerals: General[] = [
     title: "丞相",
     team: 'A',
     stats: { military: 38, intelligence: 100, leadership: 95 },
+    imageUrl: "https://picsum.photos/seed/zhuge/400/250",
   },
   {
     rank: 3,
@@ -34,6 +37,7 @@ export const mockGenerals: General[] = [
     title: "都督",
     team: 'A',
     stats: { military: 71, intelligence: 96, leadership: 93 },
+    imageUrl: "https://picsum.photos/seed/zhouyu/400/250",
   },
   {
     rank: 4,
@@ -41,6 +45,7 @@ export const mockGenerals: General[] = [
     title: "一兵卒",
     team: 'B',
     stats: { military: 98, intelligence: 30, leadership: 70 },
+    imageUrl: "https://picsum.photos/seed/zhangfei/400/250",
   },
   {
     rank: 5,
@@ -48,6 +53,7 @@ export const mockGenerals: General[] = [
     title: "一兵卒",
     team: 'B',
     stats: { military: 96, intelligence: 65, leadership: 85 },
+    imageUrl: "https://picsum.photos/seed/zhaoyun/400/250",
   },
   {
     rank: 6,
@@ -55,6 +61,7 @@ export const mockGenerals: General[] = [
     title: "一兵卒",
     team: 'B',
     stats: { military: 97, intelligence: 45, leadership: 75 },
+    imageUrl: "https://picsum.photos/seed/machao/400/250",
   },
 ];
 

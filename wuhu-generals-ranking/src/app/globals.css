@@ -1,14 +1,33 @@
 /* src/app/globals.css */
 @import "tailwindcss";
 
+/* === @property: カスタムプロパティの型登録 === */
+@property --gradient-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@property --hue {
+  syntax: "<number>";
+  initial-value: 0;
+  inherits: false;
+}
+
+@property --particle-y {
+  syntax: "<length>";
+  initial-value: 0px;
+  inherits: false;
+}
+
 /* === @theme: 和風カラーパレット === */
 @theme inline {
-  --color-ink: oklch(0.15 0.02 270);       /* 墨色 */
-  --color-ai: oklch(0.55 0.18 250);         /* 藍色 */
-  --color-shu: oklch(0.55 0.20 30);         /* 朱色 */
-  --color-gold: oklch(0.80 0.15 90);        /* 金色 */
-  --color-gold-deep: oklch(0.65 0.15 80);   /* 深金色 */
-  --color-paper: oklch(0.95 0.01 90);       /* 紙色 */
+  --color-ink: oklch(0.15 0.02 270);
+  --color-ai: oklch(0.55 0.18 250);
+  --color-shu: oklch(0.55 0.20 30);
+  --color-gold: oklch(0.80 0.15 90);
+  --color-gold-deep: oklch(0.65 0.15 80);
+  --color-paper: oklch(0.95 0.01 90);
   --font-serif-jp: var(--font-noto-serif-jp), serif;
 }
 
@@ -24,10 +43,18 @@
   }
 
   body {
-    background: var(--background);
+    /* ベース: 暗い墨色グラデーション */
+    background: linear-gradient(
+      180deg,
+      oklch(0.12 0.02 270) 0%,
+      oklch(0.08 0.03 250) 50%,
+      oklch(0.10 0.02 260) 100%
+    );
     color: var(--foreground);
     font-family: var(--font-serif-jp), serif;
     overflow-x: hidden;
+    min-height: 100vh;
+    position: relative;
   }
 
   /* スクロールバー装飾 */
@@ -43,35 +70,154 @@
   }
 }
 
-/* === @layer components === */
+/* === 多層背景コンテナ === */
 @layer components {
-  /* 背景の金色粒子 */
+  /* 背景レイヤーのベース */
+  .bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  /* レイヤー1: メッシュグラデーション（有機的な色の滲み） */
+  .bg-layer::before {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    width: 200%;
+    height: 200%;
+    background:
+      radial-gradient(
+        ellipse 60% 50% at 20% 30%,
+        oklch(0.80 0.15 90 / 0.07) 0%,
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse 50% 60% at 80% 70%,
+        oklch(0.55 0.18 250 / 0.06) 0%,
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse 45% 45% at 60% 20%,
+        oklch(0.55 0.15 300 / 0.05) 0%,
+        transparent 50%
+      ),
+      radial-gradient(
+        ellipse 55% 40% at 30% 80%,
+        oklch(0.65 0.15 80 / 0.05) 0%,
+        transparent 55%
+      ),
+      conic-gradient(
+        from var(--gradient-angle),
+        oklch(0.12 0.02 270),
+        oklch(0.10 0.03 250),
+        oklch(0.12 0.02 270),
+        oklch(0.08 0.03 260),
+        oklch(0.12 0.02 270)
+      );
+    animation: rotate-mesh 20s linear infinite;
+  }
+
+  /* レイヤー2: ノイズテクスチャ */
+  .bg-layer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-size: 256px 256px;
+    animation: noise-shift 8s steps(8) infinite;
+  }
+
+  /* グリッドパターン（別要素） */
+  .bg-grid {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* 上部からの光（金色の光が降り注ぐ） */
+  .bg-light {
+    position: fixed;
+    top: -20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120%;
+    height: 60%;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      ellipse 80% 100% at 50% 0%,
+      oklch(0.80 0.15 90 / 0.08) 0%,
+      oklch(0.80 0.15 90 / 0.03) 40%,
+      transparent 70%
+    );
+    animation: light-pulse 8s ease-in-out infinite;
+  }
+
+  /* 浮遊パーティクル */
   .gold-particles {
     position: fixed;
     inset: 0;
     pointer-events: none;
     overflow: hidden;
-    z-index: 0;
+    z-index: 1;
   }
 
   .gold-particles::before,
   .gold-particles::after {
     content: '';
     position: absolute;
-    width: 300px;
-    height: 300px;
+    width: 4px;
+    height: 4px;
     border-radius: 50%;
-    background: radial-gradient(circle, oklch(0.80 0.15 90 / 0.08) 0%, transparent 70%);
-    animation: float-particle 12s ease-in-out infinite;
+    /* 大量のパーティクルを box-shadow で配置 */
+    box-shadow:
+      10vw 20vh 0 0 oklch(0.80 0.15 90 / 0.4),
+      25vw 45vh 0 1px oklch(0.80 0.15 90 / 0.3),
+      40vw 15vh 0 0 oklch(0.80 0.15 90 / 0.5),
+      55vw 70vh 0 1px oklch(0.80 0.15 90 / 0.25),
+      70vw 35vh 0 0 oklch(0.80 0.15 90 / 0.4),
+      85vw 60vh 0 1px oklch(0.80 0.15 90 / 0.3),
+      15vw 80vh 0 0 oklch(0.80 0.15 90 / 0.35),
+      33vw 55vh 0 1px oklch(0.80 0.15 90 / 0.2),
+      50vw 90vh 0 0 oklch(0.80 0.15 90 / 0.45),
+      65vw 10vh 0 1px oklch(0.80 0.15 90 / 0.3),
+      80vw 85vh 0 0 oklch(0.80 0.15 90 / 0.35),
+      95vw 40vh 0 1px oklch(0.80 0.15 90 / 0.25),
+      5vw 65vh 0 0 oklch(0.80 0.15 90 / 0.4),
+      20vw 30vh 0 1px oklch(0.55 0.18 250 / 0.3),
+      45vw 75vh 0 0 oklch(0.55 0.18 250 / 0.25),
+      60vw 50vh 0 1px oklch(0.55 0.15 300 / 0.2),
+      75vw 25vh 0 0 oklch(0.55 0.15 300 / 0.3),
+      90vw 95vh 0 1px oklch(0.55 0.18 250 / 0.2);
+    animation: float-particles-a 25s ease-in-out infinite;
   }
 
   .gold-particles::after {
-    width: 200px;
-    height: 200px;
-    right: 10%;
-    top: 40%;
-    animation-delay: -6s;
-    background: radial-gradient(circle, oklch(0.55 0.18 250 / 0.06) 0%, transparent 70%);
+    width: 3px;
+    height: 3px;
+    box-shadow:
+      8vw 35vh 0 0 oklch(0.80 0.15 90 / 0.3),
+      22vw 65vh 0 1px oklch(0.80 0.15 90 / 0.35),
+      38vw 85vh 0 0 oklch(0.80 0.15 90 / 0.25),
+      52vw 25vh 0 1px oklch(0.80 0.15 90 / 0.4),
+      68vw 55vh 0 0 oklch(0.80 0.15 90 / 0.3),
+      82vw 15vh 0 1px oklch(0.80 0.15 90 / 0.35),
+      12vw 50vh 0 0 oklch(0.55 0.18 250 / 0.25),
+      30vw 90vh 0 1px oklch(0.55 0.15 300 / 0.3),
+      48vw 40vh 0 0 oklch(0.55 0.15 300 / 0.2),
+      72vw 75vh 0 1px oklch(0.55 0.18 250 / 0.25),
+      88vw 5vh 0 0 oklch(0.80 0.15 90 / 0.3),
+      95vw 60vh 0 1px oklch(0.80 0.15 90 / 0.2);
+    animation: float-particles-b 30s ease-in-out infinite reverse;
   }
 
   /* ヘッダーの光彩効果 */
@@ -105,22 +251,77 @@
 }
 
 /* === キーフレームアニメーション === */
-@keyframes float-particle {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-    opacity: 0.6;
+
+/* メッシュグラデーションの回転 */
+@keyframes rotate-mesh {
+  0% {
+    --gradient-angle: 0deg;
+  }
+  100% {
+    --gradient-angle: 360deg;
+  }
+}
+
+/* ノイズの微細な動き */
+@keyframes noise-shift {
+  0% {
+    transform: translate(0, 0);
   }
   25% {
-    transform: translate(30px, -40px) scale(1.1);
-    opacity: 0.9;
+    transform: translate(-3px, 2px);
   }
   50% {
-    transform: translate(-20px, -80px) scale(0.95);
-    opacity: 0.5;
+    transform: translate(2px, -3px);
   }
   75% {
-    transform: translate(40px, -30px) scale(1.05);
-    opacity: 0.8;
+    transform: translate(-2px, -2px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* 上部の光のパルス */
+@keyframes light-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: translateX(-50%) scaleY(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scaleY(1.1);
+  }
+}
+
+/* パーティクルAの浮遊 */
+@keyframes float-particles-a {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(15px, -25px);
+  }
+  50% {
+    transform: translate(-10px, -45px);
+  }
+  75% {
+    transform: translate(20px, -15px);
+  }
+}
+
+/* パーティクルBの浮遊 */
+@keyframes float-particles-b {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-20px, 15px);
+  }
+  50% {
+    transform: translate(15px, 35px);
+  }
+  75% {
+    transform: translate(-15px, 20px);
   }
 }
 
@@ -155,4 +356,11 @@
 .team-b-wrapper:has(.group:hover) .group:not(:hover) {
   opacity: 0.8;
   transition: opacity 0.3s;
+}
+
+/* === モバイル対応 === */
+@media (max-width: 768px) {
+  .bg-grid {
+    background-size: 40px 40px;
+  }
 }
