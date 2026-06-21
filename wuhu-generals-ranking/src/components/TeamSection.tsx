@@ -27,7 +27,7 @@ export default function TeamSection({ teamLabel, teamSubLabel, generals, team }:
         <h2 className={`inline-block text-3xl font-bold tracking-[0.3em] ${isTeamA ? 'text-yellow-400' : 'text-gray-400'}`}>
           {teamLabel}
         </h2>
-        <p className="text-sm text-gray-500 mt-2 tracking-widest">{teamSubLabel}</p>
+        <p className="text-base text-gray-500 mt-2 tracking-widest">{teamSubLabel}</p>
         {isTeamA && (
           <div className="mt-3 h-px w-48 mx-auto bg-gradient-to-r from-transparent via-yellow-500/50 to-transparent" />
         )}

@@ -99,7 +99,7 @@ export default function GeneralCard({ general, index }: { general: General; inde
 
         {/* 称号バッジ（画像上に重ねる） */}
         <div className="absolute top-3 right-3 z-10">
-          <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider ${titleColors[general.title]}`}>
+          <span className={`px-4 py-1.5 rounded-full text-base font-bold tracking-wider ${titleColors[general.title]}`}>
             {general.title}
           </span>
         </div>
