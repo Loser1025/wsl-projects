@@ -12,9 +12,12 @@ export default function Home() {
   return (
     <div className="relative min-h-screen">
       {/* 多層背景 */}
+      <div className="bg-aurora" />
       <div className="bg-layer" />
       <div className="bg-grid" />
       <div className="bg-light" />
+      <div className="bg-streaks" />
+      <div className="bg-ripple" />
 
       {/* 背景粒子 */}
       <div className="gold-particles" />
