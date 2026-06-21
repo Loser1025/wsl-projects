@@ -1,13 +1,55 @@
 // src/app/page.tsx
 'use client';
 
-import { mockGenerals } from '@/data/generals';
+import { General, GeneralStats } from '@/data/generals';
 import TeamSection from '@/components/TeamSection';
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+
+function computeMaxStats(generals: General[]): GeneralStats {
+  return generals.reduce<GeneralStats>(
+    (max, g) => ({
+      avgCases: Math.max(max.avgCases, g.stats.avgCases),
+      bookingRate: Math.max(max.bookingRate, g.stats.bookingRate),
+      avgCalls: Math.max(max.avgCalls, g.stats.avgCalls),
+    }),
+    { avgCases: 0, bookingRate: 0, avgCalls: 0 }
+  );
+}
 
 export default function Home() {
-  const teamA = mockGenerals.filter((g) => g.team === 'A');
-  const teamB = mockGenerals.filter((g) => g.team === 'B');
+  const [generals, setGenerals] = useState<General[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/generals')
+      .then((res) => {
+        if (!res.ok) throw new Error('データの取得に失敗しました');
+        return res.json();
+      })
+      .then(setGenerals)
+      .catch((err) => setError(err.message));
+  }, []);
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-400">
+        エラー: {error}
+      </div>
+    );
+  }
+
+  if (!generals) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-400">
+        読み込み中...
+      </div>
+    );
+  }
+
+  const teamA = generals.filter((g) => g.team === 'A');
+  const teamB = generals.filter((g) => g.team === 'B');
+  const maxStats = computeMaxStats(generals);
 
   return (
     <div className="relative min-h-screen">
@@ -47,6 +89,7 @@ export default function Home() {
             teamSubLabel="大将軍 ／ 丞相 ／ 都督"
             generals={teamA}
             team="A"
+            maxStats={maxStats}
           />
         </div>
 
@@ -64,6 +107,7 @@ export default function Home() {
             teamSubLabel="一兵卒"
             generals={teamB}
             team="B"
+            maxStats={maxStats}
           />
         </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { General } from '@/data/generals';
+import { General, GeneralStats } from '@/data/generals';
 import { motion } from 'framer-motion';
 import { Shield, Brain, Crown } from 'lucide-react';
 import Image from 'next/image';
@@ -14,14 +14,16 @@ const titleColors: Record<string, string> = {
 };
 
 const statConfig = [
-  { key: 'military' as const, label: '武力', icon: Shield, gradient: 'from-red-600 to-red-400', bg: 'bg-red-950' },
-  { key: 'intelligence' as const, label: '智力', icon: Brain, gradient: 'from-blue-600 to-blue-400', bg: 'bg-blue-950' },
-  { key: 'leadership' as const, label: '統率', icon: Crown, gradient: 'from-green-600 to-green-400', bg: 'bg-green-950' },
+  { key: 'avgCases' as const, label: 'アベ受任', icon: Shield, gradient: 'from-red-600 to-red-400', bg: 'bg-red-950', format: (v: number) => v.toFixed(2) },
+  { key: 'bookingRate' as const, label: '予約率', icon: Brain, gradient: 'from-blue-600 to-blue-400', bg: 'bg-blue-950', format: (v: number) => `${v.toFixed(1)}%` },
+  { key: 'avgCalls' as const, label: 'アベコール数', icon: Crown, gradient: 'from-green-600 to-green-400', bg: 'bg-green-950', format: (v: number) => v.toFixed(1) },
 ];
 
-export default function GeneralCard({ general, index }: { general: General; index: number }) {
+export default function GeneralCard({ general, index, maxStats }: { general: General; index: number; maxStats: GeneralStats }) {
   const isTeamA = general.team === 'A';
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const fallbackSrc = `https://picsum.photos/seed/${encodeURIComponent(general.name)}/400/250`;
 
   return (
     <motion.div
@@ -58,7 +60,7 @@ export default function GeneralCard({ general, index }: { general: General; inde
         {/* 画像 */}
         <div className="relative w-full h-full overflow-hidden">
           <Image
-            src={general.imageUrl}
+            src={imgError ? fallbackSrc : general.imageUrl}
             alt={general.name}
             width={400}
             height={250}
@@ -70,6 +72,7 @@ export default function GeneralCard({ general, index }: { general: General; inde
             `}
             style={{ transition: 'opacity 0.5s, transform 0.5s ease-out' }}
             onLoad={() => setImgLoaded(true)}
+            onError={() => setImgError(true)}
             priority={index < 3}
           />
         </div>
@@ -114,26 +117,30 @@ export default function GeneralCard({ general, index }: { general: General; inde
       <div className="p-6">
         {/* ステータス */}
         <div className="space-y-3">
-          {statConfig.map(({ key, label, icon: Icon, gradient, bg }) => (
-            <div key={key} className="flex items-center gap-2">
-              <div className={`flex items-center gap-1 w-16 text-xs text-gray-400 ${bg} rounded px-2 py-1`}>
-                <Icon size={12} />
-                <span>{label}</span>
+          {statConfig.map(({ key, label, icon: Icon, gradient, bg, format }) => {
+            const max = maxStats[key] || 1;
+            const percent = Math.min((general.stats[key] / max) * 100, 100);
+            return (
+              <div key={key} className="flex items-center gap-2">
+                <div className={`flex items-center gap-1 w-20 text-xs text-gray-400 ${bg} rounded px-2 py-1`}>
+                  <Icon size={12} />
+                  <span>{label}</span>
+                </div>
+                <div className="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    whileInView={{ width: `${percent}%` }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1, delay: index * 0.15 + 0.3, ease: 'easeOut' }}
+                    className={`h-full rounded-full bg-gradient-to-r ${gradient}`}
+                  />
+                </div>
+                <span className="w-12 text-right text-xs font-mono text-gray-300">
+                  {format(general.stats[key])}
+                </span>
               </div>
-              <div className="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  whileInView={{ width: `${general.stats[key]}%` }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1, delay: index * 0.15 + 0.3, ease: 'easeOut' }}
-                  className={`h-full rounded-full bg-gradient-to-r ${gradient}`}
-                />
-              </div>
-              <span className="w-8 text-right text-xs font-mono text-gray-300">
-                {general.stats[key]}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

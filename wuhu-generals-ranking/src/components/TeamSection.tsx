@@ -1,6 +1,6 @@
 'use client';
 
-import { General } from '@/data/generals';
+import { General, GeneralStats } from '@/data/generals';
 import GeneralCard from './GeneralCard';
 import { motion } from 'framer-motion';
 
@@ -9,9 +9,10 @@ interface TeamSectionProps {
   teamSubLabel: string;
   generals: General[];
   team: 'A' | 'B';
+  maxStats: GeneralStats;
 }
 
-export default function TeamSection({ teamLabel, teamSubLabel, generals, team }: TeamSectionProps) {
+export default function TeamSection({ teamLabel, teamSubLabel, generals, team, maxStats }: TeamSectionProps) {
   const isTeamA = team === 'A';
 
   return (
@@ -42,7 +43,7 @@ export default function TeamSection({ teamLabel, teamSubLabel, generals, team }:
         }
       `}>
         {generals.map((general, i) => (
-          <GeneralCard key={general.rank} general={general} index={i} />
+          <GeneralCard key={general.rank} general={general} index={i} maxStats={maxStats} />
         ))}
       </div>
     </section>
