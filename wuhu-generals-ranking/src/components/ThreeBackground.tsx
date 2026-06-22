@@ -228,7 +228,7 @@ export default function ThreeBackground() {
       const poleGeo = new THREE.CylinderGeometry(0.15, 0.2, 32, 8);
       const poleMat = new THREE.MeshStandardMaterial({ color: 0x1a1515, roughness: 0.5, metalness: 0.8 });
       poleMesh = new THREE.Mesh(poleGeo, poleMat);
-      poleMesh.position.set(-16, -1, -4);
+      poleMesh.position.set(-19, -3, -4);
       poleMesh.rotation.y = Math.PI / 6;
       scene.add(poleMesh);
     }
@@ -249,7 +249,7 @@ export default function ThreeBackground() {
       });
 
       bannerMesh = new THREE.Mesh(geometry, material);
-      bannerMesh.position.set(-9, -1, -2);
+      bannerMesh.position.set(-12, -3, -2);
       bannerMesh.rotation.y = Math.PI / 6;
       scene.add(bannerMesh);
 
