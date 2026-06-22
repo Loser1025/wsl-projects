@@ -35,10 +35,8 @@ class APIKeyManager {
     this.usage = {};
     // デバッグログ
     console.log(`[DEBUG] APIキー総数: ${this.keys.length}個`);
-    if (this.keys.length > 0) {
-      console.log(`[DEBUG] 最初のキーの頭: ${this.keys[0].substring(0, 8)}...`);
-    }
   }
+
 
   get currentKey() {
     const available = this.keys.filter(k => !this.failedKeys.has(k));
