@@ -23,6 +23,7 @@ export default function GeneralCard({ general, index, maxStats }: { general: Gen
   const isTeamA = general.team === 'A';
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [objectPosition, setObjectPosition] = useState('center');
   const fallbackSrc = `https://picsum.photos/seed/${encodeURIComponent(general.name)}/400/250`;
 
   return (
@@ -70,8 +71,14 @@ export default function GeneralCard({ general, index, maxStats }: { general: Gen
               group-hover:scale-105
               ${imgLoaded ? 'opacity-100' : 'opacity-0'}
             `}
-            style={{ transition: 'opacity 0.5s, transform 0.5s ease-out' }}
-            onLoad={() => setImgLoaded(true)}
+            style={{ transition: 'opacity 0.5s, transform 0.5s ease-out', objectPosition }}
+            onLoad={(e) => {
+              setImgLoaded(true);
+              const img = e.currentTarget;
+              if (img.naturalHeight > img.naturalWidth) {
+                setObjectPosition('center 25%');
+              }
+            }}
             onError={() => setImgError(true)}
             priority={index < 3}
           />
