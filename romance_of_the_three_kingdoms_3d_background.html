@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>三国志 乱世の動的背景 - Three.js WebGL</title>
+  <!-- Tailwind CSS for UI overlay styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #050202;
+      font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+    }
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    /* WebGLのCanvasの上に配置するUI要素 */
+    .ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none; /* 下のCanvasにマウスイベントを通す */
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 2rem;
+      box-sizing: border-box;
+      background: radial-gradient(circle at center, transparent 30%, rgba(5, 2, 2, 0.8) 100%);
+    }
+    .interactive {
+      pointer-events: auto; /* ボタンなどはクリック可能にする */
+    }
+    /* 筆文字風のフォントシミュレーション */
+    .calligraphy-title {
+      font-family: 'Times New Roman', Times, serif;
+      text-shadow: 0 0 10px rgba(239, 68, 68, 0.6), 0 0 20px rgba(220, 38, 38, 0.4);
+      letter-spacing: 0.5em;
+    }
+    /* フェードインアニメーション */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <!-- フロントUIオーバーレイ -->
+  <div class="ui-overlay">
+    <!-- ヘッダー -->
+    <header class="w-full flex justify-between items-center animate-fade-in" style="animation-delay: 0.2s;">
+      <div class="flex items-center space-x-3">
+        <span class="w-3 h-3 bg-red-600 rounded-full animate-ping"></span>
+        <span class="text-xs text-gray-400 tracking-widest uppercase">Three.js Dynamic Cinematic Art</span>
+      </div>
+      <div class="text-right">
+        <span class="text-xs text-red-500 font-bold tracking-widest">赤壁前夜 / PRE-RED CLIFFS</span>
+      </div>
+    </header>
+
+    <!-- メインビジュアルテキスト -->
+    <main class="text-center my-auto flex flex-col items-center justify-center animate-fade-in" style="animation-delay: 0.6s;">
+      <h1 class="calligraphy-title text-4xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-yellow-100 via-red-200 to-red-600 mb-4 select-none">
+        三国志
+      </h1>
+      <p class="text-sm md:text-md text-gray-400 tracking-widest max-w-xl mx-auto leading-relaxed select-none mb-6">
+        吹き荒れる劫火、たなびく宿命の陣旗。<br>
+        マウスを動かすことで、戦場を揺るがす「東風」を引き起こすことができます。
+      </p>
+      
+      <!-- 陣営選択インタラクション -->
+      <div class="interactive flex flex-wrap justify-center gap-4 mt-4">
+        <button onclick="changeFaction('shu')" class="px-6 py-2 bg-gradient-to-r from-emerald-950 to-emerald-800 hover:from-emerald-800 hover:to-emerald-600 border border-emerald-500/50 text-emerald-200 rounded text-xs font-semibold tracking-widest transition-all duration-300 transform hover:scale-105 shadow-lg shadow-emerald-900/30">
+          蜀 (劉備)
+        </button>
+        <button onclick="changeFaction('wei')" class="px-6 py-2 bg-gradient-to-r from-blue-950 to-blue-900 hover:from-blue-900 hover:to-blue-700 border border-blue-500/50 text-blue-200 rounded text-xs font-semibold tracking-widest transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-900/30">
+          魏 (曹操)
+        </button>
+        <button onclick="changeFaction('wu')" class="px-6 py-2 bg-gradient-to-r from-red-950 to-red-900 hover:from-red-900 hover:to-red-700 border border-red-500/50 text-red-200 rounded text-xs font-semibold tracking-widest transition-all duration-300 transform hover:scale-105 shadow-lg shadow-red-900/30">
+          呉 (孫権)
+        </button>
+      </div>
+    </main>
+
+    <!-- フッターインフォメーション -->
+    <footer class="w-full flex flex-col md:flex-row justify-between items-center text-xs text-gray-500 animate-fade-in" style="animation-delay: 1s;">
+      <p class="mb-2 md:mb-0 select-none">Drag to Orbit / Move Mouse to Blow Sparks</p>
+      <div class="flex space-x-6 interactive">
+        <a href="#" onclick="toggleLightning(event)" class="hover:text-red-400 transition-colors">雷撃演出切替</a>
+        <a href="#" onclick="intensifyWind(event)" class="hover:text-red-400 transition-colors font-bold text-red-500/80">突風を起こす (東風)</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // --- 1. グローバル設定 & 初期化 ---
+    const container = document.getElementById('canvas-container');
+    let scene, camera, renderer;
+    let clock = new THREE.Clock();
+
+    // 演出用パラメータ
+    let mouse = { x: 0, y: 0, targetX: 0, targetY: 0 };
+    let windForce = 0.5;
+    let targetWindForce = 0.5;
+    let lightningIntensity = 0;
+    let nextLightningTime = 3.0;
+    let enableLightning = true;
+
+    // オブジェクト参照
+    let sparksParticleSystem;
+    let sparksCount = 1200;
+    let sparkCoords = [];
+    let sparkSpeeds = [];
+
+    let bannerMesh;
+    const bannerWidth = 14;
+    const bannerHeight = 22;
+    const bannerSegmentsX = 20;
+    const bannerSegmentsY = 30;
+
+    let cloudParticles = [];
+    let ambientLight, pointLight, directionalLight;
+
+    // --- 2. 旗のテクスチャを Canvas で動的生成 ---
+    // 画像ロードのエラーを避けるため、自前で極上の和風グラデーション＋文字テクスチャを Canvas で描画
+    function createFactionTexture(faction) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+
+      // 背景のベースグラデーション（使い古された軍旗の質感）
+      let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      if (faction === 'shu') { // 蜀: 深緑から黒
+        grad.addColorStop(0, '#0a2e1c');
+        grad.addColorStop(0.5, '#05180e');
+        grad.addColorStop(1, '#020a06');
+      } else if (faction === 'wei') { // 魏: 深青から黒
+        grad.addColorStop(0, '#0a1d37');
+        grad.addColorStop(0.5, '#040b17');
+        grad.addColorStop(1, '#010307');
+      } else { // 呉: 燃える赤から黒
+        grad.addColorStop(0, '#3d0c0c');
+        grad.addColorStop(0.5, '#1a0505');
+        grad.addColorStop(1, '#050101');
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 古びた布の質感ノイズ
+      for (let i = 0; i < 50000; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const opacity = Math.random() * 0.04;
+        ctx.fillStyle = `rgba(255,255,255,${opacity})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+
+      // 金色の縁取り（中華風の雲・波文様をシミュレート）
+      ctx.strokeStyle = faction === 'wei' ? 'rgba(100, 200, 255, 0.4)' : 'rgba(218, 165, 32, 0.4)';
+      ctx.lineWidth = 16;
+      ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
+      
+      ctx.strokeStyle = faction === 'wei' ? 'rgba(100, 200, 255, 0.2)' : 'rgba(218, 165, 32, 0.2)';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(36, 36, canvas.width - 72, canvas.height - 72);
+
+      // 旗の中央に陣営の文字（筆文字風）
+      ctx.save();
+      ctx.shadowColor = faction === 'wei' ? '#3b82f6' : '#ef4444';
+      ctx.shadowBlur = 30;
+      
+      // メイン文字の描画
+      ctx.fillStyle = faction === 'wei' ? '#e0f2fe' : '#fef08a';
+      ctx.font = 'bold 240px "Hiragino Mincho ProN", "Yu Mincho", serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      let char = '蜀';
+      if (faction === 'wei') char = '魏';
+      if (faction === 'wu') char = '呉';
+      ctx.fillText(char, canvas.width / 2, canvas.height / 2 - 80);
+
+      // 君主の名字（小さく上に添える）
+      ctx.font = '60px "Hiragino Mincho ProN", "Yu Mincho", serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      let leader = '劉';
+      if (faction === 'wei') leader = '曹';
+      if (faction === 'wu') leader = '孫';
+      ctx.fillText(leader, canvas.width / 2, canvas.height / 2 - 260);
+
+      // 古傷・破れ表現
+      ctx.restore();
+      ctx.fillStyle = 'rgba(5, 2, 2, 0.95)';
+      for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        let py = 300 + Math.random() * 400;
+        ctx.moveTo(canvas.width - 10, py);
+        ctx.lineTo(canvas.width - 150 - Math.random() * 100, py + Math.random() * 40);
+        ctx.lineTo(canvas.width - 10, py + 80);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      return texture;
+    }
+
+    // --- 3. メイン初期化関数 ---
+    function init() {
+      // 1. Scene & Renderer
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x0a0505, 0.015);
+
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 5, 32);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
+      container.appendChild(renderer.domElement);
+
+      // 2. Lights
+      ambientLight = new THREE.AmbientLight(0x110808, 0.5);
+      scene.add(ambientLight);
+
+      // 火の粉と夕焼け（赤壁の炎）をシミュレートする動的ポイントライト
+      pointLight = new THREE.PointLight(0xff4500, 3, 100);
+      pointLight.position.set(0, -15, 5);
+      scene.add(pointLight);
+
+      // 稲妻用のディレクショナルライト
+      directionalLight = new THREE.DirectionalLight(0xffffff, 0);
+      directionalLight.position.set(20, 40, -10);
+      scene.add(directionalLight);
+
+      // 3. 雲（怪しげなたなびく霧と暗雲）の作成
+      createClouds();
+
+      // 4. 火の粉パーティクルシステム（3D空間全体に立ち上る）
+      createSparks();
+
+      // 5. 巨大な軍旗の作成（Cloth Simulation 用カスタムプレーン）
+      createBanner('shu');
+
+      // 6. イベントリスナー
+      window.addEventListener('resize', onWindowResize);
+      window.addEventListener('mousemove', onMouseMove);
+      
+      // タッチイベント（スマートフォン対応）
+      window.addEventListener('touchmove', (e) => {
+        if (e.touches.length > 0) {
+          mouse.targetX = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
+          mouse.targetY = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
+        }
+      }, { passive: true });
+    }
+
+    // --- 4. 演出要素の作成 ---
+
+    // 4.1 雲海（Volumetric Clouds）の作成
+    function createClouds() {
+      // 雲粒子用のCanvasテクスチャ生成
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      let grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      grad.addColorStop(0, 'rgba(120, 50, 40, 0.4)');
+      grad.addColorStop(0.3, 'rgba(50, 20, 20, 0.2)');
+      grad.addColorStop(0.7, 'rgba(15, 5, 5, 0.05)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+      const cloudTex = new THREE.CanvasTexture(canvas);
+
+      const cloudGeo = new THREE.PlaneGeometry(120, 120);
+      const cloudMat = new THREE.MeshBasicMaterial({
+        map: cloudTex,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+
+      for (let i = 0; i < 25; i++) {
+        const mesh = new THREE.Mesh(cloudGeo, cloudMat);
+        mesh.position.set(
+          Math.random() * 200 - 100,
+          Math.random() * 40 - 30, // 画面の下方に漂う雲海
+          Math.random() * 50 - 60
+        );
+        mesh.rotation.z = Math.random() * 360;
+        mesh.scale.set(1.5, 1.5, 1.5);
+        scene.add(mesh);
+        cloudParticles.push(mesh);
+      }
+    }
+
+    // 4.2 火の粉（Sparks Particle System）の作成
+    function createSparks() {
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(sparksCount * 3);
+      const colors = new Float32Array(sparksCount * 3);
+      const sizes = new Float32Array(sparksCount);
+
+      // パーティクル用テクスチャの生成
+      const canvas = document.createElement('canvas');
+      canvas.width = 32;
+      canvas.height = 32;
+      const ctx = canvas.getContext('2d');
+      let grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      grad.addColorStop(0.2, 'rgba(255, 150, 0, 1)');
+      grad.addColorStop(0.5, 'rgba(200, 50, 0, 0.6)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 32, 32);
+      const sparkTex = new THREE.CanvasTexture(canvas);
+
+      for (let i = 0; i < sparksCount; i++) {
+        // 広範囲に配置
+        const x = Math.random() * 80 - 40;
+        const y = Math.random() * 50 - 25;
+        const z = Math.random() * 40 - 20;
+
+        positions[i * 3] = x;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = z;
+
+        sparkCoords.push({
+          x: x, y: y, z: z,
+          seed: Math.random() * 100,
+          speedY: 2.0 + Math.random() * 3.0,
+          wobbleSpeed: 1.0 + Math.random() * 2.0,
+          wobbleScale: 0.2 + Math.random() * 0.5
+        });
+
+        // 火の粉の色（朱から深い赤、金への揺らぎを表現）
+        const r = 0.8 + Math.random() * 0.2;
+        const g = 0.2 + Math.random() * 0.4;
+        const b = 0.0;
+
+        colors[i * 3] = r;
+        colors[i * 3 + 1] = g;
+        colors[i * 3 + 2] = b;
+
+        sizes[i] = 1.0 + Math.random() * 4.0;
+      }
+
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const material = new THREE.PointsMaterial({
+        size: 0.6,
+        vertexColors: true,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        map: sparkTex
+      });
+
+      sparksParticleSystem = new THREE.Points(geometry, material);
+      scene.add(sparksParticleSystem);
+    }
+
+    // 4.3 リアルな軍旗（Cloth Banner with custom Physics Simulation）
+    function createBanner(faction) {
+      if (bannerMesh) {
+        scene.remove(bannerMesh);
+      }
+
+      const geometry = new THREE.PlaneGeometry(
+        bannerWidth,
+        bannerHeight,
+        bannerSegmentsX,
+        bannerSegmentsY
+      );
+
+      // マテリアル（質感、光沢、陰影の設定）
+      const texture = createFactionTexture(faction);
+      const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        side: THREE.DoubleSide,
+        roughness: 0.8,
+        metalness: 0.1,
+        flatShading: false,
+        alphaTest: 0.1
+      });
+
+      bannerMesh = new THREE.Mesh(geometry, material);
+      // カメラから見て少し左奥に斜めに配置
+      bannerMesh.position.set(-6, 3, -2);
+      bannerMesh.rotation.y = Math.PI / 6; // 少し斜めにして3D感を引き出す
+      scene.add(bannerMesh);
+
+      // 旗竿（ポール）を追加してリアルにする
+      createFlagPole();
+    }
+
+    // 旗を支える鉄製の竿
+    let poleMesh;
+    function createFlagPole() {
+      if (poleMesh) scene.remove(poleMesh);
+
+      const poleGeo = new THREE.CylinderGeometry(0.15, 0.2, 32, 8);
+      const poleMat = new THREE.MeshStandardMaterial({
+        color: 0x1a1515,
+        roughness: 0.5,
+        metalness: 0.8
+      });
+      poleMesh = new THREE.Mesh(poleGeo, poleMat);
+      // 旗の左端に合わせる（PlaneGeometryは中心座標基準）
+      poleMesh.position.set(-13, 3, -4);
+      poleMesh.rotation.y = Math.PI / 6;
+      scene.add(poleMesh);
+    }
+
+    // --- 5. 毎フレームの更新 (物理シミュレーション & アニメーション) ---
+
+    // 旗（クロス）シミュレーション
+    function simulateCloth(time) {
+      if (!bannerMesh) return;
+
+      const positionAttribute = bannerMesh.geometry.attributes.position;
+      const v = new THREE.Vector3();
+
+      for (let y = 0; y <= bannerSegmentsY; y++) {
+        // 旗の竿に固定されている左端（x=0に近い部分）は動かさないように、固定率を計算
+        const fixedWeight = Math.pow(y / bannerSegmentsY, 1.5); // 竿の根本は特に固定
+
+        for (let x = 0; x <= bannerSegmentsX; x++) {
+          const index = x + y * (bannerSegmentsX + 1);
+          
+          // 初期位置
+          const initX = (x / bannerSegmentsX - 0.5) * bannerWidth;
+          const initY = (0.5 - y / bannerSegmentsY) * bannerHeight;
+
+          // 旗のたなびきを生み出す複雑な多重波形
+          // 風の強さ（東風）を動的に加算
+          const speedFactor = time * 3.5;
+          
+          // 左端（x=0）は極力動かさず、右端（x=max）に行くほど激しくなびくように重みを設定
+          const windWeight = (x / bannerSegmentsX); 
+
+          // 3次元的なうねり
+          const waveZ = Math.sin(x * 0.3 - speedFactor + y * 0.1) * 1.8 * windWeight * windForce
+                      + Math.cos(y * 0.4 - speedFactor * 0.5) * 0.8 * windWeight
+                      + Math.sin((x + y) * 0.1 - speedFactor * 1.2) * 0.4 * windWeight * windForce;
+
+          const waveX = Math.sin(y * 0.2 + speedFactor) * 0.3 * windWeight * windForce;
+
+          // 頂点座標を更新
+          positionAttribute.setXYZ(
+            index, 
+            initX + waveX, 
+            initY, 
+            waveZ
+          );
+        }
+      }
+
+      positionAttribute.needsUpdate = true;
+      bannerMesh.geometry.computeVertexNormals();
+    }
+
+    // 火の粉の物理挙動
+    function updateSparks(delta) {
+      if (!sparksParticleSystem) return;
+
+      const positions = sparksParticleSystem.geometry.attributes.position.array;
+      const time = clock.getElapsedTime();
+
+      for (let i = 0; i < sparksCount; i++) {
+        const data = sparkCoords[i];
+
+        // 上昇運動
+        data.y += data.speedY * delta;
+
+        // 風の影響（マウス操作および突風を反映）
+        // 東風（左から右への風）を表現するため、X方向への力を大きくかける
+        const baseWind = 4.0 * windForce;
+        const mouseWind = mouse.x * 6.0;
+        data.x += (baseWind + mouseWind) * delta;
+
+        // 左右へのゆらぎ（サイン波による不規則運動）
+        data.x += Math.sin(time * data.wobbleSpeed + data.seed) * data.wobbleScale * 0.1;
+        data.z += Math.cos(time * data.wobbleSpeed * 0.8 + data.seed) * data.wobbleScale * 0.1;
+
+        // 画面外（上に飛び出た場合）に達したら底から再生成
+        if (data.y > 25 || data.x > 50) {
+          data.y = -25 - Math.random() * 5;
+          data.x = -40 + Math.random() * 20; // 常に左下（赤壁の自陣）から吹き出すイメージ
+          data.z = Math.random() * 40 - 20;
+        }
+
+        positions[i * 3] = data.x;
+        positions[i * 3 + 1] = data.y;
+        positions[i * 3 + 2] = data.z;
+      }
+
+      sparksParticleSystem.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // 雷撃と動的光源の更新
+    function updateEnvironment(time, delta) {
+      // 火の粉を照らす火光のゆらぎ
+      pointLight.intensity = 2.0 + Math.sin(time * 8) * 0.8 + Math.cos(time * 3) * 0.4;
+      // 風の揺らぎに連動
+      pointLight.position.x = Math.sin(time) * 10 - 5;
+
+      // 雲をゆっくり回転・ドリフトさせる
+      cloudParticles.forEach((cloud, idx) => {
+        cloud.rotation.z += 0.02 * delta;
+        cloud.position.x += (1.0 * windForce + mouse.x * 2.0) * delta;
+        // 画面右端に流れた雲を左端に戻す
+        if (cloud.position.x > 100) cloud.position.x = -100;
+      });
+
+      // 突風強度の徐々な減衰（一時的に強まった風が元に戻る）
+      if (windForce !== targetWindForce) {
+        windForce += (targetWindForce - windForce) * 2.0 * delta;
+      }
+
+      // 稲妻のシミュレーション（ランダムなタイミングで激烈な一瞬の閃光）
+      if (enableLightning) {
+        nextLightningTime -= delta;
+        if (nextLightningTime <= 0) {
+          // 閃光開始！
+          lightningIntensity = 3.0 + Math.random() * 4.0;
+          // 次の稲妻までの時間をセット（4〜12秒のランダム間隔）
+          nextLightningTime = 4.0 + Math.random() * 8.0;
+        }
+
+        if (lightningIntensity > 0) {
+          // 指数関数的に素早く減衰させる
+          lightningIntensity *= Math.exp(-6.0 * delta);
+          directionalLight.intensity = lightningIntensity;
+          scene.fog.color.setHex(lightningIntensity > 0.5 ? 0x1f242d : 0x0a0505);
+          
+          // 稲妻に合わせて画面全体が青白く輝く
+          ambientLight.color.setRGB(
+            0.05 + lightningIntensity * 0.1,
+            0.04 + lightningIntensity * 0.15,
+            0.04 + lightningIntensity * 0.2
+          );
+        } else {
+          directionalLight.intensity = 0;
+          scene.fog.color.setHex(0x0a0505);
+          ambientLight.color.setRGB(0.06, 0.03, 0.03);
+        }
+      }
+    }
+
+    // --- 6. ユーザーインタラクション機能 ---
+
+    // 陣営（バナー）の変更
+    function changeFaction(faction) {
+      createBanner(faction);
+      // 各陣営のイメージカラーに合わせてライティングを微変化
+      if (faction === 'shu') {
+        pointLight.color.setHex(0x10b981); // 翠
+        targetWindForce = 0.6;
+      } else if (faction === 'wei') {
+        pointLight.color.setHex(0x3b82f6); // 蒼
+        targetWindForce = 0.4;
+      } else {
+        pointLight.color.setHex(0xef4444); // 緋
+        targetWindForce = 0.9; // 呉は赤壁の烈風
+      }
+    }
+
+    // 稲妻のオンオフ切り替え
+    function toggleLightning(e) {
+      e.preventDefault();
+      enableLightning = !enableLightning;
+      const btn = e.target;
+      if (enableLightning) {
+        btn.innerText = "雷撃演出切替 (ON)";
+        btn.classList.remove('text-gray-500');
+        btn.classList.add('text-red-500');
+      } else {
+        btn.innerText = "雷撃演出切替 (OFF)";
+        btn.classList.remove('text-red-500');
+        btn.classList.add('text-gray-500');
+        directionalLight.intensity = 0;
+        scene.fog.color.setHex(0x0a0505);
+      }
+    }
+
+    // マウス操作で一時的に突風（東風）を引き起こす
+    function intensifyWind(e) {
+      if (e) e.preventDefault();
+      windForce = 2.5; // 通常の数倍の風
+      // 稲妻も強制誘発
+      if (enableLightning) {
+        lightningIntensity = 6.0;
+      }
+    }
+
+    // カメラのインタラクティブ操作
+    function onMouseMove(event) {
+      // マウス座標の正規化 (-1 から 1)
+      mouse.targetX = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.targetY = -(event.clientY / window.innerHeight) * 2 + 1;
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- 7. アニメーションループ ---
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = clock.getDelta();
+      const time = clock.getElapsedTime();
+
+      // マウス位置の滑らかなイージング
+      mouse.x += (mouse.targetX - mouse.x) * 0.05;
+      mouse.y += (mouse.targetY - mouse.y) * 0.05;
+
+      // カメラをマウス位置に応じて少し動かし、立体感を演出（パララックス効果）
+      camera.position.x = mouse.x * 4;
+      camera.position.y = 5 + mouse.y * 2;
+      camera.lookAt(new THREE.Vector3(-2, 3, 0));
+
+      // 物理シミュレーション & 演出の更新
+      simulateCloth(time);
+      updateSparks(delta);
+      updateEnvironment(time, delta);
+
+      renderer.render(scene, camera);
+    }
+
+    // --- 8. スタート ---
+    window.onload = function() {
+      init();
+      animate();
+    };
+  </script>
+</body>
+</html>

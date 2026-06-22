@@ -177,6 +177,9 @@ class NullAutoGit(AutoGit):
         pass
 
 
+_MAX_REACT_LOG_ENTRIES = 3000  # 超過分はJSONLに永続化済みなのでRAM上からは破棄してよい
+
+
 class ReactLog:
     """ReActループの Thought / Action / Observation を蓄積・表示・エクスポートする"""
 
@@ -186,6 +189,15 @@ class ReactLog:
         # JSONL 逐次書き込み用
         self._jsonl_path: Optional[Path] = None
         self._jsonl_lock  = threading.Lock()
+
+    def _enforce_cap(self) -> None:
+        """entries が無制限にRAMへ積み上がるのを防ぐ。先頭(session_start)は維持して
+        直近 _MAX_REACT_LOG_ENTRIES 件のみ残す（古いものは既にJSONL/MDに残っている）。"""
+        if len(self.entries) <= _MAX_REACT_LOG_ENTRIES:
+            return
+        head = self.entries[:1] if self.entries and self.entries[0].get("type") == "session_start" else []
+        tail = self.entries[len(head):][-(_MAX_REACT_LOG_ENTRIES - len(head)):]
+        self.entries = head + tail
 
     def set_jsonl_path(self, path: Path) -> None:
         """JSONL 逐次書き込み先を設定する。既存ファイルがあれば読み込んで復元する。"""
@@ -199,6 +211,7 @@ class ReactLog:
                         self.entries.append(json.loads(line))
             except Exception as e:
                 log.warning({"event": "jsonl_load_error", "error": str(e)})
+            self._enforce_cap()
 
     def clear(self):
         self.entries = []
@@ -212,6 +225,7 @@ class ReactLog:
             **kwargs,
         }
         self.entries.append(entry)
+        self._enforce_cap()
         if self._jsonl_path:
             try:
                 with self._jsonl_lock:

@@ -99,6 +99,8 @@ def _build_components(base_dir: str, active_config=None):
 
     sessions_dir = Path(__file__).parent / ".mimic" / "sessions"
     sessions_dir.mkdir(parents=True, exist_ok=True)
+    from .utils import prune_old_sessions
+    prune_old_sessions(sessions_dir, keep=200)
     from datetime import datetime as _dt
     _jsonl_path = sessions_dir / f"{_dt.now().strftime('%Y-%m-%d_%H-%M')}.jsonl"
     interactive_orch.react_log.set_jsonl_path(_jsonl_path)
@@ -117,6 +119,23 @@ def _build_components(base_dir: str, active_config=None):
     register_viewer_command(lambda: sessions_dir)
     register_delegations_command()
     set_sessions_dir(sessions_dir)
+
+    # 中断委任マニフェストに長時間（24h超）残ったままのエントリがあれば起動時に知らせる。
+    # base が既に消えているものは list_orphaned_delegations() 内で自動的に除去される。
+    from datetime import datetime as _dt2
+    from .team import list_orphaned_delegations as _list_orphaned
+    _stale = []
+    for e in _list_orphaned():
+        try:
+            started = _dt2.fromisoformat(e["started_at"])
+            if (_dt2.now() - started).total_seconds() > 24 * 3600:
+                _stale.append(e)
+        except (KeyError, ValueError):
+            pass
+    if _stale:
+        safe_print(C.yellow(
+            f"  ⚠ 24時間以上更新のない中断委任タスクが{len(_stale)}件あります。"
+            " /delegations で確認・破棄してください。"))
 
     from .viewer import start_viewer_server as _start_viewer
     _viewer_url = _start_viewer(sessions_dir)

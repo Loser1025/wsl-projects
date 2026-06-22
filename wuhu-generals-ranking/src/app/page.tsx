@@ -3,6 +3,8 @@
 
 import { General, GeneralStats } from '@/data/generals';
 import TeamSection from '@/components/TeamSection';
+import HeroBackground from '@/components/HeroBackground';
+import ThreeBackground from '@/components/ThreeBackground';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 
@@ -53,43 +55,41 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen">
-      {/* 多層背景 */}
-      <div className="bg-aurora" />
-      <div className="bg-layer" />
-      <div className="bg-grid" />
-      <div className="bg-light" />
-      <div className="bg-streaks" />
-      <div className="bg-ripple" />
-
-      {/* 背景粒子 */}
-      <div className="gold-particles" />
+      {/* 3D背景（Three.js 戦場演出） */}
+      <ThreeBackground />
 
       {/* メインコンテンツ */}
       <div className="relative z-10 max-w-6xl mx-auto px-4 py-12">
-        {/* ヘッダー */}
-        <motion.header
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
-          className="text-center mb-16"
-        >
-          <h1 className="text-5xl md:text-7xl font-black tracking-[0.2em] text-gold title-glow mb-4">
-            五虎大将軍制度
-          </h1>
-          <p className="text-gray-400 text-sm tracking-[0.5em] uppercase">
-            Generals Ranking System
-          </p>
-          <div className="mt-6 h-px w-64 mx-auto bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
-        </motion.header>
+        {/* ヒーローヘッダー */}
+        <div className="relative overflow-hidden mb-16">
+          <div className="absolute inset-0 radial-fade-mask">
+            <HeroBackground />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/55 to-ink" />
+          </div>
+          <motion.header
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="relative z-10 text-center py-24 px-4"
+          >
+            <h1 className="text-5xl md:text-7xl font-black tracking-[0.2em] text-gold title-glow mb-4">
+              五虎大将軍制度
+            </h1>
+            <p className="text-gray-300 text-sm tracking-[0.5em] uppercase">
+              Generals Ranking System
+            </p>
+            <div className="mt-6 h-px w-64 mx-auto bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
+          </motion.header>
+        </div>
 
         {/* A隊セクション */}
         <div className="team-a-wrapper">
           <TeamSection
             teamLabel="甲 隊"
-            teamSubLabel="大将軍 ／ 丞相 ／ 都督"
             generals={teamA}
             team="A"
             maxStats={maxStats}
+            bgImage="/images/battle-team-a.png"
           />
         </div>
 
@@ -104,10 +104,10 @@ export default function Home() {
         <div className="team-b-wrapper">
           <TeamSection
             teamLabel="乙 隊"
-            teamSubLabel="一兵卒"
             generals={teamB}
             team="B"
             maxStats={maxStats}
+            bgImage="/images/battle-team-b.png"
           />
         </div>
 

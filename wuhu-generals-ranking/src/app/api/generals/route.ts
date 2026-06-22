@@ -31,9 +31,11 @@ export async function GET() {
     });
 
     const rows = response.data.values || [];
-    const generals: General[] = rows.map((row: string[], index: number) => {
+    const validRows = rows.filter((row: string[]) => (row[0] || '').trim().length > 0);
+
+    const generals: General[] = validRows.map((row: string[], index: number) => {
       const team = index < 3 ? 'A' : 'B';
-      const rawImageUrl = row[4] || '';
+      const rawImageUrl = row[4] && row[4].startsWith('http') ? row[4] : '';
 
       return {
         rank: index + 1,

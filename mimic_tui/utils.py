@@ -353,11 +353,38 @@ def setup_logger(log_file: Optional[str] = None) -> logging.Logger:
     logger.addHandler(sink)
 
     if log_file:
-        fh = logging.FileHandler(log_file, encoding="utf-8")
+        # 無制限に肥大化するのを防ぐため 5MB x 3世代でローテーションする
+        from logging.handlers import RotatingFileHandler
+        fh = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
         fh.setFormatter(fmt)
         logger.addHandler(fh)
 
     return logger
+
+
+def prune_old_sessions(sessions_dir: Path, keep: int = 200) -> int:
+    """.mimic/sessions 配下の古いセッションファイル（.md/.jsonl）を直近 keep 件のみ残して削除する。
+    起動ごとに呼ぶことでディスク使用量が無限に増え続けるのを防ぐ。戻り値は削除したファイル数。"""
+    if not sessions_dir.exists():
+        return 0
+    latest_mtime: dict[str, float] = {}
+    for f in sessions_dir.glob("*.*"):
+        if f.suffix not in (".md", ".jsonl"):
+            continue
+        latest_mtime[f.stem] = max(latest_mtime.get(f.stem, 0.0), f.stat().st_mtime)
+    if len(latest_mtime) <= keep:
+        return 0
+    ordered = sorted(latest_mtime.items(), key=lambda kv: kv[1], reverse=True)
+    stale_stems = {stem for stem, _ in ordered[keep:]}
+    removed = 0
+    for f in sessions_dir.glob("*.*"):
+        if f.suffix in (".md", ".jsonl") and f.stem in stale_stems:
+            try:
+                f.unlink()
+                removed += 1
+            except OSError:
+                pass
+    return removed
 
 log = setup_logger(str(Path(__file__).parent / "mimic.log"))
 
