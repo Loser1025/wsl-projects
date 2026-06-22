@@ -38,6 +38,10 @@ There is no test suite, linter, or build step configured for this project.
 `InteractiveOrchestrator`. It wires logging into `ReactLog`, registers session search/list/viewer
 slash commands, and sets the per-session JSONL transcript path (`.mimic/sessions/<timestamp>.jsonl`).
 Interactive mode hands the resulting context dict to `MimicApp` (Textual app in `app.py`).
+On every startup it also calls `utils.prune_old_sessions(sessions_dir, keep=200)` to delete the
+oldest session `.md`/`.jsonl` pairs beyond the most recent 200, and warns (via `safe_print`) if
+`team.list_orphaned_delegations()` has any entry whose `started_at` is more than 24h old, pointing
+the user at `/delegations` to inspect/discard it.
 
 **Extreme React mode** (`/mode extreme`): An alternate tool registry `extreme_tools` is built at
 startup with write tools, shell tools, and all read/search tools removed
@@ -180,7 +184,8 @@ a JSON manifest at `.mimic/inflight_delegations.json` (`_register_inflight`/`_un
 guarded by `_INFLIGHT_LOCK`): the `base` is created and registered with `trace_id` *before*
 `run_subagent_reviewable` is called, and unregistered once `_run_delegation_core` reaches its
 `finally` — so an entry surviving in the manifest after a restart means that delegation never
-finished and is offered for recovery.
+finished and is offered for recovery. `__main__.py` checks this manifest at every startup and
+prints a warning if any entry's `started_at` is older than 24h (see Entry point & wiring above).
 - `list_orphaned_delegations()` returns manifest entries whose `base` still exists (pruning stale
   ones), annotated with `checkpoint_age_sec` (mtime of `merged/.mimic_checkpoint.json`, a proxy
   for "might still be running").
@@ -225,7 +230,9 @@ squash logic. Without this, `auto_git.squash()` would miss delegate commits.
 - `rollback()` / `diff()` for recovery
 
 `ReactLog` (same file) records structured JSONL/markdown session transcripts under
-`.mimic/sessions/`.
+`.mimic/sessions/`. Its in-memory `entries` list is capped at `_MAX_REACT_LOG_ENTRIES = 3000`
+(`_enforce_cap()`, called after every append and JSONL load) since older entries are already
+durable on disk — only the in-RAM copy is trimmed, keeping the leading `session_start` entry.
 
 ### Monitoring (`monitoring.py`, `proc_observer.py`)
 `MonitoringToolRegistry` wraps the base tool registry to record per-call timing, CPU%, and RSS
@@ -245,7 +252,11 @@ Color/markdown rendering for the terminal (`C`, `render_markdown*`), the global 
 "scratchpad" (`get_scratchpad`/`set_scratchpad`, used by `update_scratchpad*` tools and injected
 into every prompt via `_build_context_header`), `PipelineTypewriter` for streamed output
 rendering, `TokenBucket`/rate-limit helpers, and the tool-output cache. `emit_team_event` /
-`set_team_event_sink` pipe team delegation events to `ReactLog`.
+`set_team_event_sink` pipe team delegation events to `ReactLog`. `setup_logger()` writes
+`mimic.log` via a `RotatingFileHandler` (5MB × 3 backups) instead of an unbounded plain file, and
+`prune_old_sessions()` deletes stale `.mimic/sessions/*.md`/`*.jsonl` pairs beyond the most recent
+`keep` (called with `keep=200` at startup — see Entry point & wiring) — both exist to keep
+long-running installs from growing disk usage without bound.
 
 ## Notes on code provenance
 
