@@ -105,104 +105,144 @@ async function getVideoForUpload(file, onProgress) {
     return new File([compressed], `${baseName}_compressed.mp4`, { type: 'video/mp4' });
 }
 
+const MAX_CHUNK_SIZE = 8 * 1024 * 1024; // 8MB チャンクサイズ
+const MAX_RETRIES = 3;
+
 /**
- * 動画を圧縮してバックエンドに送信する
- * @param {File}     file       - 動画ファイル
- * @param {Function} [onProgress] - 進捗コールバック (percent: number, message: string) => void
- * @returns {Promise<object>} バックエンドからのレスポンス
+ * 指数バックオフ付きリトライヘルパー
+ * @param {Function} fn - 実行する非同期関数
+ * @param {number} maxRetries - 最大リトライ回数
+ * @returns {Promise<any>}
  */
-async function compressAndSendToGemini(file, onProgress) {
-    const notify = (pct, msg) => onProgress && onProgress(pct, msg);
-    notify(0, '動画を準備中...');
-
-    try {
-        // 動画を圧縮
-        const videoBlob = await getVideoForUpload(file, onProgress);
-        notify(50, '動画をアップロード中...');
-
-        // 圧縮後のサイズが 4.5MB 以下であることを確認
-        const MAX_SIZE = 4.5 * 1024 * 1024; // 4.5MB
-        if (videoBlob.size > MAX_SIZE) {
-            throw new Error(
-                `圧縮後の動画サイズ (${(videoBlob.size / 1024 / 1024).toFixed(1)}MB) が ` +
-                `Vercel の制限 (4.5MB) を超えています。より短い動画を選択してください。`
-            );
+async function retryWithBackoff(fn, maxRetries = MAX_RETRIES) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            if (attempt === maxRetries) throw error;
+            const delay = Math.pow(2, attempt) * 1000;
+            await new Promise(resolve => setTimeout(resolve, delay));
         }
-
-        // FormData を使用して送信
-        const formData = new FormData();
-        formData.append('video', videoBlob, file.name);
-
-        // バックエンドに送信
-        const response = await fetch('/api/analyze', {
-            method: 'POST',
-            body: formData,
-        });
-
-        if (!response.ok) {
-            let errorMessage = `サーバーエラー (${response.status})`;
-            try {
-                const errorData = await response.json();
-                errorMessage = errorData.error || errorMessage;
-            } catch (_) {
-                // JSON パースに失敗した場合はデフォルトメッセージを使用
-            }
-            throw new Error(errorMessage);
-        }
-
-        const result = await response.json();
-        notify(100, '分析完了');
-        return result;
-    } catch (error) {
-        notify(100, 'エラーが発生しました');
-        return { error: error.message };
     }
 }
 
-// モジュールとしてエクスポート
-if (typeof window !== 'undefined') {
-    window.compressAndSendToGemini = compressAndSendToGemini;
-}
-
 /**
- * 動画を圧縮してバックエンドに送信する
- * @param {File} file - 動画ファイル
+ * 動画を圧縮して Gemini Files API に直接アップロードし、分析をリクエストする
+ * @param {File}     file       - 動画ファイル
  * @param {Function} [onProgress] - 進捗コールバック (percent: number, message: string) => void
- * @returns {Promise<object>} バックエンドからのレスポンス
+ * @returns {Promise<object>} 分析結果
  */
 async function compressAndSendToGemini(file, onProgress) {
     const notify = (pct, msg) => onProgress && onProgress(pct, msg);
     notify(0, '動画を準備中...');
 
     try {
-        // 動画を圧縮
+        // ステップ1: 圧縮
         const videoBlob = await getVideoForUpload(file, onProgress);
-        
-        // ファイルサイズチェック（4.5MB以下）
-        if (videoBlob.size > 4.5 * 1024 * 1024) {
-            throw new Error('圧縮後の動画が4.5MBを超えています。より短い動画を選択してください。');
-        }
-        
-        notify(50, '動画をアップロード中...');
+        notify(30, '圧縮完了、アップロード準備中...');
 
-        // FormData を使用して送信
-        const formData = new FormData();
-        formData.append('video', videoBlob, file.name);
+        const mimeType = videoBlob.type || 'video/mp4';
+        const size = videoBlob.size;
+        const displayName = file.name || 'video.mp4';
 
-        // バックエンドに送信
-        const response = await fetch('/api/analyze', {
-            method: 'POST',
-            body: formData,
+        // ステップ2: アップロードセッション初期化
+        notify(32, 'アップロードセッションを初期化中...');
+        const initResponse = await retryWithBackoff(async () => {
+            const res = await fetch('/api/upload/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mimeType, size, displayName }),
+            });
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || `セッション初期化に失敗しました (${res.status})`);
+            }
+            return res.json();
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || 'アップロードに失敗しました');
+        const { uploadUrl, expiresAt } = initResponse;
+        if (!uploadUrl) {
+            throw new Error('アップロード URL が取得できませんでした');
         }
 
-        const result = await response.json();
+        // ステップ3: Resumable Upload で Gemini に直接アップロード
+        notify(35, 'Gemini にアップロード中...');
+        const totalSize = size;
+        let offset = 0;
+
+        while (offset < totalSize) {
+            const end = Math.min(offset + MAX_CHUNK_SIZE, totalSize);
+            const chunk = videoBlob.slice(offset, end);
+            const isFinal = end === totalSize;
+            const contentLength = end - offset;
+
+            const uploadHeaders = {
+                'Content-Length': String(contentLength),
+                'X-Goog-Upload-Offset': String(offset),
+                'X-Goog-Upload-Command': isFinal ? 'upload, finalize' : 'upload',
+            };
+
+            await retryWithBackoff(async () => {
+                const res = await fetch(uploadUrl, {
+                    method: 'POST',
+                    headers: uploadHeaders,
+                    body: chunk,
+                });
+                if (!res.ok && res.status !== 308) {
+                    throw new Error(`アップロードチャンクに失敗しました (${res.status})`);
+                }
+                return res;
+            });
+
+            offset = end;
+
+            // 進捗報告: 35%〜90% の範囲
+            if (!isFinal) {
+                const uploadProgress = 35 + Math.round((offset / totalSize) * 55);
+                notify(Math.min(uploadProgress, 89), `アップロード中... ${Math.min(uploadProgress, 89)}%`);
+            }
+        }
+
+        notify(90, 'アップロード完了、確認中...');
+
+        // ステップ4: アップロード完了確認
+        const completeResponse = await retryWithBackoff(async () => {
+            const res = await fetch('/api/upload/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileName: displayName }),
+            });
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || `アップロード完了確認に失敗しました (${res.status})`);
+            }
+            return res.json();
+        });
+
+        const { fileUri, fileName, state, mimeType: resultMimeType } = completeResponse;
+        if (!fileUri) {
+            throw new Error('ファイル URI が取得できませんでした');
+        }
+
+        notify(95, '分析をリクエスト中...');
+
+        // ステップ5: 分析リクエスト
+        const criteria = getCriteriaItems();
+        const analyzeResponse = await retryWithBackoff(async () => {
+            const res = await fetch('/api/analyze/direct', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileUri, mimeType: resultMimeType || mimeType, criteria }),
+            });
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || `分析リクエストに失敗しました (${res.status})`);
+            }
+            return res.json();
+        });
+
         notify(100, '分析完了');
-        return result;
+        return analyzeResponse;
     } catch (error) {
         notify(100, 'エラーが発生しました');
         return { error: error.message };
