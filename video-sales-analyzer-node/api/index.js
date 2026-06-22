@@ -359,16 +359,29 @@ async function analyzeUriWithFallback(prompt, fileUri, mimeType) {
       return parseResponse(text);
     } catch (error) {
       console.error(`URI分析エラー: ${error.message}`);
-      if (/quota|rate|429/i.test(error.message)) {
+      if (/quota|rate|429|500|502|503|504|timeout|econnreset|unavailable/i.test(error.message)) {
         keyManager.markFailed(apiKey);
         keyManager.rotateKey();
         lastError = error;
+        const retryAttempt = keyManager.failedKeys.size - 1;
+        const waitTime = Math.min(1000 * Math.pow(2, retryAttempt), 30000);
+        console.log(`[RETRY] ${error.message} - ${waitTime}ms 後にリトライ (attempt ${retryAttempt + 1})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
       lastError = error;
       break;
     }
   }
+
+  if (keyManager.failedKeys.size >= keyManager.keys.length) {
+    console.log('[INFO] 全キーが失敗しました。1分後にリセットします。');
+    setTimeout(() => {
+      keyManager.failedKeys.clear();
+      console.log('[INFO] failedKeys をリセットしました。');
+    }, 60000);
+  }
+
   throw lastError || new Error('分析に失敗しました');
 }
 
@@ -405,16 +418,29 @@ async function compareUriWithFallback(prompt, fileUriA, fileUriB, mimeType) {
       return parseCompareResponse(text);
     } catch (error) {
       console.error(`比較分析エラー: ${error.message}`);
-      if (/quota|rate|429/i.test(error.message)) {
+      if (/quota|rate|429|500|502|503|504|timeout|econnreset|unavailable/i.test(error.message)) {
         keyManager.markFailed(apiKey);
         keyManager.rotateKey();
         lastError = error;
+        const retryAttempt = keyManager.failedKeys.size - 1;
+        const waitTime = Math.min(1000 * Math.pow(2, retryAttempt), 30000);
+        console.log(`[RETRY] ${error.message} - ${waitTime}ms 後にリトライ (attempt ${retryAttempt + 1})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
       lastError = error;
       break;
     }
   }
+
+  if (keyManager.failedKeys.size >= keyManager.keys.length) {
+    console.log('[INFO] 全キーが失敗しました。1分後にリセットします。');
+    setTimeout(() => {
+      keyManager.failedKeys.clear();
+      console.log('[INFO] failedKeys をリセットしました。');
+    }, 60000);
+  }
+
   throw lastError || new Error('比較分析に失敗しました');
 }
 
