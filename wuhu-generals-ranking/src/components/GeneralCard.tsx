@@ -76,7 +76,7 @@ export default function GeneralCard({ general, index, maxStats }: { general: Gen
               setImgLoaded(true);
               const img = e.currentTarget;
               if (img.naturalHeight > img.naturalWidth) {
-                setObjectPosition('center 12.5%');
+                setObjectPosition('center 25%');
               }
             }}
             onError={() => setImgError(true)}
