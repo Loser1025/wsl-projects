@@ -649,6 +649,176 @@ app.post('/api/analyze/drive', async (req, res) => {
   }
 });
 
+// ──────────────────────────────────────────────
+// 直接アップロードエンドポイント
+// ──────────────────────────────────────────────
+
+const UPLOAD_MAX_SIZE = 100 * 1024 * 1024; // 100MB
+const ALLOWED_MIME_TYPES = [
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-msvideo',
+];
+
+// POST /api/upload/init — resumable upload セッション初期化
+app.post('/api/upload/init', async (req, res) => {
+  try {
+    const { mimeType, size, displayName } = req.body;
+
+    // バリデーション
+    if (!mimeType) {
+      return res.status(400).json({ error: 'mimeType は必須です' });
+    }
+    if (typeof size !== 'number' || size <= 0) {
+      return res.status(400).json({ error: 'size は正の数値で指定してください' });
+    }
+    if (size > UPLOAD_MAX_SIZE) {
+      return res.status(400).json({ error: `ファイルサイズは ${UPLOAD_MAX_SIZE / (1024 * 1024)}MB 以下にしてください` });
+    }
+    if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+      return res.status(400).json({ error: `許可されていないファイル形式です。許可: ${ALLOWED_MIME_TYPES.join(', ')}` });
+    }
+
+    const apiKey = keyManager.currentKey;
+    if (!apiKey) {
+      return res.status(503).json({ error: '利用可能なAPIキーがありません' });
+    }
+
+    // resumable upload セッション初期化
+    const axios = require('axios');
+    const uploadInitUrl = 'https://generativelanguage.googleapis.com/upload/v1beta/files';
+    const initResponse = await axios.post(
+      uploadInitUrl,
+      {
+        file: {
+          mimeType,
+          displayName: displayName || '',
+        },
+      },
+      {
+        headers: {
+          'x-goog-api-key': apiKey,
+          'X-Goog-Upload-Protocol': 'resumable',
+          'X-Goog-Upload-Command': 'start',
+          'X-Goog-Upload-Header-Content-Length': String(size),
+          'X-Goog-Upload-Header-Content-Type': mimeType,
+          'Content-Type': 'application/json',
+        },
+        validateStatus: () => true,
+      }
+    );
+
+    if (initResponse.status !== 200) {
+      console.error(`[ERROR] Upload init failed: status=${initResponse.status}`);
+      return res.status(502).json({ error: 'アップロードセッションの初期化に失敗しました' });
+    }
+
+    const uploadUrl = initResponse.headers['x-goog-upload-url'];
+    if (!uploadUrl) {
+      console.error('[ERROR] x-goog-upload-url がレスポンスヘッダーに含まれていません');
+      return res.status(502).json({ error: 'アップロードURLの取得に失敗しました' });
+    }
+
+    // セッション有効期限（デフォルト1時間）
+    const expiresAt = Date.now() + 3600000;
+
+    res.json({ uploadUrl, mimeType, expiresAt });
+  } catch (error) {
+    console.error('[ERROR] /api/upload/init:', error.message);
+    res.status(500).json({ error: 'アップロード初期化中にサーバーエラーが発生しました' });
+  }
+});
+
+// POST /api/upload/complete — アップロード完了確認
+app.post('/api/upload/complete', async (req, res) => {
+  try {
+    const { fileName } = req.body;
+
+    if (!fileName || typeof fileName !== 'string') {
+      return res.status(400).json({ error: 'fileName は必須です' });
+    }
+
+    const apiKey = keyManager.currentKey;
+    if (!apiKey) {
+      return res.status(503).json({ error: '利用可能なAPIキーがありません' });
+    }
+
+    const { GoogleGenAI } = require('@google/genai');
+    const ai = new GoogleGenAI({ apiKey });
+
+    // ACTIVE になるまでポーリング（最大 60 秒 = 20回 × 3秒）
+    const maxRetries = 20;
+    const retryInterval = 3000;
+    let fileState = 'PROCESSING';
+    let fileInfo = null;
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        fileInfo = await ai.files.get({ name: fileName });
+        fileState = fileInfo.state || fileInfo.status || 'UNKNOWN';
+
+        if (fileState === 'ACTIVE') {
+          break;
+        }
+        if (fileState === 'FAILED') {
+          return res.status(500).json({ error: 'ファイルの処理に失敗しました' });
+        }
+      } catch (e) {
+        console.error(`[ERROR] files.get 試行 ${i + 1} 失敗:`, e.message);
+      }
+
+      if (i < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, retryInterval));
+      }
+    }
+
+    if (fileState !== 'ACTIVE') {
+      return res.status(202).json({
+        state: fileState,
+        message: 'ファイルはまだ処理中です。後でもう一度確認してください。',
+        fileName,
+      });
+    }
+
+    res.json({
+      fileUri: fileInfo.uri || fileInfo.name,
+      fileName: fileInfo.name,
+      state: fileState,
+      mimeType: fileInfo.mimeType,
+    });
+  } catch (error) {
+    console.error('[ERROR] /api/upload/complete:', error.message);
+    res.status(500).json({ error: 'アップロード完了確認中にサーバーエラーが発生しました' });
+  }
+});
+
+// POST /api/analyze/direct — 直接アップロード済みファイルの分析
+app.post('/api/analyze/direct', async (req, res) => {
+  try {
+    const { fileUri, mimeType, criteria } = req.body;
+
+    if (!fileUri || typeof fileUri !== 'string') {
+      return res.status(400).json({ error: 'fileUri は必須です' });
+    }
+
+    const criteriaItems = Array.isArray(criteria)
+      ? criteria.map(c => String(c).trim()).filter(c => c.length > 0).slice(0, MAX_CRITERIA_ITEMS)
+      : [];
+
+    const prompt = buildPrompt(criteriaItems);
+    const effectiveMimeType = mimeType || 'video/mp4';
+
+    const result = await analyzeUriWithFallback(prompt, fileUri, effectiveMimeType);
+    result.source = 'direct_upload';
+
+    res.json(result);
+  } catch (error) {
+    console.error('[ERROR] /api/analyze/direct:', error.message);
+    res.status(500).json({ error: '分析中にサーバーエラーが発生しました' });
+  }
+});
+
 // サーバー起動
 if (require.main === module) {
   app.listen(PORT, () => {
