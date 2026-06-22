@@ -1,0 +1,6 @@
+どこからでも `mimic` コマンドで起動するためのエイリアス設定
+
+以下を ~/.bashrc に追記して source ~/.bashrc を実行する:
+
+echo 'alias mimic="/home/loser/wsl-projects/mimic_tui/.venv/bin/mimic"' >> ~/.bashrc
+source ~/.bashrc

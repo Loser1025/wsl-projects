@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mimic_sns"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "watchdog>=4.0",
+    "textual>=0.70.0",
+]
+
+[project.scripts]
+mimic-sns = "mimic_sns.__main__:main"
+
+[tool.setuptools]
+package-dir = {"" = ".."}
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["mimic_sns"]
