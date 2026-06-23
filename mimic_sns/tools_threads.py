@@ -49,7 +49,7 @@ def _api_post(url: str, params: dict) -> dict:
 
 @tools.register(
     name="get_threads_account_summary",
-    description="Threadsアカウントの基本情報（id, username, threads_profile_category）を取得する。",
+    description="Threadsアカウントの基本情報（id, username, threads_profile_picture_url, threads_biography）を取得する。",
     parameters={"type": "object", "properties": {}, "required": []},
 )
 def get_threads_account_summary() -> str:
@@ -58,7 +58,8 @@ def get_threads_account_summary() -> str:
         return "THREADS_ACCESS_TOKEN が未設定です"
     url = (
         f"{_THREADS_BASE}/me"
-        f"?fields=id,username,threads_profile_category&access_token={urllib.parse.quote(token)}"
+        f"?fields=id,username,threads_profile_picture_url,threads_biography"
+        f"&access_token={urllib.parse.quote(token)}"
     )
     try:
         data = _api_get(url)

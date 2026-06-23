@@ -35,7 +35,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Threads追加ツール(tools_threads.py)
 
-- `get_threads_account_summary` — Threadsアカウント概要(id, username, threads_profile_category)
+- `get_threads_account_summary` — Threadsアカウント概要(id, username, threads_profile_picture_url, threads_biography)
 - `get_threads_recent_posts` — 直近投稿一覧(id, text, timestamp, like_count)
 - `get_threads_insights` — 投稿インサイト取得(views, likes, replies, reposts, quotes)
 - `post_to_threads` — Threads投稿実行(テキスト・画像対応、コンテナ作成→公開の2ステップ)
