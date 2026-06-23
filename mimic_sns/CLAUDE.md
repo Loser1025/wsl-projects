@@ -19,12 +19,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   無変更でも対話・pipe・auto-prompt・Workerの全モードで自動的に登録される。
   `INSTAGRAM_ACCESS_TOKEN`/`INSTAGRAM_ACCOUNT_ID`未設定時は例外を投げず、各ツールが
   `"...が未設定です"`という文字列を返す。
+- `tools_threads.py` — Threads API ツール群(`get_threads_account_summary` /
+  `get_threads_recent_posts` / `get_threads_insights` / `post_to_threads` /
+  `save_threads_record`)。`tools_sns.py`と同じパターンで`@tools.register()`登録、`tools.py`末尾
+  (`tools_sns`の直後)から`from . import tools_threads`でimportされる。
+  `THREADS_ACCESS_TOKEN`/`THREADS_USER_ID`未設定時も例外を投げず文字列でエラーを返す。
 
 ## 環境変数(.envに設定)
 
 - `INSTAGRAM_ACCESS_TOKEN` — Instagram Graph API アクセストークン
 - `INSTAGRAM_ACCOUNT_ID` — InstagramビジネスアカウントID
+- `THREADS_ACCESS_TOKEN` — Threads API アクセストークン
+- `THREADS_USER_ID` — Threads ユーザーID
 - `GEMINI_KEY_1` — Gemini API キー(無料枠 1500 req/日、15 RPM。`RPM_LIMIT=15`と合わせて設定)
+
+## Threads追加ツール(tools_threads.py)
+
+- `get_threads_account_summary` — Threadsアカウント概要(id, username, threads_profile_category)
+- `get_threads_recent_posts` — 直近投稿一覧(id, text, timestamp, like_count)
+- `get_threads_insights` — 投稿インサイト取得(views, likes, replies, reposts, quotes)
+- `post_to_threads` — Threads投稿実行(テキスト・画像対応、コンテナ作成→公開の2ステップ)
+- `save_threads_record` — 投稿記録をSQLiteの`threads_posts`テーブルに保存
+
+### 典型的な使い方(Threads)
+
+```bash
+mimic-sns --auto-prompt "Threadsの直近20投稿を分析して、今日の投稿戦略ブリーフィングシートを出力して"
+```
+
+```bash
+mimic-sns --auto-prompt "
+戦略: [戦略メモをここに貼る]
+以下のテキストでThreadsに投稿して：[テキスト内容]
+投稿前に確認を求めること"
+```
 
 ## 典型的な使い方(ハイブリッド運用)
 

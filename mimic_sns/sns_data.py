@@ -46,6 +46,18 @@ def init_db() -> None:
                 impressions INTEGER
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS threads_posts (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id     TEXT,
+                created_at  TEXT,
+                posted_at   TEXT,
+                text        TEXT,
+                image_path  TEXT,
+                strategy    TEXT,
+                status      TEXT DEFAULT 'draft'
+            )
+        """)
 
 
 def save_post(theme: str, strategy: str, caption: str, hashtags: str, image_path: str) -> int:
@@ -94,6 +106,17 @@ def load_past_posts(limit: int = 30) -> list[dict]:
             "SELECT * FROM posts ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def save_threads_post(text: str, image_path: str, strategy: str) -> int:
+    """Threads投稿レコードを draft 状態で保存し、レコードIDを返す。"""
+    with _connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO threads_posts (created_at, text, image_path, strategy, status) "
+            "VALUES (?, ?, ?, ?, 'draft')",
+            (datetime.now().isoformat(), text, image_path, strategy),
+        )
+        return cur.lastrowid
 
 
 def load_insights(post_id: str) -> dict:

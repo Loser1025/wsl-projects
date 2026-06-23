@@ -1188,3 +1188,6 @@ from . import pipeline     # noqa: F401, E402
 
 # ── SNS特化ツール（Instagram Graph API）を登録 ───────────────────
 from . import tools_sns    # noqa: F401, E402
+
+# ── Threads API ツールを登録 ────────────────────────────────
+from . import tools_threads  # noqa: F401, E402
