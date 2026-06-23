@@ -649,7 +649,7 @@ app.post('/api/analyze/drive', async (req, res) => {
   } catch (error) {
     console.error(`[ERROR] API処理失敗:`, error);
     console.error(`Stack Trace:`, error.stack);
-    res.status(500).json({ error: 'サーバー内部エラー: ' + error.message });
+    res.status(500).json({ error: 'サーバー内部エラーが発生しました。しばらくしてから再度お試しください。' });
   } finally {
     if (uploadApiKey) {
       for (const gf of geminiFiles) {
