@@ -8,6 +8,96 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 元の `mimic_tui` は変更していません。このディレクトリで開発してください。
 パッケージ名は `mimic_sns`、コンソールスクリプトは `mimic-sns`(元の `mimic` コマンドと衝突しないよう変更)。
 
+## ローカルMCPサーバー（mcp_server/）
+
+`mcp_server/` は `mimic_sns` 本体とは独立したMCPエンドポイント。Instagram/Threadsツールを
+MCP経由で呼べるようにするためのもので、`tools_sns.py`/`tools_threads.py`のロジックを
+`sns_logic.py`に移植し、`api/mcp.py`（`BaseHTTPRequestHandler`）でJSON-RPC 2.0として公開
+している。
+
+**運用方針**: 以前はVercelにサーバーレス関数としてデプロイしていたが、
+（`@vercel/python`ビルダーが毎回`uv`をpipでインストールしようとしシステムPythonの
+externally-managed-environment保護に阻まれて`vercel dev`がローカルで動かない、トークン
+失効時の`vercel env`更新・再デプロイの手間が大きい等の理由から）Vercelデプロイは廃止し、
+**ローカル運用のみ**に切り替えた。Vercelプロジェクト（旧URL: `mcpserver-drab.vercel.app`）
+は削除済み。
+
+`api/mcp.py`の`handler`は標準ライブラリのみに依存する`BaseHTTPRequestHandler`なので、
+Vercelのビルダーを介さず`local_run.py`から直接`http.server.ThreadingHTTPServer`で起動できる。
+
+### 起動方法
+
+```bash
+cd mimic_sns/mcp_server
+python3 local_run.py [port]   # デフォルト 8787、.env を自動読み込み
+# → http://localhost:8787/api/mcp
+```
+
+### 接続情報
+
+- ローカルURL: `http://localhost:8787/api/mcp`（ポートは起動時引数で変更可）
+- 認証: `Authorization: Bearer <MCP_AUTH_TOKEN>` ヘッダー、または `?token=<MCP_AUTH_TOKEN>`
+  クエリパラメータのいずれかが必須（ヘッダー優先）。トークンは `mcp_server/.env` に保存
+  （`.gitignore`で除外済み、Gitにはコミットされない）。
+
+### 疎通確認コマンド
+
+```bash
+# tools/list
+curl -X POST http://localhost:8787/api/mcp \
+  -H "Authorization: Bearer $MCP_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# tools/call（例: Threadsアカウント概要取得）
+curl -X POST http://localhost:8787/api/mcp \
+  -H "Authorization: Bearer $MCP_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_threads_account_summary","arguments":{}}}'
+```
+
+### 利用可能なツール（10個）
+
+Instagram:
+- `get_instagram_account_summary` — IGアカウント概要
+- `get_instagram_recent_posts` — IG直近投稿一覧
+- `get_instagram_insights` — IG投稿インサイト
+- `post_to_instagram` — IG投稿実行（成功時、theme/strategy/hashtags指定の有無に関わらず
+  SQLiteへ自動記録。`save_post_record`を別途呼ぶ必要なし）
+- `save_post_record` — IG投稿記録の手動保存（下書き記録用、`status='draft'`）
+- `load_past_posts` — IG過去投稿取得（`mcp_server/data/sns_posts.db`）
+
+Threads:
+- `get_threads_account_summary` — Threadsアカウント概要
+- `get_threads_recent_posts` — Threads直近投稿一覧
+- `get_threads_insights` — Threads投稿インサイト
+- `post_to_threads` — Threads投稿実行（成功時、strategy指定の有無に関わらずSQLiteへ自動記録）
+
+### データ保存先
+
+`mcp_server/data/sns_posts.db`（`.gitignore`で除外済み）。以前はVercelの`/tmp`（実行ごとに
+揮発する一時領域）に置いていたが、ローカル常駐プロセスに切り替えたタイミングで永続パスに
+変更した。サーバー再起動・PC再起動を挟んでもデータは保持される。
+
+### トークンのローテーション
+
+`INSTAGRAM_ACCESS_TOKEN`/`INSTAGRAM_ACCOUNT_ID`/`THREADS_ACCESS_TOKEN`/`THREADS_USER_ID`/
+`MCP_AUTH_TOKEN`はすべて`mcp_server/.env`に保存。値を更新したらサーバーを再起動するだけで
+反映される（`local_run.py`は起動時に`.env`を読み込む）。
+
+```bash
+# サーバー再起動（既存プロセスをCtrl+Cまたはkillしてから）
+cd mimic_sns/mcp_server
+python3 local_run.py
+```
+
+**トークン自動更新（任意）**: `.env`に`APP_SECRET`（Meta App Secret）を設定すると、各
+Instagram/Threadsツール呼び出しの冒頭で（プロセス内キャッシュにより1時間に1回まで）
+`debug_token`で残り有効期限を確認し、7日を切っていたら`fb_exchange_token`/
+`th_exchange_token`で自動的に60日トークンへ交換し、新しいトークンを`.env`にも書き戻す
+（`sns_logic.py`の`_maybe_refresh_instagram_token`/`_maybe_refresh_threads_token`）。
+`APP_SECRET`未設定の場合は何もせず黙ってスキップし、従来通り手動ローテーションが必要。
+
 ## SNS特化の追加ファイル
 
 - `sns_data.py` — SQLite CRUD(投稿記録・インサイト保存)。標準ライブラリのみ。`data/sns_posts.db`
