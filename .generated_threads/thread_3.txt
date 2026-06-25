@@ -1,0 +1,4 @@
+3/4 5fcfb45 initial commit – scaffold of project files (2026-06-25)
+2/4 +++ b/mimic_tui/.mimic/inflight_delegations.json
+3/4 +  "308ba0ff": {
+4/4 🎯 Coaching: keep backing up your work – the checkpoint routine saved the day! #AIcantdoThis

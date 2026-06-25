@@ -1,0 +1,46 @@
+0d1cd16 🤖 mimic-agent: backup before task (2026-06-25)
+diff --git a/forms-gas-clasp/package-lock.json b/forms-gas-clasp/package-lock.json
+index 8bde9a4..b3dfe4c 100644
+--- a/forms-gas-clasp/package-lock.json
++++ b/forms-gas-clasp/package-lock.json
+@@ -778,6 +778,12 @@
+         "undici-types": "~6.21.0"
+       }
+     },
++    "node_modules/@types/node/node_modules/undici-types": {
++      "version": "6.21.0",
++      "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz",
++      "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==",
++      "license": "MIT"
++    },
+     "node_modules/@types/normalize-package-data": {
+       "version": "2.4.4",
+       "resolved": "https://registry.npmjs.org/@types/normalize-package-data/-/normalize-package-data-2.4.4.tgz",
+@@ -3361,9 +3367,9 @@
+       }
+     },
+     "node_modules/undici-types": {
+-      "version": "6.21.0",
+-      "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz",
+-      "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==",
++      "version": "6.27.0",
++      "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.27.0.tgz",
++      "integrity": "sha512-HDBmCak1Ccswl7xS6/blapTYRVsqva4skTCeeJPLiDn6qCszeqiPGDljQBH2Kf/S0BI6EN14FQsgKVyGid9xnA==",
+       "license": "MIT"
+     },
+     "node_modules/unicorn-magic": {
+diff --git a/mimic_tui/subagent.py b/mimic_tui/subagent.py
+index 66a03e2..88e611c 100644
+--- a/mimic_tui/subagent.py
++++ b/mimic_tui/subagent.py
+@@ -339,7 +339,9 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
+         verify_exit: Optional[int] = None
+         verify_output = ""
+         if verify_cmd:
+-            agent_output, _, verify_part = stdout.partition(_VERIFY_MARKER + "\n")
++            # resume試行ごとにverifyが毎回走るため、stdout中に複数回マーカーが
++            # 出現しうる。最後（=完成した試行）の結果を使う必要があるのでrpartition。
++            agent_output, _, verify_part = stdout.rpartition(_VERIFY_MARKER + "\n")
+             verify_output = verify_part
+             m = re.search(r"MIMIC_VERIFY_EXIT=(\d+)", verify_part)
+             if m:
