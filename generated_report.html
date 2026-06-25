@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>エンジニアリングの軌跡：qwen-code開発の挑戦</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.8; color: #333; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #fdfdfd; }
+        h1, h2 { border-left: 4px solid #333; padding-left: 15px; color: #1a1a1a; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 0.9em; }
+        th { background: #f4f4f4; }
+        .depth-section { margin-bottom: 60px; padding: 20px; background: #fff; border: 1px solid #eee; border-radius: 8px; }
+        .label { font-weight: bold; color: #555; }
+        .summary { margin-top: 50px; border-top: 2px solid #333; padding-top: 20px; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>エンジニアリングの軌跡：リポジトリログから読み解く課題と解決</h1>
+    
+    <table>
+        <thead>
+            <tr><th>コミット</th><th>詰まり</th><th>突破</th><th>教訓</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Feishu(Lark)対応 (#4379)</td><td>複雑な通知・カードライフサイクルとメモリリーク</td><td>段階的なレビューと防御的なガード実装</td><td>外部連携は「異常系」のケアが全て</td></tr>
+            <tr><td>設定破損の可視化 (#4448)</td><td>設定ミスで黙って起動し、ユーザーが気付けない</td><td>TUIの前にstderrへ警告を直接吐く</td><td>ユーザー体験は「沈黙」を許さない</td></tr>
+            <tr><td>oversized履歴ガード (#4531)</td><td>履歴の増大でResumed中にクラッシュ</td><td>ハードレスキュー時の履歴保護とガード強化</td><td>限界値を想定した防御的設計の重要性</td></tr>
+            <tr><td>メモリトグル (#4547)</td><td>設定の同期不整合とBareモードでの挙動不一致</td><td>一貫性のあるスキーマ更新とGuard強化</td><td>設定値の「真実」は単一箇所に置く</td></tr>
+            <tr><td>コンピュータ操作 (#4590)</td><td>複雑なMCPプロトコルとブラウザ/OS環境の統合</td><td>公式プロトコルとの同期と状態機械の実装</td><td>外部仕様との乖離は早期同期で防ぐ</td></tr>
+            <tr><td>コンパクション刷新 (#4599)</td><td>長タスクでの意図消失とテイル保存の限界</td><td>要約＋リストア用アタッチメント形式へ変更</td><td>構造的変化には「データ形式」の再定義が必要</td></tr>
+        </tbody>
+    </table>
+
+    <div class="depth-section">
+        <h2>Feishu(Lark)対応：連携の闇と光</h2>
+        <p><span class="label">詰まり：</span>多様なメッセージ形式とストリーミング制約による、メモリリークや停止ボタンのダブル発火。</p>
+        <p><span class="label">突破：</span>5回に及ぶレビューと、カード状態管理の徹底的なハード化（タイムアウト後の停止処理等）。</p>
+    </div>
+
+    <div class="depth-section">
+        <h2>コンパクション刷新：長い会話をどう繋ぐか</h2>
+        <p><span class="label">詰まり：</span>既存のSnapshot方式では長時間のコーディングセッションで意図が失われる。</p>
+        <p><span class="label">突破：</span>9セクション構成への構造化と、ファイル操作履歴の抽出アタッチメント化による高精度な文脈再現。</p>
+    </div>
+
+    <div class="summary">
+        <p>これらのコミットは、単なる機能追加ではなく、システムの信頼性と拡張性を高めるための「格闘」の記録である。エンジニアリングとは、未知の複雑さに対峙し、それをコードという秩序に落とし込むプロセスの連続である。</p>
+    </div>
+</body>
+</html>
