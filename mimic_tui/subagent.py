@@ -339,7 +339,9 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
         verify_exit: Optional[int] = None
         verify_output = ""
         if verify_cmd:
-            agent_output, _, verify_part = stdout.partition(_VERIFY_MARKER + "\n")
+            # resume試行ごとにverifyが毎回走るため、stdout中に複数回マーカーが
+            # 出現しうる。最後（=完成した試行）の結果を使う必要があるのでrpartition。
+            agent_output, _, verify_part = stdout.rpartition(_VERIFY_MARKER + "\n")
             verify_output = verify_part
             m = re.search(r"MIMIC_VERIFY_EXIT=(\d+)", verify_part)
             if m:
