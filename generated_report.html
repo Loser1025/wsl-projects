@@ -4,47 +4,97 @@
     <meta charset="UTF-8">
     <title>エンジニアリングの軌跡：qwen-code開発の挑戦</title>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.8; color: #333; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #fdfdfd; }
-        h1, h2 { border-left: 4px solid #333; padding-left: 15px; color: #1a1a1a; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 0.9em; }
-        th { background: #f4f4f4; }
-        .depth-section { margin-bottom: 60px; padding: 20px; background: #fff; border: 1px solid #eee; border-radius: 8px; }
-        .label { font-weight: bold; color: #555; }
-        .summary { margin-top: 50px; border-top: 2px solid #333; padding-top: 20px; font-style: italic; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Serif+JP:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            line-height: 1.9;
+            color: #2d3436;
+            max-width: 700px;
+            margin: 80px auto;
+            padding: 0 24px;
+            background: #fcfcfc;
+        }
+
+        h1, h2 {
+            font-family: 'Noto Serif JP', serif;
+            color: #1a2a6c;
+        }
+
+        h1 { font-size: 2em; margin-bottom: 40px; }
+        h2 { font-size: 1.5em; margin-top: 50px; }
+
+        .lead {
+            margin-bottom: 60px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+            color: #636e72;
+        }
+
+        blockquote {
+            border-left: 4px solid #1a2a6c;
+            background: #f4f6f8;
+            padding: 20px;
+            margin: 30px 0;
+            font-style: italic;
+        }
+
+        .commit-section {
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .commit-section p { margin: 10px 0; }
+        .label { font-weight: bold; color: #1a2a6c; }
     </style>
 </head>
 <body>
-    <h1>エンジニアリングの軌跡：リポジトリログから読み解く課題と解決</h1>
-    
-    <table>
-        <thead>
-            <tr><th>コミット</th><th>詰まり</th><th>突破</th><th>教訓</th></tr>
-        </thead>
-        <tbody>
-            <tr><td>Feishu(Lark)対応 (#4379)</td><td>複雑な通知・カードライフサイクルとメモリリーク</td><td>段階的なレビューと防御的なガード実装</td><td>外部連携は「異常系」のケアが全て</td></tr>
-            <tr><td>設定破損の可視化 (#4448)</td><td>設定ミスで黙って起動し、ユーザーが気付けない</td><td>TUIの前にstderrへ警告を直接吐く</td><td>ユーザー体験は「沈黙」を許さない</td></tr>
-            <tr><td>oversized履歴ガード (#4531)</td><td>履歴の増大でResumed中にクラッシュ</td><td>ハードレスキュー時の履歴保護とガード強化</td><td>限界値を想定した防御的設計の重要性</td></tr>
-            <tr><td>メモリトグル (#4547)</td><td>設定の同期不整合とBareモードでの挙動不一致</td><td>一貫性のあるスキーマ更新とGuard強化</td><td>設定値の「真実」は単一箇所に置く</td></tr>
-            <tr><td>コンピュータ操作 (#4590)</td><td>複雑なMCPプロトコルとブラウザ/OS環境の統合</td><td>公式プロトコルとの同期と状態機械の実装</td><td>外部仕様との乖離は早期同期で防ぐ</td></tr>
-            <tr><td>コンパクション刷新 (#4599)</td><td>長タスクでの意図消失とテイル保存の限界</td><td>要約＋リストア用アタッチメント形式へ変更</td><td>構造的変化には「データ形式」の再定義が必要</td></tr>
-        </tbody>
-    </table>
-
-    <div class="depth-section">
-        <h2>Feishu(Lark)対応：連携の闇と光</h2>
-        <p><span class="label">詰まり：</span>多様なメッセージ形式とストリーミング制約による、メモリリークや停止ボタンのダブル発火。</p>
-        <p><span class="label">突破：</span>5回に及ぶレビューと、カード状態管理の徹底的なハード化（タイムアウト後の停止処理等）。</p>
+    <div class="lead">
+        <h1>エンジニアリングの軌跡：リポジトリログから読み解く課題と解決</h1>
+        <p>技術の具体性とコーチング的視点を交え、開発プロセスの教訓をまとめました。</p>
     </div>
 
-    <div class="depth-section">
-        <h2>コンパクション刷新：長い会話をどう繋ぐか</h2>
-        <p><span class="label">詰まり：</span>既存のSnapshot方式では長時間のコーディングセッションで意図が失われる。</p>
-        <p><span class="label">突破：</span>9セクション構成への構造化と、ファイル操作履歴の抽出アタッチメント化による高精度な文脈再現。</p>
+    <div class="commit-section">
+        <h2>Feishu(Lark)対応 (#4379)</h2>
+        <p><span class="label">詰まり:</span> 複雑な通知・カードライフサイクルとメモリリーク</p>
+        <p><span class="label">突破:</span> 段階的なレビューと防御的なガード実装</p>
+        <blockquote><span class="label">教訓:</span> 外部連携は「異常系」のケアが全て</blockquote>
     </div>
 
-    <div class="summary">
-        <p>これらのコミットは、単なる機能追加ではなく、システムの信頼性と拡張性を高めるための「格闘」の記録である。エンジニアリングとは、未知の複雑さに対峙し、それをコードという秩序に落とし込むプロセスの連続である。</p>
+    <div class="commit-section">
+        <h2>設定破損の可視化 (#4448)</h2>
+        <p><span class="label">詰まり:</span> 設定ミスで黙って起動し、ユーザーが気付けない</p>
+        <p><span class="label">突破:</span> TUIの前にstderrへ警告を直接吐く</p>
+        <blockquote><span class="label">教訓:</span> ユーザー体験は「沈黙」を許さない</blockquote>
+    </div>
+
+    <div class="commit-section">
+        <h2>oversized履歴ガード (#4531)</h2>
+        <p><span class="label">詰まり:</span> 履歴の増大でResumed中にクラッシュ</p>
+        <p><span class="label">突破:</span> ハードレスキュー時の履歴保護とガード強化</p>
+        <blockquote><span class="label">教訓:</span> 限界値を想定した防御的設計の重要性</blockquote>
+    </div>
+
+    <div class="commit-section">
+        <h2>メモリトグル (#4547)</h2>
+        <p><span class="label">詰まり:</span> 設定の同期不整合とBareモードでの挙動不一致</p>
+        <p><span class="label">突破:</span> 一貫性のあるスキーマ更新とGuard強化</p>
+        <blockquote><span class="label">教訓:</span> 設定値の「真実」は単一箇所に置く</blockquote>
+    </div>
+
+    <div class="commit-section">
+        <h2>コンピュータ操作 (#4590)</h2>
+        <p><span class="label">詰まり:</span> 複雑なMCPプロトコルとブラウザ/OS環境の統合</p>
+        <p><span class="label">突破:</span> 公式プロトコルとの同期と状態機械の実装</p>
+        <blockquote><span class="label">教訓:</span> 外部仕様との乖離は早期同期で防ぐ</blockquote>
+    </div>
+
+    <div class="commit-section">
+        <h2>コンパクション刷新 (#4599)</h2>
+        <p><span class="label">詰まり:</span> 長タスクでの意図消失とテイル保存の限界</p>
+        <p><span class="label">突破:</span> 要約＋リストア用アタッチメント形式へ変更</p>
+        <blockquote><span class="label">教訓:</span> 構造的変化には「データ形式」の再定義が必要</blockquote>
     </div>
 </body>
 </html>
