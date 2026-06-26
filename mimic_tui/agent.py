@@ -465,8 +465,9 @@ def _stream_openrouter_api(
                         accumulated_tools[idx]["name"] = fn["name"]
                     if fn.get("arguments"):
                         accumulated_tools[idx]["arguments"] += fn["arguments"]
-                    if fn.get("thought_signature"):
-                        accumulated_tools[idx]["thought_signature"] = fn["thought_signature"]
+                    _sig = (tc_delta.get("extra_content") or {}).get("google", {}).get("thought_signature", "")
+                    if _sig:
+                        accumulated_tools[idx]["thought_signature"] = _sig
                 if finish_reason:
                     chunk_tools = []
                     for i in sorted(accumulated_tools):
@@ -507,10 +508,11 @@ def _build_tool_call_entry(tc: dict) -> dict:
         "name": tc["name"],
         "arguments": json.dumps(tc.get("args", {}), ensure_ascii=False),
     }
+    entry: dict = {"id": call_id, "type": "function", "function": fn}
     sig = tc.get("thought_signature", "")
     if sig:
-        fn["thought_signature"] = sig
-    return {"id": call_id, "type": "function", "function": fn}
+        entry["extra_content"] = {"google": {"thought_signature": sig}}
+    return entry
 
 
 # ── diff 表示ユーティリティ ───────────────────────────────────────
@@ -905,7 +907,7 @@ class OpenRouterAgent:
                     "name": fn.get("name", ""),
                     "args": args,
                     "id": tc.get("id", ""),
-                    "thought_signature": fn.get("thought_signature", ""),
+                    "thought_signature": (tc.get("extra_content") or {}).get("google", {}).get("thought_signature", ""),
                 })
             return result
         except (KeyError, IndexError):
