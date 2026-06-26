@@ -322,7 +322,7 @@ class MimicApp(App):
                 f"  Status: [{style}]{status}[/]",
                 f"  Mode:   [#58a6ff]{self._agent_mode.upper()}[/]",
             ]
-            if self._agent_mode == "extreme":
+            if self._agent_mode in ("extreme", "specialist"):
                 profile = self._current_profile_label()
                 if profile:
                     lines.append(f"  Role:   [#ff8c42]{profile}[/]")
@@ -346,8 +346,8 @@ class MimicApp(App):
             pass
 
     def _tick_role_refresh(self) -> None:
-        """Extreme React 実行中、脳内プロファイルの変化をリアルタイムに反映する。"""
-        if self._agent_busy and self._agent_mode == "extreme":
+        """Extreme React / Specialist 実行中、脳内プロファイルの変化をリアルタイムに反映する。"""
+        if self._agent_busy and self._agent_mode in ("extreme", "specialist"):
             self._refresh_status_ui()
 
     def _current_profile_label(self) -> "Optional[str]":
@@ -986,7 +986,7 @@ class MimicApp(App):
             )
 
     def _cmd_mode(self, arg: str) -> None:
-        from .orchestrator import EXTREME_REACT_SYSTEM_PROMPT
+        from .orchestrator import EXTREME_REACT_SYSTEM_PROMPT, SPECIALIST_REACT_SYSTEM_PROMPT
         arg = arg.strip().lower()
         if arg in ("interactive", "react", "i"):
             self._agent_mode = "interactive"
@@ -1004,15 +1004,28 @@ class MimicApp(App):
             self._ctx["agent"].clear_history()
             self._ctx["interactive_orch"].react_log.clear()
             self._write_direct("🔥 モード: Extreme React (Director専任・委任特化)  書き込み系ツールを取り上げました。会話履歴をリセットしました。\n")
+        elif arg in ("specialist", "spec", "s"):
+            self._agent_mode = "specialist"
+            self._ctx["agent"].tools = self._ctx["specialist_tools"]
+            self._ctx["agent"].set_system_prompt(
+                self._ctx["plan_prompt"] + SPECIALIST_REACT_SYSTEM_PROMPT
+            )
+            self._ctx["agent"].clear_history()
+            self._ctx["interactive_orch"].react_log.clear()
+            self._write_direct(
+                "🧪 モード: Specialist (動的ロール委任)  "
+                "delegate_to_specialist のみ使用可能。会話履歴をリセットしました。\n"
+            )
         else:
             mode_labels = {
                 "interactive": "Interactive (ReAct)",
-                "extreme": "Extreme React (Director専任・委任特化)",
+                "extreme":     "Extreme React (Director専任・委任特化)",
+                "specialist":  "Specialist (動的ロール委任テスト)",
             }
             label = mode_labels.get(self._agent_mode, self._agent_mode)
             self._write_direct(
                 f"  現在: {label}\n"
-                "  切替: /mode interactive  /mode extreme\n"
+                "  切替: /mode interactive  /mode extreme  /mode specialist\n"
             )
         self._refresh_status_ui()
 

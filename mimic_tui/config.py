@@ -200,14 +200,6 @@ class OpenRouterConfig:
             "X-Title": self.site_name,
         }
 
-    @property
-    def thinking_level(self) -> str:
-        return "NONE"
-
-    @thinking_level.setter
-    def thinking_level(self, v: str):
-        pass
-
 
 # ── GoogleAIConfig ────────────────────────────────────────────────
 
@@ -219,7 +211,6 @@ class GoogleAIConfig:
     rpm_limit: int = 15
     context_length: int = 0
     max_tokens: int = 0       # 最大出力トークン数（0=指定なし）
-    thinking_setting: Optional[str] = None  # None=未設定 / "none"|"minimal"|"low"|"medium"|"high" / "N"(数値=budget)
     _key_manager: "KeyManager" = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
@@ -248,19 +239,6 @@ class GoogleAIConfig:
 
     def build_auth_headers(self, api_key: str) -> dict:
         return {"Authorization": f"Bearer {api_key}"}
-
-    @property
-    def thinking_level(self) -> str:
-        if self.thinking_setting is None:
-            return "DEFAULT"
-        s = self.thinking_setting.strip().lower()
-        if s.lstrip("-").isdigit():
-            return f"{s}tok"
-        return s.upper()
-
-    @thinking_level.setter
-    def thinking_level(self, v: str):
-        pass
 
 
 # ── MistralConfig ────────────────────────────────────────────────
@@ -301,14 +279,6 @@ class MistralConfig:
 
     def build_auth_headers(self, api_key: str) -> dict:
         return {"Authorization": f"Bearer {api_key}"}
-
-    @property
-    def thinking_level(self) -> str:
-        return "NONE"
-
-    @thinking_level.setter
-    def thinking_level(self, v: str):
-        pass
 
 
 # ── 無料モデル取得・選択 ─────────────────────────────────────────
@@ -760,7 +730,7 @@ def _generate_env_template(env_path: Path):
         "# GEMINI_KEY_3=YOUR_GEMINI_KEY_3\n"
         "# GEMINI_MODEL=gemini-2.0-flash\n"
         "# RPM_LIMIT_GEMINI=15\n"
-        "# GEMINI_THINKING_LEVEL=low  # none/minimal/low/medium/high から選択 / 未設定=モデルデフォルト\n\n"
+        "\n"
         "# ── 共通設定 ──\n"
         "# どちらか一方（または両方）のキーを設定してください\n"
         "RPM_LIMIT=20\n\n"
@@ -823,12 +793,10 @@ def load_config(
         if gemini_keys:
             gemini_model = env.get("GEMINI_MODEL", "gemini-2.0-flash")
             gemini_rpm   = int(env.get("RPM_LIMIT_GEMINI", str(rpm_limit)))
-            _tl_raw = env.get("GEMINI_THINKING_LEVEL", "").strip()
-            _thinking_setting: Optional[str] = _tl_raw if _tl_raw else None
             gemini_config = GoogleAIConfig(
                 api_keys=gemini_keys, model=gemini_model,
                 system_prompt=system_prompt, rpm_limit=gemini_rpm,
-                max_tokens=max_tokens, thinking_setting=_thinking_setting,
+                max_tokens=max_tokens,
             )
 
         # ── Mistral AI ─────────────────────────────────────────

@@ -27,7 +27,88 @@ from .config import (
 
 MAX_TOOL_ROUNDS    = 60
 _CACHEABLE_TOOLS   = ["read_file", "list_directory", "search_files", "get_repo_map"]
-_THINK_BUDGET_CHARS = 15_000  # この文字数を超えた未閉タグの思考を自動停止
+
+
+# ── Gemini Context Cache Manager ──────────────────────────────────
+
+class GeminiContextCacheManager:
+    """Geminiのシステムプロンプト+ツール定義をContext Cacheとして保持する。
+    毎ターンの再送信をなくし、初回以降のTTFT（最初のトークンまでの時間）を削減する。
+    作成失敗時は透過的にNoneを返し、呼び出し側はフォールバックする。"""
+
+    _TTL_SEC        = 300   # 5分 (Gemini最小TTL = 60秒)
+    _REFRESH_MARGIN = 30    # 期限30秒前に再作成
+
+    def __init__(self):
+        self._name:         Optional[str] = None   # "cachedContents/xxxx"
+        self._expires:      float         = 0.0    # monotonic time
+        self._content_hash: str           = ""
+        self._cached_model: str           = ""
+
+    def get(self, config: "GoogleAIConfig", system_prompt: str,
+             tool_specs: list[dict]) -> Optional[str]:
+        """有効なキャッシュ名を返す。期限切れ・内容変化時は再作成する。失敗時はNone。"""
+        import hashlib
+        h = hashlib.md5((system_prompt + repr(tool_specs)).encode()).hexdigest()[:12]
+        now = time.monotonic()
+        if (self._name
+                and self._cached_model == config.model
+                and self._content_hash == h
+                and now < self._expires - self._REFRESH_MARGIN):
+            return self._name
+        name = self._create(config, system_prompt, tool_specs)
+        if name:
+            self._name         = name
+            self._expires      = now + self._TTL_SEC
+            self._content_hash = h
+            self._cached_model = config.model
+            safe_print(C.gray(f"  [GeminiCache] キャッシュ作成: {name}"), flush=True)
+        else:
+            self._name = None
+        return self._name
+
+    def invalidate(self) -> None:
+        self._name    = None
+        self._expires = 0.0
+
+    @staticmethod
+    def _create(config: "GoogleAIConfig", system_prompt: str,
+                  tool_specs: list[dict]) -> Optional[str]:
+        """Gemini cachedContents APIを呼び出してキャッシュを作成し名前を返す。"""
+        fn_decls = [
+            {
+                "name":        s["function"]["name"],
+                "description": s["function"].get("description", ""),
+                "parameters":  s["function"].get("parameters", {}),
+            }
+            for s in tool_specs if s.get("function", {}).get("name")
+        ]
+        body: dict = {
+            "model": f"models/{config.model}",
+            "ttl":   f"{GeminiContextCacheManager._TTL_SEC}s",
+        }
+        if system_prompt:
+            body["systemInstruction"] = {"parts": [{"text": system_prompt}]}
+        if fn_decls:
+            body["tools"] = [{"functionDeclarations": fn_decls}]
+
+        api_key = config.api_keys[0] if config.api_keys else ""
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/cachedContents"
+            f"?key={api_key}"
+        )
+        try:
+            data = json.dumps(body).encode()
+            req  = urllib.request.Request(
+                url, data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return json.loads(resp.read()).get("name")
+        except Exception as e:
+            safe_print(C.gray(f"  [GeminiCache] 作成失敗（フォールバック）: {e}"), flush=True)
+            return None
 
 
 def _is_context_exceeded(message: str) -> bool:
@@ -203,10 +284,12 @@ def _build_openrouter_payload(
     system_prompt: Optional[str],
     json_mode: bool,
     prompt_cache_key: Optional[str] = None,
+    cached_content_name: Optional[str] = None,
 ) -> tuple[dict, str]:
-    """ペイロードと使用する API キーを返す。変換不要・全てネイティブ OpenAI 形式。"""
+    """ペイロードと使用する API キーを返す。変換不要・全てネイティブ OpenAI 形式。
+    cached_content_name が指定された場合はシステムプロンプトとツール定義をキャッシュ参照に置き換える。"""
     send_messages = []
-    if system_prompt:
+    if system_prompt and not cached_content_name:
         send_messages.append({"role": "system", "content": system_prompt})
     for m in messages:
         clean = {k: v for k, v in m.items() if not k.startswith("_")}
@@ -220,22 +303,15 @@ def _build_openrouter_payload(
     if config.max_tokens > 0:
         payload["max_tokens"] = config.max_tokens
 
-    if tool_specs:
+    if cached_content_name:
+        # システムプロンプト・ツール定義はキャッシュに含まれているため送信不要
+        payload["cachedContent"] = cached_content_name
+    elif tool_specs:
         payload["tools"] = tool_specs  # 既に OpenAI 形式
         payload["tool_choice"] = "auto"
 
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
-
-    if isinstance(config, GoogleAIConfig) and config.thinking_setting is not None:
-        _ts = config.thinking_setting.strip().lower()
-        if not _ts.lstrip("-").isdigit():
-            # レベル指定 → OpenAI互換エンドポイントは reasoning_effort を使う
-            # minimal は low にフォールバック（OpenAI互換仕様にない）
-            _effort_map = {"none": "none", "minimal": "low", "low": "low", "medium": "medium", "high": "high"}
-            _effort = _effort_map.get(_ts, _ts)
-            payload["reasoning_effort"] = _effort
-        # 数値指定はOpenAI互換エンドポイント非対応のためスキップ
 
     if prompt_cache_key and isinstance(config, MistralConfig):
         payload["prompt_cache_key"] = prompt_cache_key
@@ -251,8 +327,12 @@ def _call_openrouter_api(
     system_prompt: Optional[str] = None,
     json_mode: bool = False,
     prompt_cache_key: Optional[str] = None,
+    cached_content_name: Optional[str] = None,
 ) -> dict:
-    payload, api_key = _build_openrouter_payload(config, messages, tool_specs, system_prompt, json_mode, prompt_cache_key)
+    payload, api_key = _build_openrouter_payload(
+        config, messages, tool_specs, system_prompt, json_mode,
+        prompt_cache_key, cached_content_name,
+    )
     url = f"{config.api_base}/chat/completions"
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
@@ -290,13 +370,17 @@ def _stream_openrouter_api(
     json_mode: bool = False,
     on_model=None,
     prompt_cache_key: Optional[str] = None,
+    cached_content_name: Optional[str] = None,
 ):
     """
     ストリーミング呼び出し。
     yields (text_chunk: str, tool_calls: list[dict], finish_reason: str)
     on_model(actual_model_id) は最初のチャンクで実際のモデルが判明した時点で1度だけ呼ばれる。
     """
-    payload, api_key = _build_openrouter_payload(config, messages, tool_specs, system_prompt, json_mode, prompt_cache_key)
+    payload, api_key = _build_openrouter_payload(
+        config, messages, tool_specs, system_prompt, json_mode,
+        prompt_cache_key, cached_content_name,
+    )
     payload["stream"] = True
 
     url = f"{config.api_base}/chat/completions"
@@ -334,7 +418,6 @@ def _stream_openrouter_api(
                                 args = {}
                             chunk_tools.append({
                             "name": t.get("name", ""), "args": args, "id": t.get("id", ""),
-                            "thought_signature": t.get("thought_signature", ""),
                         })
                         yield "", chunk_tools, "tool_calls"
                     if data_str == "[DONE]":
@@ -373,7 +456,7 @@ def _stream_openrouter_api(
                 for tc_delta in (delta.get("tool_calls") or []):
                     idx = tc_delta.get("index", 0)
                     if idx not in accumulated_tools:
-                        accumulated_tools[idx] = {"id": "", "name": "", "arguments": "", "thought_signature": ""}
+                        accumulated_tools[idx] = {"id": "", "name": "", "arguments": ""}
                     if tc_delta.get("id"):
                         accumulated_tools[idx]["id"] = tc_delta["id"]
                     fn = tc_delta.get("function") or {}
@@ -381,12 +464,6 @@ def _stream_openrouter_api(
                         accumulated_tools[idx]["name"] = fn["name"]
                     if fn.get("arguments"):
                         accumulated_tools[idx]["arguments"] += fn["arguments"]
-                    sig = (fn.get("thought_signature")
-                           or tc_delta.get("thought_signature")
-                           or tc_delta.get("extra_content", {}).get("google", {}).get("thought_signature"))
-                    if sig:
-                        accumulated_tools[idx]["thought_signature"] = sig
-
                 if finish_reason:
                     chunk_tools = []
                     for i in sorted(accumulated_tools):
@@ -397,7 +474,6 @@ def _stream_openrouter_api(
                             args = {}
                         chunk_tools.append({
                             "name": t.get("name", ""), "args": args, "id": t.get("id", ""),
-                            "thought_signature": t.get("thought_signature", ""),
                         })
                     accumulated_tools.clear()
                     yield text_chunk, chunk_tools, finish_reason
@@ -421,21 +497,13 @@ def _stream_openrouter_api(
 
 
 
-# ── thought_signature 保持ヘルパー ────────────────────────────────
-
 def _build_tool_call_entry(tc: dict) -> dict:
-    """tool_calls エントリを構築する。Gemini thinking モデルの thought_signature があれば保持する。"""
     call_id = tc.get("id") or f"call_{tc['name']}_{uuid4().hex[:8]}"
     fn: dict = {
         "name": tc["name"],
         "arguments": json.dumps(tc.get("args", {}), ensure_ascii=False),
     }
-    entry: dict = {"id": call_id, "type": "function", "function": fn}
-    sig = tc.get("thought_signature")
-    if sig:
-        # OpenRouter/Gemini形式: extra_content.google.thought_signature に格納して返す
-        entry["extra_content"] = {"google": {"thought_signature": sig}}
-    return entry
+    return {"id": call_id, "type": "function", "function": fn}
 
 
 # ── diff 表示ユーティリティ ───────────────────────────────────────
@@ -471,10 +539,12 @@ class OpenRouterAgent:
         self.json_mode: bool = False
         self._overhead_cache: tuple[float, int] = (0.0, 0)  # (timestamp, value)
         self._session_cache_key: str = uuid4().hex[:16]
+        self._gemini_cache = GeminiContextCacheManager()
         self._update_compaction_threshold()
 
     def set_system_prompt(self, prompt: str):
         self.system_prompt = prompt
+        self._gemini_cache.invalidate()
 
     def _build_context_header(self) -> str:
         sep = "─" * 40
@@ -706,13 +776,20 @@ class OpenRouterAgent:
 
         HTTP ストリームをバックグラウンドスレッドで読み、メインスレッドは
         queue.get(timeout=0.05) でポーリングするため Ctrl+C が確実に機能する。
-        <think>/<thought> タグが閉じないまま _THINK_BUDGET_CHARS を超えた場合は自動停止する。
+        Gemini使用時はContext Cacheを用いてシステムプロンプト+ツール定義の再送信を省く。
         """
         _short = isinstance(self._config, MistralConfig)
         tool_specs = self.tools.get_specs(short=_short)
         attempt = 0
         trim_count = 0
         working_messages = _repair_message_sequence(list(messages))
+
+        # Gemini Context Cache: システムプロンプト+ツール定義を初回のみ送信してキャッシュ
+        _cached_content: Optional[str] = None
+        if isinstance(self._config, GoogleAIConfig):
+            _cached_content = self._gemini_cache.get(
+                self._config, self.system_prompt or "", tool_specs
+            )
 
         while attempt < MAX_RETRIES:
             working_messages = self._trim_to_fit(working_messages)
@@ -736,8 +813,7 @@ class OpenRouterAgent:
                             self._config, working_messages, tool_specs,
                             self.system_prompt, json_mode=self.json_mode,
                             on_model=_on_actual_model,
-                            # prompt_cache_key はマルチターンtool会話では使わない
-                            # （Mistralが処理済みtool_call_idを「予期しない」と拒否するため）
+                            cached_content_name=_cached_content,
                         ):
                             chunk_queue.put(item)
                             if cancel_event.is_set():
@@ -749,12 +825,6 @@ class OpenRouterAgent:
 
                 _thread = threading.Thread(target=_stream_worker, daemon=True)
                 _thread.start()
-
-                # Think ループ検出用フラグ
-                _think_opened = False
-                _think_closed = False
-                _think_re_open  = re.compile(r'<(?:think|thought)>', re.IGNORECASE)
-                _think_re_close = re.compile(r'</(?:think|thought)>', re.IGNORECASE)
 
                 try:
                     while True:
@@ -771,23 +841,6 @@ class OpenRouterAgent:
                         text_chunk, chunk_tools, finish_reason = item
 
                         if text_chunk:
-                            # Think 状態の追跡（最初の300文字 + 新チャンクで開始検出）
-                            if not _think_opened:
-                                if _think_re_open.search(full_text[:300] + text_chunk):
-                                    _think_opened = True
-                            if _think_opened and not _think_closed:
-                                if _think_re_close.search(text_chunk):
-                                    _think_closed = True
-
-                            # Think 予算チェック: 未閉タグのまま上限超過 → 強制停止
-                            if (_think_opened and not _think_closed
-                                    and len(full_text) + len(text_chunk) > _THINK_BUDGET_CHARS):
-                                safe_print(C.yellow(
-                                    f"\n  ⚠ 思考上限 {_THINK_BUDGET_CHARS:,} 文字超過 → ストリームを強制停止"
-                                ), flush=True)
-                                cancel_event.set()
-                                break
-
                             if text_callback is not None:
                                 text_callback(text_chunk)
                             else:
@@ -803,7 +856,6 @@ class OpenRouterAgent:
                                     "name": ct["name"],
                                     "args": dict(ct.get("args", {})),
                                     "id": ct.get("id", ""),
-                                    "thought_signature": ct.get("thought_signature", ""),
                                 })
 
                 except KeyboardInterrupt:
@@ -845,10 +897,6 @@ class OpenRouterAgent:
                     "name": fn.get("name", ""),
                     "args": args,
                     "id": tc.get("id", ""),
-                    "thought_signature": (fn.get("thought_signature")
-                                          or tc.get("thought_signature")
-                                          or tc.get("extra_content", {}).get("google", {}).get("thought_signature")
-                                          or ""),
                 })
             return result
         except (KeyError, IndexError):

@@ -75,6 +75,22 @@ def _build_components(base_dir: str, active_config=None):
         display_fn = _inline_display,
     )
 
+    # Specialist モード用: 旧来の固定ロール委任ツールを除外し
+    # delegate_to_specialist のみを残す（他の通常ツールはすべて利用可能）
+    _SPECIALIST_EXCLUDED_TOOLS = {
+        "delegate_to_team", "delegate_to_team_parallel",
+        "delegate_to_worker", "delegate_research",
+    }
+    _specialist_registry = ToolRegistry()
+    for _name in _base_tools._tools:
+        if _name not in _SPECIALIST_EXCLUDED_TOOLS:
+            _specialist_registry.copy_tool(_name, _base_tools)
+    specialist_tools = MonitoringToolRegistry(
+        base       = _specialist_registry,
+        log        = tool_log,
+        display_fn = _inline_display,
+    )
+
     rotator      = AccountRotator(active_config)
     agent        = OpenRouterAgent(rotator, mon_tools)
     auto_git     = AutoGit()
@@ -157,6 +173,7 @@ def _build_components(base_dir: str, active_config=None):
         tool_log         = tool_log,
         mon_tools        = mon_tools,
         extreme_tools    = extreme_tools,
+        specialist_tools = specialist_tools,
         react_prompt     = react_prompt,
         plan_prompt      = plan_prompt,
         sessions_dir     = sessions_dir,

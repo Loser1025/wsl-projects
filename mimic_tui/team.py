@@ -302,6 +302,46 @@ def run_research_qa(question: str, project_dir: str, config, label: str = "") ->
     return answer
 
 
+def _build_dynamic_system_prompt(role: str, can_write: bool) -> str:
+    """Directorが自由記述したロール説明からシステムプロンプトを組み立てる。"""
+    write_line = (
+        "- write_file, edit_file, patch_file, run_bash でファイル変更・コマンド実行が可能\n"
+        if can_write else ""
+    )
+    return (
+        f"あなたは以下の専門家ロールで動作するエージェントです。\n\n"
+        f"# ロール\n{role}\n\n"
+        f"# 使えるツール\n"
+        f"- read_file, grep_codebase, file_info, smart_read, get_repo_map でプロジェクト内を調査できる\n"
+        f"- web_search / fetch_webpage で外部情報を調べられる\n"
+        f"{write_line}"
+        f"\n# 重要\nロールの専門性に集中し、範囲外の作業は行わない。"
+        f"最終回答は日本語で簡潔に結果のみ伝える。"
+    )
+
+
+def run_specialist_task(role: str, task: str, project_dir: str, config,
+                         can_write: bool = False, label: str = "") -> str:
+    """動的ロール定義のエージェントを実行する。"""
+    effective_label = label or role[:20]
+    system_prompt = _build_dynamic_system_prompt(role, can_write)
+
+    if can_write:
+        enriched = f"[あなたのロール]\n{role}\n\n[タスク]\n{task}"
+        return run_worker_once(enriched, project_dir, config, label=effective_label)
+    else:
+        registry = _build_researcher_registry()
+        prompt = (
+            f"[作業フォルダ] {Path(project_dir).resolve()}\n\n"
+            f"[タスク]\n{task}\n"
+        )
+        return _run_isolated(
+            config, registry, system_prompt, prompt,
+            max_rounds=_RESEARCHER_MAX_ROUNDS,
+            label=effective_label, role=role[:20],
+        )
+
+
 def run_research(task: str, project_dir: str, config, label: str = "") -> str:
     """元の指示をもとに調査を行い、Worker向けの設計ワークフローを返す。"""
     registry = _build_researcher_registry()

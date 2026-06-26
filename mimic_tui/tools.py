@@ -915,6 +915,56 @@ def delegate_research(question: str, project_dir: str = ".") -> str:
 
 
 @tools.register(
+    name="delegate_to_specialist",
+    description=(
+        "指定したロール説明を持つ専門家エージェントにタスクを委任する。"
+        "ロールはDirectorが自由に定義できる"
+        "（例: 'TypeScript型エラーの診断専門家'、'セキュリティレビュアー'、'テストコードライター'）。"
+        "can_write=False（デフォルト）なら読み取り専用のResearcher相当、"
+        "can_write=TrueならOverlayFS隔離Worker相当で実行する。"
+        "固定ロール（delegate_to_team / delegate_to_worker）が使えないSpecialistモード専用。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "role": {
+                "type": "string",
+                "description": (
+                    "専門家ロールの説明。エージェントの専門性・視点・制約を自由に記述する"
+                    "（例: 'セキュリティ脆弱性の診断専門家。認証・認可・入力検証の観点で調査する'）"
+                ),
+            },
+            "task": {
+                "type": "string",
+                "description": "そのロールに実行させるタスク",
+            },
+            "can_write": {
+                "type": "boolean",
+                "description": (
+                    "Trueでファイル変更可能なWorker（OverlayFS隔離）、"
+                    "False（デフォルト）で読み取り専用"
+                ),
+                "default": False,
+            },
+            "project_dir": {
+                "type": "string",
+                "description": "作業ディレクトリ（デフォルト: カレント）",
+                "default": ".",
+            },
+        },
+        "required": ["role", "task"],
+    },
+)
+def delegate_to_specialist(role: str, task: str,
+                            can_write: bool = False, project_dir: str = ".") -> str:
+    from .team import run_specialist_task, _get_team_config
+    return run_specialist_task(
+        role, task, project_dir, _get_team_config(),
+        can_write=can_write, label=role[:15],
+    )
+
+
+@tools.register(
     name="get_delegation_trace",
     description=(
         "delegate_to_team / delegate_to_worker の実行結果に含まれるtrace_idを指定し、"

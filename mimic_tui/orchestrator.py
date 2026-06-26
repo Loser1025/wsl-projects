@@ -319,6 +319,32 @@ delegate_to_teamは内部で Researcher（調査・設計ワークフロー作�
 ツール名を書いても実行されない（最終回答として打ち切られる）。
 """
 
+SPECIALIST_REACT_SYSTEM_PROMPT = """
+# 役割と行動指針（Specialist = 動的ロール委任モード）
+このモードでは固定ロール委任ツール（delegate_to_team / delegate_to_team_parallel /
+delegate_to_worker / delegate_research）は使用できません。
+代わりに **delegate_to_specialist(role, task, can_write)** を使い、
+タスクに合わせた専門家ロールを自分で定義して委任します。
+
+## delegate_to_specialist の使い方
+- `role`: 専門家の視点・制約・ゴールを自由に日本語で記述する
+  例: "TypeScript型エラーと循環インポートの診断専門家"
+      "pytestテストコードライター。既存テストのスタイルと命名規則に合わせる"
+      "セキュリティレビュアー。認証・入力検証・権限チェックの観点で調査する"
+- `can_write=False`（デフォルト）: 読み取り専用の調査・レビュー・回答に使う
+- `can_write=True`: ファイル変更が必要な実装・修正タスクに使う（OverlayFS隔離）
+
+## 直接作業 vs 委任の使い分け
+- 自分でファイル読み書きやシェル実行が必要なら通常ツール（read_file / run_bash 等）を使う
+- フレッシュな文脈で専門的な調査・実装をさせたいときに delegate_to_specialist を使う
+- 複数の独立した専門タスクは複数回 delegate_to_specialist を呼んで対処する
+
+## ツール呼び出しの形式（必須）
+**ツール呼び出しは必ずAPIのtool_calls機能（JSON形式）で行うこと。**
+テキスト内に `<tool_call>`, `<function=...>`, `<invoke>` などのXML形式で
+ツール名を書いても実行されない（最終回答として打ち切られる）。
+"""
+
 class InteractiveOrchestrator:
     """
     ReAct（Reason + Act）ベースの対話型オーケストレーター。
@@ -342,25 +368,6 @@ class InteractiveOrchestrator:
     @staticmethod
     def _fmt_args(args: dict) -> str:
         return ", ".join(f"{k}={repr(v)[:40]}" for k, v in args.items())
-
-    @staticmethod
-    def _extract_thought(text: str) -> str:
-        """<think>/<thought> タグ内の思考テキストを抽出する。タグがなければ空文字を返す。"""
-        if not text:
-            return ""
-        m = re.search(r'<(?:think|thought)>(.*?)</(?:think|thought)>', text, re.DOTALL | re.IGNORECASE)
-        if m:
-            return m.group(1).strip()
-        for line in text.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("Thought:"):
-                return stripped[len("Thought:"):].strip()
-        return ""
-
-    @staticmethod
-    def _strip_thinking(text: str) -> str:
-        """ログ保存前に <think>/<thought> タグとその内容を除去する。"""
-        return re.sub(r'<(?:think|thought)>.*?</(?:think|thought)>', '', text, flags=re.DOTALL | re.IGNORECASE).strip()
 
     def _execute_with_intervention(
         self, fn_name: str, fn_args: dict, error_counts: dict
@@ -492,12 +499,6 @@ class InteractiveOrchestrator:
             if text == "__interrupted__":
                 return "処理を中断しました。"
 
-            # ── Thought ログ記録 ──────────────────────────────────
-            if text:
-                thought = self._extract_thought(text)
-                if thought:
-                    self.react_log.add("thought", content=thought, step=step_count)
-
             # ── XML形式ツール呼び出し救済 ────────────────────────
             # tool_callsが空でもテキストにXML形式の呼び出しが含まれていればパースして実行する
             if not tool_calls and text and _XML_TOOL_PATTERN.search(text):
@@ -548,7 +549,7 @@ class InteractiveOrchestrator:
                     continue
 
                 final_text = text or "(応答なし)"
-                self.react_log.add("final_answer", content=self._strip_thinking(final_text))
+                self.react_log.add("final_answer", content=final_text)
 
                 # ターン内の複数checkpointコミットを1つにまとめる（git log を読みやすくする）。
                 # _checkpointsが空（書き込みなし）なら squash() は即リターンして何もしない。
