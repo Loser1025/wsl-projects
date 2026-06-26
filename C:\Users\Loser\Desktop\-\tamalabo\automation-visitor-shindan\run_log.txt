@@ -1,0 +1,314 @@
+=== 実行開始: 2026-06-26 09:24:14.644687 ===
+【管理画面抽出】開始
+ブラウザ起動中...
+メイン処理エラー: BrowserType.launch: Executable doesn't exist at /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+Traceback (most recent call last):
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 256, in main
+    await run_management_extraction()
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 56, in run_management_extraction
+    browser, page = await login_and_get_page(p)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 28, in login_and_get_page
+    browser = await p.chromium.launch(headless=True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/async_api/_generated.py", line 16307, in launch
+    await self._impl_obj.launch(
+    ...<17 lines>...
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_browser_type.py", line 98, in launch
+    await self._channel.send(
+        "launch", TimeoutSettings.launch_timeout, params
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 69, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 559, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.Error: BrowserType.launch: Executable doesn't exist at /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+=== 実行開始: 2026-06-26 09:24:46.256399 ===
+【管理画面抽出】開始
+ブラウザ起動中...
+メイン処理エラー: BrowserType.launch: Executable doesn't exist at /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+Traceback (most recent call last):
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 256, in main
+    await run_management_extraction()
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 56, in run_management_extraction
+    browser, page = await login_and_get_page(p)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 28, in login_and_get_page
+    browser = await p.chromium.launch(headless=True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/async_api/_generated.py", line 16307, in launch
+    await self._impl_obj.launch(
+    ...<17 lines>...
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_browser_type.py", line 98, in launch
+    await self._channel.send(
+        "launch", TimeoutSettings.launch_timeout, params
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 69, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 559, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.Error: BrowserType.launch: Executable doesn't exist at /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+=== 実行開始: 2026-06-26 09:25:06.151168 ===
+【管理画面抽出】開始
+ブラウザ起動中...
+メイン処理エラー: BrowserType.launch: Executable doesn't exist at /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+Traceback (most recent call last):
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 256, in main
+    await run_management_extraction()
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 56, in run_management_extraction
+    browser, page = await login_and_get_page(p)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 28, in login_and_get_page
+    browser = await p.chromium.launch(headless=True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/async_api/_generated.py", line 16307, in launch
+    await self._impl_obj.launch(
+    ...<17 lines>...
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_browser_type.py", line 98, in launch
+    await self._channel.send(
+        "launch", TimeoutSettings.launch_timeout, params
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 69, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 559, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.Error: BrowserType.launch: Executable doesn't exist at /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+=== 実行開始: 2026-06-26 09:25:11.508717 ===
+【管理画面抽出】開始
+ブラウザ起動中...
+メイン処理エラー: BrowserType.launch: Executable doesn't exist at /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+Traceback (most recent call last):
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 256, in main
+    await run_management_extraction()
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 56, in run_management_extraction
+    browser, page = await login_and_get_page(p)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 28, in login_and_get_page
+    browser = await p.chromium.launch(headless=True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/async_api/_generated.py", line 16307, in launch
+    await self._impl_obj.launch(
+    ...<17 lines>...
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_browser_type.py", line 98, in launch
+    await self._channel.send(
+        "launch", TimeoutSettings.launch_timeout, params
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 69, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 559, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.Error: BrowserType.launch: Executable doesn't exist at /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+=== 実行開始: 2026-06-26 09:25:49.030777 ===
+【管理画面抽出】開始
+ブラウザ起動中...
+メイン処理エラー: BrowserType.launch: Target page, context or browser has been closed
+Browser logs:
+
+<launching> /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/tmp/playwright_chromiumdev_profile-GwUYkf --remote-debugging-pipe --no-startup-window
+<launched> pid=13241
+[pid=13241][err] /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell: error while loading shared libraries: libasound.so.2: cannot open shared object file: No such file or directory
+Call log:
+  - <launching> /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/tmp/playwright_chromiumdev_profile-GwUYkf --remote-debugging-pipe --no-startup-window
+  - <launched> pid=13241
+  - [pid=13241][err] /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell: error while loading shared libraries: libasound.so.2: cannot open shared object file: No such file or directory
+  - [pid=13241] <gracefully close start>
+  - [pid=13241] <kill>
+  - [pid=13241] <will force kill>
+  - [pid=13241] exception while trying to kill process: Error: kill ESRCH
+  - [pid=13241] <process did exit: exitCode=127, signal=null>
+  - [pid=13241] starting temporary directories cleanup
+  - [pid=13241] finished temporary directories cleanup
+  - [pid=13241] <gracefully close end>
+
+Traceback (most recent call last):
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 256, in main
+    await run_management_extraction()
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 56, in run_management_extraction
+    browser, page = await login_and_get_page(p)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 28, in login_and_get_page
+    browser = await p.chromium.launch(headless=True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/async_api/_generated.py", line 16307, in launch
+    await self._impl_obj.launch(
+    ...<17 lines>...
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_browser_type.py", line 98, in launch
+    await self._channel.send(
+        "launch", TimeoutSettings.launch_timeout, params
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 69, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 559, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.TargetClosedError: BrowserType.launch: Target page, context or browser has been closed
+Browser logs:
+
+<launching> /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/tmp/playwright_chromiumdev_profile-GwUYkf --remote-debugging-pipe --no-startup-window
+<launched> pid=13241
+[pid=13241][err] /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell: error while loading shared libraries: libasound.so.2: cannot open shared object file: No such file or directory
+Call log:
+  - <launching> /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/tmp/playwright_chromiumdev_profile-GwUYkf --remote-debugging-pipe --no-startup-window
+  - <launched> pid=13241
+  - [pid=13241][err] /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell: error while loading shared libraries: libasound.so.2: cannot open shared object file: No such file or directory
+  - [pid=13241] <gracefully close start>
+  - [pid=13241] <kill>
+  - [pid=13241] <will force kill>
+  - [pid=13241] exception while trying to kill process: Error: kill ESRCH
+  - [pid=13241] <process did exit: exitCode=127, signal=null>
+  - [pid=13241] starting temporary directories cleanup
+  - [pid=13241] finished temporary directories cleanup
+  - [pid=13241] <gracefully close end>
+
+=== 実行開始: 2026-06-26 09:26:01.300019 ===
+【管理画面抽出】開始
+ブラウザ起動中...
+メイン処理エラー: BrowserType.launch: Target page, context or browser has been closed
+Browser logs:
+
+<launching> /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/tmp/playwright_chromiumdev_profile-BjyY3s --remote-debugging-pipe --no-startup-window
+<launched> pid=13304
+[pid=13304][err] /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell: error while loading shared libraries: libasound.so.2: cannot open shared object file: No such file or directory
+Call log:
+  - <launching> /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/tmp/playwright_chromiumdev_profile-BjyY3s --remote-debugging-pipe --no-startup-window
+  - <launched> pid=13304
+  - [pid=13304][err] /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell: error while loading shared libraries: libasound.so.2: cannot open shared object file: No such file or directory
+  - [pid=13304] <gracefully close start>
+  - [pid=13304] <kill>
+  - [pid=13304] <will force kill>
+  - [pid=13304] <process did exit: exitCode=127, signal=null>
+  - [pid=13304] starting temporary directories cleanup
+  - [pid=13304] finished temporary directories cleanup
+  - [pid=13304] <gracefully close end>
+
+Traceback (most recent call last):
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 256, in main
+    await run_management_extraction()
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 56, in run_management_extraction
+    browser, page = await login_and_get_page(p)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/Loser/Desktop/-/tamalabo/automation-visitor-shindan/count_visitors_final.py", line 28, in login_and_get_page
+    browser = await p.chromium.launch(headless=True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/async_api/_generated.py", line 16307, in launch
+    await self._impl_obj.launch(
+    ...<17 lines>...
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_browser_type.py", line 98, in launch
+    await self._channel.send(
+        "launch", TimeoutSettings.launch_timeout, params
+    )
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 69, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/tmp/mimic_subagent_single_3mv4ulkh/merged/venv/lib/python3.14/site-packages/playwright/_impl/_connection.py", line 559, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.TargetClosedError: BrowserType.launch: Target page, context or browser has been closed
+Browser logs:
+
+<launching> /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/tmp/playwright_chromiumdev_profile-BjyY3s --remote-debugging-pipe --no-startup-window
+<launched> pid=13304
+[pid=13304][err] /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell: error while loading shared libraries: libasound.so.2: cannot open shared object file: No such file or directory
+Call log:
+  - <launching> /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/tmp/playwright_chromiumdev_profile-BjyY3s --remote-debugging-pipe --no-startup-window
+  - <launched> pid=13304
+  - [pid=13304][err] /home/loser/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell: error while loading shared libraries: libasound.so.2: cannot open shared object file: No such file or directory
+  - [pid=13304] <gracefully close start>
+  - [pid=13304] <kill>
+  - [pid=13304] <will force kill>
+  - [pid=13304] <process did exit: exitCode=127, signal=null>
+  - [pid=13304] starting temporary directories cleanup
+  - [pid=13304] finished temporary directories cleanup
+  - [pid=13304] <gracefully close end>
+
