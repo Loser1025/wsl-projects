@@ -38,12 +38,14 @@ class GeminiContextCacheManager:
 
     _TTL_SEC        = 300   # 5分 (Gemini最小TTL = 60秒)
     _REFRESH_MARGIN = 30    # 期限30秒前に再作成
+    _FAIL_BACKOFF   = 600   # 失敗後の再試行抑止期間（10分）
 
     def __init__(self):
         self._name:         Optional[str] = None   # "cachedContents/xxxx"
         self._expires:      float         = 0.0    # monotonic time
         self._content_hash: str           = ""
         self._cached_model: str           = ""
+        self._fail_until:   float         = 0.0    # この時刻まで_create()を試みない
 
     def get(self, config: "GoogleAIConfig", system_prompt: str,
              tool_specs: list[dict]) -> Optional[str]:
@@ -56,15 +58,24 @@ class GeminiContextCacheManager:
                 and self._content_hash == h
                 and now < self._expires - self._REFRESH_MARGIN):
             return self._name
+        # モデルが変わった場合はバックオフをリセット
+        if self._cached_model and self._cached_model != config.model:
+            self._fail_until = 0.0
+        # 失敗バックオフ中はスキップ（ログなし）
+        if now < self._fail_until:
+            return None
         name = self._create(config, system_prompt, tool_specs)
         if name:
             self._name         = name
             self._expires      = now + self._TTL_SEC
             self._content_hash = h
             self._cached_model = config.model
+            self._fail_until   = 0.0
             safe_print(C.gray(f"  [GeminiCache] キャッシュ作成: {name}"), flush=True)
         else:
-            self._name = None
+            self._name         = None
+            self._cached_model = config.model
+            self._fail_until   = now + self._FAIL_BACKOFF
         return self._name
 
     def invalidate(self) -> None:
@@ -106,6 +117,10 @@ class GeminiContextCacheManager:
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 return json.loads(resp.read()).get("name")
+        except urllib.error.HTTPError as e:
+            # 404/400 = モデルがキャッシュ非対応（preview系など）。初回のみ表示。
+            safe_print(C.gray(f"  [GeminiCache] このモデルはキャッシュ非対応（HTTP {e.code}）、以降スキップ"), flush=True)
+            return None
         except Exception as e:
             safe_print(C.gray(f"  [GeminiCache] 作成失敗（フォールバック）: {e}"), flush=True)
             return None
