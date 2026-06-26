@@ -418,6 +418,7 @@ def _stream_openrouter_api(
                                 args = {}
                             chunk_tools.append({
                             "name": t.get("name", ""), "args": args, "id": t.get("id", ""),
+                            "thought_signature": t.get("thought_signature", ""),
                         })
                         yield "", chunk_tools, "tool_calls"
                     if data_str == "[DONE]":
@@ -456,7 +457,7 @@ def _stream_openrouter_api(
                 for tc_delta in (delta.get("tool_calls") or []):
                     idx = tc_delta.get("index", 0)
                     if idx not in accumulated_tools:
-                        accumulated_tools[idx] = {"id": "", "name": "", "arguments": ""}
+                        accumulated_tools[idx] = {"id": "", "name": "", "arguments": "", "thought_signature": ""}
                     if tc_delta.get("id"):
                         accumulated_tools[idx]["id"] = tc_delta["id"]
                     fn = tc_delta.get("function") or {}
@@ -464,6 +465,8 @@ def _stream_openrouter_api(
                         accumulated_tools[idx]["name"] = fn["name"]
                     if fn.get("arguments"):
                         accumulated_tools[idx]["arguments"] += fn["arguments"]
+                    if fn.get("thought_signature"):
+                        accumulated_tools[idx]["thought_signature"] = fn["thought_signature"]
                 if finish_reason:
                     chunk_tools = []
                     for i in sorted(accumulated_tools):
@@ -474,6 +477,7 @@ def _stream_openrouter_api(
                             args = {}
                         chunk_tools.append({
                             "name": t.get("name", ""), "args": args, "id": t.get("id", ""),
+                            "thought_signature": t.get("thought_signature", ""),
                         })
                     accumulated_tools.clear()
                     yield text_chunk, chunk_tools, finish_reason
@@ -503,6 +507,9 @@ def _build_tool_call_entry(tc: dict) -> dict:
         "name": tc["name"],
         "arguments": json.dumps(tc.get("args", {}), ensure_ascii=False),
     }
+    sig = tc.get("thought_signature", "")
+    if sig:
+        fn["thought_signature"] = sig
     return {"id": call_id, "type": "function", "function": fn}
 
 
@@ -856,6 +863,7 @@ class OpenRouterAgent:
                                     "name": ct["name"],
                                     "args": dict(ct.get("args", {})),
                                     "id": ct.get("id", ""),
+                                    "thought_signature": ct.get("thought_signature", ""),
                                 })
 
                 except KeyboardInterrupt:
@@ -897,6 +905,7 @@ class OpenRouterAgent:
                     "name": fn.get("name", ""),
                     "args": args,
                     "id": tc.get("id", ""),
+                    "thought_signature": fn.get("thought_signature", ""),
                 })
             return result
         except (KeyError, IndexError):
