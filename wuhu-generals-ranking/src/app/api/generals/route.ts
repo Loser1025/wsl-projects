@@ -23,7 +23,7 @@ export async function GET() {
 
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = '1YMxcM8b3TyOK55GQYHgN0Wa3rfseeNKv2iJFJEJ8fJQ';
-    const range = 'ランキング!A2:E7';
+    const range = 'ランキング!A2:E9';
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
