@@ -192,6 +192,16 @@ ${scoresExample}
 }
 
 // 比較レスポンス解析
+function safeJsonParse(text) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error('[ERROR] JSONパース失敗:', error.message);
+    console.error('パース対象テキスト(スニペット):', text.substring(0, 200));
+    throw new Error(`JSONパースエラー: ${error.message}`);
+  }
+}
+
 function parseCompareResponse(text) {
   try {
     let jsonText = text.trim();
@@ -204,7 +214,7 @@ function parseCompareResponse(text) {
       if (match && match[1]) jsonText = match[1].trim();
     }
 
-    const result = JSON.parse(jsonText);
+    const result = safeJsonParse(jsonText);
 
     const normalizeSide = (side) => {
       const overall = Math.max(0, Math.min(100, parseInt(side && side.overall_score) || 0));
@@ -270,10 +280,7 @@ function parseResponse(text) {
     }
     
     // JSONパース
-    console.log('JSONパースを試みます...');
-    console.log('パース対象テキスト:', jsonText.substring(0, 200));
-    
-    const result = JSON.parse(jsonText);
+    const result = safeJsonParse(jsonText);
 
     result.overall_score = Math.max(0, Math.min(100, parseInt(result.overall_score) || 0));
     if (!Array.isArray(result.scores)) {
