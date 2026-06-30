@@ -1,7 +1,7 @@
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env.local') });
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
 const { GoogleGenAI } = require('@google/genai');
 
 const app = express();
@@ -443,10 +443,9 @@ async function compareUriWithFallback(prompt, fileUriA, fileUriB, mimeType) {
 }
 
 // バッファを Gemini Files API にアップロードして ACTIVE になるまで待つ
-async function uploadToGemini(filePath, mimeType, apiKey) {
+async function uploadToGemini(fileData, mimeType, apiKey) {
   const ai = new GoogleGenAI({ apiKey });
-  const data = fs.readFileSync(filePath);
-  const blob = new Blob([data], { type: mimeType });
+  const blob = new Blob([fileData], { type: mimeType });
 
   let file = await ai.files.upload({
     file: blob,
@@ -466,7 +465,7 @@ async function uploadToGemini(filePath, mimeType, apiKey) {
   return file;
 }
 
-// Google Drive の共有リンクから動画をダウンロードし、ローカルの一時ファイルパスを返す
+// Google Drive の共有リンクから動画をダウンロードし、Buffer を返す（ファイル書き込みなし）
 async function downloadDriveVideo(driveUrl) {
   const match = driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
   const fileId = match ? match[1] : null;
@@ -481,8 +480,6 @@ async function downloadDriveVideo(driveUrl) {
     maxRedirects: 10,
     headers: { 'User-Agent': 'Mozilla/5.0' }
   });
-
-  const videoPath = `/tmp/drive_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.mp4`;
 
   const initialUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=no_virus_check`;
   console.log(`[DEBUG] 初回リクエスト URL: ${initialUrl}`);
@@ -506,6 +503,7 @@ async function downloadDriveVideo(driveUrl) {
   const confirmMatch = html.match(/name="confirm" value="([0-9A-Za-z_-]+)"/);
   const uuidMatch = html.match(/name="uuid" value="([0-9A-Fa-f-]+)"/);
 
+  let videoBuffer;
   if (confirmMatch) {
     const token = confirmMatch[1];
     const uuid = uuidMatch ? uuidMatch[1] : '';
@@ -526,21 +524,19 @@ async function downloadDriveVideo(driveUrl) {
     if (Buffer.byteLength(confirmed.data) === 2436) {
       throw new Error('Download failed: Received warning page instead of file.');
     }
-    fs.writeFileSync(videoPath, confirmed.data);
+    videoBuffer = Buffer.from(confirmed.data);
   } else {
     if (Buffer.byteLength(dlResponse.data) === 2436) {
       throw new Error('Download failed: Received warning page instead of file.');
     }
-    fs.writeFileSync(videoPath, dlResponse.data);
+    videoBuffer = Buffer.from(dlResponse.data);
   }
 
-  const stat = fs.statSync(videoPath);
-  if (stat.size < 1024) {
-    fs.unlinkSync(videoPath);
+  if (videoBuffer.length < 1024) {
     throw new Error('動画ファイルのダウンロードに失敗しました（ファイルが空または無効です）。共有設定を確認してください。');
   }
-  console.log(`[INFO] ダウンロード完了: ${videoPath}, サイズ = ${stat.size} bytes`);
-  return videoPath;
+  console.log(`[INFO] ダウンロード完了: サイズ = ${videoBuffer.length} bytes`);
+  return videoBuffer;
 }
 
 // ルート
@@ -566,7 +562,6 @@ app.post('/api/analyze/drive', async (req, res) => {
     console.log(`GEMINI_KEY_${i}: ${process.env[`GEMINI_KEY_${i}`] ? '設定済み' : '未設定'}`);
   }
 
-  const videoPaths = [];   // 後始末対象の一時ファイル（成功分のみ随時追加）
   const geminiFiles = [];  // 後始末対象のGeminiアップロード済みファイル（成功分のみ随時追加）
   let uploadApiKey = null;
 
@@ -594,11 +589,10 @@ app.post('/api/analyze/drive', async (req, res) => {
     if (!isCompare) {
       // ── 単体分析 ──────────────────────────────
       console.log(`[DEBUG] ダウンロード開始: ${drive_url}`);
-      const videoPath = await downloadDriveVideo(drive_url);
-      videoPaths.push(videoPath);
+      const videoBuffer = await downloadDriveVideo(drive_url);
 
-      console.log(`[DEBUG] Geminiへアップロード開始: ${videoPath}`);
-      const geminiFile = await uploadToGemini(videoPath, mimeType, uploadApiKey);
+      console.log(`[DEBUG] Geminiへアップロード開始`);
+      const geminiFile = await uploadToGemini(videoBuffer, mimeType, uploadApiKey);
       geminiFiles.push(geminiFile);
       console.log(`[DEBUG] アップロード完了: ${geminiFile.name}`);
 
@@ -614,26 +608,21 @@ app.post('/api/analyze/drive', async (req, res) => {
       // ── 比較分析（2本を並列でダウンロード・アップロードし、1回のリクエストで比較）──
       console.log(`[DEBUG] 比較モード: 2本の動画を並列処理します (${drive_url} / ${compareUrl})`);
 
-      const trackedDownload = async (url) => {
-        const p = await downloadDriveVideo(url);
-        videoPaths.push(p); // 成功した時点で即座に後始末対象へ（片方失敗時も漏れなく削除するため）
-        return p;
-      };
-      const trackedUpload = async (videoPath) => {
-        const f = await uploadToGemini(videoPath, mimeType, uploadApiKey);
+      const trackedUpload = async (videoBuffer) => {
+        const f = await uploadToGemini(videoBuffer, mimeType, uploadApiKey);
         geminiFiles.push(f);
         return f;
       };
 
-      const [pathA, pathB] = await Promise.all([
-        trackedDownload(drive_url),
-        trackedDownload(compareUrl),
+      const [bufferA, bufferB] = await Promise.all([
+        downloadDriveVideo(drive_url),
+        downloadDriveVideo(compareUrl),
       ]);
 
       console.log('[DEBUG] Geminiへ並列アップロード開始');
       const [fileA, fileB] = await Promise.all([
-        trackedUpload(pathA),
-        trackedUpload(pathB),
+        trackedUpload(bufferA),
+        trackedUpload(bufferB),
       ]);
       console.log(`[DEBUG] アップロード完了: ${fileA.name}, ${fileB.name}`);
 
@@ -660,14 +649,6 @@ app.post('/api/analyze/drive', async (req, res) => {
         } catch (e) {
           console.error(`[ERROR] Geminiファイル削除失敗:`, e);
         }
-      }
-    }
-    for (const vp of videoPaths) {
-      try {
-        console.log(`[DEBUG] 一時ファイル削除: ${vp}`);
-        fs.unlinkSync(vp);
-      } catch (e) {
-        console.error(`[ERROR] 一時ファイル削除失敗:`, e);
       }
     }
   }
