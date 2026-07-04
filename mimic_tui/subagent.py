@@ -183,6 +183,7 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
                               verify_cmd: str = "",
                               provider: Optional[str] = None,
                               model: Optional[str] = None,
+                              role_prompt: str = "",
                               ) -> tuple[SubagentResult, Optional[Path], Optional[Path]]:
     """Worker を OverlayFS 隔離下で同期実行する。
 
@@ -230,6 +231,7 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
                 f"MIMIC_PROVIDER={shlex.quote(provider)} "
                 f"MIMIC_MODEL={shlex.quote(model)} "
             )
+        role_env = f"MIMIC_ROLE_PROMPT={shlex.quote(role_prompt)} " if role_prompt else ""
 
         agent_cmd = (
             f"cd {shlex.quote(str(merged))} && "
@@ -237,6 +239,7 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
             f"MIMIC_NO_AUTOGIT=1 "
             f"{trace_env}"
             f"{model_env}"
+            f"{role_env}"
             f"python3 -m mimic_tui --auto-prompt {shlex.quote(task)}"
         )
         inner_cmd = f"{agent_cmd}; agent_exit=$?"

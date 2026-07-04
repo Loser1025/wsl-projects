@@ -75,9 +75,16 @@ def _build_components(base_dir: str, active_config=None):
         display_fn = _inline_display,
     )
 
-    # Specialist モード用: 旧来の固定ロール委任ツールを除外し
-    # delegate_to_specialist のみを残す（他の通常ツールはすべて利用可能）
+    # Specialist モード用: extreme と同じ書き込み・シェル・読み取り・検索・Web ツールを除外し
+    # delegate_to_specialist のみを残す
     _SPECIALIST_EXCLUDED_TOOLS = {
+        # extreme mode と同じ制限
+        "write_file", "edit_file", "patch_file", "delete_file",
+        "run_bash", "run_pipeline",
+        "read_file", "grep_codebase", "file_info",
+        "smart_read", "get_repo_map",
+        "web_search", "fetch_webpage",
+        # 旧来の固定ロール委任ツール
         "delegate_to_team", "delegate_to_team_parallel",
         "delegate_to_worker", "delegate_research",
     }
@@ -255,7 +262,8 @@ def main():
         mon_tools = MonitoringToolRegistry(base=_agent_tools, log=ToolCallLog())
         rotator   = AccountRotator(active_config)
         agent     = OpenRouterAgent(rotator, mon_tools)
-        plan_prompt  = (system_prompt or "") + BASH_EXECUTOR_GUIDANCE
+        role_prompt  = os.environ.get("MIMIC_ROLE_PROMPT", "")
+        plan_prompt  = (role_prompt + "\n\n" if role_prompt else "") + (system_prompt or "") + BASH_EXECUTOR_GUIDANCE
         react_prompt = plan_prompt + REACT_SYSTEM_PROMPT
         if os.environ.get("MIMIC_NO_AUTOGIT"):
             react_prompt += WORKER_COMPLETION_GUIDANCE

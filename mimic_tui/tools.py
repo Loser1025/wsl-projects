@@ -951,16 +951,27 @@ def delegate_research(question: str, project_dir: str = ".") -> str:
                 "description": "作業ディレクトリ（デフォルト: カレント）",
                 "default": ".",
             },
+            "verify_cmd": {
+                "type": "string",
+                "description": (
+                    "can_write=True のとき、Worker実行後にOverlay上で実行する検証コマンド"
+                    "（例: 'pytest tests/test_foo.py -q'）。"
+                    "失敗した場合はWorkerが修正再試行する（最大3回）。"
+                    "can_write=False の場合は無視される。省略可。"
+                ),
+                "default": "",
+            },
         },
         "required": ["role", "task"],
     },
 )
 def delegate_to_specialist(role: str, task: str,
-                            can_write: bool = False, project_dir: str = ".") -> str:
+                            can_write: bool = False, project_dir: str = ".",
+                            verify_cmd: str = "") -> str:
     from .team import run_specialist_task, _get_team_config
     return run_specialist_task(
         role, task, project_dir, _get_team_config(),
-        can_write=can_write, label=role[:15],
+        can_write=can_write, label=role[:15], verify_cmd=verify_cmd,
     )
 
 

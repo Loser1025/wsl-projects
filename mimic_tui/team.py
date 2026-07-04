@@ -321,14 +321,16 @@ def _build_dynamic_system_prompt(role: str, can_write: bool) -> str:
 
 
 def run_specialist_task(role: str, task: str, project_dir: str, config,
-                         can_write: bool = False, label: str = "") -> str:
+                         can_write: bool = False, label: str = "",
+                         verify_cmd: str = "") -> str:
     """動的ロール定義のエージェントを実行する。"""
     effective_label = label or role[:20]
     system_prompt = _build_dynamic_system_prompt(role, can_write)
 
     if can_write:
         enriched = f"[あなたのロール]\n{role}\n\n[タスク]\n{task}"
-        return run_worker_once(enriched, project_dir, config, label=effective_label)
+        return run_worker_once(enriched, project_dir, config, label=effective_label,
+                                role_prompt=system_prompt, verify_cmd=verify_cmd)
     else:
         registry = _build_researcher_registry()
         prompt = (
@@ -354,7 +356,8 @@ def run_research(task: str, project_dir: str, config, label: str = "") -> str:
 
 
 def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_id: str,
-                          label: str, verify_cmd: str, tag: str, print_tag: str) -> str:
+                          label: str, verify_cmd: str, tag: str, print_tag: str,
+                          role_prompt: str = "") -> str:
     """base 上でWorkerを実行し、verify失敗リトライ→適用→マニフェスト解除までを行う共通処理。
 
     新規実行（base は空のOverlay）・再開（base に前回までの変更が残っている）の
@@ -370,6 +373,7 @@ def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_
         task, project_dir, label=label or "single", base=base,
         trace_id=trace_id, verify_cmd=verify_cmd,
         provider=config.name, model=config.model,
+        role_prompt=role_prompt,
     )
 
     # verify失敗ループ: 同じOverlay上でWorkerが修正再試行する
@@ -405,6 +409,7 @@ def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_
             base=base,  # 前回のOverlayを引き継いで続きから作業
             trace_id=trace_id, verify_cmd=verify_cmd,
             provider=config.name, model=config.model,
+            role_prompt=role_prompt,
         )
         if new_upper is None or new_base is None:
             # リトライ自体が失敗（baseも削除済み）→ 直前の結果で打ち切り
@@ -481,7 +486,8 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
                                  verify_cmd, "delegate_to_team", team_tag)
 
 
-def run_worker_once(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "") -> str:
+def run_worker_once(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "",
+                     role_prompt: str = "") -> str:
     """Researcherを介さずWorkerを実行し、verify失敗時は自動リトライ後に変更を適用する。"""
     resolved_dir = str(Path(project_dir).resolve())
     trace_id = uuid.uuid4().hex[:8]
@@ -490,7 +496,8 @@ def run_worker_once(task: str, project_dir: str, config, label: str = "", verify
     _register_inflight(trace_id, base, resolved_dir, task, label, verify_cmd,
                         "worker", config.name, config.model)
     return _run_delegation_core(task, project_dir, config, base, trace_id, label,
-                                 verify_cmd, "delegate_to_worker", "[Worker]")
+                                 verify_cmd, "delegate_to_worker", "[Worker]",
+                                 role_prompt=role_prompt)
 
 
 def resume_delegation(trace_id: str) -> str:

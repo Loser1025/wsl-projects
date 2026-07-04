@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事業部進捗ポータル - Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+    <!-- ナビゲーションバー -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-indigo-600 text-white rounded-lg">
+                        <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <span class="text-lg font-bold text-slate-900">NextGen 事業部ポータル</span>
+                        <span class="text-xs block text-slate-500">各セクション進捗ダッシュボード</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <!-- 今日。2026年想定 -->
+                    <div class="flex items-center space-x-1 text-sm text-slate-500">
+                        <i data-lucide="calendar" class="w-4 h-4"></i>
+                        <span>2026年6月27日 (土)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- 1. 全体サマリー KPI カード -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- 全体進捗 -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">事業部 全体進捗率</p>
+                    <h3 class="text-3xl font-bold text-indigo-600 mt-1" id="overallProgress">0%</h3>
+                    <p class="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                        <i data-lucide="trending-up" class="w-3.5 h-3.5 text-emerald-500"></i> 
+                        <span>完了タスク / 総タスク数</span>
+                    </p>
+                </div>
+                <div class="relative w-16 h-16">
+                    <canvas id="progressChartMini"></canvas>
+                </div>
+            </div>
+
+            <!-- アクティブタスク -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">稼働中タスク数</p>
+                    <h3 class="text-3xl font-bold text-slate-800 mt-1" id="activeTasksCount">0</h3>
+                    <p class="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                        <i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i> 
+                        <span>進行中 & レビュー中</span>
+                    </p>
+                </div>
+                <div class="p-4 bg-amber-50 text-amber-500 rounded-xl">
+                    <i data-lucide="play-circle" class="w-6 h-6"></i>
+                </div>
+            </div>
+
+            <!-- アラート (期限超過または切迫) -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">要フォロー (期限切迫)</p>
+                    <h3 class="text-3xl font-bold text-rose-600 mt-1" id="alertTasksCount">0</h3>
+                    <p class="text-xs text-rose-500 mt-2 flex items-center gap-1">
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> 
+                        <span>期限切れ または 3日以内</span>
+                    </p>
+                </div>
+                <div class="p-4 bg-rose-50 text-rose-500 rounded-xl">
+                    <i data-lucide="alert-circle" class="w-6 h-6"></i>
+                </div>
+            </div>
+
+            <!-- 完了済み -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">完了済みタスク数</p>
+                    <h3 class="text-3xl font-bold text-emerald-600 mt-1" id="doneTasksCount">0</h3>
+                    <p class="text-xs text-emerald-500 mt-2 flex items-center gap-1">
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i> 
+                        <span>クローズされた業務</span>
+                    </p>
+                </div>
+                <div class="p-4 bg-emerald-50 text-emerald-500 rounded-xl">
+                    <i data-lucide="check-square" class="w-6 h-6"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. セクション別進捗状況（グリッド表示） -->
+        <div class="mb-8">
+            <h2 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <i data-lucide="users" class="w-5 h-5 text-indigo-600"></i>
+                セクション別進捗ステータス
+            </h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="sectionsGrid">
+                <!-- セクションカードが動的に挿入されます -->
+            </div>
+        </div>
+
+        <!-- 3. タスク管理（対話型操作・インライン編集対応） -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i data-lucide="check-square" class="w-5 h-5 text-indigo-600"></i>
+                        事業部タスク管理ボード
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1 font-medium">
+                        💡 <span class="text-indigo-600">GOAL</span> や <span class="text-amber-600">NA (Next Action)</span> の入力欄をクリックすると、その場で直接編集できます（変更は自動保存されます）。
+                    </p>
+                </div>
+                <!-- フィルター & 新規追加ボタン -->
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <select id="sectionFilter" onchange="renderTasks()" class="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium border-0 focus:ring-2 focus:ring-indigo-500">
+                        <option value="all">すべてのセクション</option>
+                        <!-- 動的に挿入 -->
+                    </select>
+                    <select id="statusFilter" onchange="renderTasks()" class="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium border-0 focus:ring-2 focus:ring-indigo-500">
+                        <option value="all">すべてのステータス</option>
+                        <option value="todo">未着手 (Todo)</option>
+                        <option value="doing">進行中 (Doing)</option>
+                        <option value="review">レビュー中 (Review)</option>
+                        <option value="done">完了 (Done)</option>
+                    </select>
+                    <button onclick="openAddTaskModal()" class="ml-auto md:ml-0 flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                        <span>新規タスク追加</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- タスクテーブル -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead>
+                        <tr class="bg-slate-50">
+                            <th class="px-4 py-3 text-left font-semibold text-slate-600 w-2/5">タスク情報 (🎯目的GOAL / ➡️直近アクションNA)</th>
+                            <th class="px-4 py-3 text-left font-semibold text-slate-600">担当セクション</th>
+                            <th class="px-4 py-3 text-left font-semibold text-slate-600">期限</th>
+                            <th class="px-4 py-3 text-left font-semibold text-slate-600">優先度</th>
+                            <th class="px-4 py-3 text-left font-semibold text-slate-600">ステータス更新</th>
+                            <th class="px-4 py-3 text-right font-semibold text-slate-600">アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tasksTableBody" class="divide-y divide-slate-100">
+                        <!-- タスク行が動的に挿入されます -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- タスク追加モーダル -->
+    <div id="addTaskModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-lg w-full overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-55">
+                <h3 class="font-bold text-slate-900 text-base flex items-center gap-1.5">
+                    <i data-lucide="plus-circle" class="w-5 h-5 text-indigo-600"></i>
+                    新規タスクの追加
+                </h3>
+                <button onclick="closeAddTaskModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form onsubmit="addTask(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">タスク名 <span class="text-rose-500">*</span></label>
+                    <input type="text" id="new_title" required placeholder="例: 夏期セールス資料のアップデート" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">🎯 GOAL (このタスクが達成すべき目的) <span class="text-rose-500">*</span></label>
+                    <input type="text" id="new_goal" required placeholder="例: 商談時における成約率の5%向上、データ連携エラーの解消など" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">➡️ NA (直近で起こすネクストアクション) <span class="text-rose-500">*</span></label>
+                    <input type="text" id="new_na" required placeholder="例: 各営業メンバーへのアンケート実施、テストサーバーでの動作確認など" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">セクション <span class="text-rose-500">*</span></label>
+                        <select id="new_section" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm bg-white">
+                            <!-- 動的に挿入 -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">優先度</label>
+                        <select id="new_priority" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm bg-white">
+                            <option value="high">高 (High)</option>
+                            <option value="medium" selected>中 (Medium)</option>
+                            <option value="low">低 (Low)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">期限 <span class="text-rose-500">*</span></label>
+                        <input type="date" id="new_dueDate" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">初期ステータス</label>
+                        <select id="new_status" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm bg-white">
+                            <option value="todo" selected>未着手 (Todo)</option>
+                            <option value="doing">進行中 (Doing)</option>
+                            <option value="review">レビュー中 (Review)</option>
+                            <option value="done">完了 (Done)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pt-4 flex justify-end gap-2 border-t border-slate-100">
+                    <button type="button" onclick="closeAddTaskModal()" class="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-sm font-medium transition-colors">
+                        キャンセル
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
+                        タスクを追加
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JavaScript ロジック -->
+    <script>
+        // セクション定義
+        const sections = [
+            { id: 'dev', name: 'システム開発部', leader: '山田 太郎', color: 'indigo' },
+            { id: 'mktg', name: 'マーケティング部', leader: '佐藤 美咲', color: 'emerald' },
+            { id: 'sales', name: '営業第一チーム', leader: '高橋 健二', color: 'amber' },
+            { id: 'planning', name: '事業企画部', leader: '鈴木 雅也', color: 'violet' }
+        ];
+
+        // 初期タスクデータ
+        const initialTasks = [
+            { id: 1, section: 'dev', title: 'メインデータベースの移行作業', status: 'doing', priority: 'high', dueDate: '2026-07-05', goal: '新サーバーでのデータベース安定稼働率99.99%達成', na: '移行手順書の最終レビューと夜間実施シミュレーション' },
+            { id: 2, section: 'dev', title: 'フロントエンド パフォーマンス改善', status: 'done', priority: 'medium', dueDate: '2026-06-25', goal: '主要ページの読み込み時間（LCP）を2.5秒以下にする', na: '未使用ライブラリの削除と全画像の最適化処理の適用' },
+            { id: 3, section: 'dev', title: 'セキュリティ脆弱性パッチ適用', status: 'todo', priority: 'high', dueDate: '2026-07-10', goal: '監査指摘のあった全3箇所の重要セキュリティリスクの排除', na: '検証環境への先行インストールと他モジュールへの影響検証' },
+            { id: 4, section: 'mktg', title: '夏期プロモーションLP制作', status: 'review', priority: 'high', dueDate: '2026-06-30', goal: '新キャンペーンによる新規ユーザー登録数 200件突破', na: 'スマホ表示崩れの修正確認とリーダー最終承認の取得' },
+            { id: 5, section: 'mktg', title: 'SNS広告運用レポート作成', status: 'done', priority: 'low', dueDate: '2026-06-20', goal: 'CPA（獲得単価）高騰の原因を特定し改善方針を決定する', na: '配信セグメント別実績データの抽出と週報フォーマットへの反映' },
+            { id: 6, section: 'mktg', title: '新規リード獲得施策の選定', status: 'todo', priority: 'medium', dueDate: '2026-07-15', goal: '他社連携による費用対効果の高いアライアンス施策を2件厳選する', na: 'アライアンス候補企業のリストアップとアプローチ文面の準備' },
+            { id: 7, section: 'sales', title: '大口クライアントA社 提案資料作成', status: 'doing', priority: 'high', dueDate: '2026-06-29', goal: '年間契約額5,000万円の見込み案件においてコンペ競合に勝つ', na: '提案書の第二システム連携部分に関する技術部山田さんとの最終相談' },
+            { id: 8, section: 'sales', title: '今期売上進捗の集計と分析', status: 'done', priority: 'medium', dueDate: '2026-06-24', goal: '各営業の行動ボトルネックをグラフ化して可視化する', na: '未提出の営業マン2名へチャットにて回収リマインド' },
+            { id: 9, section: 'planning', title: '来期事業戦略 of ドラフト策定', status: 'doing', priority: 'high', dueDate: '2026-07-15', goal: '役員会議の第1次審査をノー修正で通過できる計画骨子の合意', na: '各部門長リーダーに対する現在の課題と来期の構想に関するヒアリング' },
+            { id: 10, section: 'planning', title: '社内ワークフロー改善案の策定', status: 'review', priority: 'low', dueDate: '2026-06-28', goal: '各種経費申請承認にかかるリードタイムを2日短縮する', na: 'テスト協力部署から回収したアンケートフィードバック集計と改善要約' }
+        ];
+
+        let tasks = JSON.parse(localStorage.getItem('portal_tasks')) || initialTasks;
+        let miniChartInstance = null;
+
+        // アプリ起動時のセットアップ
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            initSelects();
+            updateDashboard();
+        });
+
+        // セレクトボックスの選択肢を初期化
+        function initSelects() {
+            const sectionFilter = document.getElementById('sectionFilter');
+            const newSectionSelect = document.getElementById('new_section');
+
+            sections.forEach(sec => {
+                // フィルター用
+                const option = document.createElement('option');
+                option.value = sec.id;
+                option.textContent = sec.name;
+                sectionFilter.appendChild(option);
+
+                // 新規追加フォーム用
+                const optForm = document.createElement('option');
+                optForm.value = sec.id;
+                optForm.textContent = sec.name;
+                newSectionSelect.appendChild(optForm);
+            });
+        }
+
+        // ダッシュボード更新処理 (全体リレンダリング)
+        function updateDashboard() {
+            localStorage.setItem('portal_tasks', JSON.stringify(tasks));
+            
+            calculateKPIs();
+            renderOverallProgressChart();
+            renderSections();
+            renderTasks();
+            lucide.createIcons();
+        }
+
+        // インライン編集用アップデート処理 (テーブル全体の再描画を避けてフォーカスアウトを防ぐ)
+        function updateTaskField(taskId, field, value) {
+            tasks = tasks.map(t => t.id === taskId ? { ...t, [field]: value } : t);
+            localStorage.setItem('portal_tasks', JSON.stringify(tasks));
+            
+            // テーブル以外の上部ダッシュボードやグラフをリアルタイムで同期更新
+            calculateKPIs();
+            renderOverallProgressChart();
+            renderSections();
+            lucide.createIcons();
+        }
+
+        // KPI計算
+        function calculateKPIs() {
+            const totalTasks = tasks.length;
+            const doneTasks = tasks.filter(t => t.status === 'done').length;
+            const activeTasks = tasks.filter(t => t.status === 'doing' || t.status === 'review').length;
+
+            // 進捗率
+            const progressPercent = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+            document.getElementById('overallProgress').textContent = `${progressPercent}%`;
+            document.getElementById('activeTasksCount').textContent = activeTasks;
+            document.getElementById('doneTasksCount').textContent = doneTasks;
+
+            // アラートタスク（未完了かつ、期限が今日を含め3日以内、または過ぎているもの）
+            const today = new Date('2026-06-27'); // 2026年想定基準日
+            const alertTasks = tasks.filter(t => {
+                if (t.status === 'done') return false;
+                const dueDate = new Date(t.dueDate);
+                const diffTime = dueDate - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays <= 3; // 3日以内、またはマイナス（期限超過）
+            });
+            document.getElementById('alertTasksCount').textContent = alertTasks.length;
+        }
+
+        // KPI内円グラフ（Chart.js）
+        function renderOverallProgressChart() {
+            const total = tasks.length;
+            const done = tasks.filter(t => t.status === 'done').length;
+            const remaining = total - done;
+
+            const ctx = document.getElementById('progressChartMini').getContext('2d');
+            
+            if (miniChartInstance) {
+                miniChartInstance.destroy();
+            }
+
+            miniChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [done, remaining],
+                        backgroundColor: ['#4f46e5', '#e2e8f0'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    }
+                }
+            });
+        }
+
+        // セクション別カードの描画
+        function renderSections() {
+            const container = document.getElementById('sectionsGrid');
+            container.innerHTML = '';
+
+            sections.forEach(sec => {
+                const secTasks = tasks.filter(t => t.section === sec.id);
+                const total = secTasks.length;
+                
+                const counts = { todo: 0, doing: 0, review: 0, done: 0 };
+                secTasks.forEach(t => counts[t.status]++);
+
+                const progressPercent = total > 0 ? Math.round((counts.done / total) * 100) : 0;
+
+                // セクションごとの色指定
+                const colorMap = {
+                    indigo: { border: 'border-l-indigo-500', text: 'text-indigo-600', bg: 'bg-indigo-50', bar: 'bg-indigo-500' },
+                    emerald: { border: 'border-l-emerald-500', text: 'text-emerald-600', bg: 'bg-emerald-50', bar: 'bg-emerald-500' },
+                    amber: { border: 'border-l-amber-500', text: 'text-amber-600', bg: 'bg-amber-50', bar: 'bg-amber-500' },
+                    violet: { border: 'border-l-violet-500', text: 'text-violet-600', bg: 'bg-violet-50', bar: 'bg-violet-500' }
+                };
+                const theme = colorMap[sec.color] || colorMap.indigo;
+
+                // 要フォロー（期限超過など）の検出
+                const today = new Date('2026-06-27');
+                const warningCount = secTasks.filter(t => {
+                    if (t.status === 'done') return false;
+                    const diffDays = Math.ceil((new Date(t.dueDate) - today) / (1000 * 60 * 60 * 24));
+                    return diffDays <= 3;
+                }).length;
+
+                const cardHtml = `
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 border-l-4 ${theme.border} shadow-sm hover:shadow-md transition-shadow">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <span class="text-xs font-semibold text-slate-400">Section</span>
+                                <h3 class="font-bold text-slate-900 text-base mt-0.5">${sec.name}</h3>
+                                <div class="flex items-center gap-1.5 mt-1 text-xs text-slate-500">
+                                    <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
+                                    <span>リーダー: <strong>${sec.leader}</strong></span>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-end">
+                                <span class="text-2xl font-bold ${theme.text}">${progressPercent}%</span>
+                                <span class="text-[10px] text-slate-400 font-medium uppercase tracking-wider">消化率</span>
+                            </div>
+                        </div>
+
+                        <!-- 進捗ビジュアルバー -->
+                        <div class="mt-4">
+                            <div class="flex justify-between text-xs text-slate-400 mb-1">
+                                <span>ステータス内訳</span>
+                                <span>総タスク: ${total}件</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex">
+                                <div class="bg-indigo-600 h-full" style="width: ${total > 0 ? (counts.done / total) * 100 : 0}%" title="Done"></div>
+                                <div class="bg-violet-400 h-full" style="width: ${total > 0 ? (counts.review / total) * 100 : 0}%" title="Review"></div>
+                                <div class="bg-amber-400 h-full" style="width: ${total > 0 ? (counts.doing / total) * 100 : 0}%" title="Doing"></div>
+                                <div class="bg-slate-300 h-full" style="width: ${total > 0 ? (counts.todo / total) * 100 : 0}%" title="Todo"></div>
+                            </div>
+                            <div class="flex justify-between mt-2 text-[10px] text-slate-500">
+                                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-indigo-600"></span>完了 (${counts.done})</span>
+                                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-violet-400"></span>レビュー (${counts.review})</span>
+                                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>進行中 (${counts.doing})</span>
+                                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-300"></span>未着手 (${counts.todo})</span>
+                            </div>
+                        </div>
+
+                        <!-- 警告表示 -->
+                        ${warningCount > 0 ? `
+                        <div class="mt-4 p-2 bg-rose-50 border border-rose-100 rounded-lg flex items-center gap-2 text-xs text-rose-600 font-medium animate-pulse">
+                            <i data-lucide="alert-circle" class="w-4 h-4 text-rose-500"></i>
+                            <span>このセクションに期限超過・切迫タスクが <strong>${warningCount}件</strong> あります。</span>
+                        </div>
+                        ` : `
+                        <div class="mt-4 p-2 bg-slate-50 rounded-lg flex items-center gap-2 text-xs text-slate-500">
+                            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-500"></i>
+                            <span>著しい遅延タスクはありません。順調です。</span>
+                        </div>
+                        `}
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', cardHtml);
+            });
+        }
+
+        // タスクリストの描画 (GOAL / NA のインライン編集対応)
+        function renderTasks() {
+            const body = document.getElementById('tasksTableBody');
+            body.innerHTML = '';
+
+            const sectionFilter = document.getElementById('sectionFilter').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            const filteredTasks = tasks.filter(t => {
+                const matchSec = sectionFilter === 'all' || t.section === sectionFilter;
+                const matchStatus = statusFilter === 'all' || t.status === statusFilter;
+                return matchSec && matchStatus;
+            });
+
+            if (filteredTasks.length === 0) {
+                body.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400 text-xs">該当するタスクはありません。</td></tr>`;
+                return;
+            }
+
+            const today = new Date('2026-06-27');
+
+            filteredTasks.forEach(task => {
+                const sec = sections.find(s => s.id === task.section);
+                const secName = sec ? sec.name : '未割当';
+
+                // 期限の色分け
+                const dueDate = new Date(task.dueDate);
+                const diffTime = dueDate - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                let dateBadge = `<span class="text-slate-600 font-medium">${task.dueDate}</span>`;
+                if (task.status !== 'done') {
+                    if (diffDays < 0) {
+                        dateBadge = `<span class="text-rose-600 font-semibold flex items-center gap-1 text-xs"><i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> 超過 (${Math.abs(diffDays)}日)</span>`;
+                    } else if (diffDays <= 3) {
+                        dateBadge = `<span class="text-amber-600 font-semibold flex items-center gap-1 text-xs"><i data-lucide="clock" class="w-3.5 h-3.5 animate-bounce"></i> 切迫 (あと${diffDays}日)</span>`;
+                    }
+                }
+
+                // 優先度バッジ
+                const priorityLabels = { high: '高', medium: '中', low: '低' };
+                const priorityColors = {
+                    high: 'bg-rose-50 text-rose-600 border-rose-100',
+                    medium: 'bg-amber-50 text-amber-600 border-amber-100',
+                    low: 'bg-slate-50 text-slate-600 border-slate-100'
+                };
+                const pColor = priorityColors[task.priority] || priorityColors.medium;
+                const pLabel = priorityLabels[task.priority] || '中';
+
+                // ステータスセレクトボックス
+                const statusOptions = `
+                    <select onchange="updateTaskStatus(${task.id}, this.value)" class="px-2 py-1 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-white font-medium">
+                        <option value="todo" ${task.status === 'todo' ? 'selected' : ''}>未着手 (Todo)</option>
+                        <option value="doing" ${task.status === 'doing' ? 'selected' : ''}>進行中 (Doing)</option>
+                        <option value="review" ${task.status === 'review' ? 'selected' : ''}>レビュー中 (Review)</option>
+                        <option value="done" ${task.status === 'done' ? 'selected' : ''}>完了 (Done)</option>
+                    </select>
+                `;
+
+                const row = `
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                        <td class="px-4 py-3.5">
+                            <div class="font-bold text-slate-900 text-sm">${task.title}</div>
+                            <!-- GOAL & NA インラインテキスト入力（都度編集対応） -->
+                            <div class="mt-2 space-y-1.5 text-xs font-normal max-w-xl bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-indigo-600 font-semibold shrink-0 bg-indigo-50 px-1 rounded text-[10px]">🎯 GOAL</span>
+                                    <input type="text" value="${task.goal || ''}" 
+                                        onblur="updateTaskField(${task.id}, 'goal', this.value)" 
+                                        onkeypress="if(event.key === 'Enter') { this.blur(); }"
+                                        placeholder="最終目標を入力（クリックで編集）" 
+                                        class="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white focus:outline-none px-1.5 py-0.5 rounded transition-all text-slate-700 text-xs">
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-amber-600 font-semibold shrink-0 bg-amber-50 px-1 rounded text-[10px]">➡️ NA</span>
+                                    <input type="text" value="${task.na || ''}" 
+                                        onblur="updateTaskField(${task.id}, 'na', this.value)" 
+                                        onkeypress="if(event.key === 'Enter') { this.blur(); }"
+                                        placeholder="次の具体的ステップを入力（クリックで編集）" 
+                                        class="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-amber-500 focus:bg-white focus:outline-none px-1.5 py-0.5 rounded transition-all text-slate-700 font-medium text-xs">
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3.5">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">
+                                ${secName}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3.5">${dateBadge}</td>
+                        <td class="px-4 py-3.5">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${pColor}">
+                                ${pLabel}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3.5">${statusOptions}</td>
+                        <td class="px-4 py-3.5 text-right">
+                            <button onclick="deleteTask(${task.id})" class="text-slate-400 hover:text-rose-600 p-1 rounded-md hover:bg-rose-50 transition-colors" title="タスク削除">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                body.insertAdjacentHTML('beforeend', row);
+            });
+            lucide.createIcons();
+        }
+
+        // ステータス変更処理
+        function updateTaskStatus(taskId, newStatus) {
+            tasks = tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
+            updateDashboard();
+        }
+
+        // タスク削除処理
+        function deleteTask(taskId) {
+            tasks = tasks.filter(t => t.id !== taskId);
+            updateDashboard();
+        }
+
+        // モーダル制御
+        function openAddTaskModal() {
+            document.getElementById('addTaskModal').classList.remove('hidden');
+        }
+
+        function closeAddTaskModal() {
+            document.getElementById('addTaskModal').classList.add('hidden');
+        }
+
+        // 新規タスク追加 (GOAL と NA を追加)
+        function addTask(event) {
+            event.preventDefault();
+            const title = document.getElementById('new_title').value;
+            const goal = document.getElementById('new_goal').value;
+            const na = document.getElementById('new_na').value;
+            const section = document.getElementById('new_section').value;
+            const priority = document.getElementById('new_priority').value;
+            const dueDate = document.getElementById('new_dueDate').value;
+            const status = document.getElementById('new_status').value;
+
+            const newTask = {
+                id: Date.now(),
+                title,
+                goal,
+                na,
+                section,
+                priority,
+                dueDate,
+                status
+            };
+
+            tasks.push(newTask);
+            updateDashboard();
+            closeAddTaskModal();
+            
+            // 入力欄のリセット
+            document.getElementById('new_title').value = '';
+            document.getElementById('new_goal').value = '';
+            document.getElementById('new_na').value = '';
+        }
+    </script>
+</body>
+</html>

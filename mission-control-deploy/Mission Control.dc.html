@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:#E4E1DA;color-scheme:light;}
+  input,select,button,textarea{font-family:inherit;color-scheme:light;color:inherit;}
+  input::placeholder{color:#a8a4a0;}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+</style>
+</helmet>
+<div style="background:#EBE9E3; min-height:100vh; color:#1c1c1c; font-family:'Noto Sans JP',sans-serif; padding-bottom:96px; color-scheme:light;">
+
+  <!-- TOP BAR -->
+  <div style="border-bottom:1px solid rgba(0,0,0,0.12); background:#EBE9E3;">
+    <div style="max-width:1180px; margin:0 auto; padding:20px 32px; display:flex; align-items:center; justify-content:space-between; gap:24px;">
+      <div style="display:flex; align-items:center; gap:16px;">
+        <div style="width:30px; height:30px; background:#FF5A1E; display:flex; align-items:center; justify-content:center;">
+          <div style="width:10px; height:10px; background:#EBE9E3;"></div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; letter-spacing:0.22em; color:#1c1c1c;">MISSION&nbsp;CONTROL</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.18em; color:#8a8a8a; margin-top:2px;">DIVISION&nbsp;TASK&nbsp;SYSTEM</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:28px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#6e6e6e;">
+        <span>2026.06.28&nbsp;SUN</span>
+        <span style="display:flex; align-items:center; gap:8px; color:#2a2a2a;">
+          <span style="width:7px; height:7px; background:#2E9B6B; animation:blink 2s ease-in-out infinite;"></span>
+          ONLINE
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width:1180px; margin:0 auto; padding:0 32px;">
+
+    <!-- HERO / OVERALL PROGRESS -->
+    <div style="padding:56px 0 40px; display:flex; align-items:flex-end; justify-content:space-between; gap:48px; flex-wrap:wrap;">
+      <div style="min-width:280px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.3em; color:#FF5A1E; margin-bottom:18px;">// OVERVIEW</div>
+        <h1 style="margin:0; font-size:44px; font-weight:700; letter-spacing:-0.01em; line-height:1.05; color:#161616;">ミッション<br>コントロール</h1>
+        <p style="margin:18px 0 0; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.16em; color:#8a8a8a;">事業部 進捗 / TASK&nbsp;MANAGEMENT</p>
+      </div>
+      <div style="flex:1; min-width:340px;">
+        <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:14px;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.18em; color:#6e6e6e;">事業部 タスク構成</span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-weight:500; letter-spacing:0.04em;"><span style="font-size:46px; color:#2E9B6B;">{{ overallPercent }}</span><span style="font-size:20px; color:#2E9B6B;">%</span><span style="font-size:11px; color:#8a8a8a; letter-spacing:0.18em; margin-left:10px;">COMPLETE</span></span>
+        </div>
+        {{ overallMeter }}
+        <div style="display:flex; gap:26px; flex-wrap:wrap; margin-top:18px;">
+          <sc-for list="{{ divisionLegend }}" as="lg" hint-placeholder-count="4">
+            <div style="display:flex; align-items:center; gap:9px;">
+              <span style="{{ lg.dotStyle }}"></span>
+              <span style="{{ lg.textStyle }}">{{ lg.label }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600; color:#1c1c1c;">{{ lg.count }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI READOUT STRIP -->
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); background:#FFFFFF; border:1px solid rgba(0,0,0,0.10);">
+      <div style="padding:30px 28px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.2em; color:#8a8a8a;">OVERALL</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:40px; font-weight:500; line-height:1; margin-top:14px; color:#2E9B6B;">{{ overallPercent }}<span style="font-size:18px;">%</span></div>
+        <div style="font-size:12px; color:#6e6e6e; margin-top:12px;">全体進捗率</div>
+      </div>
+      <div style="padding:30px 28px; border-left:1px solid rgba(0,0,0,0.10);">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.2em; color:#8a8a8a;">ACTIVE</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:40px; font-weight:500; line-height:1; margin-top:14px; color:#2E7CC4;">{{ activeCount }}</div>
+        <div style="font-size:12px; color:#6e6e6e; margin-top:12px;">稼働中タスク</div>
+      </div>
+      <div style="padding:30px 28px; border-left:1px solid rgba(0,0,0,0.10);">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.2em; color:#D93A3F;">ALERT</div>
+        <div style="{{ alertNumStyle }}">{{ alertCount }}</div>
+        <div style="font-size:12px; color:#6e6e6e; margin-top:12px;">要フォロー（期限切迫）</div>
+      </div>
+      <div style="padding:30px 28px; border-left:1px solid rgba(0,0,0,0.10);">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.2em; color:#8a8a8a;">DONE</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:40px; font-weight:500; line-height:1; margin-top:14px; color:#2E9B6B;">{{ doneCount }}</div>
+        <div style="font-size:12px; color:#6e6e6e; margin-top:12px;">完了済みタスク</div>
+      </div>
+    </div>
+
+    <!-- ATTENTION REQUIRED -->
+    <div style="padding:56px 0 18px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.3em; color:#FF5A1E; margin-bottom:8px;">// ATTENTION</div>
+      <h2 style="margin:0; font-size:20px; font-weight:700; color:#161616;">今すぐ対応が必要なタスク</h2>
+    </div>
+    <sc-if value="{{ hasUrgent }}" hint-placeholder-val="{{ true }}">
+      <div style="border:1px solid rgba(0,0,0,0.10); background:#FFFFFF;">
+        <sc-for list="{{ urgentList }}" as="u" hint-placeholder-count="3">
+          <div style="display:flex; align-items:center; gap:24px; padding:20px 8px 20px 20px; border-bottom:1px solid rgba(0,0,0,0.08); border-left:3px solid #D93A3F; background:rgba(217,58,63,0.05);">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; letter-spacing:0.02em; color:#D93A3F; width:110px; flex-shrink:0;">{{ u.tag }}</div>
+            <div style="flex:1; min-width:0; font-size:16px; font-weight:500; color:#1c1c1c;">{{ u.title }}</div>
+            <div style="display:inline-flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.06em; color:#5a5a5a; white-space:nowrap;"><span style="{{ u.secTickStyle }}"></span>{{ u.secName }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ allClear }}">
+      <div style="border:1px solid rgba(0,0,0,0.10); background:#FFFFFF; padding:24px 20px; font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.1em; color:#2E9B6B;">✓ ALL CLEAR / 緊急対応が必要なタスクはありません</div>
+    </sc-if>
+
+    <!-- SECTION CARDS -->
+    <div style="padding:56px 0 18px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.3em; color:#FF5A1E; margin-bottom:8px;">// CHANNELS</div>
+      <h2 style="margin:0; font-size:20px; font-weight:700; color:#161616;">セクション別 進捗ステータス</h2>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:rgba(0,0,0,0.10); border:1px solid rgba(0,0,0,0.10);">
+      <sc-for list="{{ sections }}" as="sec" hint-placeholder-count="4">
+        <div style="{{ sec.cardStyle }}">
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">
+            <div style="min-width:0;">
+              <div style="{{ sec.codeStyle }}">{{ sec.code }}</div>
+              <div style="{{ sec.nameStyle }}">{{ sec.name }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; color:#8a8a8a; margin-top:7px;">LEAD / {{ sec.leader }}</div>
+            </div>
+            <div style="{{ sec.healthStyle }}">{{ sec.health }}</div>
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:18px; margin:26px 0 16px;">
+            <div style="{{ sec.percentStyle }}">{{ sec.percent }}<span style="font-size:18px;">%</span></div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.04em; color:#6e6e6e; padding-bottom:5px;">完了 {{ sec.done }} / 全 {{ sec.total }}</div>
+          </div>
+          {{ sec.meter }}
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px; flex-wrap:wrap;">
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+              <sc-for list="{{ sec.legend }}" as="lg" hint-placeholder-count="4">
+                <div style="display:flex; align-items:center; gap:7px;">
+                  <span style="{{ lg.dotStyle }}"></span>
+                  <span style="{{ lg.textStyle }}">{{ lg.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="{{ sec.alertStyle }}">{{ sec.alertText }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- TASK BOARD -->
+    <div style="padding:64px 0 18px;">
+      <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap;">
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.3em; color:#FF5A1E; margin-bottom:6px;">// TASKS</div>
+          <h2 style="margin:0; font-size:18px; font-weight:700; color:#161616;">事業部タスク管理ボード</h2>
+          <p style="margin:10px 0 0; font-size:11px; color:#8a8a8a;">GOAL・NA の欄をクリックでその場編集（自動保存）</p>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <select value="{{ sectionFilter }}" onChange="{{ onSectionFilter }}" style="background:#FFFFFF; border:1px solid rgba(0,0,0,0.18); border-radius:0; color:#2a2a2a; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.06em; padding:9px 12px;">
+            <option value="all">ALL SECTIONS</option>
+            <sc-for list="{{ sectionOptions }}" as="opt" hint-placeholder-count="4">
+              <option value="{{ opt.id }}">{{ opt.name }}</option>
+            </sc-for>
+          </select>
+          <select value="{{ statusFilter }}" onChange="{{ onStatusFilter }}" style="background:#FFFFFF; border:1px solid rgba(0,0,0,0.18); border-radius:0; color:#2a2a2a; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.06em; padding:9px 12px;">
+            <option value="all">ALL STATUS</option>
+            <option value="todo">未着手 TODO</option>
+            <option value="doing">進行中 DOING</option>
+            <option value="review">レビュー REVIEW</option>
+            <option value="done">完了 DONE</option>
+          </select>
+          <button onClick="{{ onOpenModal }}" style="background:#FF5A1E; border:none; border-radius:0; color:#ffffff; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:0.1em; padding:9px 16px; cursor:pointer;">+ ADD</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TASK ROWS -->
+    <div style="background:#FFFFFF; border:1px solid rgba(0,0,0,0.10);">
+      <sc-if value="{{ hasTasks }}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{ tasks }}" as="task" hint-placeholder-count="6">
+          <div style="{{ task.rowStyle }}">
+            <div style="display:flex; gap:18px; flex:1; min-width:0; align-items:flex-start;">
+              <div style="{{ task.dotStyle }}"></div>
+              <div style="{{ task.numStyle }}">{{ task.num }}</div>
+              <div style="flex:1; min-width:0;">
+                <div style="{{ task.secChipStyle }}"><span style="{{ task.secTickStyle }}"></span>{{ task.secName }}</div>
+                <div style="{{ task.titleStyle }}">{{ task.title }}</div>
+                <div style="margin-top:16px; display:flex; flex-direction:column; gap:10px;">
+                  <div style="display:flex; align-items:center; gap:14px;">
+                    <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:0.12em; color:#FF5A1E; flex-shrink:0; width:44px;">GOAL</span>
+                    <input type="text" value="{{ task.goal }}" onChange="{{ task.onGoal }}" placeholder="最終目標を入力" style="flex:1; min-width:0; background:transparent; border:none; border-bottom:1px solid rgba(0,0,0,0.14); border-radius:0; color:#2a2a2a; font-size:15px; padding:5px 2px;">
+                  </div>
+                  <div style="display:flex; align-items:center; gap:14px;">
+                    <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:0.12em; color:#8a8a8a; flex-shrink:0; width:44px;">NA</span>
+                    <input type="text" value="{{ task.na }}" onChange="{{ task.onNa }}" placeholder="次の具体アクションを入力" style="flex:1; min-width:0; background:transparent; border:none; border-bottom:1px solid rgba(0,0,0,0.14); border-radius:0; color:#2a2a2a; font-size:15px; padding:5px 2px;">
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:9px; width:206px; flex-shrink:0; align-self:center;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <div style="{{ task.urgencyBadgeStyle }}">{{ task.urgencyLabel }}</div>
+                <button onClick="{{ task.onDelete }}" style="background:transparent; border:1px solid rgba(0,0,0,0.18); border-radius:0; color:#9a9a9a; font-family:'IBM Plex Mono',monospace; font-size:12px; line-height:1; width:26px; height:26px; flex-shrink:0; cursor:pointer;" title="削除">✕</button>
+              </div>
+              <select value="{{ task.status }}" onChange="{{ task.onStatus }}" style="{{ task.selectStyle }}">
+                <option value="todo">未着手 TODO</option>
+                <option value="doing">進行中 DOING</option>
+                <option value="review">レビュー REVIEW</option>
+                <option value="done">完了 DONE</option>
+              </select>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="{{ task.dateStyle }}">{{ task.dateText }}</div>
+                <div style="{{ task.pStyle }}">{{ task.pLabel }}</div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{ noTasks }}">
+        <div style="padding:48px 20px; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.12em; color:#8a8a8a;">NO TASKS / 該当するタスクはありません</div>
+      </sc-if>
+    </div>
+
+    <!-- ADD BAR -->
+    <button onClick="{{ onOpenModal }}" style="width:100%; margin-top:28px; background:transparent; border:1px dashed rgba(0,0,0,0.25); border-radius:0; color:#6e6e6e; text-align:left; font-family:'IBM Plex Mono',monospace; font-size:13px; letter-spacing:0.1em; padding:22px 24px; cursor:pointer;">+&nbsp;&nbsp;新規タスク追加&nbsp;&nbsp;<span style="color:#a8a8a8;">(CMD+N)</span></button>
+
+  </div>
+
+  <!-- MODAL -->
+  <sc-if value="{{ modalOpen }}">
+    <div style="position:fixed; inset:0; background:rgba(30,28,24,0.45); display:flex; align-items:center; justify-content:center; z-index:50; padding:24px;">
+      <div style="background:#FFFFFF; border:1px solid rgba(0,0,0,0.14); border-radius:0; width:100%; max-width:540px; box-shadow:0 24px 60px rgba(0,0,0,0.22);">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:22px 28px; border-bottom:1px solid rgba(0,0,0,0.10);">
+          <div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.22em; color:#FF5A1E;">// NEW TASK</div>
+            <div style="font-size:15px; font-weight:700; color:#161616; margin-top:5px;">新規タスクの追加</div>
+          </div>
+          <button onClick="{{ onCloseModal }}" style="background:transparent; border:1px solid rgba(0,0,0,0.18); border-radius:0; color:#8a8a8a; font-family:'IBM Plex Mono',monospace; font-size:13px; width:30px; height:30px; cursor:pointer;">✕</button>
+        </div>
+        <form onSubmit="{{ onAddSubmit }}" style="padding:28px;">
+          <div style="margin-bottom:20px;">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.16em; color:#8a8a8a; margin-bottom:8px;">タスク名 *</div>
+            <input type="text" required value="{{ draft.title }}" onChange="{{ onDraftTitle }}" placeholder="例: 夏期セールス資料のアップデート" style="width:100%; background:#FBFAF8; border:1px solid rgba(0,0,0,0.18); border-radius:0; color:#1c1c1c; font-size:13px; padding:11px 12px;">
+          </div>
+          <div style="margin-bottom:20px;">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.16em; color:#8a8a8a; margin-bottom:8px;">GOAL（達成すべき目的）*</div>
+            <input type="text" required value="{{ draft.goal }}" onChange="{{ onDraftGoal }}" placeholder="例: 成約率の5%向上" style="width:100%; background:#FBFAF8; border:1px solid rgba(0,0,0,0.18); border-radius:0; color:#1c1c1c; font-size:13px; padding:11px 12px;">
+          </div>
+          <div style="margin-bottom:20px;">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.16em; color:#8a8a8a; margin-bottom:8px;">NA（直近のネクストアクション）*</div>
+            <input type="text" required value="{{ draft.na }}" onChange="{{ onDraftNa }}" placeholder="例: 各メンバーへアンケート実施" style="width:100%; background:#FBFAF8; border:1px solid rgba(0,0,0,0.18); border-radius:0; color:#1c1c1c; font-size:13px; padding:11px 12px;">
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.16em; color:#8a8a8a; margin-bottom:8px;">セクション *</div>
+              <select value="{{ draft.section }}" onChange="{{ onDraftSection }}" style="width:100%; background:#FBFAF8; border:1px solid rgba(0,0,0,0.18); border-radius:0; color:#1c1c1c; font-size:13px; padding:11px 12px;">
+                <sc-for list="{{ sectionOptions }}" as="opt" hint-placeholder-count="4">
+                  <option value="{{ opt.id }}">{{ opt.name }}</option>
+                </sc-for>
+              </select>
+            </div>
+            <div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.16em; color:#8a8a8a; margin-bottom:8px;">優先度</div>
+              <select value="{{ draft.priority }}" onChange="{{ onDraftPriority }}" style="width:100%; background:#FBFAF8; border:1px solid rgba(0,0,0,0.18); border-radius:0; color:#1c1c1c; font-size:13px; padding:11px 12px;">
+                <option value="high">高 HIGH</option>
+                <option value="medium">中 MID</option>
+                <option value="low">低 LOW</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:28px;">
+            <div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.16em; color:#8a8a8a; margin-bottom:8px;">期限 *</div>
+              <input type="date" required value="{{ draft.dueDate }}" onChange="{{ onDraftDue }}" style="width:100%; background:#FBFAF8; border:1px solid rgba(0,0,0,0.18); border-radius:0; color:#1c1c1c; font-size:13px; padding:10px 12px;">
+            </div>
+            <div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.16em; color:#8a8a8a; margin-bottom:8px;">初期ステータス</div>
+              <select value="{{ draft.status }}" onChange="{{ onDraftStatus }}" style="width:100%; background:#FBFAF8; border:1px solid rgba(0,0,0,0.18); border-radius:0; color:#1c1c1c; font-size:13px; padding:11px 12px;">
+                <option value="todo">未着手 TODO</option>
+                <option value="doing">進行中 DOING</option>
+                <option value="review">レビュー REVIEW</option>
+                <option value="done">完了 DONE</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid rgba(0,0,0,0.10); padding-top:20px;">
+            <button type="button" onClick="{{ onCloseModal }}" style="background:transparent; border:1px solid rgba(0,0,0,0.20); border-radius:0; color:#5a5a5a; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.08em; padding:11px 18px; cursor:pointer;">CANCEL</button>
+            <button type="submit" style="background:#FF5A1E; border:none; border-radius:0; color:#ffffff; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:0.08em; padding:11px 22px; cursor:pointer;">タスクを追加</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    tasks: this.loadTasks(),
+    sectionFilter: 'all',
+    statusFilter: 'all',
+    modalOpen: false,
+    draft: { title:'', goal:'', na:'', section:'dev', priority:'medium', dueDate:'2026-07-10', status:'todo' }
+  };
+
+  get SECTIONS(){
+    return [
+      { id:'dev', code:'SEC-01', name:'システム開発部', leader:'山田 太郎' },
+      { id:'mktg', code:'SEC-02', name:'マーケティング部', leader:'佐藤 美咲' },
+      { id:'sales', code:'SEC-03', name:'営業第一チーム', leader:'高橋 健二' },
+      { id:'planning', code:'SEC-04', name:'事業企画部', leader:'鈴木 雅也' }
+    ];
+  }
+
+  get STATUS_COLORS(){
+    return { todo:'#6B7280', doing:'#2E7CC4', review:'#7E5FC6', done:'#2E9B6B' };
+  }
+
+  get STATUS_LABELS(){
+    return { todo:'未着手', doing:'進行中', review:'レビュー', done:'完了' };
+  }
+
+  get SECTION_COLORS(){
+    return { dev:'#0E9E96', mktg:'#3B7DD8', sales:'#8B5FD6', planning:'#D45D8E' };
+  }
+
+  get EMPTY_SEG(){ return 'rgba(0,0,0,0.09)'; }
+  get EMPTY_DOT(){ return 'rgba(0,0,0,0.16)'; }
+
+  tint(hex, a){
+    const h = hex.replace('#','');
+    const r = parseInt(h.substring(0,2),16);
+    const g = parseInt(h.substring(2,4),16);
+    const b = parseInt(h.substring(4,6),16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  }
+
+  get INITIAL(){
+    return [
+      { id:1, section:'dev', title:'メインデータベースの移行作業', status:'doing', priority:'high', dueDate:'2026-07-05', goal:'新サーバーでのデータベース安定稼働率99.99%達成', na:'移行手順書の最終レビューと夜間実施シミュレーション' },
+      { id:2, section:'dev', title:'フロントエンド パフォーマンス改善', status:'done', priority:'medium', dueDate:'2026-06-25', goal:'主要ページの読み込み時間（LCP）を2.5秒以下にする', na:'未使用ライブラリの削除と全画像の最適化処理の適用' },
+      { id:3, section:'dev', title:'セキュリティ脆弱性パッチ適用', status:'todo', priority:'high', dueDate:'2026-07-10', goal:'監査指摘のあった全3箇所の重要セキュリティリスクの排除', na:'検証環境への先行インストールと他モジュールへの影響検証' },
+      { id:4, section:'mktg', title:'夏期プロモーションLP制作', status:'review', priority:'high', dueDate:'2026-06-30', goal:'新キャンペーンによる新規ユーザー登録数 200件突破', na:'スマホ表示崩れの修正確認とリーダー最終承認の取得' },
+      { id:5, section:'mktg', title:'SNS広告運用レポート作成', status:'done', priority:'low', dueDate:'2026-06-20', goal:'CPA（獲得単価）高騰の原因を特定し改善方針を決定する', na:'配信セグメント別実績データの抽出と週報フォーマットへの反映' },
+      { id:6, section:'mktg', title:'新規リード獲得施策の選定', status:'todo', priority:'medium', dueDate:'2026-07-15', goal:'費用対効果の高いアライアンス施策を2件厳選する', na:'アライアンス候補企業のリストアップとアプローチ文面の準備' },
+      { id:7, section:'sales', title:'大口クライアントA社 提案資料作成', status:'doing', priority:'high', dueDate:'2026-06-29', goal:'年間契約額5,000万円の見込み案件でコンペ競合に勝つ', na:'提案書の技術連携部分に関する技術部山田さんとの最終相談' },
+      { id:8, section:'sales', title:'今期売上進捗の集計と分析', status:'done', priority:'medium', dueDate:'2026-06-24', goal:'各営業の行動ボトルネックをグラフ化して可視化する', na:'未提出の営業マン2名へチャットにて回収リマインド' },
+      { id:9, section:'planning', title:'来期事業戦略ドラフト策定', status:'doing', priority:'high', dueDate:'2026-07-15', goal:'役員会議の第1次審査をノー修正で通過できる計画骨子の合意', na:'各部門長リーダーへの現在の課題と来期構想のヒアリング' },
+      { id:10, section:'planning', title:'社内ワークフロー改善案の策定', status:'review', priority:'low', dueDate:'2026-06-28', goal:'各種経費申請承認にかかるリードタイムを2日短縮する', na:'テスト協力部署から回収したフィードバック集計と改善要約' }
+    ];
+  }
+
+  loadTasks(){
+    try {
+      const s = JSON.parse(localStorage.getItem('portal_tasks'));
+      if (s && s.length) return s;
+    } catch(e){}
+    return this.INITIAL;
+  }
+
+  persist(tasks){ try { localStorage.setItem('portal_tasks', JSON.stringify(tasks)); } catch(e){} }
+
+  componentDidMount(){
+    this._key = (e)=>{
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        this.setState({ modalOpen:true });
+      }
+      if (e.key === 'Escape' && this.state.modalOpen) this.setState({ modalOpen:false });
+    };
+    window.addEventListener('keydown', this._key);
+  }
+  componentWillUnmount(){ window.removeEventListener('keydown', this._key); }
+
+  updateField(id, field, val){
+    const tasks = this.state.tasks.map(t => t.id === id ? { ...t, [field]:val } : t);
+    this.persist(tasks);
+    this.setState({ tasks });
+  }
+  updateStatus(id, val){ this.updateField(id, 'status', val); }
+  deleteTask(id){
+    const tasks = this.state.tasks.filter(t => t.id !== id);
+    this.persist(tasks);
+    this.setState({ tasks });
+  }
+  setDraft(field, val){ this.setState({ draft: { ...this.state.draft, [field]:val } }); }
+  addTask(e){
+    e.preventDefault();
+    const d = this.state.draft;
+    if (!d.title || !d.goal || !d.na || !d.dueDate) return;
+    const task = { id: Date.now(), title:d.title, goal:d.goal, na:d.na, section:d.section, priority:d.priority, dueDate:d.dueDate, status:d.status };
+    const tasks = [...this.state.tasks, task];
+    this.persist(tasks);
+    this.setState({ tasks, modalOpen:false, draft:{ title:'', goal:'', na:'', section:'dev', priority:'medium', dueDate:'2026-07-10', status:'todo' } });
+  }
+
+  diffDays(due){ return Math.ceil((new Date(due) - new Date('2026-06-27')) / 86400000); }
+
+  buildStackedMeter(counts, count, height, gap){
+    const order = ['done','review','doing','todo'];
+    const colors = this.STATUS_COLORS;
+    const total = order.reduce((s,k)=>s+counts[k],0);
+    const segColors = [];
+    if (total === 0){
+      for (let i=0;i<count;i++) segColors.push(this.EMPTY_SEG);
+    } else {
+      const raw = order.map(k => counts[k]/total*count);
+      const floor = raw.map(v=>Math.floor(v));
+      let used = floor.reduce((a,b)=>a+b,0);
+      const rema = raw.map((v,i)=>({i, r:v-floor[i]})).sort((a,b)=>b.r-a.r);
+      let idx=0;
+      while (used < count && rema.length){ floor[rema[idx % rema.length].i]++; used++; idx++; }
+      order.forEach((k,oi)=>{ for(let j=0;j<floor[oi];j++) segColors.push(colors[k]); });
+      while (segColors.length < count) segColors.push(this.EMPTY_SEG);
+    }
+    const segs = segColors.map((c,i)=>React.createElement('div',{key:i,style:{flex:'1 1 0',height,background:c}}));
+    return React.createElement('div',{style:{display:'flex',gap,width:'100%'}},segs);
+  }
+
+  renderVals(){
+    const MONO = "'IBM Plex Mono', monospace";
+    const tasks = this.state.tasks;
+    const total = tasks.length;
+    const done = tasks.filter(t => t.status === 'done').length;
+    const active = tasks.filter(t => t.status === 'doing' || t.status === 'review').length;
+    const overallPercent = total ? Math.round(done / total * 100) : 0;
+    const divCounts = { todo:0, doing:0, review:0, done:0 };
+    tasks.forEach(t => { if (divCounts[t.status] !== undefined) divCounts[t.status]++; });
+    const divisionLegend = ['done','doing','review','todo'].map(k => ({
+      label: this.STATUS_LABELS[k], count: divCounts[k],
+      dotStyle: { width:'11px', height:'11px', flexShrink:0, background: divCounts[k] > 0 ? this.STATUS_COLORS[k] : this.EMPTY_DOT },
+      textStyle: { fontFamily: MONO, fontSize:'12px', letterSpacing:'0.04em', color:'#5a5a5a' }
+    }));
+    const alertCount = tasks.filter(t => t.status !== 'done' && this.diffDays(t.dueDate) <= 3).length;
+
+    const urgentList = tasks
+      .filter(t => t.status !== 'done' && this.diffDays(t.dueDate) <= 3)
+      .sort((a, b) => this.diffDays(a.dueDate) - this.diffDays(b.dueDate))
+      .map(t => {
+        const sec = this.SECTIONS.find(s => s.id === t.section);
+        const dd = this.diffDays(t.dueDate);
+        return {
+          title: t.title,
+          secName: sec ? sec.name : '未割当',
+          secTickStyle: { width:'8px', height:'8px', flexShrink:0, background: this.SECTION_COLORS[t.section] || '#a8a8a8' },
+          tag: dd < 0 ? (Math.abs(dd) + '日 超過') : (dd === 0 ? '本日締切' : ('あと ' + dd + '日'))
+        };
+      });
+
+    const sections = this.SECTIONS.map(sec => {
+      const st = tasks.filter(t => t.section === sec.id);
+      const tot = st.length;
+      const c = { todo:0, doing:0, review:0, done:0 };
+      st.forEach(t => c[t.status]++);
+      const percent = tot ? Math.round(c.done / tot * 100) : 0;
+      const warn = st.filter(t => t.status !== 'done' && this.diffDays(t.dueDate) <= 3).length;
+      const secCol = this.SECTION_COLORS[sec.id] || '#FF5A1E';
+      const SCc = this.STATUS_COLORS, SLl = this.STATUS_LABELS;
+      const legend = ['done','doing','review','todo'].map(k => ({
+        label: SLl[k] + ' ' + c[k],
+        dotStyle: { width:'9px', height:'9px', flexShrink:0, background: c[k] > 0 ? SCc[k] : this.EMPTY_DOT },
+        textStyle: { fontFamily: MONO, fontSize:'10px', letterSpacing:'0.03em', color: c[k] > 0 ? '#5a5a5a' : '#a0a0a0' }
+      }));
+      return {
+        code: sec.code, name: sec.name, leader: sec.leader,
+        percent, total: tot, done: c.done, legend,
+        health: warn > 0 ? '要注意' : '順調',
+        healthStyle: {
+          fontFamily: MONO, fontSize:'10px', fontWeight:'600', letterSpacing:'0.12em',
+          padding:'5px 10px', whiteSpace:'nowrap', flexShrink:0, color:'#ffffff',
+          background: warn > 0 ? '#D93A3F' : '#2E9B6B', border:'none'
+        },
+        alertText: warn > 0 ? ('要フォロー ' + warn + '件') : '遅延なし',
+        alertStyle: { fontFamily: MONO, fontSize:'10px', letterSpacing:'0.08em', whiteSpace:'nowrap', color: warn > 0 ? '#D93A3F' : '#2E9B6B' },
+        percentStyle: { fontFamily: MONO, fontSize:'40px', fontWeight:'500', color: percent > 0 ? '#2E9B6B' : '#b0b0b0', lineHeight:'1' },
+        codeStyle: {
+          display:'inline-block', fontFamily: MONO, fontSize:'10px', fontWeight:'600', letterSpacing:'0.16em',
+          color:'#ffffff', background: secCol, padding:'4px 9px'
+        },
+        nameStyle: { fontSize:'20px', fontWeight:'700', color:'#161616', marginTop:'12px' },
+        cardStyle: {
+          background:'#FFFFFF', padding:'28px',
+          borderTop:'5px solid ' + secCol,
+          boxShadow:'inset 5px 0 0 ' + secCol
+        },
+        meter: this.buildStackedMeter(c, 30, '10px', '2px')
+      };
+    });
+
+    const pLabel = { high:'HIGH', medium:'MID', low:'LOW' };
+
+    const filtered = tasks.filter(t => {
+      const ms = this.state.sectionFilter === 'all' || t.section === this.state.sectionFilter;
+      const mst = this.state.statusFilter === 'all' || t.status === this.state.statusFilter;
+      return ms && mst;
+    }).map((task, idx) => {
+      const sec = this.SECTIONS.find(s => s.id === task.section);
+      const secColor = this.SECTION_COLORS[task.section] || '#8a8a8a';
+      const dd = this.diffDays(task.dueDate);
+      const dateText = task.dueDate.replace(/-/g, '.');
+      const dateColor = task.status === 'done' ? '#a0a0a0' : '#7a7a7a';
+
+      let uLevel, uLabel, uColor, uFill;
+      if (task.status === 'done') { uLevel='done'; uLabel='完了'; uColor='#9aa0a8'; uFill=false; }
+      else if (dd < 0) { uLevel='overdue'; uLabel='超過 ' + Math.abs(dd) + '日'; uColor='#D93A3F'; uFill=true; }
+      else if (dd <= 3) { uLevel='soon'; uLabel='切迫 あと' + dd + '日'; uColor='#E8722A'; uFill=true; }
+      else if (dd <= 7) { uLevel='watch'; uLabel='注意 あと' + dd + '日'; uColor='#C8911F'; uFill=false; }
+      else { uLevel='normal'; uLabel='あと' + dd + '日'; uColor='#8a8a8a'; uFill=false; }
+
+      const isUrgent = uLevel === 'overdue' || uLevel === 'soon';
+      const urgencyBadgeStyle = {
+        fontFamily: MONO, fontSize:'11px', fontWeight:'600', letterSpacing:'0.04em', whiteSpace:'nowrap',
+        padding:'6px 11px', display:'inline-block', textAlign:'center', minWidth:'96px',
+        color: uFill ? '#ffffff' : uColor,
+        background: uFill ? uColor : 'transparent',
+        border: '1px solid ' + (uLevel==='normal' ? 'rgba(0,0,0,0.18)' : uLevel==='done' ? 'rgba(0,0,0,0.14)' : uColor)
+      };
+      const lampStyle = {
+        width: uLevel==='overdue' ? '12px' : '10px',
+        height: uLevel==='overdue' ? '12px' : '10px',
+        flexShrink:0, marginTop:'7px',
+        background: (uFill || uLevel==='watch') ? uColor : uLevel==='done' ? '#c4c4c4' : 'transparent',
+        border: uLevel==='normal' ? '2px solid #b8b8b8' : 'none'
+      };
+      const rowAccent = (uFill || uLevel==='watch') ? uColor : 'transparent';
+      const rowBg = uLevel==='overdue' ? 'rgba(217,58,63,0.05)' : uLevel==='soon' ? 'rgba(232,114,42,0.05)' : 'transparent';
+      const selectBase = { fontFamily: MONO, fontSize:'11px', fontWeight:'600', letterSpacing:'0.06em', padding:'10px 12px', width:'150px', borderRadius:'0', cursor:'pointer' };
+      const sc = this.STATUS_COLORS;
+      let selectStyle;
+      if (task.status === 'doing') selectStyle = { ...selectBase, background:sc.doing, color:'#ffffff', border:'1px solid '+sc.doing };
+      else if (task.status === 'review') selectStyle = { ...selectBase, background:sc.review, color:'#ffffff', border:'1px solid '+sc.review };
+      else if (task.status === 'done') selectStyle = { ...selectBase, background:sc.done, color:'#ffffff', border:'1px solid '+sc.done };
+      else selectStyle = { ...selectBase, background:'#FFFFFF', color:'#5a6068', border:'1px solid rgba(0,0,0,0.22)' };
+      const rowStyle = {
+        display:'flex', gap:'28px', alignItems:'flex-start',
+        padding:'26px 8px 26px 18px',
+        borderTop: idx === 0 ? 'none' : '1px solid rgba(0,0,0,0.08)',
+        borderLeft: '5px solid ' + secColor,
+        background: rowBg
+      };
+
+      const dotStyle = lampStyle;
+
+      return {
+        id: task.id,
+        num: String(idx + 1).padStart(2, '0'),
+        title: task.title,
+        goal: task.goal || '',
+        na: task.na || '',
+        secName: sec ? sec.name : '未割当',
+        secCode: sec ? sec.code : '--',
+        dateText,
+        dateStyle: { fontFamily: MONO, fontSize:'11px', letterSpacing:'0.06em', color: dateColor, whiteSpace:'nowrap' },
+        pLabel: pLabel[task.priority] || 'MID',
+        pStyle: {
+          fontFamily: MONO, fontSize:'10px', fontWeight:'600', letterSpacing:'0.08em', lineHeight:'1',
+          padding:'3px 7px', whiteSpace:'nowrap',
+          color: task.priority === 'high' ? '#D93A3F' : task.priority === 'medium' ? '#6e6e6e' : '#a0a0a0',
+          border: '1px solid ' + (task.priority === 'high' ? '#D93A3F' : task.priority === 'medium' ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.14)')
+        },
+        numStyle: { fontFamily: MONO, fontSize:'13px', color: task.status === 'done' ? '#b0b0b0' : '#9a9a9a', letterSpacing:'0.05em', marginTop:'2px' },
+        titleStyle: { fontSize:'21px', fontWeight:'700', letterSpacing:'-0.01em', lineHeight:'1.3', color: task.status === 'done' ? '#a0a0a0' : '#161616', textDecoration: task.status === 'done' ? 'line-through' : 'none' },
+        dotStyle,
+        status: task.status,
+        selectStyle,
+        rowStyle,
+        urgencyLabel: uLabel,
+        urgencyBadgeStyle,
+        secColor,
+        secChipStyle: { display:'inline-flex', alignItems:'center', gap:'7px', fontFamily: MONO, fontSize:'10px', fontWeight:'600', letterSpacing:'0.04em', color:'#ffffff', background: secColor, padding:'4px 9px', alignSelf:'flex-start', marginBottom:'10px' },
+        secTickStyle: { width:'6px', height:'6px', flexShrink:0, background:'rgba(255,255,255,0.85)' },
+        onGoal: (e) => this.updateField(task.id, 'goal', e.target.value),
+        onNa: (e) => this.updateField(task.id, 'na', e.target.value),
+        onStatus: (e) => this.updateStatus(task.id, e.target.value),
+        onDelete: () => this.deleteTask(task.id)
+      };
+    });
+
+    return {
+      overallPercent,
+      overallMeter: this.buildStackedMeter(divCounts, 48, '30px', '3px'),
+      totalCount: total, activeCount: active, alertCount, doneCount: done,
+      alertNumStyle: { fontFamily: MONO, fontSize:'40px', fontWeight:'500', lineHeight:'1', marginTop:'14px', color: alertCount > 0 ? '#D93A3F' : '#1c1c1c' },
+      noTasks: filtered.length === 0,
+      urgentList,
+      hasUrgent: urgentList.length > 0,
+      divisionLegend,
+      allClear: urgentList.length === 0,
+      sections,
+      tasks: filtered,
+      hasTasks: filtered.length > 0,
+      sectionFilter: this.state.sectionFilter,
+      statusFilter: this.state.statusFilter,
+      onSectionFilter: (e) => this.setState({ sectionFilter: e.target.value }),
+      onStatusFilter: (e) => this.setState({ statusFilter: e.target.value }),
+      sectionOptions: this.SECTIONS,
+      modalOpen: this.state.modalOpen,
+      draft: this.state.draft,
+      onOpenModal: () => this.setState({ modalOpen:true }),
+      onCloseModal: () => this.setState({ modalOpen:false }),
+      onAddSubmit: (e) => this.addTask(e),
+      onDraftTitle: (e) => this.setDraft('title', e.target.value),
+      onDraftGoal: (e) => this.setDraft('goal', e.target.value),
+      onDraftNa: (e) => this.setDraft('na', e.target.value),
+      onDraftSection: (e) => this.setDraft('section', e.target.value),
+      onDraftPriority: (e) => this.setDraft('priority', e.target.value),
+      onDraftDue: (e) => this.setDraft('dueDate', e.target.value),
+      onDraftStatus: (e) => this.setDraft('status', e.target.value)
+    };
+  }
+}
+</script>
+</body>
+</html>
