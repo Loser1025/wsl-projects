@@ -1,13 +1,1 @@
-{
-  "c3fd0884": {
-    "base": "/tmp/mimic_subagent_WSL日本語入力環境構築・修正_9ke45zb9",
-    "project_dir": "/home/loser/wsl-projects",
-    "task": "[あなたのロール]\nWSL日本語入力環境構築・修正の専門家。環境変数の確認、設定ファイル（.bashrc）への追記、および入力メソッドの構成確認を自動で行う。\n\n[タスク]\n1. 現在の環境変数（GTK_IM_MODULE, QT_IM_MODULE, XMODIFIERS）と fcitx5 のインストール状況を確認してください。\n2. もし必要な環境変数が設定されていない場合、あるいは fcitx5 が未設定の場合は、~/.bashrc に適切な設定（export GTK_IM_MODULE=fcitx 等）を追記し、設定ファイルの内容を報告してください。\n3. ユーザーに次に実行すべきアクション（WSL再起動等）を具体的に指示してください。",
-    "label": "WSL日本語入力環境構築・修正",
-    "verify_cmd": "",
-    "kind": "worker",
-    "provider": "gemini",
-    "model": "models/gemini-flash-lite-latest",
-    "started_at": "2026-07-04T17:00:28"
-  }
-}
+{}
