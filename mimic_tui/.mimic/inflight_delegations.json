@@ -1,13 +1,1 @@
-{
-  "7d3b2fd3": {
-    "base": "/tmp/mimic_subagent_Debian系OSパッケージ導_qczksens",
-    "project_dir": "/home/loser/wsl-projects",
-    "task": "[あなたのロール]\nDebian系OSパッケージ導入および依存関係解決の専門家。管理者権限(sudo)を用いたパッケージインストールを、非対話型(DEBIAN_FRONTEND=noninteractive)かつ安全に行うプロフェッショナル。\n\n[タスク]\n以下のパッケージ群を apt を用いてインストールしてください。\n1. fcitx5\n2. fcitx5-mozc\n3. fcitx5-frontend-gtk3\n4. fcitx5-frontend-gtk4\n5. fcitx5-frontend-qt5\n\n【実行時の制約・要件】\n- コマンド実行時は必ず `DEBIAN_FRONTEND=noninteractive` を環境変数に付与し、非対話的に実行してください（例: `sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ...`）。\n- パッケージリストの更新（`sudo apt-get update`）を事前に行ってください。\n- ロックエラー（`/var/lib/dpkg/lock` 等が他プロセスに掴まれている等）が発生した場合は、ロックが解除されるまで待つか、適切に対処してください。\n- ユーザーに「自分で実行してください」と求めてはなりません。あなた自身のシェル実行ツール（run_bash）を使用して、インストールを完了させてください。\n- インストール完了後、実際にパッケージが正しく導入されたことを `dpkg -s fcitx5 fcitx5-mozc` 等を実行して確認し、結果を報告してください。",
-    "label": "Debian系OSパッケージ導",
-    "verify_cmd": "dpkg -s fcitx5 fcitx5-mozc fcitx5-frontend-gtk3 fcitx5-frontend-gtk4 fcitx5-frontend-qt5",
-    "kind": "worker",
-    "provider": "gemini",
-    "model": "models/gemini-flash-latest",
-    "started_at": "2026-07-04T17:14:53"
-  }
-}
+{}
