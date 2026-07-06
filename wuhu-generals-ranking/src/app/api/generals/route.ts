@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import type { General } from '@/data/generals';
 
-const TITLES_TEAM_A = ['大将軍', '丞相', '都督'];
+const TITLES_TEAM_A = ['大将軍', '丞相', '都督', '猛将'];
 const TITLE_TEAM_B = '一兵卒';
 
 function toDriveThumbnail(url: string): string {
@@ -34,7 +34,7 @@ export async function GET() {
     const validRows = rows.filter((row: string[]) => (row[0] || '').trim().length > 0);
 
     const generals: General[] = validRows.map((row: string[], index: number) => {
-      const team = index < 3 ? 'A' : 'B';
+      const team = index < 4 ? 'A' : 'B';
       const rawImageUrl = row[4] && row[4].startsWith('http') ? row[4] : '';
 
       return {
