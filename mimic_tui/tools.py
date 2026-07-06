@@ -920,9 +920,10 @@ def delegate_research(question: str, project_dir: str = ".") -> str:
         "指定したロール説明を持つ専門家エージェントにタスクを委任する。"
         "ロールはDirectorが自由に定義できる"
         "（例: 'TypeScript型エラーの診断専門家'、'セキュリティレビュアー'、'テストコードライター'）。"
-        "can_write=False（デフォルト）なら読み取り専用のResearcher相当、"
-        "can_write=TrueならOverlayFS隔離Worker相当で実行する。"
-        "固定ロール（delegate_to_team / delegate_to_worker）が使えないSpecialistモード専用。"
+        "権限は3段階で、用途に合う最小権限を選ぶこと: デフォルト（読み取り専用の調査・レビュー）、"
+        "can_execute=True（OverlayFS隔離内でテスト・ビルド等のコマンド実行可、変更は破棄）、"
+        "can_write=True（OverlayFS隔離内で実装し、変更をプロジェクトへ適用・コミット）。"
+        "Specialistモードでは唯一の委任手段。他モードでも動的ロールが必要な場合に使用できる。"
     ),
     parameters={
         "type": "object",
@@ -941,8 +942,17 @@ def delegate_research(question: str, project_dir: str = ".") -> str:
             "can_write": {
                 "type": "boolean",
                 "description": (
-                    "Trueでファイル変更可能なWorker（OverlayFS隔離）、"
+                    "Trueでファイル変更可能なWorker（OverlayFS隔離、変更は適用・コミットされる）、"
                     "False（デフォルト）で読み取り専用"
+                ),
+                "default": False,
+            },
+            "can_execute": {
+                "type": "boolean",
+                "description": (
+                    "Trueで実行専用Worker（OverlayFS隔離内で run_bash 等のコマンド実行が可能だが、"
+                    "ファイル変更はタスク終了後に破棄される）。テスト実行・ビルド・診断など"
+                    "「実行はするが変更を残さない」タスク向け。can_write=True が優先される。"
                 ),
                 "default": False,
             },
@@ -954,10 +964,10 @@ def delegate_research(question: str, project_dir: str = ".") -> str:
             "verify_cmd": {
                 "type": "string",
                 "description": (
-                    "can_write=True のとき、Worker実行後にOverlay上で実行する検証コマンド"
-                    "（例: 'pytest tests/test_foo.py -q'）。"
+                    "can_write=True / can_execute=True のとき、Worker実行後にOverlay上で実行する"
+                    "検証コマンド（例: 'pytest tests/test_foo.py -q'）。"
                     "失敗した場合はWorkerが修正再試行する（最大3回）。"
-                    "can_write=False の場合は無視される。省略可。"
+                    "読み取り専用（両方False）の場合は無視される。省略可。"
                 ),
                 "default": "",
             },
@@ -966,12 +976,13 @@ def delegate_research(question: str, project_dir: str = ".") -> str:
     },
 )
 def delegate_to_specialist(role: str, task: str,
-                            can_write: bool = False, project_dir: str = ".",
-                            verify_cmd: str = "") -> str:
+                            can_write: bool = False, can_execute: bool = False,
+                            project_dir: str = ".", verify_cmd: str = "") -> str:
     from .team import run_specialist_task, _get_team_config
     return run_specialist_task(
         role, task, project_dir, _get_team_config(),
-        can_write=can_write, label=role[:15], verify_cmd=verify_cmd,
+        can_write=can_write, can_execute=can_execute,
+        label=role[:15], verify_cmd=verify_cmd,
     )
 
 

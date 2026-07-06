@@ -39,6 +39,12 @@ _apply_lock = threading.Lock()
 
 MAX_VERIFY_RETRIES = 3   # verify失敗時のWorker自動再試行上限
 
+# 委任Worker（サブプロセス）の総同時実行数上限。delegate_to_team_parallel の
+# バッチ制御(3)とは独立に、delegate_to_specialist 等が orchestrator の並列
+# ツール実行経路で呼び出し数ぶん同時に走った場合も、全委任経路まとめて絞る。
+_MAX_DELEGATION_CONCURRENCY = 3
+_DELEGATION_SEMAPHORE = threading.BoundedSemaphore(_MAX_DELEGATION_CONCURRENCY)
+
 
 # ── 中断委任マニフェスト ──────────────────────────────────────────
 # Directorプロセス自体がクラッシュ/killされた場合、進行中の委任タスクの
@@ -71,13 +77,15 @@ def _save_manifest(data: dict) -> None:
 
 def _register_inflight(trace_id: str, base: Path, project_dir: str, task: str,
                         label: str, verify_cmd: str, kind: str,
-                        provider: str, model: str) -> None:
+                        provider: str, model: str,
+                        role_prompt: str = "", apply_changes: bool = True) -> None:
     with _INFLIGHT_LOCK:
         data = _load_manifest()
         data[trace_id] = {
             "base": str(base), "project_dir": project_dir, "task": task,
             "label": label, "verify_cmd": verify_cmd, "kind": kind,
             "provider": provider, "model": model,
+            "role_prompt": role_prompt, "apply_changes": apply_changes,
             "started_at": datetime.now().isoformat(timespec="seconds"),
         }
         _save_manifest(data)
@@ -210,12 +218,14 @@ def _run_isolated(config, tool_registry: ToolRegistry, system_prompt: str,
     messages: list[dict] = [{"role": "user", "content": user_message}]
     prefix = f"  {C.gray(f'[{role}:{label}]' if label else f'[{role}]')} "
     xml_tool_retry_count = 0
+    last_text = ""
 
     for _ in range(max_rounds):
         response = agent._api_call_with_retry(messages)
         text = agent._extract_text(response)
         tool_calls = agent._extract_tool_calls(response)
         if text:
+            last_text = text
             for line in text.splitlines():
                 if line.strip():
                     safe_print(prefix + line, flush=True)
@@ -266,7 +276,14 @@ def _run_isolated(config, tool_registry: ToolRegistry, system_prompt: str,
                 "tool_call_id": call_id,
                 "content": str(result),
             })
-    return ""
+
+    # ラウンド上限到達 — 空文字ではなく「未完了」であることを呼び出し元（Director）に明示する。
+    # 空文字を返すとDirectorが「失敗」と「発見なし」を区別できず誤った報告をし得る。
+    note = f"[ラウンド上限到達・調査未完了] {max_rounds}ラウンド以内に最終回答に到達できませんでした。"
+    partial = last_text.strip()
+    if partial:
+        return f"{note}\nここまでの最終出力（不完全な可能性あり）:\n{partial}"
+    return note + " タスクを分割するか、より狭いロールで再委任してください。"
 
 
 
@@ -302,46 +319,150 @@ def run_research_qa(question: str, project_dir: str, config, label: str = "") ->
     return answer
 
 
-def _build_dynamic_system_prompt(role: str, can_write: bool) -> str:
-    """Directorが自由記述したロール説明からシステムプロンプトを組み立てる。"""
-    write_line = (
-        "- write_file, edit_file, patch_file, run_bash でファイル変更・コマンド実行が可能\n"
-        if can_write else ""
-    )
+def _build_dynamic_system_prompt(role: str, can_write: bool,
+                                  can_execute: bool = False) -> str:
+    """Directorが自由記述したロール説明からシステムプロンプトを組み立てる。
+
+    ツール説明は実行経路ごとの実態に合わせる: can_write=True のWorkerは委任以外の
+    全ツールを持つため個別列挙しない（過少申告を避ける）。"""
+    if can_write:
+        tools_desc = (
+            "- ファイルの読み書き・シェル実行・検索・Web調査など、委任以外の全ツールが使える\n"
+            "- 変更はOverlayFS隔離された作業部屋で行われ、タスク完了後にプロジェクトへ適用される\n"
+        )
+    elif can_execute:
+        tools_desc = (
+            "- ファイル読み取り・検索・Web調査に加え、run_bash / run_pipeline で"
+            "コマンド（テスト・ビルド・診断等）を実行できる\n"
+            "- **作業部屋はOverlayFS隔離されており、ファイルへの変更はタスク終了後に破棄される。**"
+            "実行・診断・分析と、その結果の報告に集中すること（修正の実装は行わない）\n"
+        )
+    else:
+        tools_desc = (
+            "- read_file, grep_codebase, file_info, smart_read, get_repo_map でプロジェクト内を調査できる\n"
+            "- web_search / fetch_webpage で外部情報を調べられる（書き込み・コマンド実行は不可）\n"
+        )
     return (
         f"あなたは以下の専門家ロールで動作するエージェントです。\n\n"
         f"# ロール\n{role}\n\n"
         f"# 使えるツール\n"
-        f"- read_file, grep_codebase, file_info, smart_read, get_repo_map でプロジェクト内を調査できる\n"
-        f"- web_search / fetch_webpage で外部情報を調べられる\n"
-        f"{write_line}"
+        f"{tools_desc}"
         f"\n# 重要\nロールの専門性に集中し、範囲外の作業は行わない。"
         f"最終回答は日本語で簡潔に結果のみ伝える。"
     )
 
 
-def run_specialist_task(role: str, task: str, project_dir: str, config,
-                         can_write: bool = False, label: str = "",
-                         verify_cmd: str = "") -> str:
-    """動的ロール定義のエージェントを実行する。"""
-    effective_label = label or role[:20]
-    system_prompt = _build_dynamic_system_prompt(role, can_write)
+def _rounds_for_specialist(role: str, task: str) -> int:
+    """role/taskの記述量から読み取り専用Specialistのラウンド上限を段階的に決める。
 
-    if can_write:
+    「コードベース全体のレビュー」のような広いタスクほど記述が長くなる傾向を利用した
+    粗いヒューリスティック。"""
+    size = len(role) + len(task)
+    if size > 1200:
+        return 24
+    if size > 500:
+        return 18
+    return _RESEARCHER_MAX_ROUNDS
+
+
+# ── Specialistロール定義の永続化 ──────────────────────────────────
+# 成功した委任のロール定義を保存し、/mode specialist 切替時にシステムプロンプトへ
+# 注入する。動的生成の柔軟性を保ちつつ、実績あるロール文の再利用で品質を安定させる。
+
+_ROLES_KEEP = 30          # 保存するロール定義の上限（最終使用が古いものから削除）
+_ROLES_INJECT_LIMIT = 10  # システムプロンプトに注入する件数
+
+
+def _roles_dir() -> Path:
+    p = Path(__file__).parent / ".mimic" / "roles"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _save_specialist_role(role: str, mode: str) -> None:
+    """成功した委任のロール定義を保存する（同一ロールは使用回数を加算）。失敗は無視。"""
+    import hashlib
+    try:
+        slug = hashlib.md5(role.strip().encode()).hexdigest()[:10]
+        p = _roles_dir() / f"{slug}.json"
+        data: dict = {"role": role.strip(), "uses": 0}
+        if p.exists():
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        data["uses"] = int(data.get("uses", 0)) + 1
+        data["mode"] = mode
+        data["last_used"] = datetime.now().isoformat(timespec="seconds")
+        p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        files = sorted(_roles_dir().glob("*.json"), key=lambda f: f.stat().st_mtime)
+        for f in files[:-_ROLES_KEEP]:
+            f.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def load_saved_roles_section(limit: int = _ROLES_INJECT_LIMIT) -> str:
+    """保存済みロール定義をSpecialistモードのシステムプロンプト追記用に整形して返す。
+    保存済みロールがなければ空文字。"""
+    try:
+        files = sorted(_roles_dir().glob("*.json"),
+                       key=lambda f: f.stat().st_mtime, reverse=True)[:limit]
+    except Exception:
+        return ""
+    lines = []
+    for f in files:
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            role = str(data.get("role", "")).strip().replace("\n", " ")
+            if role:
+                lines.append(f"- {role[:180]}（使用{data.get('uses', 1)}回）")
+        except Exception:
+            continue
+    if not lines:
+        return ""
+    return (
+        "\n\n## 保存済みロール（過去に成功した委任のロール定義）\n"
+        "類似タスクでは以下のロール定義をそのまま、または微修正して再利用すること:\n"
+        + "\n".join(lines) + "\n"
+    )
+
+
+def run_specialist_task(role: str, task: str, project_dir: str, config,
+                         can_write: bool = False, can_execute: bool = False,
+                         label: str = "", verify_cmd: str = "") -> str:
+    """動的ロール定義のエージェントを実行する。
+
+    権限は3段階: 読み取り専用（デフォルト）/ can_execute=True（Overlay内で
+    コマンド実行可・変更は破棄）/ can_write=True（Overlay内で実装し変更を適用・コミット）。
+    can_write と can_execute が両方 True の場合は can_write が優先される。
+    成功した委任のロール定義は .mimic/roles/ に保存され、次回以降のSpecialistモードで
+    再利用候補としてシステムプロンプトに注入される。"""
+    effective_label = label or role[:20]
+    system_prompt = _build_dynamic_system_prompt(role, can_write, can_execute)
+
+    if can_write or can_execute:
         enriched = f"[あなたのロール]\n{role}\n\n[タスク]\n{task}"
-        return run_worker_once(enriched, project_dir, config, label=effective_label,
-                                role_prompt=system_prompt, verify_cmd=verify_cmd)
+        result = run_worker_once(enriched, project_dir, config, label=effective_label,
+                                  role_prompt=system_prompt, verify_cmd=verify_cmd,
+                                  apply_changes=can_write)
+        if "✓ 完了" in result and "✗検証失敗" not in result:
+            _save_specialist_role(role, "write" if can_write else "execute")
+        return result
     else:
         registry = _build_researcher_registry()
         prompt = (
             f"[作業フォルダ] {Path(project_dir).resolve()}\n\n"
             f"[タスク]\n{task}\n"
         )
-        return _run_isolated(
+        answer = _run_isolated(
             config, registry, system_prompt, prompt,
-            max_rounds=_RESEARCHER_MAX_ROUNDS,
+            max_rounds=_rounds_for_specialist(role, task),
             label=effective_label, role=role[:20],
         )
+        if answer and not answer.startswith("[ラウンド上限到達"):
+            _save_specialist_role(role, "read")
+        return answer
 
 
 def run_research(task: str, project_dir: str, config, label: str = "") -> str:
@@ -357,15 +478,39 @@ def run_research(task: str, project_dir: str, config, label: str = "") -> str:
 
 def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_id: str,
                           label: str, verify_cmd: str, tag: str, print_tag: str,
-                          role_prompt: str = "") -> str:
+                          role_prompt: str = "", apply_changes: bool = True) -> str:
+    """_run_delegation_core_inner を同時実行数制限付きで実行する。
+
+    delegate_to_specialist 等は orchestrator の並列ツール実行経路で呼び出し数ぶん
+    同時に走り得るため、Workerサブプロセスの総同時実行数をここで絞る。
+    """
+    if not _DELEGATION_SEMAPHORE.acquire(blocking=False):
+        safe_print(C.gray(
+            f"  {print_tag} ⏳ 委任スロット待機中（同時実行上限 {_MAX_DELEGATION_CONCURRENCY}）..."
+        ), flush=True)
+        _DELEGATION_SEMAPHORE.acquire()
+    try:
+        return _run_delegation_core_inner(task, project_dir, config, base, trace_id,
+                                           label, verify_cmd, tag, print_tag,
+                                           role_prompt=role_prompt,
+                                           apply_changes=apply_changes)
+    finally:
+        _DELEGATION_SEMAPHORE.release()
+
+
+def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, trace_id: str,
+                                label: str, verify_cmd: str, tag: str, print_tag: str,
+                                role_prompt: str = "", apply_changes: bool = True) -> str:
     """base 上でWorkerを実行し、verify失敗リトライ→適用→マニフェスト解除までを行う共通処理。
 
     新規実行（base は空のOverlay）・再開（base に前回までの変更が残っている）の
     どちらからも呼ばれる。呼び出し側は事前に base を作成し _register_inflight 済みであること。
     正常終了時（適用成功/不要/実行エラーでの打ち切りいずれも）は必ず _unregister_inflight する
     ため、ここに到達せずプロセスが落ちた場合だけがマニフェストに残り、中断扱いとして検出できる。
+    apply_changes=False（実行専用委任）の場合、Overlay内の変更は適用せず破棄する。
     """
     resolved_dir = str(Path(project_dir).resolve())
+    _t_start = time.time()  # 競合検出用: この時刻以降に本体側で変更されたファイルを警告する
 
     safe_print(C.gray(f"  {print_tag} ⚙ Worker実行..."), flush=True)
     _log_team_event({"event": "team_worker_start", "attempt": 1, "task": task, "resumed": False, "trace_id": trace_id})
@@ -427,12 +572,25 @@ def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_
         return f"[{tag}: ⚠ 実行エラー] (trace_id={trace_id})\nタスク: {task}\n\n{result.summary}"
 
     applied = False
+    discarded = False
+    conflict_files: list[str] = []
     try:
-        if result.changed_files:
+        if result.changed_files and apply_changes:
+            # 委任実行中に本体側でも変更されたファイルを検出する
+            # （applyはlast-writer-winsで上書きするため、警告として差分サマリに載せる）
+            for f in result.changed_files:
+                dst = Path(resolved_dir) / f
+                try:
+                    if dst.exists() and dst.stat().st_mtime > _t_start:
+                        conflict_files.append(f)
+                except OSError:
+                    pass
             with _apply_lock:
                 apply_subagent_changes(upper, Path(resolved_dir), result.changed_files)
                 _get_team_autogit().checkpoint(resolved_dir, tag)
             applied = True
+        elif result.changed_files:
+            discarded = True
     finally:
         cleanup_subagent(base)
         _unregister_inflight(trace_id)
@@ -446,7 +604,13 @@ def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_
         else:
             verify_status = " ?(検証結果取得失敗)"
 
-    status_label = f"{'✓ 完了・適用済み' if applied else '✓ 完了（変更なし）'}{verify_status}"
+    if applied:
+        status_core = "✓ 完了・適用済み"
+    elif discarded:
+        status_core = "✓ 完了（実行専用・変更は破棄）"
+    else:
+        status_core = "✓ 完了（変更なし）"
+    status_label = f"{status_core}{verify_status}"
     lines = [
         f"[{tag}: {status_label}] (trace_id={trace_id})",
         f"タスク: {task}",
@@ -455,6 +619,11 @@ def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_
     ]
     if applied:
         lines += ["", "(変更はプロジェクトに適用され、AutoGitでコミット済みです)"]
+        if conflict_files:
+            lines += ["", "⚠ 競合の可能性: 委任実行中にプロジェクト側でも変更されていた"
+                          f"ファイルを上書きしました: {', '.join(conflict_files)}"]
+    elif discarded:
+        lines += ["", "(実行専用モード(can_execute)のため、Overlay内のファイル変更は破棄されました)"]
     return "\n".join(lines)
 
 
@@ -487,17 +656,21 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
 
 
 def run_worker_once(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "",
-                     role_prompt: str = "") -> str:
-    """Researcherを介さずWorkerを実行し、verify失敗時は自動リトライ後に変更を適用する。"""
+                     role_prompt: str = "", apply_changes: bool = True) -> str:
+    """Researcherを介さずWorkerを実行し、verify失敗時は自動リトライ後に変更を適用する。
+
+    apply_changes=False の場合はOverlay内での実行のみ行い、変更は適用せず破棄する
+    （delegate_to_specialist の can_execute=True 用）。"""
     resolved_dir = str(Path(project_dir).resolve())
     trace_id = uuid.uuid4().hex[:8]
 
     base = Path(tempfile.mkdtemp(prefix=f"mimic_subagent_{label or 'single'}_"))
     _register_inflight(trace_id, base, resolved_dir, task, label, verify_cmd,
-                        "worker", config.name, config.model)
+                        "worker", config.name, config.model,
+                        role_prompt=role_prompt, apply_changes=apply_changes)
     return _run_delegation_core(task, project_dir, config, base, trace_id, label,
                                  verify_cmd, "delegate_to_worker", "[Worker]",
-                                 role_prompt=role_prompt)
+                                 role_prompt=role_prompt, apply_changes=apply_changes)
 
 
 def resume_delegation(trace_id: str) -> str:
@@ -521,6 +694,8 @@ def resume_delegation(trace_id: str) -> str:
     return _run_delegation_core(
         entry["task"], entry["project_dir"], config, base, trace_id,
         entry.get("label", ""), entry.get("verify_cmd", ""), tag, "[Resume]",
+        role_prompt=entry.get("role_prompt", ""),
+        apply_changes=entry.get("apply_changes", True),
     )
 
 

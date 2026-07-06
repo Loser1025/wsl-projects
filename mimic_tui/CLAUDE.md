@@ -48,6 +48,11 @@ startup with write tools, shell tools, and all read/search tools removed
 (`_EXTREME_EXCLUDED_TOOLS`). In this mode the agent is forced to route all code changes and
 research through `delegate_to_team`/`delegate_to_team_parallel` and `delegate_research`.
 
+**Specialist mode** (`/mode specialist`): Like extreme but also removes the fixed-role delegation
+tools (`_SPECIALIST_EXCLUDED_TOOLS`), leaving `delegate_to_specialist` as the only delegation
+path. On mode switch, `team.load_saved_roles_section()` is appended to the system prompt to
+surface previously successful role definitions (see `delegate_to_specialist` below).
+
 ### Agent core (`agent.py`)
 `OpenRouterAgent` is provider-agnostic despite the name — `self._config` can be an
 `OpenRouterConfig`, `GoogleAIConfig`, or `MistralConfig` (all OpenAI-chat-completions-compatible).
@@ -162,10 +167,16 @@ mode, described above).
    previous `base` is already cleaned up by the sub-process; the loop breaks and reports the
    error.
 
-4. **Apply**: if `result.changed_files` is non-empty, `apply_subagent_changes()` copies the
-   `upperdir` diff onto the real project dir (including deletions via overlay whiteout markers,
-   excluding the internal `.mimic_checkpoint.json` via `_APPLY_EXCLUDED_PATHS`), serialized
-   through `_apply_lock`. Then `_get_team_autogit().checkpoint()` commits the changes.
+4. **Apply**: if `result.changed_files` is non-empty (and `apply_changes` is not False),
+   `apply_subagent_changes()` copies the `upperdir` diff onto the real project dir (including
+   deletions via overlay whiteout markers, excluding the internal `.mimic_checkpoint.json` via
+   `_APPLY_EXCLUDED_PATHS`), serialized through `_apply_lock`. Then
+   `_get_team_autogit().checkpoint()` commits the changes. Files whose real-project mtime is
+   newer than the delegation's start time are flagged in the summary as potential conflicts
+   (apply is last-writer-wins). All delegation Worker subprocesses (team/worker/specialist,
+   including resumes) share `_DELEGATION_SEMAPHORE` (`_MAX_DELEGATION_CONCURRENCY = 3`), so
+   parallel `delegate_to_specialist` calls from the orchestrator's parallel tool path cannot
+   spawn unbounded Workers.
    Changes are applied regardless of final verify status (so partial work is not lost); the
    status label shows `✓検証通過` or `✗検証失敗(exit=N, 3回試行後)`. The Worker's own final-answer
    text (captured from stdout after the `===MIMIC_FINAL===` marker in `subagent.py`) is prepended
@@ -176,6 +187,22 @@ mode, described above).
 `run_worker_once` skips the Researcher phase and runs one Worker directly. Shares the same
 `_run_delegation_core` (verify retry loop, apply, inflight bookkeeping) as `delegate_to_team`.
 Useful for self-contained tasks where the target file and change are already known.
+Accepts `apply_changes=False` to run the Worker in the overlay but discard its changes
+(used by `delegate_to_specialist(can_execute=True)`).
+
+#### `delegate_to_specialist` — dynamic-role delegation
+`run_specialist_task` runs an agent whose system prompt is built at runtime from a free-form
+`role` string (`_build_dynamic_system_prompt`). Three permission tiers: default (read-only,
+in-process `_run_isolated` with the Researcher registry; `max_rounds` scales 12→18→24 with
+role+task length via `_rounds_for_specialist`), `can_execute=True` (full overlay Worker, but
+changes are discarded — for test/build/diagnosis roles), and `can_write=True` (overlay Worker
+with apply+commit, verify retry included). Successful delegations persist their role text to
+`.mimic/roles/*.json` (`_save_specialist_role`, capped at `_ROLES_KEEP=30`);
+`load_saved_roles_section()` renders the most recent 10 for prompt injection on
+`/mode specialist`. Available in all modes, but it is the only delegation tool in Specialist
+mode. If `_run_isolated` exhausts its rounds it returns an explicit
+`[ラウンド上限到達・調査未完了]` message (with the last partial output) instead of an empty
+string, so the Director can distinguish "incomplete" from "no findings".
 
 #### Orphaned delegation recovery (`/delegations`, `team.py` inflight manifest)
 If the Director process itself crashes/is killed mid-delegation, the Worker's overlay `base`
@@ -192,7 +219,8 @@ prints a warning if any entry's `started_at` is older than 24h (see Entry point 
 - The TUI `/delegations` command (`commands.py::register_delegations_command`, Director-only —
   never registered for Worker sub-processes) lists these and supports
   `/delegations resume <番号>` (`resume_delegation`: re-enters `_run_delegation_core` with the
-  saved `base`/task/verify_cmd, relying on `orchestrator.py`'s existing
+  saved `base`/task/verify_cmd/role_prompt/apply_changes — specialist role prompts and the
+  execute-only discard flag survive a Director crash — relying on `orchestrator.py`'s existing
   `.mimic_checkpoint.json`-resume logic) and `/delegations discard <番号>` (`discard_delegation`:
   `cleanup_subagent(base)` + unregister, no changes applied).
 

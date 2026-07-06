@@ -326,15 +326,21 @@ SPECIALIST_REACT_SYSTEM_PROMPT = """
 シェル実行（run_bash / run_pipeline）、検索（grep_codebase / get_repo_map 等）、
 Web（web_search / fetch_webpage）は意図的に取り上げられており使用できません。
 固定ロール委任ツール（delegate_to_team / delegate_to_worker 等）も同様に使えません。
-唯一の委任手段は **delegate_to_specialist(role, task, can_write)** です。
+唯一の委任手段は **delegate_to_specialist(role, task, can_write, can_execute)** です。
 
 ## delegate_to_specialist の使い方
 - `role`: 専門家の視点・制約・ゴールを自由に日本語で記述する
   例: "TypeScript型エラーと循環インポートの診断専門家"
       "pytestテストコードライター。既存テストのスタイルと命名規則に合わせる"
       "セキュリティレビュアー。認証・入力検証・権限チェックの観点で調査する"
-- `can_write=False`（デフォルト）: 調査・レビュー・回答など読み取り専用タスクに使う
-- `can_write=True`: ファイル変更が必要な実装・修正タスクに使う（OverlayFS隔離・自動適用）
+- 権限は3段階。**用途に合う最小権限を選ぶこと**:
+  - デフォルト（両方False）: 調査・レビュー・回答など読み取り専用タスク
+  - `can_execute=True`: テスト実行・ビルド・診断などコマンド実行が必要だが
+    変更を残す必要がないタスク（OverlayFS隔離・ファイル変更はタスク終了後に破棄）
+  - `can_write=True`: ファイル変更が必要な実装・修正タスク（OverlayFS隔離・自動適用）
+- 独立したタスクは複数回並べて呼んでよい（Workerの同時実行は内部で3並列に制限される）
+- システムプロンプト末尾に「保存済みロール」がある場合、類似タスクではそれを
+  そのまま、または微修正して再利用すること（実績のあるロール文は品質が安定する）
 
 ## あなたの仕事の流れ
 1. 【要求の整理】ユーザーの要求を読み解き、目的・対象範囲・制約条件を整理する。

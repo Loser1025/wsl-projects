@@ -1005,10 +1005,12 @@ class MimicApp(App):
             self._ctx["interactive_orch"].react_log.clear()
             self._write_direct("🔥 モード: Extreme React (Director専任・委任特化)  書き込み系ツールを取り上げました。会話履歴をリセットしました。\n")
         elif arg in ("specialist", "spec", "s"):
+            from .team import load_saved_roles_section
             self._agent_mode = "specialist"
             self._ctx["agent"].tools = self._ctx["specialist_tools"]
             self._ctx["agent"].set_system_prompt(
                 self._ctx["plan_prompt"] + SPECIALIST_REACT_SYSTEM_PROMPT
+                + load_saved_roles_section()
             )
             self._ctx["agent"].clear_history()
             self._ctx["interactive_orch"].react_log.clear()
