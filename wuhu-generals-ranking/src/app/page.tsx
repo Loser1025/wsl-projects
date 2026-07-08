@@ -2,7 +2,7 @@
 'use client';
 
 import { General, GeneralStats } from '@/data/generals';
-import TeamSection from '@/components/TeamSection';
+import TierSection from '@/components/TierSection';
 import HeroBackground from '@/components/HeroBackground';
 import ThreeBackground from '@/components/ThreeBackground';
 import { motion } from 'framer-motion';
@@ -49,8 +49,9 @@ export default function Home() {
     );
   }
 
-  const teamA = generals.filter((g) => g.team === 'A');
-  const teamB = generals.filter((g) => g.team === 'B');
+  const shitenno = generals.filter((g) => g.tier === 'shitenno');
+  const busho = generals.filter((g) => g.tier === 'busho');
+  const heisotsu = generals.filter((g) => g.tier === 'heisotsu');
   const maxStats = computeMaxStats(generals);
 
   return (
@@ -82,16 +83,15 @@ export default function Home() {
           </motion.header>
         </div>
 
-        {/* A隊セクション */}
-        <div className="team-a-wrapper">
-          <TeamSection
-            teamLabel="甲 隊"
-            generals={teamA}
-            team="A"
-            maxStats={maxStats}
-            bgImage="/images/battle-team-a.png"
-          />
-        </div>
+        {/* 四天王セクション（1〜4位） */}
+        <TierSection
+          tier="shitenno"
+          teamLabel="四 天 王"
+          subLabel={`Shitennō — Rank 1-${shitenno.length}`}
+          generals={shitenno}
+          maxStats={maxStats}
+          bgImage="/images/battle-team-a.png"
+        />
 
         {/* セクション区切り */}
         <div className="flex items-center justify-center my-12 gap-4">
@@ -100,16 +100,31 @@ export default function Home() {
           <div className="h-px flex-1 max-w-32 bg-gradient-to-l from-transparent to-gray-700" />
         </div>
 
-        {/* B隊セクション */}
-        <div className="team-b-wrapper">
-          <TeamSection
-            teamLabel="乙 隊"
-            generals={teamB}
-            team="B"
-            maxStats={maxStats}
-            bgImage="/images/battle-team-b.png"
-          />
+        {/* 武将セクション（5〜8位） */}
+        <TierSection
+          tier="busho"
+          teamLabel="武 将"
+          subLabel={`Busho — Rank ${shitenno.length + 1}-${shitenno.length + busho.length}`}
+          generals={busho}
+          maxStats={maxStats}
+          bgImage="/images/battle-team-b.png"
+        />
+
+        {/* セクション区切り */}
+        <div className="flex items-center justify-center my-12 gap-4">
+          <div className="h-px flex-1 max-w-32 bg-gradient-to-r from-transparent to-gray-700" />
+          <span className="text-gray-600 text-xs tracking-[0.3em]">◆ ◆ ◆</span>
+          <div className="h-px flex-1 max-w-32 bg-gradient-to-l from-transparent to-gray-700" />
         </div>
+
+        {/* 一兵卒セクション（9位以降・無制限） */}
+        <TierSection
+          tier="heisotsu"
+          teamLabel="一 兵 卒"
+          subLabel={`Heisotsu — Rank ${shitenno.length + busho.length + 1}+ (${heisotsu.length}名)`}
+          generals={heisotsu}
+          maxStats={maxStats}
+        />
 
         {/* フッター */}
         <footer className="text-center mt-20 pb-8">

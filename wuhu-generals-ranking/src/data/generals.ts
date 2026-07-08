@@ -4,11 +4,13 @@ export interface GeneralStats {
   avgCalls: number;    // アベコール数
 }
 
+export type GeneralTier = 'shitenno' | 'busho' | 'heisotsu';
+
 export interface General {
   rank: number;
   name: string;
   title: string;
-  team: 'A' | 'B';
+  tier: GeneralTier;
   stats: GeneralStats;
   imageUrl: string;
 }

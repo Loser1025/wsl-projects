@@ -7,10 +7,26 @@ import Image from 'next/image';
 import { useState } from 'react';
 
 const titleColors: Record<string, string> = {
-  '大将軍': 'bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500 text-black',
+  // 四天王（東西南北を司る四天王の伝統色）
+  '毘沙門天': 'bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-500 text-black',
+  '持国天': 'bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 text-white',
+  '増長天': 'bg-gradient-to-r from-red-600 via-rose-500 to-red-700 text-white',
+  '広目天': 'bg-gradient-to-r from-slate-300 via-gray-100 to-slate-400 text-black',
+  // 武将
+  '大将軍': 'bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600 text-black',
   '丞相': 'bg-gradient-to-r from-purple-500 via-violet-400 to-purple-600 text-white',
   '都督': 'bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-600 text-white',
+  '猛将': 'bg-gradient-to-r from-red-500 via-rose-400 to-red-600 text-white',
+  // 一兵卒
   '一兵卒': 'bg-gradient-to-r from-gray-500 via-gray-400 to-gray-600 text-white',
+};
+
+// 四天王は各々の方角色で枠を個別に彩る
+const shitennoBorder: Record<string, string> = {
+  '毘沙門天': 'border-yellow-400/70',
+  '持国天': 'border-emerald-400/60',
+  '増長天': 'border-rose-500/60',
+  '広目天': 'border-slate-300/60',
 };
 
 const statConfig = [
@@ -20,7 +36,7 @@ const statConfig = [
 ];
 
 export default function GeneralCard({ general, index, maxStats }: { general: General; index: number; maxStats: GeneralStats }) {
-  const isTeamA = general.team === 'A';
+  const isShitenno = general.tier === 'shitenno';
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [objectPosition, setObjectPosition] = useState('center');
@@ -32,15 +48,14 @@ export default function GeneralCard({ general, index, maxStats }: { general: Gen
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.6, delay: index * 0.15, ease: 'easeOut' }}
-      whileHover={isTeamA ? { rotateY: 8, rotateX: -4, scale: 1.04, z: 40 } : { scale: 1.03 }}
+      whileHover={isShitenno ? { rotateY: 8, rotateX: -4, scale: 1.04, z: 40 } : { scale: 1.03 }}
       className={`
         relative group rounded-2xl border overflow-hidden
-        ${isTeamA
-          ? 'border-yellow-500/50 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 shadow-[0_0_30px_rgba(234,179,8,0.15)]'
-          : 'border-gray-700/50 bg-gradient-to-br from-gray-900 to-gray-800 shadow-lg'
+        ${isShitenno
+          ? `shitenno-frame shitenno-glow border-2 border-double ${shitennoBorder[general.title] || 'border-yellow-400/70'} bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900`
+          : 'border border-amber-800/40 bg-gradient-to-br from-gray-900 to-gray-800 shadow-lg hover:shadow-[0_0_30px_rgba(217,119,6,0.25)] hover:border-amber-600/60'
         }
         transition-shadow duration-300
-        ${isTeamA ? 'hover:shadow-[0_0_50px_rgba(234,179,8,0.3)]' : 'hover:shadow-[0_0_20px_rgba(255,255,255,0.08)]'}
       `}
       style={{ perspective: 800 }}
     >
@@ -50,6 +65,13 @@ export default function GeneralCard({ general, index, maxStats }: { general: Gen
           backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,215,0,0.1) 10px, rgba(255,215,0,0.1) 11px)`,
         }}
       />
+
+      {/* 四天王：中央上部の王冠アイコン */}
+      {isShitenno && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 text-yellow-300 drop-shadow-[0_0_6px_rgba(234,179,8,0.8)]">
+          <Crown size={18} fill="currentColor" />
+        </div>
+      )}
 
       {/* ===== 画像エリア ===== */}
       <div className="relative w-full h-[200px] overflow-hidden rounded-t-[12px]">
@@ -89,7 +111,7 @@ export default function GeneralCard({ general, index, maxStats }: { general: Gen
 
         {/* 武将名オーバーレイ（画像下部） */}
         <div className="absolute bottom-2 left-0 right-0 text-center pointer-events-none z-10">
-          <span className={`text-lg font-bold tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] ${isTeamA ? 'text-yellow-100' : 'text-gray-200'}`}>
+          <span className={`text-lg font-bold tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] ${isShitenno ? 'text-yellow-100' : 'text-gray-200'}`}>
             {general.name}
           </span>
         </div>
@@ -97,10 +119,10 @@ export default function GeneralCard({ general, index, maxStats }: { general: Gen
         {/* 順位バッジ（画像上に重ねる） */}
         <div className="absolute top-3 left-3 z-10">
           <div className={`
-            flex items-center justify-center w-10 h-10 rounded-full font-bold text-lg
-            ${isTeamA
-              ? 'bg-gradient-to-br from-yellow-400 to-amber-600 text-black shadow-lg shadow-yellow-500/30'
-              : 'bg-gradient-to-br from-gray-600 to-gray-700 text-gray-200 shadow-md'
+            flex items-center justify-center rounded-full font-bold
+            ${isShitenno
+              ? 'w-12 h-12 text-xl bg-gradient-to-br from-yellow-400 to-amber-600 text-black shadow-lg shadow-yellow-500/40 ring-2 ring-yellow-300/50'
+              : 'w-10 h-10 text-lg bg-gradient-to-br from-amber-700 to-amber-900 text-amber-100 shadow-md'
             }
           `}>
             {general.rank}
@@ -114,8 +136,8 @@ export default function GeneralCard({ general, index, maxStats }: { general: Gen
           </span>
         </div>
 
-        {/* 金色の光彩（A隊のみ） */}
-        {isTeamA && (
+        {/* 金色の光彩（四天王のみ） */}
+        {isShitenno && (
           <div className="absolute inset-0 rounded-t-[12px] pointer-events-none shadow-[inset_0_0_20px_rgba(234,179,8,0.15)]" />
         )}
       </div>
@@ -151,8 +173,8 @@ export default function GeneralCard({ general, index, maxStats }: { general: Gen
         </div>
       </div>
 
-      {/* A隊カード：下部の金色ライン */}
-      {isTeamA && (
+      {/* 四天王カード：下部の金色ライン */}
+      {isShitenno && (
         <div className="h-1 bg-gradient-to-r from-transparent via-yellow-400 to-transparent" />
       )}
     </motion.div>

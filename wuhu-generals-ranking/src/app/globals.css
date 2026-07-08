@@ -101,6 +101,46 @@
       transparent 12px
     ) 1;
   }
+
+  /* 四天王カード：四隅の飾り罫 */
+  .shitenno-frame {
+    position: relative;
+  }
+  .shitenno-frame::before,
+  .shitenno-frame::after {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border: 2px solid oklch(0.80 0.15 90 / 0.85);
+    pointer-events: none;
+    z-index: 20;
+  }
+  .shitenno-frame::before {
+    top: 6px;
+    left: 6px;
+    border-right: none;
+    border-bottom: none;
+  }
+  .shitenno-frame::after {
+    bottom: 6px;
+    right: 6px;
+    border-left: none;
+    border-top: none;
+  }
+
+  /* 四天王カード：明滅する光彩アニメーション */
+  @keyframes shitenno-pulse {
+    0%, 100% {
+      box-shadow: 0 0 25px 2px rgba(234, 179, 8, 0.25), inset 0 0 20px rgba(234, 179, 8, 0.08);
+    }
+    50% {
+      box-shadow: 0 0 45px 6px rgba(234, 179, 8, 0.45), inset 0 0 30px rgba(234, 179, 8, 0.15);
+    }
+  }
+  .shitenno-glow {
+    animation: shitenno-pulse 3s ease-in-out infinite;
+  }
 }
 
 /* === @layer utilities === */
@@ -135,13 +175,18 @@
 }
 
 /* === :has() セレクター === */
-.team-a-wrapper:has(.group:hover) .group:not(:hover) {
+.tier-shitenno-wrapper:has(.group:hover) .group:not(:hover) {
   opacity: 0.7;
   filter: brightness(0.8);
   transition: opacity 0.3s, filter 0.3s;
 }
 
-.team-b-wrapper:has(.group:hover) .group:not(:hover) {
+.tier-busho-wrapper:has(.group:hover) .group:not(:hover) {
   opacity: 0.8;
+  transition: opacity 0.3s;
+}
+
+.tier-heisotsu-wrapper:has(.group:hover) .group:not(:hover) {
+  opacity: 0.85;
   transition: opacity 0.3s;
 }
