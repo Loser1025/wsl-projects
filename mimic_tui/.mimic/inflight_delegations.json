@@ -1,1 +1,15 @@
-{}
+{
+  "54a23892": {
+    "base": "/tmp/mimic_subagent_Reactコンポーネント・AP_zgvu55b6",
+    "project_dir": "/home/loser/wsl-projects",
+    "task": "[あなたのロール]\nReactコンポーネント・APIエラーハンドリング実装専門家。fetch の失敗時に「実際のエラー原因（HTTP ステータス・応答本文・例外メッセージ）」を画面に表示するよう最小変更で実装し、開発者が原因を特定できるようにする。変更前に git 保存。\n\n[タスク]\nプロジェクト /home/loser/wsl-projects/mission-control-v2 について、カレンダーの「空き枠の取得に失敗しました」という表示の原因を特定できるよう、実際のエラー内容を画面に表示するように修正してください（can_write により変更がプロジェクトへ反映・コミットされます）。\n\n【最重要前処置】\n- 作業開始時に必ず `cd /home/loser/wsl-projects/mission-control-v2 && git add -A && git commit -m \"WIP: before error-display fix\" --allow-empty` を実行し、現在の状態をコミットしてから変更を加えてください（ロールバック用）。\n\n【背景】\n- 直前の修正で `src/components/Calendar/CustomerCalendar.jsx` の `fetch('/api/get-availability', { method: 'POST', headers: {...} })` を POST に変更した。\n- それ以降、画面に「空き枠の取得に失敗しました。」が表示されるようになった（405 は回避されたが、別のエラーが発生している疑い）。\n- 現在の catch ブロックは単に「空き枠の取得に失敗しました。」を表示しているだけで、実際のエラー原因（ステータスコード、応答本文、例外内容）が分からない。\n\n【調査事項（実施しつつ、該当箇所を特定）】\n1. `src/components/Calendar/CustomerCalendar.jsx` を読み、以下を特定すること：\n   - 空き枠を取得する `fetch('/api/get-availability', ...)` の呼び出しと、`res.json()` の処理\n   - `catch` ブロックの内容と、「空き枠の取得に失敗しました」を state にセットしている箇所\n   - エラー表示用の JSX（そのメッセージを描画している箇所）と、その state 変数名\n2. `api/get-availability.js` を読み、失敗しやすい箇所（認証情報の読み込み、外部 API 呼び出し、JSON 以外の応答など）を確認すること（※ただし今回は API の修正は行わず、画面表示の改善のみ。API の挙動把握のための読み取りのみ）。\n\n【実施する修正（画面のエラー表示の改善）】\n- `fetch` のエラーハンドリングを強化し、「空き枠の取得に失敗しました」の代わりに、**実際のエラー内容が分かる詳細メッセージ**を画面に表示するよう変更すること。\n- 具体的に以下の情報を含めること：\n  - `!res.ok` の場合：HTTP ステータスコード（`res.status`）とステータステキスト、および応答本文（`await res.text()`）の一部（長すぎる場合は先頭約500文字に切る）\n  - ネットワークエラー等で `fetch` 自体が例外を投げた場合：例外の `message`\n  - `res.json()` のパースに失敗した場合：その例外メッセージと応答本文\n- また、同じ詳細を `console.error` にも出力して、開発者ツールのコンソールで確認できるようにすること。\n- 表示メッセージの例（実装時に適宜調整可）：\n  `空き枠の取得に失敗しました（ステータス: 500 / 本文: ...エラー本文...）`\n  `空き枠の取得に失敗しました（例外: ...メッセージ...）`\n- 既存の「空き枠の取得に失敗しました」という文言は維持しつつ、括弧内に詳細を付与する形でも可。\n- 取得成功時の表示（予約枠リストなど）には影響を与えないこと。\n\n【検証（自身で実施）】\n- `npm run build` が成功すること。\n- 修正後の `CustomerCalendar.jsx` について、`res.status` と `res.text()` と `console.error` を含む形になっていることを grep 等で確認すること。\n\n【注意】\n- これまでの修復（フェーズ0 の build 設定 / 表記崩れ / FULCRUM 除去 / React 明示ロード / #130 修正）には触らないこと（本件は fetch エラーハンドリングの改善のみ）。\n- `api/get-availability.js` 自体の修正は行わない（今回は「画面にエラーを表示する」が目的）。\n- 変更はプロジェクトへ適用・コミットされる。失敗時は状態を元に戻してから再試行。\n- 最後に実施した変更の差分サマリ（特にエラー表示の追加箇所と、fetch/catch の修正行）を報告すること。",
+    "label": "Reactコンポーネント・AP",
+    "verify_cmd": "cd /home/loser/wsl-projects/mission-control-v2 && npm run build && node -e \"const fs=require('fs');const c=fs.readFileSync('src/components/Calendar/CustomerCalendar.jsx','utf8');console.log('hasStatus='+c.includes('res.status'), 'hasText='+c.includes('res.text()'), 'hasConsoleError='+c.includes('console.error'));\"",
+    "kind": "worker",
+    "provider": "openrouter",
+    "model": "tencent/hy3:free",
+    "role_prompt": "あなたは以下の専門家ロールで動作するエージェントです。\n\n# ロール\nReactコンポーネント・APIエラーハンドリング実装専門家。fetch の失敗時に「実際のエラー原因（HTTP ステータス・応答本文・例外メッセージ）」を画面に表示するよう最小変更で実装し、開発者が原因を特定できるようにする。変更前に git 保存。\n\n# 使えるツール\n- ファイルの読み書き・シェル実行・検索・Web調査など、委任以外の全ツールが使える\n- 変更はOverlayFS隔離された作業部屋で行われ、タスク完了後にプロジェクトへ適用される\n\n# 重要\nロールの専門性に集中し、範囲外の作業は行わない。最終回答は日本語で簡潔に結果のみ伝える。",
+    "apply_changes": true,
+    "started_at": "2026-07-09T16:07:17"
+  }
+}

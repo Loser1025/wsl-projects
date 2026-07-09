@@ -211,17 +211,50 @@ Accepts `apply_changes=False` to run the Worker in the overlay but discard its c
 
 #### `delegate_to_specialist` — dynamic-role delegation
 `run_specialist_task` runs an agent whose system prompt is built at runtime from a free-form
-`role` string (`_build_dynamic_system_prompt`). Three permission tiers: default (read-only,
-in-process `_run_isolated` with the Researcher registry; `max_rounds` scales 12→18→24 with
-role+task length via `_rounds_for_specialist`), `can_execute=True` (full overlay Worker, but
-changes are discarded — for test/build/diagnosis roles), and `can_write=True` (overlay Worker
-with apply+commit, verify retry included). Successful delegations persist their role text to
-`.mimic/roles/*.json` (`_save_specialist_role`, capped at `_ROLES_KEEP=30`);
-`load_saved_roles_section()` renders the most recent 10 for prompt injection on
-`/mode specialist`. Available in all modes, but it is the only delegation tool in Specialist
-mode. If `_run_isolated` exhausts its rounds it returns an explicit
-`[ラウンド上限到達・調査未完了]` message (with the last partial output) instead of an empty
-string, so the Director can distinguish "incomplete" from "no findings".
+`role` string (`_build_dynamic_system_prompt`). The `role` is validated at the tool boundary
+(`validate_specialist_role`: ≥20 chars and must contain the literal "完了基準"; otherwise the
+call is rejected with a fill-in template, without spawning a Worker). Three permission tiers:
+default (read-only, in-process `_run_isolated` with the Researcher registry — which also
+includes the `browser_*` tools copied from `_browser_registry` for observing deployed pages;
+`max_rounds` scales 12→18→24 with role+task length via `_rounds_for_specialist`),
+`can_execute=True` (full overlay Worker, but changes are discarded — for test/build/diagnosis
+roles), and `can_write=True` (overlay Worker with apply+commit, verify retry included; optional
+`expected_files` triggers a harness warning when files outside the list were changed).
+
+Harness-side controls (none of these rely on the model's self-report):
+- If `can_write=True` and no `verify_cmd` was given, `_suggest_verify_cmd` runs a cheap
+  read-only pass (max 6 rounds) to auto-procure one; if none is found the result is labeled
+  `※未検証（verify_cmd未指定・Workerの自己申告のみ）`.
+- A `can_write` delegation whose overlay diff is empty gets a `⚠ ハーネス判定 … 未遂の可能性`
+  warning appended.
+- Every delegation is recorded in a ring buffer (last 5; `_record_delegation` /
+  `render_delegation_history`) and the rendered history is auto-prepended to the next
+  delegation's task inside `_run_delegation_core_inner` (and to read-only specialist prompts),
+  so Workers see what previous Workers did without relying on the Director copying context.
+- **Write interlock** (`check_write_interlock`): 3 consecutive write delegations whose changed
+  files overlap (and which did not pass verify) block further write delegations until one
+  read-only delegation completes; `/clear` and `/mode` switches reset it
+  (`clear_delegation_history`).
+- Role definitions persist to `.mimic/roles/*.json` (`_save_specialist_role`, capped at
+  `_ROLES_KEEP=30`) **only when the delegation passed machine verification** (`✓検証通過` for
+  write/execute; read-only roles save on any completed answer);
+  `load_saved_roles_section()` renders the most recent 10 for prompt injection on
+  `/mode specialist`.
+- Specialist final answers must use the 4-heading template (【結論】【変更・実施内容】【残課題】
+  【次の推奨】, `STRUCTURED_ANSWER_GUIDANCE`); read-only runs re-request the format once if
+  missing (`_run_isolated(require_structured=True)`).
+
+Available in all modes, but it is the only delegation tool in Specialist mode. If
+`_run_isolated` exhausts its rounds it returns an explicit `[ラウンド上限到達・調査未完了]`
+message (with the last partial output) instead of an empty string, so the Director can
+distinguish "incomplete" from "no findings".
+
+Worker sandbox boundary: when running as a Worker (`MIMIC_NO_AUTOGIT=1`), `write_file`/
+`edit_file`/`patch_file` refuse paths outside the process cwd (= the overlay `merged` dir;
+`_check_worker_write_boundary` in tools.py), and `run_bash`/`run_pipeline` append a warning
+when a command redirects/copies to an absolute path outside it
+(`_worker_outside_write_warning` in tools_linux.py) — otherwise such writes silently escape
+the overlay and never appear in `changed_files`.
 
 #### Orphaned delegation recovery (`/delegations`, `team.py` inflight manifest)
 If the Director process itself crashes/is killed mid-delegation, the Worker's overlay `base`

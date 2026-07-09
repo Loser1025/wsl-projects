@@ -1,11 +1,28 @@
-import React, { useState, useEffect } from 'react';
+# -*- coding: utf-8 -*-
+import io, sys
 
-const CustomerCalendar = () => {
-  const [slots, setSlots] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+path = "/home/loser/wsl-projects/mission-control-v2/src/components/Calendar/CustomerCalendar.jsx"
 
-  useEffect(() => {
+with io.open(path, "r", encoding="utf-8") as f:
+    src = f.read()
+
+old = """  useEffect(() => {
+    fetch('/api/get-availability', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+      .then(res => res.json())
+      .then(data => {
+        setSlots(data.slots || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError('空き枠の取得に失敗しました。');
+        setLoading(false);
+      });
+  }, []);"""
+
+new = """  useEffect(() => {
     fetch('/api/get-availability', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -61,48 +78,20 @@ const CustomerCalendar = () => {
         console.error(
           '[CustomerCalendar] 空き枠の取得に失敗しました:',
           err,
-          err && err.body ? '\n応答本文:\n' + err.body : ''
+          err && err.body ? '\\n応答本文:\\n' + err.body : ''
         );
         setError(message);
         setLoading(false);
       });
-  }, []);
+  }, []);"""
 
-  const handleBooking = (slot) => {
-    fetch('/api/create-booking', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slot }),
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          alert('予約が完了しました！');
-        } else {
-          alert('予約に失敗しました: ' + (data.message || '不明なエラー'));
-        }
-      })
-      .catch(() => alert('予約リクエストの送信に失敗しました。'));
-  };
+if old not in src:
+    sys.stderr.write("OLD BLOCK NOT FOUND\\n")
+    sys.exit(1)
 
-  if (loading) return <div>読み込み中...</div>;
-  if (error) return <div>{error}</div>;
+src = src.replace(old, new, 1)
 
-  return (
-    <div className="calendar-container">
-      <h2>予約可能枠</h2>
-      <ul>
-        {slots.map((slot, index) => (
-          <li key={index} onClick={() => handleBooking(slot)} style={{ cursor: 'pointer', margin: '10px', padding: '5px', border: '1px solid #ccc' }}>
-            {slot.start} - {slot.end}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-};
+with io.open(path, "w", encoding="utf-8") as f:
+    f.write(src)
 
-export default CustomerCalendar;
-
-// dc-runtime registration
-window.CustomerCalendar = CustomerCalendar;
+print("OK: replaced")
