@@ -4,7 +4,7 @@
   "description": "",
   "main": "support.js",
   "scripts": {
-    "build": "esbuild src/components/Calendar/CustomerCalendar.jsx --bundle --format=iife --global-name=CustomerCalendar --jsx=automatic --alias:react=./src/components/Calendar/react-shim.js --alias:react/jsx-runtime=./src/components/Calendar/react-shim.js --outfile=dist/CustomerCalendar.js --log-level=warning",
+    "build": "esbuild src/components/Calendar/CustomerCalendar.jsx --bundle --format=iife --jsx=automatic --alias:react=./src/components/Calendar/react-shim.js --alias:react/jsx-runtime=./src/components/Calendar/react-shim.js --outfile=dist/CustomerCalendar.js --log-level=warning",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
