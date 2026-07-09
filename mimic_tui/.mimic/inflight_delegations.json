@@ -1,15 +1,1 @@
-{
-  "e6c05091": {
-    "base": "/tmp/mimic_subagent_フロントエンドHTML構造修復_4bv2ocaf",
-    "project_dir": "/home/loser/wsl-projects",
-    "task": "[あなたのロール]\nフロントエンドHTML構造修復専門家。index.html の head/body 構造と CSS・フォント適用を正確に扱い、FULCRUM オーバーレイや独自ランタイム(<x-dc>)を不用意に復元せずに、フォント/スタイルの崩れだけを最小リスクで修復する。\n\n[タスク]\nプロジェクト /home/loser/wsl-projects/mission-control-v2 の index.html について、「デプロイ後に表記が大きく崩れた」原因を修復してください（can_write により変更が反映・コミットされます）。\n\n【根本原因（調査済み）】\n1. 最重要: 直前のフェーズ0 で、Google Fonts の `<link>` URL の「途中切れの断片（`family=Noto+Sans+JP:wght@...`）」を削除した結果、**フォントをロードする `<link>` 全体が消滅**。本文は `font-family:'Noto Sans JP','Inter',sans-serif` / `'IBM Plex Mono',monospace` / `'Bebas Neue',sans-serif` を多用しているため、フォント未ロードでブラウザ既定フォントにフォールバックし表記が大きく崩れている。\n2. 構造破損: オーバーレイ削除時に `<helmet>` 開始タグも一緒に消え、現在 body 内に `<style>` ブロックがあり、その直後に孤立した `</helmet>` 閉じタグだけが残っている。\n\n【実施する修復】\n1. **Google Fonts の `<link>` を head に復元（最優先）**\n   - index.html の `<head>` 内（`<title>` の直後など適切な位置）に、以下を追加すること：\n     ```html\n     <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n     <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n     <link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Bebas+Neue&display=swap\">\n     ```\n   - すでに同等の link が存在する場合は重複追加しないこと。\n\n2. **構造修復**\n   - body 内の孤立した `</helmet>` タグを削除する。\n   - body 内にある `<style>` ブロック（CSS 本体）を、`<head>` 内へ移動（または head に複製して body 側の重複を削る）し、正しい head 管理下のスタイルとして適用されるようにする。CSS の中身（セレクタ・プロパティ）は一切変更せず、そのまま保持すること。\n\n【絶対にやってはいけないこと】\n- FULCRUM ローディングオーバーレイ（以前削除した `<!-- LOADING OVERLAY -->` ブロック）を復元しないこと。\n- `<x-dc>` タグや `<script data-dc-script>` を復元しないこと（ルートロジック不在で描画エラーになるため）。\n- フェーズ0 で整えた「安全マウント待機ロジック（window.React/ReactDOM 到着ポーリング）」や build 成果物には触らないこと。\n\n【検証（自身で実施）】\n- 修正後の index.html について、以下を確認すること：\n  - `<head>` に Google Fonts の `<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?...\">` が存在する\n  - 孤立した `</helmet>` が存在しない（または `<helmet>` 開始タグと正しく対になっている）\n  - `<style>` ブロックが head 内に存在し、CSS 内容が維持されている\n  - HTML が整形式（開始/終了タグの不整合がない）\n- 必要なら `node -e` や簡易パースで確認してもよい。\n\n【注意】\n- 変更はプロジェクトへ適用・コミットされる。失敗時は元に戻してから再試行。\n- 最後に実施した変更の差分サマリ（特に追加した link と移動した style の箇所）を報告すること。",
-    "label": "フロントエンドHTML構造修復",
-    "verify_cmd": "cd /home/loser/wsl-projects/mission-control-v2 && node -e \"const fs=require('fs');const h=fs.readFileSync('index.html','utf8');console.log('FONT_LINK='+h.includes('fonts.googleapis.com/css2'), 'ORPHAN_HELMET='+/>\\s*<\\/helmet>\\s*</.test(h), 'HEAD_STYLE='+/<head[^>]*>[\\s\\S]*<style>/.test(h));\"",
-    "kind": "worker",
-    "provider": "openrouter",
-    "model": "tencent/hy3:free",
-    "role_prompt": "あなたは以下の専門家ロールで動作するエージェントです。\n\n# ロール\nフロントエンドHTML構造修復専門家。index.html の head/body 構造と CSS・フォント適用を正確に扱い、FULCRUM オーバーレイや独自ランタイム(<x-dc>)を不用意に復元せずに、フォント/スタイルの崩れだけを最小リスクで修復する。\n\n# 使えるツール\n- ファイルの読み書き・シェル実行・検索・Web調査など、委任以外の全ツールが使える\n- 変更はOverlayFS隔離された作業部屋で行われ、タスク完了後にプロジェクトへ適用される\n\n# 重要\nロールの専門性に集中し、範囲外の作業は行わない。最終回答は日本語で簡潔に結果のみ伝える。",
-    "apply_changes": true,
-    "started_at": "2026-07-09T12:45:27"
-  }
-}
+{}
