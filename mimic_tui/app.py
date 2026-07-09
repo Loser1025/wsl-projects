@@ -987,7 +987,12 @@ class MimicApp(App):
 
     def _cmd_mode(self, arg: str) -> None:
         from .orchestrator import EXTREME_REACT_SYSTEM_PROMPT, SPECIALIST_REACT_SYSTEM_PROMPT
+        from .team import clear_delegation_history
         arg = arg.strip().lower()
+        if arg in ("interactive", "react", "i", "extreme", "extreme-react", "x",
+                    "specialist", "spec", "s"):
+            # モード切替は会話履歴と同時に委任履歴・書き込みストリークもリセットする
+            clear_delegation_history()
         if arg in ("interactive", "react", "i"):
             self._agent_mode = "interactive"
             self._ctx["agent"].tools = self._ctx["mon_tools"]

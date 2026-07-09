@@ -23,7 +23,9 @@ def cmd_status(agent: OpenRouterAgent, args: str):
 
 @cmd_registry.register("clear", "会話履歴をリセット")
 def cmd_clear(agent: OpenRouterAgent, args: str):
+    from .team import clear_delegation_history
     agent.clear_history()
+    clear_delegation_history()  # 委任履歴・書き込みストリークも同時にリセット
     safe_print("会話履歴をクリアしました。")
 
 @cmd_registry.register("model", "モデルの確認・変更 (/model → ライブ選択  /model <名前> → 直接指定)")

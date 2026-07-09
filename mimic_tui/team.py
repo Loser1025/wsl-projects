@@ -169,9 +169,10 @@ def render_delegation_history() -> str:
 
 
 def clear_delegation_history() -> None:
-    """委任履歴をリセットする（/clear やセッション開始時用）。"""
+    """委任履歴と書き込みストリークをリセットする（/clear やモード切替時用）。"""
     with _HISTORY_LOCK:
         _delegation_history.clear()
+        _write_streak.clear()
 
 
 # ── 反復失敗インターロック（案3: 連続書き込み委任の遮断） ──────────
@@ -240,11 +241,11 @@ _RESEARCHER_TOOLS = [
     "web_search", "fetch_webpage",
 ]
 # 読み取り専用Specialist/Researcherにもブラウザ観測を許可する（案5）。
-# 「デプロイ先の実ページを開いてコンソール相当の情報を観測する」委任を可能にし、
+# 「デプロイ先の実ページを開いて表示・エラーを観測する」委任を可能にし、
 # 修正→デプロイ→確認のループをユーザーの手動コピペなしで閉じる。
-# Playwright未導入環境ではツール自体がその旨を返すだけなので安全。
+# ブラウザツールは tools.py の _browser_registry に隔離されているためそこからコピーする。
+# Playwright未導入環境ではツールが呼び出し時にその旨を返すだけなので安全。
 _RESEARCHER_BROWSER_TOOLS = [
-    "enable_browser_tools", "disable_browser_tools",
     "browser_navigate", "browser_click", "browser_type",
     "browser_get_text", "browser_screenshot", "browser_close",
 ]
@@ -320,9 +321,10 @@ def _build_researcher_registry() -> ToolRegistry:
     reg = ToolRegistry()
     for name in _RESEARCHER_TOOLS:
         reg.copy_tool(name, _base_tools)
+    from .tools import _browser_registry
     for name in _RESEARCHER_BROWSER_TOOLS:
         try:
-            reg.copy_tool(name, _base_tools)
+            reg.copy_tool(name, _browser_registry)
         except Exception:
             pass  # ブラウザツールが未登録の環境では黙ってスキップ
     return reg
@@ -490,8 +492,7 @@ def _build_dynamic_system_prompt(role: str, can_write: bool,
             "- read_file, grep_codebase, file_info, smart_read, get_repo_map でプロジェクト内を調査できる\n"
             "- web_search / fetch_webpage で外部情報を調べられる（書き込み・コマンド実行は不可）\n"
             "- browser_navigate / browser_get_text / browser_screenshot 等で実際のWebページ"
-            "（デプロイ先のサイト等）を開いて観測できる（enable_browser_tools で有効化。"
-            "Playwright未導入の環境では使用不可）\n"
+            "（デプロイ先のサイト等）を開いて観測できる（Playwright未導入の環境ではエラーが返る）\n"
         )
     return (
         f"あなたは以下の専門家ロールで動作するエージェントです。\n\n"
