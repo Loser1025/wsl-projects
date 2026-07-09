@@ -43,6 +43,83 @@ _MAX_RESUME_ATTEMPTS = 3
 _LAUNCHER_DIR = Path(__file__).resolve().parent.parent
 
 
+# ── サンドボックス自己診断 ────────────────────────────────────────
+# unshare -U -m -r + overlayマウントが使えない環境（ユーザー名前空間無効の
+# カーネル/コンテナ等）では、隔離なしでも委任が全滅しないよう「コピー方式」に
+# フォールバックする: プロジェクトを作業ディレクトリへ実コピーしてWorkerを直接
+# 実行し、完了後にファイル比較で差分を検出する。隔離強度は落ちる
+# （tools.py の Worker 書き込み境界ガードが作業ディレクトリ外への書き込みを防ぐ）。
+
+_SANDBOX_MODE: Optional[str] = None  # "overlay" | "copy"
+
+
+def sandbox_mode() -> str:
+    """委任サンドボックスの実行方式を返す（初回呼び出し時に実地診断してキャッシュ）。"""
+    global _SANDBOX_MODE
+    if _SANDBOX_MODE is None:
+        _SANDBOX_MODE = _detect_sandbox_mode()
+        if _SANDBOX_MODE != "overlay":
+            log.warning({"event": "sandbox_fallback", "mode": _SANDBOX_MODE})
+    return _SANDBOX_MODE
+
+
+def _detect_sandbox_mode() -> str:
+    """unshare+overlayマウントを小さな一時ディレクトリで実際に試して判定する。"""
+    tmp = Path(tempfile.mkdtemp(prefix="mimic_sandbox_check_"))
+    try:
+        lower, upper, work, merged = tmp / "l", tmp / "u", tmp / "w", tmp / "m"
+        for d in (lower, upper, work, merged):
+            d.mkdir()
+        script = (
+            f"mount -t overlay overlay "
+            f"-o lowerdir={shlex.quote(str(lower))},"
+            f"upperdir={shlex.quote(str(upper))},"
+            f"workdir={shlex.quote(str(work))} "
+            f"{shlex.quote(str(merged))} && echo MIMIC_SANDBOX_OK"
+        )
+        r = subprocess.run(["unshare", "-U", "-m", "-r", "bash", "-c", script],
+                           capture_output=True, text=True, timeout=15)
+        if "MIMIC_SANDBOX_OK" in (r.stdout or ""):
+            return "overlay"
+    except Exception:
+        pass
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "copy"
+
+
+_COPY_COMPARE_EXCLUDE_PREFIXES = (".git/",)
+_COPY_COMPARE_EXCLUDE_FILES = {".mimic_checkpoint.json"}
+
+
+def _changed_files_copy(merged: Path, lower: Path) -> tuple[list[str], list[str]]:
+    """コピー方式: merged と lower を内容比較し、(変更/追加ファイル, 削除ファイル) を返す。"""
+    import filecmp
+    changed: list[str] = []
+    deleted: list[str] = []
+    for p in sorted(merged.rglob("*")):
+        if not p.is_file() or p.is_symlink():
+            continue
+        rel = str(p.relative_to(merged))
+        if rel in _COPY_COMPARE_EXCLUDE_FILES or rel.startswith(_COPY_COMPARE_EXCLUDE_PREFIXES):
+            continue
+        counterpart = lower / rel
+        try:
+            if not counterpart.exists() or not filecmp.cmp(p, counterpart, shallow=False):
+                changed.append(rel)
+        except OSError:
+            continue
+    for p in sorted(lower.rglob("*")):
+        if not p.is_file() or p.is_symlink():
+            continue
+        rel = str(p.relative_to(lower))
+        if rel in _COPY_COMPARE_EXCLUDE_FILES or rel.startswith(_COPY_COMPARE_EXCLUDE_PREFIXES):
+            continue
+        if not (merged / rel).exists():
+            deleted.append(rel)
+    return changed, deleted
+
+
 @dataclass
 class SubagentResult:
     task: str
@@ -184,6 +261,7 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
                               provider: Optional[str] = None,
                               model: Optional[str] = None,
                               role_prompt: str = "",
+                              keep_checkpoint: bool = False,
                               ) -> tuple[SubagentResult, Optional[Path], Optional[Path]]:
     """Worker を OverlayFS 隔離下で同期実行する。
 
@@ -206,6 +284,7 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
     upper  = base / "upper"
     work   = base / "work"
     merged = base / "merged"
+    _mode = sandbox_mode()
     try:
         for d in (upper, work, merged):
             d.mkdir(parents=True, exist_ok=True)
@@ -221,6 +300,15 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
             f"workdir={shlex.quote(str(work))} "
             f"{shlex.quote(str(merged))}"
         )
+
+        if _mode == "copy":
+            # コピー方式: merged にプロジェクトの実コピーを作る（初回のみ。
+            # 継続実行・verifyリトライでは前回の作業状態を保持する）。
+            if not any(merged.iterdir()):
+                subprocess.run(
+                    ["cp", "-a", f"{lower}/.", str(merged)],
+                    check=True, capture_output=True, timeout=300,
+                )
         # --auto-prompt は _build_components を経由しないため MIMIC_CWD は効かない
         # （agent.cwd は単に起動時の OS cwd になる）。そこで cwd 自体を merged にし、
         # モジュール解決だけ PYTHONPATH で実体ディレクトリを指す。
@@ -232,11 +320,15 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
                 f"MIMIC_MODEL={shlex.quote(model)} "
             )
         role_env = f"MIMIC_ROLE_PROMPT={shlex.quote(role_prompt)} " if role_prompt else ""
+        # セッションWorker用: 正常完了後もチェックポイント（会話状態）を残し、
+        # 同じ base での継続委任（continue_specialist）が前回の文脈を引き継げるようにする
+        keep_cp_env = "MIMIC_KEEP_CHECKPOINT=1 " if keep_checkpoint else ""
 
         agent_cmd = (
             f"cd {shlex.quote(str(merged))} && "
             f"PYTHONPATH={shlex.quote(str(_LAUNCHER_DIR))}:$PYTHONPATH "
             f"MIMIC_NO_AUTOGIT=1 "
+            f"{keep_cp_env}"
             f"{trace_env}"
             f"{model_env}"
             f"{role_env}"
@@ -250,7 +342,12 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
                 f"; echo MIMIC_VERIFY_EXIT=$?"
             )
         inner_cmd += "; exit $agent_exit"
-        script = f"{mount_cmd} && {inner_cmd}"
+        if _mode == "overlay":
+            script = f"{mount_cmd} && {inner_cmd}"
+            launch_argv = ["unshare", "-U", "-m", "-r", "bash", "-c", script]
+        else:
+            # コピー方式: 名前空間もマウントも使わず直接実行する
+            launch_argv = ["bash", "-c", inner_cmd]
 
         # ── 実行（クラッシュ時は _MAX_RESUME_ATTEMPTS 回まで再開）──
         prefix = f"  {C.gray(f'[Worker:{label}]')} "
@@ -268,7 +365,7 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
                 timed_out.clear()
 
             proc = subprocess.Popen(
-                ["unshare", "-U", "-m", "-r", "bash", "-c", script],
+                launch_argv,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 bufsize=1, start_new_session=True,
             )
@@ -315,8 +412,19 @@ def run_subagent_reviewable(task: str, project_dir: str, label: str = "single",
             ), None, None
 
         ok = completed
-        changed = _changed_files(upper)
-        summary = _summarize(lower, upper, changed)
+        if _mode == "overlay":
+            changed = _changed_files(upper)
+            summary = _summarize(lower, upper, changed)
+        else:
+            # コピー方式: 内容比較で差分を検出し、適用元(upper相当)は merged を使う
+            changed, _deleted = _changed_files_copy(merged, lower)
+            upper = merged
+            summary = _summarize(lower, merged, changed)
+            if _deleted:
+                summary += (
+                    f"\n⚠ コピー方式サンドボックスのため、削除されたファイルは適用されません: "
+                    f"{', '.join(_deleted[:10])}"
+                )
 
         # Worker の最終回答テキストを stdout から抽出してサマリーに前置する。
         # ファイル変更がない読み取り専用タスクでも回答内容が Director に届くようにする。

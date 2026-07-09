@@ -195,8 +195,14 @@ _OBS_MAX_CHARS = 2000  # conversation内のobservationをこの文字数に切�
 _DELEGATION_OBS_MAX_CHARS = 6000
 _DELEGATION_TOOLS = {
     "delegate_to_specialist", "delegate_to_team", "delegate_to_worker",
-    "delegate_to_team_parallel", "delegate_research",
+    "delegate_to_team_parallel", "delegate_research", "continue_specialist",
 }
+
+# 覗き見ツール: 書き込みツールを持たないDirector（Specialistモード）に許可された
+# 読み取りツールの観測上限。存在確認・場所特定には足りるが深読みはできないサイズにし、
+# 「深い調査は委任へ」の誘導をプロンプト規約ではなく出力構造で行う。
+_PEEK_OBS_MAX_CHARS = 600
+_PEEK_TOOLS = {"read_file", "grep_codebase", "file_info"}
 
 BASH_EXECUTOR_GUIDANCE = """\
 
@@ -338,71 +344,28 @@ WORKER_COMPLETION_GUIDANCE = """
 - 完了できない場合も、何をどこまで行ったか・何が問題だったかを日本語で報告して停止すること。
 """
 
-EXTREME_REACT_SYSTEM_PROMPT = """
-# 役割と行動指針（Extreme React = Director専任モード）
-あなたはこのモードでは「指示係（Director）」専任です。ファイルを直接書き換える
-ツール（write_file / edit_file / patch_file）、およびシェルを実行するツール
-（run_bash / run_pipeline）は意図的に取り上げられており、使用できません。
-コードへの変更・テスト実行・動作確認が必要な作業は、すべて delegate_to_team /
-delegate_to_team_parallel への委任を通じて行います。
-
-delegate_to_teamは内部で Researcher（調査・設計ワークフロー作成）→ Worker（実装）を
-自動で実行し、変更を即時適用・AutoGitコミットして差分サマリが返ります。
-**あなたの役割はファイル単位の詳細設計を作ることではなく、プロジェクト全体の
-管理者・検証者として、何を・どの粒度で委任し、結果が要求を満たしているかを
-確認し、ユーザーに報告することです。**
-
-## あなたの仕事の流れ
-1. 【要求の整理】ユーザーの要求を読み解き、目的・対象範囲・制約条件
-   （既存仕様との整合性、互換性など）を整理する。複雑な要求は、依存関係のある
-   複数の委任タスクに分解する（例: 「APIを追加してからフロントを直す」は2段階）。
-2. 【委任戦略の決定】各タスクについて、依存関係があれば順番に
-   delegate_to_team を呼び、互いに独立したタスクは delegate_to_team_parallel で
-   まとめて並列委任する。指示文(task)には、自分が把握している目的・対象範囲・
-   制約条件を漏れなく書く（ファイル単位の詳細はResearcherが調査するので不要）。
-   対象が既に明確で自己完結している単純なタスクのみ delegate_to_worker
-   （Researcher無し、即時適用）も使えるが、このモードではファイルを直接読めないため
-   指示文に対象ファイルと変更内容を具体的に書くこと。
-3. 【適用は自動】delegate_to_teamが"完了・適用済み"を返した場合、変更は既に
-   プロジェクトへ反映され、AutoGitでコミット済みである。**あなた自身でファイルを
-   書き換えたりコミットし直したりする必要はない**。
-4. 【検証】このモードではファイルを直接読むツール（read_file/grep_codebase/
-   get_repo_map など）も取り上げられているため、delegate_to_team
-   が返す差分サマリの記述だけを根拠に、本当にユーザーの要求を満たしているか確認する。
-   コードの内容そのものを確認したい場合は
-   delegate_research に調査を依頼する。不足や問題があれば、判明した事実を踏まえて
-   追加の delegate_to_team を発行する。
-5. 【報告】最終的に行われた変更内容と検証結果を日本語で簡潔にユーザーへ報告する。
-
-## 調べ物の委任（delegate_research）
-- 外部の公式ドキュメント・API仕様などの「調べ物」は、自分で web_search /
-  fetch_webpage を繰り返すのではなく delegate_research(question) に委任すること。
-  フレッシュな文脈の調査役が調査結果（回答）だけを返すため、自分の会話履歴に
-  ページ内容や試行錯誤が積み上がらず、コンテキスト圧迫・劣化を防げる。
-  戻り値はユーザーへの回答としてそのまま提示してよい。
-
-## update_scratchpad（複数回の委任にまたがる記憶）
-複雑なタスクで delegate_to_team を複数回呼ぶ場合、各委任の前後で update_scratchpad
-を呼び、以下を整理しておくこと：
-【ゴール】全体の目標
-【調査で判明した事実】対象ファイル・現状の実装
-【委任結果】これまでのdelegate_to_team呼び出しと適用結果
-【次の一手】次に委任する内容、または最終報告の準備
-
-## ツール呼び出しの形式（必須）
-**ツール呼び出しは必ずAPIのtool_calls機能（JSON形式）で行うこと。**
-テキスト内に `<tool_call>`, `<function=...>`, `<invoke>` などのXML形式で
-ツール名を書いても実行されない（最終回答として打ち切られる）。
-"""
-
 SPECIALIST_REACT_SYSTEM_PROMPT = """
-# 役割と行動指針（Specialist = 動的ロール委任モード）
-このモードでは **すべての作業を delegate_to_specialist への委任で行います**。
-ファイルの読み書き（read_file / write_file / edit_file / patch_file）、
-シェル実行（run_bash / run_pipeline）、検索（grep_codebase / get_repo_map 等）、
-Web（web_search / fetch_webpage）は意図的に取り上げられており使用できません。
-固定ロール委任ツール（delegate_to_team / delegate_to_worker 等）も同様に使えません。
-唯一の委任手段は **delegate_to_specialist(role, task, can_write, can_execute)** です。
+# 役割と行動指針（Specialist = 動的ロール委任モード・標準）
+このモードでは **実装・修正・実行・深い調査を delegate_to_specialist への委任で行います**。
+ファイルの書き込み（write_file / edit_file / patch_file）、シェル実行
+（run_bash / run_pipeline）、Web（web_search / fetch_webpage）は意図的に
+取り上げられており使用できません。
+委任手段は **delegate_to_specialist(role, task, can_write, can_execute)** と、
+直前のWorkerに追加指示を出す **continue_specialist(task)** の2つです。
+
+## 覗き見ツール（read_file / grep_codebase / file_info）
+存在確認・場所特定のための軽量な読み取りは自分で行える。ただし観測は先頭600字で
+打ち切られるため、深読みはできない。600字で足りない調査は読み取り専用の
+delegate_to_specialist に委任すること。
+- 使う: ファイルの存在確認、関数の場所特定、委任結果の軽い実地検証
+- 使わない: コードの理解・診断・レビュー（→委任）
+
+## continue_specialist（継続委任 — 重要）
+直前の can_write 委任のWorkerは、会話と作業状態を保持したまま待機している。
+**前回の変更に対するフィードバック（エラーが出た・動かない・追加要望）を反映する
+場合は、新しい delegate_to_specialist ではなく continue_specialist(task) を使うこと。**
+Workerは経緯を覚えているため、taskには新しく判明した情報だけを書けばよい。
+新しい種類の作業・別の専門性が必要なときだけ新規の delegate_to_specialist を使う。
 
 ## delegate_to_specialist の使い方
 - `role`: 専門家ロールを日本語で記述する。**「視点」「制約」「完了基準」の3要素を必ず含めること**
@@ -606,9 +569,11 @@ class InteractiveOrchestrator:
             _read_call_ids: dict[str, list[str]] = dict(_cp_read_call_ids)
             old_conv_len                  = len(self.agent.conversation)
             user_message                  = _cp_user_message
+            # 継続委任（continue_specialist）はチェックポイントに専用ノートを埋めて
+            # 「クラッシュ再開」ではなく「追加指示による継続」として文脈を再開する
             messages.append({
                 "role": "user",
-                "content": _CHECKPOINT_RESUME_NOTE,
+                "content": _cp.get("resume_note") or _CHECKPOINT_RESUME_NOTE,
                 "_skip_save": True,
             })
         else:
@@ -749,8 +714,10 @@ class InteractiveOrchestrator:
                 self.agent.conversation.extend(_save_msgs)
                 self.agent.conversation.append({"role": "assistant", "content": final_text})
 
-                # チェックポイント削除（正常完了）
-                if _cp_path:
+                # チェックポイント削除（正常完了）。
+                # MIMIC_KEEP_CHECKPOINT=1（セッションWorker）の場合は会話状態を残し、
+                # 次回の継続委任（continue_specialist）が文脈を引き継げるようにする。
+                if _cp_path and not _os.environ.get("MIMIC_KEEP_CHECKPOINT"):
                     try:
                         _cp_path.unlink(missing_ok=True)
                     except Exception:
@@ -910,8 +877,13 @@ class InteractiveOrchestrator:
                             if m.get("role") == "tool" and m.get("tool_call_id") == stale_id:
                                 m["content"] = "[このread結果は後で上書きされました—省略]"
                                 break
-                _obs_limit = (_DELEGATION_OBS_MAX_CHARS if fn_n in _DELEGATION_TOOLS
-                              else _OBS_MAX_CHARS)
+                if fn_n in _DELEGATION_TOOLS:
+                    _obs_limit = _DELEGATION_OBS_MAX_CHARS
+                elif fn_n in _PEEK_TOOLS and "write_file" not in self.agent.tools._tools:
+                    # 書き込みツールなし = 委任特化Director → 読み取りは覗き見上限
+                    _obs_limit = _PEEK_OBS_MAX_CHARS
+                else:
+                    _obs_limit = _OBS_MAX_CHARS
                 obs = cache_obs(fn_n, r["result"], threshold=_obs_limit)
                 cid = r["call_id"]
                 # 読み取り系: call_idを記録してあとで無効化できるようにする

@@ -253,12 +253,14 @@ class MimicApp(App):
     def on_mount(self) -> None:
         from .utils import set_tui_output, set_tui_mode, set_tui_stream, get_ascii_art_str
         from .tools import set_write_approval_handler
+        from .team import set_apply_approval_handler
 
         self._log = self.query_one("#chat-log", RichLog)
         set_tui_mode(True)
         set_tui_output(self._output_callback)
         set_tui_stream(self._stream_callback)
         set_write_approval_handler(self._make_approval_handler())
+        set_apply_approval_handler(self._make_apply_approval_handler())
 
         cfg = self._ctx["active_config"]
         cwd = self._ctx["agent"].cwd
@@ -290,6 +292,14 @@ class MimicApp(App):
         self._build_file_tree()
         self._show_file_preview(None)
         self._refresh_scratchpad_tab()
+
+        # 起動時デフォルトモード: specialist（委任特化）。
+        # MIMIC_DEFAULT_MODE=interactive で従来のReActを既定にできる。
+        import os as _os_mod
+        _default_mode = (_os_mod.environ.get("MIMIC_DEFAULT_MODE") or "specialist").strip().lower()
+        if _default_mode != "interactive":
+            self._cmd_mode("specialist")
+
         self.query_one("#user-input", ChatInput).focus()
 
     # ── 入力ヒント管理 ────────────────────────────────────────────────
@@ -322,7 +332,7 @@ class MimicApp(App):
                 f"  Status: [{style}]{status}[/]",
                 f"  Mode:   [#58a6ff]{self._agent_mode.upper()}[/]",
             ]
-            if self._agent_mode in ("extreme", "specialist"):
+            if self._agent_mode == "specialist":
                 profile = self._current_profile_label()
                 if profile:
                     lines.append(f"  Role:   [#ff8c42]{profile}[/]")
@@ -347,7 +357,7 @@ class MimicApp(App):
 
     def _tick_role_refresh(self) -> None:
         """Extreme React / Specialist 実行中、脳内プロファイルの変化をリアルタイムに反映する。"""
-        if self._agent_busy and self._agent_mode in ("extreme", "specialist"):
+        if self._agent_busy and self._agent_mode == "specialist":
             self._refresh_status_ui()
 
     def _current_profile_label(self) -> "Optional[str]":
@@ -818,6 +828,53 @@ class MimicApp(App):
 
         return handler
 
+    def _make_apply_approval_handler(self):
+        """委任Workerの変更をプロジェクトへ適用する前の承認ハンドラ
+        （APPLY_APPROVAL=ask/threshold のときのみ team.py 側から呼ばれる）。"""
+        app = self
+
+        def handler(label: str, changed_files: list, summary: str) -> bool:
+            from .utils import safe_print, C
+
+            app.agent_status_text = "WAIT_APPROVAL"
+            safe_print(C.yellow(f"\n  ┌─ 委任変更の適用確認 [{label}] ─────────────────────"))
+            safe_print(C.yellow(f"  │  変更ファイル ({len(changed_files)}件):"))
+            for f in changed_files[:15]:
+                safe_print(C.gray(f"  │    {f}"))
+            if len(changed_files) > 15:
+                safe_print(C.gray(f"  │    …ほか{len(changed_files) - 15}件"))
+            safe_print(C.yellow(f"  │"))
+            for line in (summary or "").splitlines()[:12]:
+                safe_print(C.gray(f"  │  {line}"))
+            safe_print(C.yellow(f"  └──────────────────────────────────────────────────────"))
+            safe_print(
+                C.bold_green(
+                    f"  プロジェクトへ適用しますか？ [Y/n] ({app._APPROVAL_TIMEOUT}秒で自動承認): "
+                ),
+                end="",
+            )
+
+            done   = threading.Event()
+            result = [True]
+
+            def on_response(resp: str) -> None:
+                result[0] = resp.strip().lower() in ("y", "")
+                done.set()
+
+            app.call_from_thread(app._enter_approval_mode, on_response)
+            timed_out = not done.wait(timeout=app._APPROVAL_TIMEOUT)
+            if timed_out:
+                safe_print(C.gray(f"\n  ⏱ {app._APPROVAL_TIMEOUT}秒経過 → 自動承認"))
+                result[0] = True
+                app.call_from_thread(app._exit_approval_mode)
+
+            safe_print(C.green("  ✓ 適用します") if result[0]
+                       else C.red("  ✗ 拒否しました（変更は破棄されます）"))
+            app.agent_status_text = "THINKING"
+            return result[0]
+
+        return handler
+
     def _enter_approval_mode(
         self,
         callback: Callable[[str], None],
@@ -986,12 +1043,12 @@ class MimicApp(App):
             )
 
     def _cmd_mode(self, arg: str) -> None:
-        from .orchestrator import EXTREME_REACT_SYSTEM_PROMPT, SPECIALIST_REACT_SYSTEM_PROMPT
+        from .orchestrator import SPECIALIST_REACT_SYSTEM_PROMPT
         from .team import clear_delegation_history
         arg = arg.strip().lower()
-        if arg in ("interactive", "react", "i", "extreme", "extreme-react", "x",
-                    "specialist", "spec", "s"):
-            # モード切替は会話履歴と同時に委任履歴・書き込みストリークもリセットする
+        if arg in ("interactive", "react", "i", "specialist", "spec", "s"):
+            # モード切替は会話履歴と同時に委任履歴・書き込みストリーク・
+            # セッションWorkerもリセットする
             clear_delegation_history()
         if arg in ("interactive", "react", "i"):
             self._agent_mode = "interactive"
@@ -999,16 +1056,9 @@ class MimicApp(App):
             self._ctx["agent"].set_system_prompt(self._ctx["react_prompt"])
             self._ctx["agent"].clear_history()
             self._ctx["interactive_orch"].react_log.clear()
-            self._write_direct("⚡ モード: Interactive (ReAct)  会話履歴をリセットしました。\n")
-        elif arg in ("extreme", "extreme-react", "x"):
-            self._agent_mode = "extreme"
-            self._ctx["agent"].tools = self._ctx["extreme_tools"]
-            self._ctx["agent"].set_system_prompt(
-                self._ctx["plan_prompt"] + EXTREME_REACT_SYSTEM_PROMPT
+            self._write_direct(
+                "⚡ モード: Interactive (ReAct・退避用)  会話履歴をリセットしました。\n"
             )
-            self._ctx["agent"].clear_history()
-            self._ctx["interactive_orch"].react_log.clear()
-            self._write_direct("🔥 モード: Extreme React (Director専任・委任特化)  書き込み系ツールを取り上げました。会話履歴をリセットしました。\n")
         elif arg in ("specialist", "spec", "s"):
             from .team import load_saved_roles_section
             self._agent_mode = "specialist"
@@ -1020,19 +1070,19 @@ class MimicApp(App):
             self._ctx["agent"].clear_history()
             self._ctx["interactive_orch"].react_log.clear()
             self._write_direct(
-                "🧪 モード: Specialist (動的ロール委任)  "
-                "delegate_to_specialist のみ使用可能。会話履歴をリセットしました。\n"
+                "🧪 モード: Specialist (動的ロール委任・標準)  "
+                "作業は delegate_to_specialist / continue_specialist へ委任。"
+                "会話履歴をリセットしました。\n"
             )
         else:
             mode_labels = {
-                "interactive": "Interactive (ReAct)",
-                "extreme":     "Extreme React (Director専任・委任特化)",
-                "specialist":  "Specialist (動的ロール委任テスト)",
+                "interactive": "Interactive (ReAct・退避用)",
+                "specialist":  "Specialist (動的ロール委任・標準)",
             }
             label = mode_labels.get(self._agent_mode, self._agent_mode)
             self._write_direct(
                 f"  現在: {label}\n"
-                "  切替: /mode interactive  /mode extreme  /mode specialist\n"
+                "  切替: /mode specialist（標準）  /mode interactive（退避用）\n"
             )
         self._refresh_status_ui()
 

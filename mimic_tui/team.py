@@ -46,6 +46,82 @@ _MAX_DELEGATION_CONCURRENCY = 3
 _DELEGATION_SEMAPHORE = threading.BoundedSemaphore(_MAX_DELEGATION_CONCURRENCY)
 
 
+# ── セッションWorker（継続委任のための文脈保持） ────────────────────
+# can_write 委任の完了後も Overlay(base) と Worker の会話チェックポイントを破棄せず
+# 保持し、continue_specialist で「前回の続き」として追加指示を出せるようにする。
+# 毎回フレッシュなWorkerに経緯を説明し直す往復（修正の振動の主因）をなくす。
+# 保持は常に最新1件のみ。新しい can_write 委任の成功・/clear・モード切替で破棄される。
+
+_SESSION_WORKER_LOCK = threading.Lock()
+_session_worker: Optional[dict] = None
+
+
+def _set_session_worker(base: Path, role_prompt: str, project_dir: str,
+                         verify_cmd: str, label: str) -> None:
+    global _session_worker
+    with _SESSION_WORKER_LOCK:
+        old = _session_worker
+        _session_worker = {
+            "base": base, "role_prompt": role_prompt, "project_dir": project_dir,
+            "verify_cmd": verify_cmd, "label": label,
+            "saved_at": datetime.now().isoformat(timespec="seconds"),
+        }
+    if old and old["base"] != base:
+        cleanup_subagent(old["base"])
+
+
+def _get_session_worker() -> Optional[dict]:
+    with _SESSION_WORKER_LOCK:
+        if _session_worker and Path(_session_worker["base"]).exists():
+            return dict(_session_worker)
+        return None
+
+
+def discard_session_worker() -> None:
+    """保持中のセッションWorkerを破棄する（/clear・モード切替時用）。"""
+    global _session_worker
+    with _SESSION_WORKER_LOCK:
+        old = _session_worker
+        _session_worker = None
+    if old:
+        cleanup_subagent(old["base"])
+
+
+# ── 適用承認ゲート ────────────────────────────────────────────────
+# Workerは全速力で作業し、人間は「適用/破棄」を委任単位の1判断で行う。
+# ポリシーは環境変数 APPLY_APPROVAL で選択:
+#   auto      … 常に自動適用（デフォルト・従来挙動）
+#   ask       … 毎回承認を求める
+#   threshold … 変更ファイルが _APPROVAL_FILE_THRESHOLD 件を超えたときのみ承認を求める
+# 承認ハンドラ未登録（--auto-prompt 等の非対話実行）時は常に自動適用。
+
+_APPROVAL_FILE_THRESHOLD = 3
+_apply_approval_handler = None  # fn(label, changed_files, summary) -> bool
+
+
+def set_apply_approval_handler(handler) -> None:
+    """委任変更の適用前承認ハンドラを登録する（TUI側から呼ぶ）。Noneで解除。"""
+    global _apply_approval_handler
+    _apply_approval_handler = handler
+
+
+def _apply_approval_policy() -> str:
+    import os
+    mode = (os.environ.get("APPLY_APPROVAL") or "auto").strip().lower()
+    return mode if mode in ("auto", "ask", "threshold") else "auto"
+
+
+def _needs_apply_approval(changed_files: list[str]) -> bool:
+    if _apply_approval_handler is None:
+        return False
+    policy = _apply_approval_policy()
+    if policy == "ask":
+        return True
+    if policy == "threshold":
+        return len(changed_files) > _APPROVAL_FILE_THRESHOLD
+    return False
+
+
 # ── 中断委任マニフェスト ──────────────────────────────────────────
 # Directorプロセス自体がクラッシュ/killされた場合、進行中の委任タスクの
 # Overlay作業ディレクトリ（base）が孤立する。base をteam.py側で先に作って
@@ -175,10 +251,11 @@ def get_delegation_history_brief(limit: int = 3) -> list[str]:
 
 
 def clear_delegation_history() -> None:
-    """委任履歴と書き込みストリークをリセットする（/clear やモード切替時用）。"""
+    """委任履歴・書き込みストリーク・セッションWorkerをリセットする（/clear やモード切替時用）。"""
     with _HISTORY_LOCK:
         _delegation_history.clear()
         _write_streak.clear()
+    discard_session_worker()
 
 
 # ── 反復失敗インターロック（案3: 連続書き込み委任の遮断） ──────────
@@ -538,6 +615,68 @@ def validate_specialist_role(role: str) -> str:
     )
 
 
+# ── verify_cmd のプロジェクト学習（検証コマンドの実績庫） ──────────
+# 検証を通過した verify_cmd をプロジェクト単位で永続化し、2回目以降の
+# 自動調達（読み取りパス最大6ラウンド）をゼロコストにする。
+# 無効と判明したコマンド（bash構文エラー等）は削除する。
+
+_VERIFY_CMDS_LOCK = threading.Lock()
+
+
+def _verify_cmds_path() -> Path:
+    p = Path(__file__).parent / ".mimic" / "verify_cmds.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _load_verify_cmds() -> dict:
+    try:
+        return json.loads(_verify_cmds_path().read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def get_learned_verify_cmd(project_dir: str) -> str:
+    """このプロジェクトで過去に検証通過した verify_cmd を返す（なければ空文字）。"""
+    key = str(Path(project_dir).resolve())
+    with _VERIFY_CMDS_LOCK:
+        entry = _load_verify_cmds().get(key)
+    return str(entry.get("cmd", "")) if isinstance(entry, dict) else ""
+
+
+def _save_learned_verify_cmd(project_dir: str, cmd: str) -> None:
+    """検証通過した verify_cmd を保存する（同一なら通過回数を加算）。失敗は無視。"""
+    if not cmd:
+        return
+    key = str(Path(project_dir).resolve())
+    try:
+        with _VERIFY_CMDS_LOCK:
+            data = _load_verify_cmds()
+            entry = data.get(key) if isinstance(data.get(key), dict) else {}
+            passes = int(entry.get("passes", 0)) + 1 if entry.get("cmd") == cmd else 1
+            data[key] = {"cmd": cmd, "passes": passes,
+                         "last_used": datetime.now().isoformat(timespec="seconds")}
+            _verify_cmds_path().write_text(
+                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _forget_learned_verify_cmd(project_dir: str, cmd: str) -> None:
+    """無効と判明した verify_cmd を実績庫から削除する。"""
+    key = str(Path(project_dir).resolve())
+    try:
+        with _VERIFY_CMDS_LOCK:
+            data = _load_verify_cmds()
+            entry = data.get(key)
+            if isinstance(entry, dict) and entry.get("cmd") == cmd:
+                data.pop(key, None)
+                _verify_cmds_path().write_text(
+                    json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
 _VERIFY_SUGGEST_MAX_ROUNDS = 6
 
 _VERIFY_SUGGEST_SYSTEM_PROMPT = """\
@@ -666,21 +805,28 @@ def run_specialist_task(role: str, task: str, project_dir: str, config,
     system_prompt = _build_dynamic_system_prompt(role, can_write, can_execute)
 
     if can_write or can_execute:
-        # can_write で verify_cmd 未指定なら、軽量パスで検証コマンドを自動調達する。
-        # 成功判定をWorkerの自己申告から機械検証へ寄せるための施策で、
+        # can_write で verify_cmd 未指定なら、①学習済みの実績コマンド →
+        # ②軽量パスでの自動調達 の順に検証コマンドを確保する。
         # 特定できなければ未検証のまま続行する（結果に「※未検証」ラベルが付く）。
         if can_write and not verify_cmd:
-            verify_cmd = _suggest_verify_cmd(task, project_dir, config, label=effective_label)
+            verify_cmd = get_learned_verify_cmd(project_dir)
             if verify_cmd:
                 safe_print(C.gray(
-                    f"  [{effective_label}] 🧪 自動調達したverify_cmd: {verify_cmd}"
+                    f"  [{effective_label}] 🧪 学習済みverify_cmdを再利用: {verify_cmd}"
                 ), flush=True)
+            else:
+                verify_cmd = _suggest_verify_cmd(task, project_dir, config, label=effective_label)
+                if verify_cmd:
+                    safe_print(C.gray(
+                        f"  [{effective_label}] 🧪 自動調達したverify_cmd: {verify_cmd}"
+                    ), flush=True)
 
         enriched = f"[あなたのロール]\n{role}\n\n[タスク]\n{task}"
         result = run_worker_once(enriched, project_dir, config, label=effective_label,
                                   role_prompt=system_prompt, verify_cmd=verify_cmd,
                                   apply_changes=can_write,
-                                  expected_files=expected_files)
+                                  expected_files=expected_files,
+                                  keep_base=can_write)  # can_writeはセッションWorkerとして保持
         # ロール保存は機械検証を通過した委任のみ（自己申告の「完了」では保存しない）
         if "✓検証通過" in result:
             _save_specialist_role(role, "write" if can_write else "execute")
@@ -721,7 +867,8 @@ def run_research(task: str, project_dir: str, config, label: str = "") -> str:
 def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_id: str,
                           label: str, verify_cmd: str, tag: str, print_tag: str,
                           role_prompt: str = "", apply_changes: bool = True,
-                          expected_files: Optional[list[str]] = None) -> str:
+                          expected_files: Optional[list[str]] = None,
+                          keep_base: bool = False) -> str:
     """_run_delegation_core_inner を同時実行数制限付きで実行する。
 
     delegate_to_specialist 等は orchestrator の並列ツール実行経路で呼び出し数ぶん
@@ -737,7 +884,8 @@ def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_
                                            label, verify_cmd, tag, print_tag,
                                            role_prompt=role_prompt,
                                            apply_changes=apply_changes,
-                                           expected_files=expected_files)
+                                           expected_files=expected_files,
+                                           keep_base=keep_base)
     finally:
         _DELEGATION_SEMAPHORE.release()
 
@@ -745,7 +893,8 @@ def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_
 def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, trace_id: str,
                                 label: str, verify_cmd: str, tag: str, print_tag: str,
                                 role_prompt: str = "", apply_changes: bool = True,
-                                expected_files: Optional[list[str]] = None) -> str:
+                                expected_files: Optional[list[str]] = None,
+                                keep_base: bool = False) -> str:
     """base 上でWorkerを実行し、verify失敗リトライ→適用→マニフェスト解除までを行う共通処理。
 
     新規実行（base は空のOverlay）・再開（base に前回までの変更が残っている）の
@@ -767,7 +916,7 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
         worker_task, project_dir, label=label or "single", base=base,
         trace_id=trace_id, verify_cmd=verify_cmd,
         provider=config.name, model=config.model,
-        role_prompt=role_prompt,
+        role_prompt=role_prompt, keep_checkpoint=keep_base,
     )
 
     # verify失敗ループ: 同じOverlay上でWorkerが修正再試行する
@@ -785,6 +934,7 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
                 "event": "verify_cmd_invalid", "verify_exit": result.verify_exit,
                 "verify_cmd": verify_cmd, "trace_id": trace_id,
             })
+            _forget_learned_verify_cmd(resolved_dir, verify_cmd)
             break
         safe_print(C.yellow(
             f"  {print_tag} ⚠ 検証失敗(exit={result.verify_exit})"
@@ -803,7 +953,7 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
             base=base,  # 前回のOverlayを引き継いで続きから作業
             trace_id=trace_id, verify_cmd=verify_cmd,
             provider=config.name, model=config.model,
-            role_prompt=role_prompt,
+            role_prompt=role_prompt, keep_checkpoint=keep_base,
         )
         if new_upper is None or new_base is None:
             # リトライ自体が失敗（baseも削除済み）→ 直前の結果で打ち切り
@@ -823,8 +973,21 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
 
     applied = False
     discarded = False
+    rejected = False
     conflict_files: list[str] = []
     try:
+        # ── 適用承認ゲート（APPLY_APPROVAL=ask/threshold 時のみ発動）──
+        if result.changed_files and apply_changes and _needs_apply_approval(result.changed_files):
+            try:
+                approved = _apply_approval_handler(
+                    label or tag, list(result.changed_files), result.summary[:2000])
+            except Exception:
+                approved = True  # ハンドラ異常時は従来挙動（自動適用）に倒す
+            if not approved:
+                apply_changes = False
+                rejected = True
+                safe_print(C.yellow(f"  {print_tag} ✋ ユーザーが適用を拒否 → 変更を破棄"), flush=True)
+
         if result.changed_files and apply_changes:
             # 委任実行中に本体側でも変更されたファイルを検出する
             # （applyはlast-writer-winsで上書きするため、警告として差分サマリに載せる）
@@ -842,13 +1005,19 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
         elif result.changed_files:
             discarded = True
     finally:
-        cleanup_subagent(base)
+        if keep_base:
+            # セッションWorker: base（Overlay+会話チェックポイント）を保持し、
+            # continue_specialist での継続委任に備える
+            _set_session_worker(base, role_prompt, resolved_dir, verify_cmd, label)
+        else:
+            cleanup_subagent(base)
         _unregister_inflight(trace_id)
 
     verify_status = ""
     if verify_cmd:
         if result.verify_exit == 0:
             verify_status = " ✓検証通過"
+            _save_learned_verify_cmd(resolved_dir, verify_cmd)  # 実績庫に学習
         elif result.verify_exit is not None:
             verify_status = f" ✗検証失敗(exit={result.verify_exit}, {MAX_VERIFY_RETRIES}回試行後)"
         else:
@@ -860,6 +1029,8 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
 
     if applied:
         status_core = "✓ 完了・適用済み"
+    elif rejected:
+        status_core = "✋ 完了（ユーザーが適用を拒否・変更は破棄）"
     elif discarded:
         status_core = "✓ 完了（実行専用・変更は破棄）"
     else:
@@ -945,7 +1116,8 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
 
 def run_worker_once(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "",
                      role_prompt: str = "", apply_changes: bool = True,
-                     expected_files: Optional[list[str]] = None) -> str:
+                     expected_files: Optional[list[str]] = None,
+                     keep_base: bool = False) -> str:
     """Researcherを介さずWorkerを実行し、verify失敗時は自動リトライ後に変更を適用する。
 
     apply_changes=False の場合はOverlay内での実行のみ行い、変更は適用せず破棄する
@@ -965,7 +1137,56 @@ def run_worker_once(task: str, project_dir: str, config, label: str = "", verify
     return _run_delegation_core(task, project_dir, config, base, trace_id, label,
                                  verify_cmd, "delegate_to_worker", "[Worker]",
                                  role_prompt=role_prompt, apply_changes=apply_changes,
-                                 expected_files=expected_files)
+                                 expected_files=expected_files, keep_base=keep_base)
+
+
+def run_specialist_continue(task: str, verify_cmd: str = "") -> str:
+    """保持中のセッションWorkerに追加指示を出し、前回の文脈（会話+Overlay）の続きで実行する。
+
+    delegate_to_specialist(can_write=True) の完了時に保持された base の
+    会話チェックポイントへ追加指示を注入して再起動する。セッションがなければ
+    新規委任への誘導メッセージを返す。"""
+    session = _get_session_worker()
+    if session is None:
+        return (
+            "[継続不可] 保持中のセッションWorkerがありません（未実行・/clear済み・または破棄済み）。\n"
+            "delegate_to_specialist(can_write=True) で新しい委任を開始してください。"
+        )
+    interlock = check_write_interlock()
+    if interlock:
+        return interlock
+
+    config = _get_team_config()
+    base = Path(session["base"])
+    project_dir = session["project_dir"]
+    verify_cmd = verify_cmd or session["verify_cmd"] or get_learned_verify_cmd(project_dir)
+
+    # チェックポイントへ継続ノートを注入し、ステップ数をリセットする。
+    # orchestrator側はチェックポイントを見つけると resume_note を新しいuserメッセージ
+    # として会話に追加するため、Workerは前回までの会話を保持したまま追加指示を受け取る。
+    cp = base / "merged" / ".mimic_checkpoint.json"
+    if cp.exists():
+        try:
+            data = json.loads(cp.read_text(encoding="utf-8"))
+            data["step"] = 0
+            data["user_message"] = task
+            data["resume_note"] = (
+                "[追加指示] 前回のタスクの続きです。これまでの会話・作業内容を踏まえて、"
+                f"以下の追加指示に対応してください:\n{task}"
+            )
+            cp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass  # 注入失敗時は同一Overlay上でフレッシュ起動（ファイル状態の継続のみ）
+
+    trace_id = uuid.uuid4().hex[:8]
+    _register_inflight(trace_id, base, project_dir, task, session["label"], verify_cmd,
+                        "worker", config.name, config.model,
+                        role_prompt=session["role_prompt"], apply_changes=True)
+    return _run_delegation_core(task, project_dir, config, base, trace_id,
+                                 session["label"], verify_cmd,
+                                 "continue_specialist", "[Continue]",
+                                 role_prompt=session["role_prompt"], apply_changes=True,
+                                 keep_base=True)
 
 
 def resume_delegation(trace_id: str) -> str:

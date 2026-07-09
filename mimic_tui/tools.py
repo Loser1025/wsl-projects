@@ -956,7 +956,7 @@ def delegate_research(question: str, project_dir: str = ".") -> str:
         "権限は3段階で、用途に合う最小権限を選ぶこと: デフォルト（読み取り専用の調査・レビュー）、"
         "can_execute=True（OverlayFS隔離内でテスト・ビルド等のコマンド実行可、変更は破棄）、"
         "can_write=True（OverlayFS隔離内で実装し、変更をプロジェクトへ適用・コミット）。"
-        "Specialistモードでは唯一の委任手段。他モードでも動的ロールが必要な場合に使用できる。"
+        "Specialistモードでの標準の委任手段（直前のWorkerへの追加指示は continue_specialist を使う）。"
     ),
     parameters={
         "type": "object",
@@ -1033,6 +1033,40 @@ def delegate_to_specialist(role: str, task: str,
         label=role[:15], verify_cmd=verify_cmd,
         expected_files=list(expected_files or []),
     )
+
+
+@tools.register(
+    name="continue_specialist",
+    description=(
+        "直前の delegate_to_specialist(can_write=True) のWorkerに追加指示を出し、"
+        "**前回の会話と作業状態を引き継いだまま**続きの作業をさせる。"
+        "同じ問題の修正を繰り返す場合・前回の変更に対するフィードバック"
+        "（エラーが出た、動かない等）を反映させる場合は、新しい delegate_to_specialist "
+        "ではなくこちらを使うこと（毎回ゼロから経緯を説明し直す必要がなくなる）。"
+        "保持されるセッションは最新1件のみで、/clear やモード切替で破棄される。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "task": {
+                "type": "string",
+                "description": (
+                    "追加指示。前回の会話をWorkerが覚えているため、経緯の再説明は不要。"
+                    "新しく判明した情報（エラーメッセージ・ユーザーのフィードバック等）を具体的に書く"
+                ),
+            },
+            "verify_cmd": {
+                "type": "string",
+                "description": "検証コマンド（省略時は前回と同じものを使用）",
+                "default": "",
+            },
+        },
+        "required": ["task"],
+    },
+)
+def continue_specialist(task: str, verify_cmd: str = "") -> str:
+    from .team import run_specialist_continue
+    return run_specialist_continue(task, verify_cmd=verify_cmd)
 
 
 @tools.register(

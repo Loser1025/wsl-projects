@@ -52,36 +52,13 @@ def _build_components(base_dir: str, active_config=None):
         display_fn = _inline_display,
     )
 
-    # Extreme React モード用: 書き込み系・シェル実行系・読み取り系のツールを
-    # すべて取り上げ、調査は delegate_research、実装・修正・検証は
-    # delegate_to_team / delegate_to_team_parallel に委任せざるを得ない構成にする
-    # （フレッシュな文脈のResearcher/Worker/Supervisorが実際にファイルへ触れる）。
-    # 残るのは delegate_research / delegate_to_team[_parallel] / update_scratchpad /
-    # search_history（過去セッションの参照のみで、現プロジェクトのファイルには触れない）のみ。
-    _EXTREME_EXCLUDED_TOOLS = {
-        "write_file", "edit_file", "patch_file", "delete_file",
-        "run_bash", "run_pipeline",
-        "read_file", "grep_codebase", "file_info",
-        "smart_read", "get_repo_map",
-        "web_search", "fetch_webpage",
-    }
-    _extreme_registry = ToolRegistry()
-    for _name in _base_tools._tools:
-        if _name not in _EXTREME_EXCLUDED_TOOLS:
-            _extreme_registry.copy_tool(_name, _base_tools)
-    extreme_tools = MonitoringToolRegistry(
-        base       = _extreme_registry,
-        log        = tool_log,
-        display_fn = _inline_display,
-    )
-
-    # Specialist モード用: extreme と同じ書き込み・シェル・読み取り・検索・Web ツールを除外し
-    # delegate_to_specialist のみを残す
+    # Specialist モード用: 書き込み・シェル・Web ツールと固定ロール委任を除外する。
+    # read_file / grep_codebase / file_info は「覗き見ツール」として残す
+    # （orchestrator側で観測が _PEEK_OBS_MAX_CHARS=600字 に強制されるため、
+    #   存在確認・場所特定はできるが深読みはできない。深い調査は委任に誘導される）。
     _SPECIALIST_EXCLUDED_TOOLS = {
-        # extreme mode と同じ制限
         "write_file", "edit_file", "patch_file", "delete_file",
         "run_bash", "run_pipeline",
-        "read_file", "grep_codebase", "file_info",
         "smart_read", "get_repo_map",
         "web_search", "fetch_webpage",
         # 旧来の固定ロール委任ツール
@@ -160,6 +137,16 @@ def _build_components(base_dir: str, active_config=None):
             f"  ⚠ 24時間以上更新のない中断委任タスクが{len(_stale)}件あります。"
             " /delegations で確認・破棄してください。"))
 
+    # 委任サンドボックスの自己診断（overlay不可の環境ではコピー方式に自動フォールバック）
+    from .subagent import sandbox_mode as _sandbox_mode
+    _sb = _sandbox_mode()
+    if _sb == "overlay":
+        safe_print(C.gray("  委任隔離: OverlayFS + unshare（完全隔離）"))
+    else:
+        safe_print(C.yellow(
+            "  ⚠ 委任隔離: コピー方式フォールバック"
+            "（この環境では unshare/overlay が使えません。隔離強度が低下します）"))
+
     from .viewer import start_viewer_server as _start_viewer
     _viewer_url = _start_viewer(sessions_dir)
 
@@ -179,7 +166,6 @@ def _build_components(base_dir: str, active_config=None):
         auto_git         = auto_git,
         tool_log         = tool_log,
         mon_tools        = mon_tools,
-        extreme_tools    = extreme_tools,
         specialist_tools = specialist_tools,
         react_prompt     = react_prompt,
         plan_prompt      = plan_prompt,
@@ -250,7 +236,12 @@ def main():
         # さらに自分のWorkerを再帰的に委任し続け、サブエージェントが無限増殖してしまう。
         if os.environ.get("MIMIC_NO_AUTOGIT"):
             from .tools import ToolRegistry
-            _DELEGATE_TOOLS = {"delegate_to_team", "delegate_to_team_parallel", "delegate_to_worker", "delegate_research"}
+            _DELEGATE_TOOLS = {
+                "delegate_to_team", "delegate_to_team_parallel",
+                "delegate_to_worker", "delegate_research",
+                # 動的ロール委任・継続委任もWorkerには与えない（孫Workerの無限増殖防止）
+                "delegate_to_specialist", "continue_specialist",
+            }
             _worker_registry = ToolRegistry()
             for _name in _base_tools._tools:
                 if _name not in _DELEGATE_TOOLS:
