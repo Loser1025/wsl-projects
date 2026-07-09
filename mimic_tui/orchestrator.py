@@ -24,6 +24,74 @@ _XML_TOOL_PATTERN = re.compile(
 _MAX_XML_TOOL_RETRIES = 3
 
 
+# ── 最終回答ゲート（弱いモデルの失敗モードを機械検査で差し戻す） ────
+# 「ツールなし応答＝最終回答」の無条件受理をやめ、観測済みの失敗パターンを
+# 受理前に文字列検査する。各ゲートは1回だけ差し戻す（無限ループ防止）。
+
+# ゲートA: 実行ツールを持っているのにユーザーへコマンド実行を丸投げする回答
+_OFFLOAD_RE = re.compile(
+    r"実行してください|実行して下さい|実行をお願い|お手元で実行|ご自身で実行"
+    r"|手動で(?:実行|編集|修正)|以下のコマンドを実行|コマンドを叩いて"
+)
+# 丸投げ検知の適用除外: 本当にユーザーの環境・操作が必要なケース
+_OFFLOAD_EXEMPT_RE = re.compile(
+    r"ログイン|認証|サインイン|パスワード|ブラウザで開いて|この環境では実行できな"
+)
+_EXEC_CAPABLE_TOOLS = {
+    "run_bash", "run_pipeline",
+    "delegate_to_specialist", "delegate_to_team", "delegate_to_worker",
+    "delegate_to_team_parallel",
+}
+
+
+def _detect_command_offload(text: str, available_tools) -> bool:
+    """実行手段を持つのにユーザーへ実行を丸投げしている最終回答を検知する。"""
+    if not text or not (_EXEC_CAPABLE_TOOLS & set(available_tools)):
+        return False
+    if not _OFFLOAD_RE.search(text):
+        return False
+    if _OFFLOAD_EXEMPT_RE.search(text):
+        return False
+    return True
+
+
+# ゲートB: ターン内に「※未検証」の委任結果があるのに検証済みかのように断言する回答
+_COMPLETION_CLAIM_RE = re.compile(
+    r"完了しました|解決しました|完了です|修正しました|対応しました|実装しました|適用しました"
+)
+
+
+def _detect_unverified_claim(text: str, turn_had_unverified: bool) -> bool:
+    """未検証の変更を「完了/解決」と断言している最終回答を検知する。"""
+    if not turn_had_unverified or not text:
+        return False
+    if "未検証" in text or "動作未確認" in text or "確認できていません" in text:
+        return False
+    return bool(_COMPLETION_CLAIM_RE.search(text))
+
+
+# ── 同一ツール呼び出しの反復失敗ループブレーカー ────────────────────
+# 弱いモデルは「同じ呼び出しを同じ引数で失敗し続ける」傾向が最も強い。
+# 同一キーの失敗が上限に達したら実行自体を拒否し（安価なno-op化）、
+# 拒否が続く場合はターンを強制終了する。
+
+_MAX_IDENTICAL_TOOL_FAILURES = 3   # 同一呼び出しの失敗上限（以降は実行拒否）
+_MAX_LOOP_REFUSALS = 5             # 実行拒否の累計上限（超えたらターン終了）
+
+
+class ToolLoopBreakError(Exception):
+    """同一ツール呼び出しの失敗反復が上限を超えたことを示す。"""
+
+
+def _tool_call_key(fn_name: str, fn_args: dict) -> str:
+    """ツール呼び出しの同一性判定キー（名前+正規化引数）。"""
+    try:
+        args_repr = _json.dumps(fn_args, sort_keys=True, ensure_ascii=False)
+    except Exception:
+        args_repr = str(fn_args)
+    return f"{fn_name}:{args_repr[:512]}"
+
+
 def _parse_xml_tool_calls(text: str) -> list[dict]:
     """テキスト内のXML形式ツール呼び出しをパースして tool_calls リストに変換する。
 
@@ -415,12 +483,34 @@ class InteractiveOrchestrator:
         return ", ".join(f"{k}={repr(v)[:40]}" for k, v in args.items())
 
     def _execute_with_intervention(
-        self, fn_name: str, fn_args: dict, error_counts: dict
+        self, fn_name: str, fn_args: dict, error_counts: dict,
+        repeat_fail_counts: Optional[dict] = None,
+        loop_state: Optional[dict] = None,
     ) -> str:
         """
         ツールを実行する。エラー発生時はAIに内容を返して自律的に解決させる（介入なし）。
         読み取り系ツールはキャッシュを利用する。
+        同一引数の呼び出しが _MAX_IDENTICAL_TOOL_FAILURES 回失敗した後は実行を拒否し、
+        拒否が _MAX_LOOP_REFUSALS 回を超えたら ToolLoopBreakError でターンを打ち切る。
         """
+        # ── ループブレーカー: 反復失敗した同一呼び出しは実行しない ──
+        call_key = _tool_call_key(fn_name, fn_args)
+        if repeat_fail_counts is not None and \
+                repeat_fail_counts.get(call_key, 0) >= _MAX_IDENTICAL_TOOL_FAILURES:
+            if loop_state is not None:
+                loop_state["refusals"] = loop_state.get("refusals", 0) + 1
+                if loop_state["refusals"] > _MAX_LOOP_REFUSALS:
+                    raise ToolLoopBreakError(fn_name)
+            safe_print(C.yellow(
+                f"    ⛔ [{fn_name}] 同一引数の失敗が{_MAX_IDENTICAL_TOOL_FAILURES}回に達したため実行拒否"
+            ), flush=True)
+            return (
+                f"[ループ防止] この呼び出し（{fn_name}）は同一の引数で"
+                f"{_MAX_IDENTICAL_TOOL_FAILURES}回失敗しているため、これ以上実行されません。\n"
+                "引数を変える・別のツールを使う・アプローチを変える、のいずれかを行ってください。\n"
+                "打つ手がない場合は、現状と失敗の内容を最終回答として報告してください。"
+            )
+
         # ── キャッシュヒット確認（読み取り系のみ）────────────────
         if fn_name in _CACHEABLE_TOOLS:
             cache_key = self.agent._make_cache_key(fn_name, fn_args)
@@ -451,8 +541,18 @@ class InteractiveOrchestrator:
             log.error({"event": "react_tool_error", "tool": fn_name,
                         "error": err_msg, "count": error_counts[fn_name]})
             safe_print(C.red(f"\n  ✗ [{fn_name}] エラー: {err_msg}"), flush=True)
+            # ── ループブレーカー: 同一呼び出しの失敗を計数し、2回目で予告する ──
+            repeat_hint = ""
+            if repeat_fail_counts is not None:
+                repeat_fail_counts[call_key] = repeat_fail_counts.get(call_key, 0) + 1
+                n = repeat_fail_counts[call_key]
+                if n == _MAX_IDENTICAL_TOOL_FAILURES - 1:
+                    repeat_hint = (
+                        f"\n⚠ 同一の呼び出しが{n}回連続で失敗しています。"
+                        "次も同じ引数で呼ぶと実行が拒否されます。引数または手段を変えてください。"
+                    )
             # エラーテキストをAIに返してAIに対処させる（自律的なリカバリ）
-            return f"ツール実行エラー: {fn_name}: {err_msg}"
+            return f"ツール実行エラー: {fn_name}: {err_msg}{repeat_hint}"
 
     def run_react(self, user_message: str, on_done=None) -> str:
         """
@@ -528,6 +628,11 @@ class InteractiveOrchestrator:
         xml_tool_retry_count = 0
         had_tool_call       = False
         error_counts: dict[str, int] = {}
+        repeat_fail_counts: dict[str, int] = {}   # ループブレーカー: 同一呼び出しの失敗数
+        loop_state: dict[str, int] = {"refusals": 0}
+        offload_retry_done   = False   # 最終回答ゲートA（丸投げ）の差し戻しは1回まで
+        unverified_retry_done = False  # 最終回答ゲートB（未検証断言）の差し戻しは1回まで
+        turn_had_unverified  = False   # ターン内に「※未検証」の委任結果があったか
         write_tools  = {"write_file", "edit_file", "patch_file", "delete_file"}
 
         # ── 3. ReActループ ───────────────────────────────────────
@@ -590,6 +695,41 @@ class InteractiveOrchestrator:
                         ),
                         "_skip_save": True,
                     })
+                    step_count += 1
+                    continue
+
+                # ── 最終回答ゲートA: 実行の丸投げ検知（1回だけ差し戻す）──
+                if (not offload_retry_done and text
+                        and _detect_command_offload(text, self.agent.tools._tools.keys())):
+                    offload_retry_done = True
+                    safe_print(C.yellow(
+                        "  ⚠ 最終回答ゲート: ユーザーへの実行丸投げを検知 → 差し戻します"
+                    ), flush=True)
+                    messages.append({"role": "assistant", "content": text, "_skip_save": True})
+                    messages.append({"role": "user", "content": (
+                        "[システム] 回答内でユーザーにコマンド実行や手動修正を依頼していますが、"
+                        "実行はあなたの仕事です。利用可能なツール（run_bash / 委任ツール等）で"
+                        "自分で実行してから結果を報告してください。\n"
+                        "この環境で本当に実行できない場合（認証・対話操作が必要等）のみ、"
+                        "その理由を明記した上でユーザーへの依頼を残してください。"
+                    ), "_skip_save": True})
+                    step_count += 1
+                    continue
+
+                # ── 最終回答ゲートB: 未検証変更の断言検知（1回だけ差し戻す）──
+                if (not unverified_retry_done and text
+                        and _detect_unverified_claim(text, turn_had_unverified)):
+                    unverified_retry_done = True
+                    safe_print(C.yellow(
+                        "  ⚠ 最終回答ゲート: 未検証の変更を断言 → 差し戻します"
+                    ), flush=True)
+                    messages.append({"role": "assistant", "content": text, "_skip_save": True})
+                    messages.append({"role": "user", "content": (
+                        "[システム] このターンの変更には「※未検証」のものが含まれています。"
+                        "動作確認をしていない変更を「完了・解決」と断言しないでください。\n"
+                        "回答を修正し、どこまでが確認済みでどこからが未検証かを明記して"
+                        "再報告してください（可能なら検証を先に実行してもよい）。"
+                    ), "_skip_save": True})
                     step_count += 1
                     continue
 
@@ -662,7 +802,18 @@ class InteractiveOrchestrator:
                             r_str = self.agent._tool_cache[ck]
                             safe_print(C.gray(f"    [キャッシュ] {len(r_str)}文字"), flush=True)
                             self.react_log.add("observation", tool=fn_n, result=r_str[:500], step=step_count)
-                            return idx, fn_n, r_str, call_id
+                            return idx, fn_n, r_str, call_id, fn_a.get("path", "")
+                    # ループブレーカー: 反復失敗した同一呼び出しは実行しない
+                    _lb_key = _tool_call_key(fn_n, fn_a)
+                    if repeat_fail_counts.get(_lb_key, 0) >= _MAX_IDENTICAL_TOOL_FAILURES:
+                        r_str = (
+                            f"[ループ防止] この呼び出し（{fn_n}）は同一の引数で"
+                            f"{_MAX_IDENTICAL_TOOL_FAILURES}回失敗しているため実行されません。"
+                            "引数または手段を変えてください。"
+                        )
+                        safe_print(C.yellow(f"    ⛔ [{fn_n}] 反復失敗のため実行拒否"), flush=True)
+                        self.react_log.add("observation", tool=fn_n, result=r_str[:500], step=step_count)
+                        return idx, fn_n, r_str, call_id, fn_a.get("path", "")
                     try:
                         r = self.agent.tools.execute(fn_n, fn_a)
                         r_str = cache_tool_output(fn_n, str(r))
@@ -670,6 +821,7 @@ class InteractiveOrchestrator:
                             self.agent._tool_cache[ck] = r_str  # type: ignore[possibly-undefined]
                     except Exception as e:
                         r_str = f"ツール実行エラー: {fn_n}: {e}"
+                        repeat_fail_counts[_lb_key] = repeat_fail_counts.get(_lb_key, 0) + 1
                         log.error({"event": "react_tool_error_par", "tool": fn_n, "error": str(e)})
                         safe_print(C.red(f"  ✗ [{fn_n}] 並列実行エラー: {e}"), flush=True)
                         safe_print(C.gray("    （並列実行中のため自動リトライ・介入なし — AIがリカバリします）"), flush=True)
@@ -698,11 +850,21 @@ class InteractiveOrchestrator:
                     self.react_log.add("action", tool=fn_name, args=fn_args, step=step_count)
 
                     try:
-                        result_str = self._execute_with_intervention(fn_name, fn_args, error_counts)
+                        result_str = self._execute_with_intervention(
+                            fn_name, fn_args, error_counts,
+                            repeat_fail_counts=repeat_fail_counts, loop_state=loop_state)
                     except UserRejectedWriteError as e:
                         safe_print(C.yellow(f"\n  ✋ 書き込みを拒否しました（{e}）。処理を中断します。"), flush=True)
                         safe_print(C.gray("  新しい指示を入力してください。"), flush=True)
                         return "書き込みが拒否されたため処理を中断しました。"
+                    except ToolLoopBreakError as e:
+                        safe_print(C.red(
+                            f"\n  ⛔ 同一ツール呼び出し（{e}）の失敗反復が上限を超えたため処理を中断します。"
+                        ), flush=True)
+                        return (
+                            f"同一のツール呼び出し（{e}）が同じ引数で失敗し続けたため、処理を中断しました。\n"
+                            "アプローチを変えた指示を出すか、対象の状態を確認してください。"
+                        )
 
                     # Auto-checkpoint: 書き込み系ツール成功後に自動コミット
                     # エラー・スキップ・キャンセル時はチェックポイントを行わない
@@ -732,6 +894,10 @@ class InteractiveOrchestrator:
                         "call_id": call_id,
                         "path":    fn_args.get("path", ""),
                     })
+
+            # 未検証の委任結果があったかを記録（最終回答ゲートBで使用）
+            if any("※未検証" in str(r.get("result", "")) for r in tool_results if r):
+                turn_had_unverified = True
 
             # ── Observation を OpenAI ネイティブ形式（role: tool）で追加 ──
             for r in tool_results:

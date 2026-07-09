@@ -168,6 +168,12 @@ def render_delegation_history() -> str:
     return "\n".join(lines) + "\n\n"
 
 
+def get_delegation_history_brief(limit: int = 3) -> list[str]:
+    """直近の委任の1行要約（コンテキストヘッダーの自動記録区画用）。"""
+    with _HISTORY_LOCK:
+        return [f"[{e['label']}] {e['status']}" for e in _delegation_history[-limit:]]
+
+
 def clear_delegation_history() -> None:
     """委任履歴と書き込みストリークをリセットする（/clear やモード切替時用）。"""
     with _HISTORY_LOCK:

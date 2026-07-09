@@ -241,6 +241,53 @@ def _trim_messages_smart(messages: list[dict]) -> list[dict]:
     return protected + [m for i, m in enumerate(body) if i not in indices_to_remove]
 
 
+_DIGEST_MAX_LINES = 25
+_DIGEST_MAX_CHARS = 1600
+
+
+def _build_compaction_digest(removed_msgs: list[dict],
+                              max_lines: int = _DIGEST_MAX_LINES) -> str:
+    """削除対象メッセージから作業履歴をLLMなしで機械抽出する。
+
+    抽出対象: ユーザー指示（先頭80文字）、ツール呼び出し（名前+主要引数）とその成否。
+    tool_calls は構造化データなので正確に取れる。成否は直後の tool メッセージの
+    先頭文字列で判定する（粗いが「何を試して失敗したか」が残るだけで再試行の重複を防げる）。"""
+    lines: list[str] = []
+    pending_calls: dict[str, int] = {}  # tool_call_id -> lines index
+    for m in removed_msgs:
+        role = m.get("role")
+        if role == "user":
+            content = str(m.get("content", "") or "")
+            if content and not content.startswith("["):
+                lines.append(f"指示: {' '.join(content.split())[:80]}")
+        elif role == "assistant" and m.get("tool_calls"):
+            for tc in m["tool_calls"]:
+                fn = tc.get("function", {})
+                name = fn.get("name", "?")
+                try:
+                    args = json.loads(fn.get("arguments") or "{}")
+                except Exception:
+                    args = {}
+                target = str(args.get("path") or args.get("command")
+                             or args.get("task") or args.get("pattern") or "")
+                target = " ".join(target.split())[:60]
+                lines.append(f"{name}({target})")
+                if tc.get("id"):
+                    pending_calls[tc["id"]] = len(lines) - 1
+        elif role == "tool":
+            idx = pending_calls.pop(m.get("tool_call_id", ""), None)
+            if idx is not None:
+                content = str(m.get("content", "") or "")
+                ok = not content.startswith(("ツール実行エラー", "エラー", "[ループ防止]"))
+                lines[idx] += " →OK" if ok else " →失敗"
+    if not lines:
+        return ""
+    if len(lines) > max_lines:
+        lines = [f"…（先頭{len(lines) - max_lines}行省略）"] + lines[-max_lines:]
+    text = "\n".join(f"- {ln}" for ln in lines)
+    return text[:_DIGEST_MAX_CHARS]
+
+
 def _repair_message_sequence(messages: list[dict]) -> list[dict]:
     """孤立した tool_calls / tool ロールメッセージを除去する（OpenAI ネイティブ形式）。"""
     repaired = []
@@ -564,17 +611,47 @@ class OpenRouterAgent:
         self._overhead_cache: tuple[float, int] = (0.0, 0)  # (timestamp, value)
         self._session_cache_key: str = uuid4().hex[:16]
         self._gemini_cache = GeminiContextCacheManager()
+        self._recent_writes: list[str] = []  # ハーネス自動記録: セッション内の書き込みファイル
         self._update_compaction_threshold()
 
     def set_system_prompt(self, prompt: str):
         self.system_prompt = prompt
         self._gemini_cache.invalidate()
 
+    _RECENT_WRITES_SHOWN = 8
+
+    def _build_machine_notes(self) -> str:
+        """ハーネスが確実に知っている事実（自己申告に依存しない）を整形する。
+
+        scratchpad はモデルの自己更新頼みで信頼できないため、タスクゴール・
+        書き込み済みファイル・直近の委任結果はハーネス側で毎ターン自動併記する。"""
+        lines = []
+        if self._task_goal:
+            lines.append(f"現在のタスク: {self._task_goal[:120]}")
+        if self._recent_writes:
+            shown = self._recent_writes[-self._RECENT_WRITES_SHOWN:]
+            lines.append(f"このセッションで書き込んだファイル: {', '.join(shown)}")
+        try:
+            from .team import get_delegation_history_brief
+            brief = get_delegation_history_brief()
+            if brief:
+                lines.append("直近の委任: " + " / ".join(brief))
+        except Exception:
+            pass
+        if not lines:
+            return ""
+        return (
+            "--- [ハーネス自動記録（機械生成・正確）] ---\n"
+            + "\n".join(f"- {ln}" for ln in lines)
+            + "\n--- [自動記録 ここまで] ---\n"
+        )
+
     def _build_context_header(self) -> str:
         sep = "─" * 40
         return (
             f"[作業フォルダ] {self.cwd}\n"
             f"{sep}\n"
+            f"{self._build_machine_notes()}"
             f"--- [エージェントの自己記憶（Scratchpad）] ---\n"
             f"{get_scratchpad()}\n"
             f"--- [Scratchpad ここまで] ---"
@@ -685,8 +762,16 @@ class OpenRouterAgent:
         keep_recent = self._compaction_keep_recent()
         first_pair = self.conversation[:2]
         recent_part = self.conversation[-keep_recent:] if keep_recent < len(self.conversation) else []
-        removed = len(self.conversation) - len(first_pair) - len(recent_part)
-        note = {"role": "user", "content": f"[{removed}件の古い会話を削除しました（コンテキスト節約）]"}
+        removed_msgs = self.conversation[len(first_pair):len(self.conversation) - len(recent_part)]
+        removed = len(removed_msgs)
+        # 削除する会話から「何をしたか」をLLMなしで機械抽出して残す。
+        # 弱いモデルはscratchpadの自己更新が当てにならないため、削除＝完全な記憶喪失に
+        # ならないようハーネス側で最低限の作業履歴を保証する。
+        digest = _build_compaction_digest(removed_msgs)
+        note_text = f"[{removed}件の古い会話を削除しました（コンテキスト節約）]"
+        if digest:
+            note_text += f"\n[削除された会話の機械ダイジェスト（ハーネス自動抽出）]\n{digest}"
+        note = {"role": "user", "content": note_text}
         ack = {"role": "assistant", "content": "了解しました。"}
         self.conversation = first_pair + [note, ack] + recent_part
 
@@ -940,6 +1025,12 @@ class OpenRouterAgent:
         return f"{fn_name}:{json.dumps(fn_args, sort_keys=True, ensure_ascii=False)}"
 
     def _invalidate_cache_for_path(self, path: str):
+        # ハーネス自動記録: 書き込み済みファイルを記録（コンテキストヘッダーに毎ターン併記）
+        if path:
+            if path in self._recent_writes:
+                self._recent_writes.remove(path)
+            self._recent_writes.append(path)
+            del self._recent_writes[:-30]
         parent_dir = str(Path(path).parent)
         dir_key = self._make_cache_key("list_directory", {"path": parent_dir})
         with self._tool_cache_lock:

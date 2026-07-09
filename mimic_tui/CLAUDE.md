@@ -23,7 +23,7 @@ browser tools — degrades gracefully if not installed).
 
 Configuration lives in `.env` (gitignored) at the package root: API keys for up to 3 providers
 (`OPENROUTER_KEY_*`, `GEMINI_KEY_*`, `MISTRAL_KEY_*`), model selection, RPM limits, `MAX_TOKENS`,
-`SYSTEM_PROMPT`, `ENABLE_CONFIDENCE_CHECK`, `GEMINI_THINKING_LEVEL`
+`SYSTEM_PROMPT`, `GEMINI_THINKING_LEVEL`
 (`none`/`minimal`/`low`/`medium`/`high`, mapped to `reasoning_effort` in the OpenAI-compatible
 payload — see `GoogleAIConfig.thinking_setting` / `_build_openrouter_payload` in `agent.py`).
 Parsed in `config.py::load_config`.
@@ -89,13 +89,32 @@ Key responsibilities:
 6. **Stale observation invalidation**: when a file is written, all prior `read_file` observations
    for that path in the current turn's messages are overwritten with `"[このread結果は後で上書き
    されました—省略]"` to prevent the model from acting on stale content.
-7. Observations are truncated to `_OBS_MAX_CHARS = 2000` chars in the conversation messages;
-   full output is separately accessible via the tool output cache (`cache_obs`).
+7. Observations are truncated to `_OBS_MAX_CHARS = 2000` chars in the conversation messages
+   (delegation tool results get a larger `_DELEGATION_OBS_MAX_CHARS = 6000` budget since they
+   may be the Director's only information source); full output is separately accessible via
+   the tool output cache (`cache_obs`).
 8. Saves a `.mimic_checkpoint.json` after each step (Worker only, via `MIMIC_NO_AUTOGIT` env
    check). On loop limit or normal completion, the checkpoint is deleted.
-9. On final answer: **squashes** all per-write checkpoint commits into a single commit
-   (`auto_git.squash()`) so the git log stays clean.
-10. Logs every thought/action/observation/final-answer to `ReactLog` (JSONL + markdown).
+9. **Loop breaker**: identical tool calls (same name + normalized args) that fail
+   `_MAX_IDENTICAL_TOOL_FAILURES = 3` times are refused without execution (a warning is
+   injected at the 2nd failure); more than `_MAX_LOOP_REFUSALS = 5` refusals in a turn raises
+   `ToolLoopBreakError` and aborts the turn.
+10. **Final-answer gates** (each bounces at most once per turn, via `_skip_save` messages):
+    Gate A (`_detect_command_offload`) rejects answers that ask the user to run commands or
+    edit files while the agent still has `run_bash`/delegation tools (exempt if the text
+    mentions login/auth/interactive needs); Gate B (`_detect_unverified_claim`) rejects
+    "完了/解決" claims when the turn contained a delegation result marked `※未検証`.
+11. On final answer: **squashes** all per-write checkpoint commits into a single commit
+    (`auto_git.squash()`) so the git log stays clean.
+12. Logs every thought/action/observation/final-answer to `ReactLog` (JSONL + markdown).
+
+Context support for weak models: `_compact_if_needed` (agent.py) replaces old conversation
+with a deletion note **plus a mechanically extracted digest** (`_build_compaction_digest`:
+user instructions, tool calls with primary args, per-call OK/失敗 status — no LLM involved),
+and `_build_context_header` prepends a "ハーネス自動記録" section (current task goal, files
+written this session tracked in `agent._recent_writes`, last 3 delegation outcomes via
+`team.get_delegation_history_brief`) so the model's own scratchpad discipline is not the only
+memory mechanism.
 
 `BASH_EXECUTOR_GUIDANCE` and `REACT_SYSTEM_PROMPT` (appended to the user's `SYSTEM_PROMPT`) define
 the agent's operating rules — notably a "Pipeline-First" policy (prefer `search_in_file` /
