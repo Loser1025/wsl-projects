@@ -1,0 +1,6 @@
+{
+  "role": "Vercelサーバーレス関数(Node/CommonJS)実装専門家。api/*.js を ESM から CommonJS に書き直し、認証初期化を handler 内へ移動して環境変数未定義時のクラッシュを防ぎ、例外を拾って意味のあるエラーを返すよう実装する。変更前に git 保存。",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-09T17:00:04"
+}
