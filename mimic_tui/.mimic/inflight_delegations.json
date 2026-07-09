@@ -1,1 +1,15 @@
-{}
+{
+  "5f1a730d": {
+    "base": "/tmp/mimic_subagent_Reactコンポーネント・AP_ek8cnx67",
+    "project_dir": "/home/loser/wsl-projects",
+    "task": "[あなたのロール]\nReactコンポーネント・API統合修正専門家。最小変更で不整合を解消し、意図しない副作用を出さずに正確に修正・ビルドする。変更前に git で現在状態を保存する。\n\n[タスク]\nプロジェクト /home/loser/wsl-projects/mission-control-v2 に対して、以下の修正を実装・適用してください（can_write により変更がプロジェクトへ反映・コミットされます）。\n\n【最重要前処置】\n- 作業開始時に必ず `cd /home/loser/wsl-projects/mission-control-v2 && git add -A && git commit -m \"WIP: before API POST fix\" --allow-empty` を実行し、現在の状態をコミットしてから変更を加えてください（ロールバック用）。\n\n【背景（調査済み）】\n- カレンダー表示時に `src/components/Calendar/CustomerCalendar.jsx` が `fetch('/api/get-availability')` を method 省略（＝GET）で呼んでいる。\n- しかし `api/get-availability.js`（Vercel serverless function）は `if (req.method !== 'POST') return res.status(405)` で POST 専用になっているため、クライアントが GET で投げると常に 405 になり、空き枠取得が失敗する。\n- これを解消するため、**案A（クライアント側に method:'POST' を付与）**を採用する。\n\n【実施する修正】\n1. **(案A) CustomerCalendar.jsx の fetch 修正**\n   - `src/components/Calendar/CustomerCalendar.jsx` を開き、`fetch('/api/get-availability')` の呼び出し（おそらく L7 付近、または `useEffect` 内の fetch）に `method: 'POST'` オプションを付与してください。\n   - 既に `method` が指定されている場合は 'POST' になっているか確認し、GET なら POST に変更。headers（例: `'Content-Type': 'application/json'`）が必要な場合は適切に付与してください（API側が body を期待しないなら不要ですが、POST の慣例として付けて問題ないか API 実装を確認して判断）。\n   - 他の fetch（例: `/api/create-booking` など）には触らないでください。\n\n2. **(.gitignore 運用改善・低〜中リスク)**\n   - プロジェクトルートの `.gitignore` に、以下を追加してください（既にあれば重複追加しないこと）：\n     - `dist/`（ビルド成果物を git 管理から除外）\n     - 機密ファイルパターンとして `sa_credentials.json`（該当ファイルが現在リポジトリに無くても、将来の誤コミット防止のため）\n   - 現在の `.gitignore` には `.vercel` と `.env.local` しかない状態です。\n\n【検証（自身で実施）】\n- 修正後の `CustomerCalendar.jsx` について、`fetch('/api/get-availability', { method: 'POST' })` の形になっていることを確認（grep 等で可）。\n- `npm run build` が成功し、`dist/CustomerCalendar.js` が再生成されることを確認。\n- `.gitignore` に `dist/` と `sa_credentials.json` が含まれることを確認。\n\n【注意】\n- フェーズ0/表記崩れ修復で整えた仕組み（マウントスクリプト、フォント link、build 設定）には触らないこと。\n- 変更はプロジェクトへ適用・コミットされる。失敗時は状態を元に戻してから再試行。\n- 最後に実施した変更の差分サマリ（特に fetch の変更行と .gitignore の追加行）を報告すること。",
+    "label": "Reactコンポーネント・AP",
+    "verify_cmd": "cd /home/loser/wsl-projects/mission-control-v2 && grep -n \"method: 'POST'\" src/components/Calendar/CustomerCalendar.jsx && npm run build && node -e \"const fs=require('fs');const g=fs.readFileSync('.gitignore','utf8');console.log('GITIGNORE_OK dist='+g.includes('dist/')+' sa='+g.includes('sa_credentials.json'));\"",
+    "kind": "worker",
+    "provider": "openrouter",
+    "model": "tencent/hy3:free",
+    "role_prompt": "あなたは以下の専門家ロールで動作するエージェントです。\n\n# ロール\nReactコンポーネント・API統合修正専門家。最小変更で不整合を解消し、意図しない副作用を出さずに正確に修正・ビルドする。変更前に git で現在状態を保存する。\n\n# 使えるツール\n- ファイルの読み書き・シェル実行・検索・Web調査など、委任以外の全ツールが使える\n- 変更はOverlayFS隔離された作業部屋で行われ、タスク完了後にプロジェクトへ適用される\n\n# 重要\nロールの専門性に集中し、範囲外の作業は行わない。最終回答は日本語で簡潔に結果のみ伝える。",
+    "apply_changes": true,
+    "started_at": "2026-07-09T14:08:18"
+  }
+}
