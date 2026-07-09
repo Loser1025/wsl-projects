@@ -1,0 +1,14 @@
+{
+  "outputDirectory": ".",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/CustomerCalendar.dc.html",
+      "headers": [
+        { "key": "Content-Type", "value": "text/html" }
+      ]
+    }
+  ]
+}

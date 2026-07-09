@@ -26,11 +26,16 @@
 </script>
 </head>
 <body>
-<x-dc>
-<helmet>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
+<div id="calendar-container"></div>
+<script src="/dist/CustomerCalendar.js"></script>
+<script>
+  window.addEventListener('load', () => {
+    const container = document.getElementById('calendar-container');
+    if (window.CustomerCalendar && typeof ReactDOM !== 'undefined') {
+       ReactDOM.render(React.createElement(window.CustomerCalendar), container);
+    }
+  });
+</script>family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -948,17 +953,7 @@
         </div>
       </sc-if>
 
-    </div>
   </sc-if>
-
-</div>
-</x-dc>
-<script type="text/x-dc" data-dc-script>
-class Component extends DCLogic {
-  state = {
-    activeView: 'tasks',
-    tasks: this.loadTasks(),
-    sections: this.loadSections(),
     activeSecFilters: [],
     activeStatusFilters: ['doing', 'review', 'todo'],
     sortBy: 'default',
