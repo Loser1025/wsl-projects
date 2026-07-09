@@ -4,6 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FULCRUM — 事業部タスクシステム</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Bebas+Neue&display=swap">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:#FFFFFF;color-scheme:light;}
+  input,select,button,textarea{font-family:inherit;color-scheme:light;color:inherit;}
+  input::placeholder{color:#c4c4c4;}
+  select{appearance:none;-webkit-appearance:none;}
+  input[type="color"]{padding:2px 3px;cursor:pointer;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  @media(max-width:767px){
+    .mc-mast-inner{padding:0 14px !important;}
+    .mc-sub-grp,.mc-meta-fade{display:none !important;}
+    .mc-wrap{padding:0 14px !important;}
+    .mc-kpi{grid-template-columns:repeat(2,1fr) !important;}
+    .mc-kpi-c{padding:20px 14px 18px !important;}
+    .mc-kpi-c:nth-child(3){border-left:none !important;border-top:1px solid #ececec !important;}
+    .mc-kpi-c:nth-child(4){border-top:1px solid #ececec !important;}
+    .mc-secs{grid-template-columns:1fr !important;}
+    .mc-board-top{flex-direction:column !important;align-items:flex-start !important;gap:10px !important;}
+    .mc-divider{display:none !important;}
+    .mc-sort{margin-left:0 !important;width:100%;}
+    .mc-sort select{width:100% !important;}
+    .mc-task-wrap{overflow-x:auto !important;-webkit-overflow-scrolling:touch;}
+    .mc-urg-row{flex-wrap:wrap !important;gap:8px !important;}
+    button,select{min-height:44px !important;}
+    input[type=text]{min-height:40px !important;}
+  }
+</style>
 <script src="./support.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
@@ -70,36 +102,6 @@
     });
   })();
 </script>
-<style>
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{background:#FFFFFF;color-scheme:light;}
-  input,select,button,textarea{font-family:inherit;color-scheme:light;color:inherit;}
-  input::placeholder{color:#c4c4c4;}
-  select{appearance:none;-webkit-appearance:none;}
-  input[type="color"]{padding:2px 3px;cursor:pointer;}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-  @media(max-width:767px){
-    .mc-mast-inner{padding:0 14px !important;}
-    .mc-sub-grp,.mc-meta-fade{display:none !important;}
-    .mc-wrap{padding:0 14px !important;}
-    .mc-kpi{grid-template-columns:repeat(2,1fr) !important;}
-    .mc-kpi-c{padding:20px 14px 18px !important;}
-    .mc-kpi-c:nth-child(3){border-left:none !important;border-top:1px solid #ececec !important;}
-    .mc-kpi-c:nth-child(4){border-top:1px solid #ececec !important;}
-    .mc-secs{grid-template-columns:1fr !important;}
-    .mc-board-top{flex-direction:column !important;align-items:flex-start !important;gap:10px !important;}
-    .mc-divider{display:none !important;}
-    .mc-sort{margin-left:0 !important;width:100%;}
-    .mc-sort select{width:100% !important;}
-    .mc-task-wrap{overflow-x:auto !important;-webkit-overflow-scrolling:touch;}
-    .mc-urg-row{flex-wrap:wrap !important;gap:8px !important;}
-    button,select{min-height:44px !important;}
-    input[type=text]{min-height:40px !important;}
-  }
-</style>
-</helmet>
 <div style="background:#FFFFFF; min-height:100vh; color:#0a0a0a; font-family:'Noto Sans JP','Inter',sans-serif; padding-bottom:96px; color-scheme:light;">
 
 
