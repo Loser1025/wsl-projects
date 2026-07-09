@@ -122,6 +122,14 @@ from .autogit import AutoGit, ReactLog
 
 _OBS_MAX_CHARS = 2000  # conversation内のobservationをこの文字数に切り詰める（大出力はtool cacheに別保存済み）
 
+# 委任結果はDirectorの唯一の情報源（Directorは自分でファイルを読めないモードがある）ため、
+# 通常ツールより大きい切り詰め上限を使う。2000字では診断レポートの核心が失われる事故があった。
+_DELEGATION_OBS_MAX_CHARS = 6000
+_DELEGATION_TOOLS = {
+    "delegate_to_specialist", "delegate_to_team", "delegate_to_worker",
+    "delegate_to_team_parallel", "delegate_research",
+}
+
 BASH_EXECUTOR_GUIDANCE = """\
 
 [bash実行ガイドライン（必須遵守）]

@@ -127,6 +127,101 @@ def list_orphaned_delegations() -> list[dict]:
         out.append(e)
     return out
 
+# ── 委任履歴リングバッファ（案2: ハーネスによるコンテキスト自動継承） ──
+# Directorのscratchpad転記（プロンプト規約）に依存せず、直近の委任の要約を
+# ハーネス側で記録し、次の委任タスクの冒頭へ自動注入する。
+# 弱いDirectorモデルが経緯を転記し忘れても、Worker間の矛盾修正（前のWorkerの
+# 変更を次のWorkerが打ち消す振動）を防げる。
+
+_HISTORY_LOCK = threading.Lock()
+_DELEGATION_HISTORY_KEEP = 5
+_delegation_history: list[dict] = []
+
+
+def _record_delegation(label: str, task: str, status: str,
+                        changed_files: list[str] | None = None) -> None:
+    """完了した委任の要約を履歴バッファへ記録する。"""
+    with _HISTORY_LOCK:
+        _delegation_history.append({
+            "ts": datetime.now().strftime("%H:%M"),
+            "label": label[:40],
+            "task": " ".join(task.split())[:120],
+            "status": status,
+            "changed_files": list(changed_files or [])[:8],
+        })
+        del _delegation_history[:-_DELEGATION_HISTORY_KEEP]
+
+
+def render_delegation_history() -> str:
+    """直近の委任履歴を、委任タスク冒頭へ注入するテキストとして整形する。履歴がなければ空文字。"""
+    with _HISTORY_LOCK:
+        entries = list(_delegation_history)
+    if not entries:
+        return ""
+    lines = ["[直近の委任履歴（ハーネス自動記録・あなた以前に行われた作業）]"]
+    for e in entries:
+        cf = f" 変更: {', '.join(e['changed_files'])}" if e["changed_files"] else ""
+        lines.append(f"- {e['ts']} [{e['label']}] {e['status']}{cf}")
+        lines.append(f"  依頼: {e['task']}")
+    lines.append("※ 上記と矛盾する変更（直前の委任が行った変更を打ち消す等）を行う場合は、"
+                 "その理由を最終回答に明記すること。")
+    return "\n".join(lines) + "\n\n"
+
+
+def clear_delegation_history() -> None:
+    """委任履歴をリセットする（/clear やセッション開始時用）。"""
+    with _HISTORY_LOCK:
+        _delegation_history.clear()
+
+
+# ── 反復失敗インターロック（案3: 連続書き込み委任の遮断） ──────────
+# 「同じ問題に can_write 委任を盲目的に連発して振動する」失敗モードを機械的に断つ。
+# 変更ファイルが重複する書き込み委任が連続 _WRITE_STREAK_LIMIT 回続いたら、
+# 次の書き込み委任を拒否し、読み取り専用の診断委任を強制する。
+# 読み取り専用委任が1回完了するとリセットされる。
+
+_WRITE_STREAK_LIMIT = 3
+_write_streak: list[set[str]] = []  # 直近の連続書き込み委任の変更ファイル集合
+
+
+def _note_write_delegation(changed_files: list[str]) -> None:
+    with _HISTORY_LOCK:
+        _write_streak.append(set(changed_files))
+        del _write_streak[:-(_WRITE_STREAK_LIMIT + 2)]
+
+
+def _note_readonly_delegation() -> None:
+    with _HISTORY_LOCK:
+        _write_streak.clear()
+
+
+def check_write_interlock() -> str:
+    """書き込み委任を許可してよいか判定する。拒否する場合はエラー文字列を返す。
+
+    直近 _WRITE_STREAK_LIMIT 回の書き込み委任の変更ファイルに重複があれば
+    「同じ箇所を修正し続けて進展していない」とみなす。"""
+    with _HISTORY_LOCK:
+        recent = _write_streak[-_WRITE_STREAK_LIMIT:]
+    if len(recent) < _WRITE_STREAK_LIMIT:
+        return ""
+    overlapping = any(
+        recent[i] & recent[j]
+        for i in range(len(recent)) for j in range(i + 1, len(recent))
+        if recent[i] and recent[j]
+    )
+    if not overlapping:
+        return ""
+    files = sorted(set().union(*recent))[:10]
+    return (
+        f"[委任拒否: 反復失敗インターロック] 書き込み委任が連続{_WRITE_STREAK_LIMIT}回、"
+        f"同じファイル群（{', '.join(files)}）を修正していますが問題が解決していません。\n"
+        "同じアプローチの繰り返しを防ぐため、次の書き込み委任はブロックされました。\n"
+        "先に **読み取り専用の委任（can_write=False, can_execute=False）** で対象ファイル全体を"
+        "精査させ、根本原因の診断レポートを取得してください。"
+        "その診断結果を踏まえた書き込み委任は再び許可されます。"
+    )
+
+
 def _sanitize_label_for_path(label: str) -> str:
     """label を tempfile.mkdtemp の prefix として安全な文字列に変換する。
 
@@ -143,6 +238,15 @@ _RESEARCHER_TOOLS = [
     "read_file", "read_tool_cache", "get_repo_map",
     "grep_codebase", "file_info", "smart_read",
     "web_search", "fetch_webpage",
+]
+# 読み取り専用Specialist/Researcherにもブラウザ観測を許可する（案5）。
+# 「デプロイ先の実ページを開いてコンソール相当の情報を観測する」委任を可能にし、
+# 修正→デプロイ→確認のループをユーザーの手動コピペなしで閉じる。
+# Playwright未導入環境ではツール自体がその旨を返すだけなので安全。
+_RESEARCHER_BROWSER_TOOLS = [
+    "enable_browser_tools", "disable_browser_tools",
+    "browser_navigate", "browser_click", "browser_type",
+    "browser_get_text", "browser_screenshot", "browser_close",
 ]
 _RESEARCHER_MAX_ROUNDS = 12
 
@@ -212,22 +316,32 @@ def _build_verify_retry_task(original_task: str, verify_cmd: str, verify_exit: i
 
 
 def _build_researcher_registry() -> ToolRegistry:
-    """Researcher用のツールレジストリ（読み取り専用＋Web検索）を構築する。"""
+    """Researcher用のツールレジストリ（読み取り専用＋Web検索＋ブラウザ観測）を構築する。"""
     reg = ToolRegistry()
     for name in _RESEARCHER_TOOLS:
         reg.copy_tool(name, _base_tools)
+    for name in _RESEARCHER_BROWSER_TOOLS:
+        try:
+            reg.copy_tool(name, _base_tools)
+        except Exception:
+            pass  # ブラウザツールが未登録の環境では黙ってスキップ
     return reg
 
 
 def _run_isolated(config, tool_registry: ToolRegistry, system_prompt: str,
                    user_message: str, max_rounds: int = _ISOLATED_MAX_ROUNDS,
-                   label: str = "", role: str = "Supervisor") -> str:
-    """会話履歴・スクラッチパッドを持たないフレッシュなエージェントを1ターン実行し、最終回答テキストを返す。"""
+                   label: str = "", role: str = "Supervisor",
+                   require_structured: bool = False) -> str:
+    """会話履歴・スクラッチパッドを持たないフレッシュなエージェントを1ターン実行し、最終回答テキストを返す。
+
+    require_structured=True の場合、最終回答に必須見出し（【結論】）が無ければ
+    1回だけ形式の修正を機械的に再要求する（弱いモデルの自由作文で要点が欠落するのを防ぐ）。"""
     agent = OpenRouterAgent(AccountRotator(config), tool_registry)
     agent.set_system_prompt(system_prompt)
     messages: list[dict] = [{"role": "user", "content": user_message}]
     prefix = f"  {C.gray(f'[{role}:{label}]' if label else f'[{role}]')} "
     xml_tool_retry_count = 0
+    structured_retry_done = False
     last_text = ""
 
     for _ in range(max_rounds):
@@ -268,6 +382,20 @@ def _run_isolated(config, tool_registry: ToolRegistry, system_prompt: str,
                         "直前のツール呼び出し意図をtool_calls形式で再送してください。"
                     ),
                 })
+                continue
+            # ── 構造化回答の機械チェック（欠落時は1回だけ再要求）────
+            if (require_structured and text and "【結論】" not in text
+                    and not structured_retry_done):
+                structured_retry_done = True
+                safe_print(C.yellow(
+                    f"{prefix}⚠ 最終回答が指定形式でないため再要求します"
+                ), flush=True)
+                messages.append({"role": "assistant", "content": text})
+                messages.append({"role": "user", "content": (
+                    "[システム] 最終回答が指定の形式ではありません。内容を変えずに、"
+                    "【結論】【変更・実施内容】【残課題】【次の推奨】の4見出しで"
+                    "整理し直して再送してください（該当なしの項目は「なし」と書く）。"
+                )})
                 continue
             return text or ""
 
@@ -329,6 +457,16 @@ def run_research_qa(question: str, project_dir: str, config, label: str = "") ->
     return answer
 
 
+STRUCTURED_ANSWER_GUIDANCE = """
+# 最終回答の形式（必須）
+最終回答は必ず以下の4見出しで構成すること（該当なしの項目は「なし」と書く）:
+【結論】タスクの結果を1〜3行で
+【変更・実施内容】変更/実行したファイル・コマンドと内容
+【残課題】未解決の問題・確認できなかったこと
+【次の推奨】依頼元が次に行うべきこと
+"""
+
+
 def _build_dynamic_system_prompt(role: str, can_write: bool,
                                   can_execute: bool = False) -> str:
     """Directorが自由記述したロール説明からシステムプロンプトを組み立てる。
@@ -351,6 +489,9 @@ def _build_dynamic_system_prompt(role: str, can_write: bool,
         tools_desc = (
             "- read_file, grep_codebase, file_info, smart_read, get_repo_map でプロジェクト内を調査できる\n"
             "- web_search / fetch_webpage で外部情報を調べられる（書き込み・コマンド実行は不可）\n"
+            "- browser_navigate / browser_get_text / browser_screenshot 等で実際のWebページ"
+            "（デプロイ先のサイト等）を開いて観測できる（enable_browser_tools で有効化。"
+            "Playwright未導入の環境では使用不可）\n"
         )
     return (
         f"あなたは以下の専門家ロールで動作するエージェントです。\n\n"
@@ -358,8 +499,73 @@ def _build_dynamic_system_prompt(role: str, can_write: bool,
         f"# 使えるツール\n"
         f"{tools_desc}"
         f"\n# 重要\nロールの専門性に集中し、範囲外の作業は行わない。"
-        f"最終回答は日本語で簡潔に結果のみ伝える。"
+        f"最終回答は日本語で簡潔に結果のみ伝える。\n"
+        f"{STRUCTURED_ANSWER_GUIDANCE}"
     )
+
+
+# ── roleスキーマ検証（案4: 自由度の削減） ─────────────────────────
+# 弱いDirectorモデルが「〜の専門家」だけの薄いroleを書くとSpecialistの精度が
+# 大きく落ちる。形式チェックは機械でできるため、完了基準の明記をツール境界で
+# 強制する（欠落時はテンプレ付きで即差し戻し。Workerは起動しないのでコストゼロ）。
+
+_ROLE_MIN_CHARS = 20
+
+
+def validate_specialist_role(role: str) -> str:
+    """delegate_to_specialist の role を検証する。問題があればエラー文字列を返す。"""
+    role = (role or "").strip()
+    problems = []
+    if len(role) < _ROLE_MIN_CHARS:
+        problems.append(f"role が短すぎます（{len(role)}文字 < {_ROLE_MIN_CHARS}文字）")
+    if "完了基準" not in role:
+        problems.append("role に「完了基準」の明記がありません")
+    if not problems:
+        return ""
+    return (
+        "[委任拒否: role不備] " + " / ".join(problems) + "\n"
+        "role は以下のテンプレートを埋めて再送してください（このチェックは機械的な文字列検査です）:\n"
+        "  視点: <どの専門性・観点で作業するか>\n"
+        "  制約: <やってはいけないこと・守るべき既存の流儀>\n"
+        "  完了基準: <何が確認できたらタスク完了とみなすか（検証可能な形で）>"
+    )
+
+
+_VERIFY_SUGGEST_MAX_ROUNDS = 6
+
+_VERIFY_SUGGEST_SYSTEM_PROMPT = """\
+あなたは検証コマンドの提案役です。渡されたタスクの変更スコープに対応する
+テスト・ビルド・Lint コマンドを1つだけ特定してください。
+- プロジェクト内を読み取りツールで軽く確認してよい（package.json, pyproject.toml 等）
+- 変更スコープに絞った最小限のコマンドにする（フルスイートは避ける）
+- 実行に数分以上かかるものは不適切
+- 適切なコマンドが特定できない場合は「なし」とだけ答える
+
+最終回答は以下の1行のみ:
+[推奨verify_cmd] <コマンド>
+または
+[推奨verify_cmd] なし
+"""
+
+
+def _suggest_verify_cmd(task: str, project_dir: str, config, label: str = "") -> str:
+    """can_write委任でverify_cmd未指定のとき、軽量な読み取り専用パスで検証コマンドを自動調達する。
+    特定できなければ空文字を返す（失敗しても委任は続行する）。"""
+    try:
+        registry = _build_researcher_registry()
+        prompt = (
+            f"[作業フォルダ] {Path(project_dir).resolve()}\n\n"
+            f"[これから実施される変更タスク]\n{task[:2000]}\n"
+        )
+        answer = _run_isolated(config, registry, _VERIFY_SUGGEST_SYSTEM_PROMPT, prompt,
+                                max_rounds=_VERIFY_SUGGEST_MAX_ROUNDS,
+                                label=label, role="VerifySuggest")
+        cmd = _extract_suggested_verify_cmd(answer)
+        if cmd and cmd not in ("なし", "none", "None"):
+            return cmd
+    except Exception:
+        pass
+    return ""
 
 
 def _rounds_for_specialist(role: str, task: str) -> int:
@@ -440,38 +646,57 @@ def load_saved_roles_section(limit: int = _ROLES_INJECT_LIMIT) -> str:
 
 def run_specialist_task(role: str, task: str, project_dir: str, config,
                          can_write: bool = False, can_execute: bool = False,
-                         label: str = "", verify_cmd: str = "") -> str:
+                         label: str = "", verify_cmd: str = "",
+                         expected_files: Optional[list[str]] = None) -> str:
     """動的ロール定義のエージェントを実行する。
 
     権限は3段階: 読み取り専用（デフォルト）/ can_execute=True（Overlay内で
     コマンド実行可・変更は破棄）/ can_write=True（Overlay内で実装し変更を適用・コミット）。
     can_write と can_execute が両方 True の場合は can_write が優先される。
-    成功した委任のロール定義は .mimic/roles/ に保存され、次回以降のSpecialistモードで
-    再利用候補としてシステムプロンプトに注入される。"""
+    ロール定義は .mimic/roles/ に保存され再利用候補として注入されるが、
+    書き込み/実行系は機械検証（verify）を通過した場合のみ「実績」として保存する。"""
     effective_label = label or role[:20]
     system_prompt = _build_dynamic_system_prompt(role, can_write, can_execute)
 
     if can_write or can_execute:
+        # can_write で verify_cmd 未指定なら、軽量パスで検証コマンドを自動調達する。
+        # 成功判定をWorkerの自己申告から機械検証へ寄せるための施策で、
+        # 特定できなければ未検証のまま続行する（結果に「※未検証」ラベルが付く）。
+        if can_write and not verify_cmd:
+            verify_cmd = _suggest_verify_cmd(task, project_dir, config, label=effective_label)
+            if verify_cmd:
+                safe_print(C.gray(
+                    f"  [{effective_label}] 🧪 自動調達したverify_cmd: {verify_cmd}"
+                ), flush=True)
+
         enriched = f"[あなたのロール]\n{role}\n\n[タスク]\n{task}"
         result = run_worker_once(enriched, project_dir, config, label=effective_label,
                                   role_prompt=system_prompt, verify_cmd=verify_cmd,
-                                  apply_changes=can_write)
-        if "✓ 完了" in result and "✗検証失敗" not in result:
+                                  apply_changes=can_write,
+                                  expected_files=expected_files)
+        # ロール保存は機械検証を通過した委任のみ（自己申告の「完了」では保存しない）
+        if "✓検証通過" in result:
             _save_specialist_role(role, "write" if can_write else "execute")
         return result
     else:
         registry = _build_researcher_registry()
         prompt = (
             f"[作業フォルダ] {Path(project_dir).resolve()}\n\n"
+            f"{render_delegation_history()}"
             f"[タスク]\n{task}\n"
         )
         answer = _run_isolated(
             config, registry, system_prompt, prompt,
             max_rounds=_rounds_for_specialist(role, task),
             label=effective_label, role=role[:20],
+            require_structured=True,
         )
         if answer and not answer.startswith("[ラウンド上限到達"):
             _save_specialist_role(role, "read")
+            _record_delegation(effective_label, task, "✓ 調査完了（読み取り専用）")
+            _note_readonly_delegation()
+        else:
+            _record_delegation(effective_label, task, "⚠ ラウンド上限・調査未完了")
         return answer
 
 
@@ -488,7 +713,8 @@ def run_research(task: str, project_dir: str, config, label: str = "") -> str:
 
 def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_id: str,
                           label: str, verify_cmd: str, tag: str, print_tag: str,
-                          role_prompt: str = "", apply_changes: bool = True) -> str:
+                          role_prompt: str = "", apply_changes: bool = True,
+                          expected_files: Optional[list[str]] = None) -> str:
     """_run_delegation_core_inner を同時実行数制限付きで実行する。
 
     delegate_to_specialist 等は orchestrator の並列ツール実行経路で呼び出し数ぶん
@@ -503,14 +729,16 @@ def _run_delegation_core(task: str, project_dir: str, config, base: Path, trace_
         return _run_delegation_core_inner(task, project_dir, config, base, trace_id,
                                            label, verify_cmd, tag, print_tag,
                                            role_prompt=role_prompt,
-                                           apply_changes=apply_changes)
+                                           apply_changes=apply_changes,
+                                           expected_files=expected_files)
     finally:
         _DELEGATION_SEMAPHORE.release()
 
 
 def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, trace_id: str,
                                 label: str, verify_cmd: str, tag: str, print_tag: str,
-                                role_prompt: str = "", apply_changes: bool = True) -> str:
+                                role_prompt: str = "", apply_changes: bool = True,
+                                expected_files: Optional[list[str]] = None) -> str:
     """base 上でWorkerを実行し、verify失敗リトライ→適用→マニフェスト解除までを行う共通処理。
 
     新規実行（base は空のOverlay）・再開（base に前回までの変更が残っている）の
@@ -522,10 +750,14 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
     resolved_dir = str(Path(project_dir).resolve())
     _t_start = time.time()  # 競合検出用: この時刻以降に本体側で変更されたファイルを警告する
 
+    # 委任履歴（直近の委任の要約）をハーネス側でタスク冒頭に自動注入する。
+    # task 変数自体は汚さない（履歴記録・結果サマリには元のタスクを使う）。
+    worker_task = render_delegation_history() + task
+
     safe_print(C.gray(f"  {print_tag} ⚙ Worker実行..."), flush=True)
     _log_team_event({"event": "team_worker_start", "attempt": 1, "task": task, "resumed": False, "trace_id": trace_id})
     result, upper, base = run_subagent_reviewable(
-        task, project_dir, label=label or "single", base=base,
+        worker_task, project_dir, label=label or "single", base=base,
         trace_id=trace_id, verify_cmd=verify_cmd,
         provider=config.name, model=config.model,
         role_prompt=role_prompt,
@@ -579,6 +811,7 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
 
     if upper is None or base is None:
         _unregister_inflight(trace_id)
+        _record_delegation(label or tag, task, "⚠ 実行エラー")
         return f"[{tag}: ⚠ 実行エラー] (trace_id={trace_id})\nタスク: {task}\n\n{result.summary}"
 
     applied = False
@@ -613,6 +846,10 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
             verify_status = f" ✗検証失敗(exit={result.verify_exit}, {MAX_VERIFY_RETRIES}回試行後)"
         else:
             verify_status = " ?(検証結果取得失敗)"
+    elif applied:
+        # 検証なしの適用は「Workerの自己申告のみ」であることをハーネスが明示する。
+        # 弱いDirectorモデルが「完了しました」とユーザーへ言い切るのを防ぐ。
+        verify_status = " ※未検証（verify_cmd未指定・Workerの自己申告のみ）"
 
     if applied:
         status_core = "✓ 完了・適用済み"
@@ -634,11 +871,45 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
                           f"ファイルを上書きしました: {', '.join(conflict_files)}"]
     elif discarded:
         lines += ["", "(実行専用モード(can_execute)のため、Overlay内のファイル変更は破棄されました)"]
+
+    # ── ハーネスによる機械判定（Workerの自己申告に依存しない注記） ──
+    if apply_changes and not result.changed_files:
+        # 書き込み権限の委任で差分ゼロ = 未遂の可能性。Workerの完了報告と矛盾し得る。
+        lines += ["", "⚠ ハーネス判定: 書き込み権限（can_write）の委任ですが、変更ファイルは0件でした。"
+                      "Workerの完了報告と矛盾する場合、タスクは実施されていない可能性があります。"
+                      "結果を鵜呑みにせず、読み取り専用の委任で実ファイルの状態を確認してください。"]
+    if expected_files and result.changed_files:
+        resolved_prefix = resolved_dir.rstrip("/") + "/"
+        normalized_expected = {
+            f[len(resolved_prefix):] if f.startswith(resolved_prefix) else f.lstrip("./")
+            for f in expected_files
+        }
+        unexpected = [f for f in result.changed_files if f not in normalized_expected]
+        if unexpected:
+            lines += ["", "⚠ ハーネス判定: 変更予定（expected_files）に含まれないファイルが変更されました: "
+                          f"{', '.join(unexpected[:10])}\n"
+                          "意図した変更範囲からの逸脱がないか差分サマリを確認してください。"]
+
+    # ── 委任履歴・書き込みストリークの記録 ──
+    _record_delegation(label or tag, task, status_label, result.changed_files)
+    if apply_changes:
+        if verify_cmd and result.verify_exit == 0:
+            # 機械検証を通過した変更は「進展」なのでストリークをリセットする
+            _note_readonly_delegation()
+        else:
+            _note_write_delegation(result.changed_files)
+    else:
+        _note_readonly_delegation()
+
     return "\n".join(lines)
 
 
 def run_team_task(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "") -> str:
     """Researcher → Worker を実行し、verify失敗時は自動リトライ後に変更を適用してサマリを返す。"""
+    interlock = check_write_interlock()
+    if interlock:
+        return interlock
+
     resolved_dir = str(Path(project_dir).resolve())
     team_tag = f"[Team:{label}]" if label else "[Team]"
     trace_id = uuid.uuid4().hex[:8]
@@ -666,11 +937,17 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
 
 
 def run_worker_once(task: str, project_dir: str, config, label: str = "", verify_cmd: str = "",
-                     role_prompt: str = "", apply_changes: bool = True) -> str:
+                     role_prompt: str = "", apply_changes: bool = True,
+                     expected_files: Optional[list[str]] = None) -> str:
     """Researcherを介さずWorkerを実行し、verify失敗時は自動リトライ後に変更を適用する。
 
     apply_changes=False の場合はOverlay内での実行のみ行い、変更は適用せず破棄する
     （delegate_to_specialist の can_execute=True 用）。"""
+    if apply_changes:
+        interlock = check_write_interlock()
+        if interlock:
+            return interlock
+
     resolved_dir = str(Path(project_dir).resolve())
     trace_id = uuid.uuid4().hex[:8]
 
@@ -680,7 +957,8 @@ def run_worker_once(task: str, project_dir: str, config, label: str = "", verify
                         role_prompt=role_prompt, apply_changes=apply_changes)
     return _run_delegation_core(task, project_dir, config, base, trace_id, label,
                                  verify_cmd, "delegate_to_worker", "[Worker]",
-                                 role_prompt=role_prompt, apply_changes=apply_changes)
+                                 role_prompt=role_prompt, apply_changes=apply_changes,
+                                 expected_files=expected_files)
 
 
 def resume_delegation(trace_id: str) -> str:

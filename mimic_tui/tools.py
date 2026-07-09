@@ -964,13 +964,24 @@ def delegate_research(question: str, project_dir: str = ".") -> str:
             "role": {
                 "type": "string",
                 "description": (
-                    "専門家ロールの説明。エージェントの専門性・視点・制約を自由に記述する"
-                    "（例: 'セキュリティ脆弱性の診断専門家。認証・認可・入力検証の観点で調査する'）"
+                    "専門家ロールの説明。「視点」「制約」「完了基準」の3要素を必ず含めること"
+                    "（「完了基準」の明記がないと機械チェックで差し戻される）。"
+                    "例: '視点: セキュリティ脆弱性の診断専門家。制約: コードの変更提案はしない。"
+                    "完了基準: 認証・認可・入力検証の問題点を重大度付きで列挙できている'"
                 ),
             },
             "task": {
                 "type": "string",
                 "description": "そのロールに実行させるタスク",
+            },
+            "expected_files": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "can_write=True のとき、変更を想定しているファイルのリスト（プロジェクト相対パス）。"
+                    "指定すると、想定外のファイルが変更された場合にハーネスが警告を付与する。省略可。"
+                ),
+                "default": [],
             },
             "can_write": {
                 "type": "boolean",
@@ -1010,12 +1021,17 @@ def delegate_research(question: str, project_dir: str = ".") -> str:
 )
 def delegate_to_specialist(role: str, task: str,
                             can_write: bool = False, can_execute: bool = False,
-                            project_dir: str = ".", verify_cmd: str = "") -> str:
-    from .team import run_specialist_task, _get_team_config
+                            project_dir: str = ".", verify_cmd: str = "",
+                            expected_files: Optional[list] = None) -> str:
+    from .team import run_specialist_task, validate_specialist_role, _get_team_config
+    role_error = validate_specialist_role(role)
+    if role_error:
+        return role_error
     return run_specialist_task(
         role, task, project_dir, _get_team_config(),
         can_write=can_write, can_execute=can_execute,
         label=role[:15], verify_cmd=verify_cmd,
+        expected_files=list(expected_files or []),
     )
 
 
