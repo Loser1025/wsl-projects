@@ -55,4 +55,4 @@ const CustomerCalendar = () => {
 export default CustomerCalendar;
 
 // dc-runtime registration
-// window.CustomerCalendar = CustomerCalendar;
+window.CustomerCalendar = CustomerCalendar;

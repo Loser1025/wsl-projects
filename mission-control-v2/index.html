@@ -29,13 +29,47 @@
 <div id="calendar-container"></div>
 <script src="/dist/CustomerCalendar.js"></script>
 <script>
-  window.addEventListener('load', () => {
-    const container = document.getElementById('calendar-container');
-    if (window.CustomerCalendar && typeof ReactDOM !== 'undefined') {
-       ReactDOM.render(React.createElement(window.CustomerCalendar), container);
+  (function () {
+    var container = document.getElementById('calendar-container');
+
+    function removeOverlay() {
+      var overlay = document.querySelector('sc-if[value="{{ isLoading }}"]');
+      if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
     }
-  });
-</script>family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+    function mount() {
+      if (!window.CustomerCalendar || typeof window.React === 'undefined' || typeof window.ReactDOM === 'undefined') {
+        return false;
+      }
+      try {
+        window.ReactDOM.render(window.React.createElement(window.CustomerCalendar), container);
+        removeOverlay();
+        return true;
+      } catch (e) {
+        console.error('CustomerCalendar mount failed:', e);
+        return false;
+      }
+    }
+
+    var deadline = Date.now() + 4000;
+    var timer = setInterval(function () {
+      if (mount()) {
+        clearInterval(timer);
+        return;
+      }
+      if (Date.now() > deadline) {
+        clearInterval(timer);
+        // タイムアウト: オーバーレイを強制削除して永続表示を防ぐ
+        removeOverlay();
+      }
+    }, 50);
+
+    window.addEventListener('load', function () {
+      mount();
+      setTimeout(removeOverlay, 4200);
+    });
+  })();
+</script>
 <style>
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -68,17 +102,6 @@
 </helmet>
 <div style="background:#FFFFFF; min-height:100vh; color:#0a0a0a; font-family:'Noto Sans JP','Inter',sans-serif; padding-bottom:96px; color-scheme:light;">
 
-  <!-- LOADING OVERLAY -->
-  <sc-if value="{{ isLoading }}">
-    <div style="position:fixed; inset:0; background:#ffffff; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:999;">
-      <div style="font-family:'Bebas Neue',sans-serif; font-size:32px; letter-spacing:0.18em; color:#000000; margin-bottom:18px;">FULCRUM</div>
-      <div style="display:flex; gap:6px;">
-        <span style="width:6px; height:6px; border-radius:50%; background:#000000; animation:pulse 1.2s ease-in-out 0s infinite;"></span>
-        <span style="width:6px; height:6px; border-radius:50%; background:#000000; animation:pulse 1.2s ease-in-out 0.2s infinite;"></span>
-        <span style="width:6px; height:6px; border-radius:50%; background:#000000; animation:pulse 1.2s ease-in-out 0.4s infinite;"></span>
-      </div>
-    </div>
-  </sc-if>
 
   <!-- MASTHEAD -->
   <div style="border-bottom:2px solid #000000; background:#ffffff; position:sticky; top:0; z-index:100;">

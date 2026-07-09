@@ -37,6 +37,40 @@ _SUDO_PROMPT_RE = re.compile(
     r'|パスワードを入力してください'
 )
 
+# Worker（OverlayFS隔離）実行時: リダイレクト・tee・cp/mv 等で作業ディレクトリ外の
+# 絶対パスへ書き込むコマンドを検出するパターン（書き込み先候補の絶対パスを抽出）
+_OUTSIDE_WRITE_TARGET_RE = re.compile(
+    r'(?:>>?\s*|\btee\s+(?:-a\s+)?|\b(?:cp|mv)\s+(?:-\S+\s+)*\S+\s+)(/[^\s;|&\'"<>]+)'
+)
+
+
+def _worker_outside_write_warning(command: str) -> str:
+    """Worker実行時、作業ディレクトリ外への書き込みらしきコマンドを検出して警告を返す。
+
+    OverlayFS隔離は作業ディレクトリのマウントにしか効かず、外部絶対パスへの書き込みは
+    ホストFSへ直接届き、差分検出（changed_files）にも掛からない「見えない書き込み」になる。
+    シェルコマンドを確実にブロックすることはできないため、ここでは検出＋警告に留める。"""
+    if not os.environ.get("MIMIC_NO_AUTOGIT"):
+        return ""
+    root = str(Path.cwd().resolve())
+    outside = []
+    for target in _OUTSIDE_WRITE_TARGET_RE.findall(command):
+        if target.startswith(("/dev/", "/proc/", "/tmp/")):
+            continue
+        if target == root or target.startswith(root + "/"):
+            continue
+        outside.append(target)
+    if not outside:
+        return ""
+    return (
+        f"\n⚠ 警告: 作業ディレクトリ（{root}）外の絶対パスへの書き込みらしき操作を検出: "
+        f"{', '.join(outside[:5])}\n"
+        "この環境はOverlayFS隔離されており、外部への書き込みは差分として検出・適用されません"
+        "（プロジェクトへの変更として扱われず、Directorにも見えません）。\n"
+        "プロジェクトのファイルを変更する場合は、作業ディレクトリ内の相対パスを使用してください。"
+    )
+
+
 def _sudo_password() -> bytes:
     """環境変数 SUDO_PASSWORD からパスワードを取得する（デフォルト: 1025）。"""
     return (os.environ.get("SUDO_PASSWORD", "1025") + "\n").encode()
@@ -208,6 +242,9 @@ def run_bash(
     parts = [f"[{status}]", f"作業フォルダ: {cwd}"]
     if output:
         parts.append(output)
+    outside_warning = _worker_outside_write_warning(command)
+    if outside_warning:
+        parts.append(outside_warning)
     return "\n".join(parts)
 
 

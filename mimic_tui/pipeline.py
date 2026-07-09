@@ -139,4 +139,9 @@ def run_pipeline(
     if stderr_out:
         parts.append(f"STDERR:\n{stderr_out}")
 
+    from .tools_linux import _worker_outside_write_warning
+    outside_warning = _worker_outside_write_warning(command)
+    if outside_warning:
+        parts.append(outside_warning)
+
     return cache_tool_output("run_pipeline", "\n".join(parts))
