@@ -6,7 +6,10 @@ const CustomerCalendar = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch('/api/get-availability')
+    fetch('/api/get-availability', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
       .then(res => res.json())
       .then(data => {
         setSlots(data.slots || []);
