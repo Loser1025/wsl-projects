@@ -7,16 +7,16 @@ module.exports = async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
-  const key = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  const key = process.env.SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (!key || key === 'undefined') {
-    return res.status(500).json({ error: 'Missing FIREBASE_SERVICE_ACCOUNT_KEY env var' });
+    return res.status(500).json({ error: 'Missing SERVICE_ACCOUNT_JSON env var' });
   }
 
   let serviceAccount;
   try {
     serviceAccount = JSON.parse(key);
   } catch (error) {
-    return res.status(500).json({ error: 'Invalid FIREBASE_SERVICE_ACCOUNT_KEY' });
+    return res.status(500).json({ error: 'Invalid SERVICE_ACCOUNT_JSON' });
   }
 
   try {
