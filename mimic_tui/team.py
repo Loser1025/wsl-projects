@@ -127,6 +127,16 @@ def list_orphaned_delegations() -> list[dict]:
         out.append(e)
     return out
 
+def _sanitize_label_for_path(label: str) -> str:
+    """label を tempfile.mkdtemp の prefix として安全な文字列に変換する。
+
+    delegate_to_specialist の label はロール文字列の先頭から作られるため、
+    'React/ランタイム競合解決専門家' のように `/` を含むと mkdtemp が
+    [Errno 2] で即失敗する。パス区切りや空白類を `_` に置換して防ぐ。"""
+    import re
+    return re.sub(r"[/\\\s\x00]+", "_", label)
+
+
 _ISOLATED_MAX_ROUNDS = 8
 
 _RESEARCHER_TOOLS = [
@@ -648,7 +658,7 @@ def run_team_task(task: str, project_dir: str, config, label: str = "", verify_c
     # base をここで先に作って登録してから run_subagent_reviewable に渡す。
     # こうしないと、Worker実行中にDirectorプロセスが落ちた場合 base の存在をどこにも
     # 記録できず、Overlay作業ディレクトリが孤立したまま再開も破棄もできなくなる。
-    base = Path(tempfile.mkdtemp(prefix=f"mimic_subagent_{label or 'single'}_"))
+    base = Path(tempfile.mkdtemp(prefix=f"mimic_subagent_{_sanitize_label_for_path(label) or 'single'}_"))
     _register_inflight(trace_id, base, resolved_dir, worker_task, label, verify_cmd,
                         "team", config.name, config.model)
     return _run_delegation_core(worker_task, project_dir, config, base, trace_id, label,
@@ -664,7 +674,7 @@ def run_worker_once(task: str, project_dir: str, config, label: str = "", verify
     resolved_dir = str(Path(project_dir).resolve())
     trace_id = uuid.uuid4().hex[:8]
 
-    base = Path(tempfile.mkdtemp(prefix=f"mimic_subagent_{label or 'single'}_"))
+    base = Path(tempfile.mkdtemp(prefix=f"mimic_subagent_{_sanitize_label_for_path(label) or 'single'}_"))
     _register_inflight(trace_id, base, resolved_dir, task, label, verify_cmd,
                         "worker", config.name, config.model,
                         role_prompt=role_prompt, apply_changes=apply_changes)

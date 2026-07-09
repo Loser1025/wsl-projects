@@ -65,6 +65,30 @@ def clear_read_files_registry():
     """ターンの開始時に読み取り履歴をリセットする。"""
     _get_registry().clear()
 
+def _check_worker_write_boundary(path: str) -> str:
+    """Worker（OverlayFS隔離サブプロセス）実行時、作業部屋の外への書き込みを拒否する。
+
+    Overlay隔離は作業ディレクトリ（merged）のマウントにしか効かないため、
+    絶対パスで外部へ書くとホストFSへ直接書き込まれ、差分検出（changed_files）にも
+    掛からず適用もロールバックもできない「見えない書き込み」になる。
+    エラー文字列を返した場合、呼び出し元は書き込みを行わずそれをそのまま返すこと。"""
+    if not os.environ.get("MIMIC_NO_AUTOGIT"):
+        return ""
+    try:
+        root = Path.cwd().resolve()
+        Path(path).resolve().relative_to(root)
+    except ValueError:
+        return (
+            f"エラー: 作業ディレクトリ（{Path.cwd()}）の外への書き込みは禁止されています: {path}\n"
+            "この環境はOverlayFS隔離されており、外部への書き込みは差分として検出・適用されません。\n"
+            "作業ディレクトリ内の相対パスで書き込んでください。"
+            "外部ファイルの変更が必要な場合は、その旨を最終回答でDirectorに報告してください。"
+        )
+    except Exception:
+        return ""
+    return ""
+
+
 def _check_read_warning(path: str) -> str:
     """ファイルが現在のターンで read_file されたか確認し、警告を返す。"""
     resolved = str(Path(path).resolve())
@@ -406,6 +430,9 @@ def get_repo_map(path: str = ".") -> str:
     }
 )
 def write_file(path: str, content: str) -> str:
+    boundary_error = _check_worker_write_boundary(path)
+    if boundary_error:
+        return boundary_error
     warning = _check_read_warning(path)
     p = Path(path)
     preview = f"  書き込み内容（先頭30行）:\n" + "\n".join(content.splitlines()[:30])
@@ -430,6 +457,9 @@ def write_file(path: str, content: str) -> str:
     }
 )
 def edit_file(path: str, old_string: str, new_string: str) -> str:
+    boundary_error = _check_worker_write_boundary(path)
+    if boundary_error:
+        return boundary_error
     warning = _check_read_warning(path)
     p = Path(path)
     old_preview = "\n".join(old_string.splitlines()[:15])
@@ -624,6 +654,9 @@ def fetch_webpage(url: str, max_chars: int = 10000) -> str:
     }
 )
 def patch_file(path: str, search: str, replace: str) -> str:
+    boundary_error = _check_worker_write_boundary(path)
+    if boundary_error:
+        return boundary_error
     warning = _check_read_warning(path)
     p = Path(path)
     search_preview = "\n".join(search.splitlines()[:15])
