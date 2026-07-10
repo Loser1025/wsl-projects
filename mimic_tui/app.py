@@ -1107,7 +1107,9 @@ class MimicApp(App):
             self._agent_mode = "specialist"
             self._ctx["agent"].tools = self._ctx["specialist_tools"]
             self._ctx["agent"].set_system_prompt(
-                self._ctx["plan_prompt"] + SPECIALIST_REACT_SYSTEM_PROMPT
+                # BASH_EXECUTOR_GUIDANCE抜きのベース（Directorはrun_bashを持たない）
+                self._ctx.get("specialist_base_prompt", "")
+                + SPECIALIST_REACT_SYSTEM_PROMPT
                 + load_saved_roles_section()
             )
             self._ctx["agent"].clear_history()

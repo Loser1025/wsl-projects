@@ -94,6 +94,9 @@ def _build_components(base_dir: str, active_config=None):
 
     plan_prompt  = (system_prompt or "") + BASH_EXECUTOR_GUIDANCE
     react_prompt = plan_prompt + REACT_SYSTEM_PROMPT
+    # Specialist Director用: run_bash前提のBASH_EXECUTOR_GUIDANCEを含めない
+    # （Directorはrun_bashを持たないため、言及すると幻覚呼び出し・矛盾指示になる）
+    specialist_base_prompt = (system_prompt or "")
     agent.set_system_prompt(react_prompt)
     interactive_orch = InteractiveOrchestrator(agent, auto_git)
 
@@ -169,6 +172,7 @@ def _build_components(base_dir: str, active_config=None):
         specialist_tools = specialist_tools,
         react_prompt     = react_prompt,
         plan_prompt      = plan_prompt,
+        specialist_base_prompt = specialist_base_prompt,
         sessions_dir     = sessions_dir,
         viewer_url       = _viewer_url,
     )
