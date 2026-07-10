@@ -252,7 +252,7 @@ class MimicApp(App):
 
     def on_mount(self) -> None:
         from .utils import set_tui_output, set_tui_mode, set_tui_stream, get_ascii_art_str
-        from .tools import set_write_approval_handler
+        from .tools import set_write_approval_handler, set_host_exec_approval_handler
         from .team import set_apply_approval_handler
 
         self._log = self.query_one("#chat-log", RichLog)
@@ -261,6 +261,7 @@ class MimicApp(App):
         set_tui_stream(self._stream_callback)
         set_write_approval_handler(self._make_approval_handler())
         set_apply_approval_handler(self._make_apply_approval_handler())
+        set_host_exec_approval_handler(self._make_host_exec_approval_handler())
 
         cfg = self._ctx["active_config"]
         cwd = self._ctx["agent"].cwd
@@ -870,6 +871,48 @@ class MimicApp(App):
 
             safe_print(C.green("  ✓ 適用します") if result[0]
                        else C.red("  ✗ 拒否しました（変更は破棄されます）"))
+            app.agent_status_text = "THINKING"
+            return result[0]
+
+        return handler
+
+    def _make_host_exec_approval_handler(self):
+        """run_host_command（ホスト直接実行）の承認ハンドラ。
+        書き込み承認と同じく Y/n・タイムアウト（_APPROVAL_TIMEOUT秒）で自動承認。"""
+        app = self
+
+        def handler(command: str, reason: str) -> bool:
+            from .utils import safe_print, C
+
+            app.agent_status_text = "WAIT_APPROVAL"
+            safe_print(C.red(f"\n  ┌─ ⚠ ホスト直接実行の承認 ─────────────────────────────"))
+            safe_print(C.yellow(f"  │  コマンド: {command[:200]}"))
+            safe_print(C.yellow(f"  │  理由    : {reason[:200]}"))
+            safe_print(C.gray(f"  │  ※ 隔離なしで実システムに影響します（デプロイ・インストール等）"))
+            safe_print(C.red(f"  └──────────────────────────────────────────────────────"))
+            safe_print(
+                C.bold_green(
+                    f"  実行しますか？ [Y/n] ({app._APPROVAL_TIMEOUT}秒で自動承認): "
+                ),
+                end="",
+            )
+
+            done   = threading.Event()
+            result = [True]
+
+            def on_response(resp: str) -> None:
+                result[0] = resp.strip().lower() in ("y", "")
+                done.set()
+
+            app.call_from_thread(app._enter_approval_mode, on_response)
+            timed_out = not done.wait(timeout=app._APPROVAL_TIMEOUT)
+            if timed_out:
+                safe_print(C.gray(f"\n  ⏱ {app._APPROVAL_TIMEOUT}秒経過 → 自動承認"))
+                result[0] = True
+                app.call_from_thread(app._exit_approval_mode)
+
+            safe_print(C.green("  ✓ 承認 — ホストで実行します") if result[0]
+                       else C.red("  ✗ 拒否しました"))
             app.agent_status_text = "THINKING"
             return result[0]
 

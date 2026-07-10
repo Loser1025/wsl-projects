@@ -38,7 +38,7 @@ _OFFLOAD_EXEMPT_RE = re.compile(
     r"ログイン|認証|サインイン|パスワード|ブラウザで開いて|この環境では実行できな"
 )
 _EXEC_CAPABLE_TOOLS = {
-    "run_bash", "run_pipeline",
+    "run_bash", "run_pipeline", "run_host_command",
     "delegate_to_specialist", "delegate_to_team", "delegate_to_worker",
     "delegate_to_team_parallel",
 }
@@ -226,7 +226,12 @@ BASH_EXECUTOR_GUIDANCE = """\
 - ファイル読み取りは read_file の offset で10000文字ずつ分割して読むこと。
 """
 
-REACT_SYSTEM_PROMPT = """
+# ReActプロンプトは部品から組み立てる:
+#   REACT_SYSTEM_PROMPT        … Director/interactive用（委任ガイダンス込み）
+#   WORKER_REACT_SYSTEM_PROMPT … Workerサブプロセス用（委任ツールへの言及を一切含まない。
+#                                Workerには委任ツールが存在しないため、存在を知らせると
+#                                弱いモデルが幻覚呼び出し・様子見停止を起こす）
+_REACT_PROMPT_CORE = """
 # 動作ルール
 
 ## 言語
@@ -271,6 +276,9 @@ REACT_SYSTEM_PROMPT = """
 - 依頼されていない改善・リファクタリングを自発的に行わない
 - 範囲外の問題を発見したら「メモ: ～も見つかりました」と一言添えてユーザーに委ねる
 
+"""
+
+_REACT_DELEGATION_GUIDANCE = """
 ## サブエージェントへの委任（delegate_to_team / delegate_to_team_parallel）
 **【積極委任モード】複雑・正確性が求められるタスクでは積極的にチームへの委任を試みること。**
 - **同期的**（呼び出すと完了まで待機し、戻り値として最終的な差分サマリを受け取る）
@@ -308,7 +316,9 @@ REACT_SYSTEM_PROMPT = """
 - 戻り値はユーザーへの回答としてそのまま（必要なら整形して）提示してよい。
 - 単発で1回 fetch_webpage すれば済む程度の軽い確認は、自分で web_search / fetch_webpage を
   使ってよい。
+"""
 
+_REACT_TOOLS_COMMON = """
 ## 利用可能なツール
 ### run_bash の結果の読み方
 - `[SUCCESS]` — 正常終了
@@ -324,7 +334,9 @@ read_file, read_tool_cache, write_file, edit_file, patch_file
 
 ### 探索
 get_repo_map, run_bash("ls / find ...")
+"""
 
+_REACT_TOOLS_DIRECTOR = """
 ### 委任（同期・Worker→Supervisorレビュー付き、OverlayFS隔離）
 delegate_to_team, delegate_to_team_parallel
 
@@ -334,6 +346,17 @@ delegate_to_worker
 ### 調べ物
 delegate_research（本格的な調べ物はこちら）, web_search, fetch_webpage（軽い確認用）
 """
+
+_REACT_TOOLS_WORKER = """
+### 調べ物
+web_search, fetch_webpage
+"""
+
+REACT_SYSTEM_PROMPT = (_REACT_PROMPT_CORE + _REACT_DELEGATION_GUIDANCE
+                        + _REACT_TOOLS_COMMON + _REACT_TOOLS_DIRECTOR)
+
+# Worker用: 委任ツール群への言及なし（Workerのレジストリにはそもそも存在しない）
+WORKER_REACT_SYSTEM_PROMPT = _REACT_PROMPT_CORE + _REACT_TOOLS_COMMON + _REACT_TOOLS_WORKER
 
 # delegate_to_team/delegate_to_worker の Worker（サブエージェント、MIMIC_NO_AUTOGIT=1で起動）に
 # のみ追加で付与するガイダンス。Directorには付与しない（毎ターンの追加往復を避けるため）。
@@ -366,6 +389,15 @@ delegate_to_specialist に委任すること。
 場合は、新しい delegate_to_specialist ではなく continue_specialist(task) を使うこと。**
 Workerは経緯を覚えているため、taskには新しく判明した情報だけを書けばよい。
 新しい種類の作業・別の専門性が必要なときだけ新規の delegate_to_specialist を使う。
+
+## run_host_command（ホスト直接実行 — ユーザー承認必須）
+Workerの隔離環境では原理的に不可能な操作**のみ**、run_host_command(command, reason) で
+実行できる。実行前に必ずユーザーの承認確認が入る（拒否されたら実行されない）。
+- 使う: システムパッケージのインストール（apt等）、ログイン状態が必要な操作
+  （vercel --prod / gh / git push 等のデプロイ・公開）、ユーザー環境の設定変更
+- 使わない: ファイル編集・テスト・ビルド・調査（→ 委任。承認不要で速い）
+- ユーザーに「このコマンドを実行してください」と依頼するのは禁止。代わりに
+  run_host_command で承認を求めること。reason には委任で代替できない理由を書く。
 
 ## delegate_to_specialist の使い方
 - `role`: 専門家ロールを日本語で記述する。**「視点」「制約」「完了基準」の3要素を必ず含めること**

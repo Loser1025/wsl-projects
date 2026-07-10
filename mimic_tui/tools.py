@@ -65,6 +65,17 @@ def clear_read_files_registry():
     """ターンの開始時に読み取り履歴をリセットする。"""
     _get_registry().clear()
 
+_host_exec_approval_handler = None  # fn(command, reason) -> bool
+
+
+def set_host_exec_approval_handler(handler) -> None:
+    """run_host_command の実行前承認ハンドラを登録する（TUI側から呼ぶ）。Noneで解除。
+
+    ハンドラ未登録（非対話実行・Workerサブプロセス）では run_host_command は常に拒否される。"""
+    global _host_exec_approval_handler
+    _host_exec_approval_handler = handler
+
+
 def _check_worker_write_boundary(path: str) -> str:
     """Worker（OverlayFS隔離サブプロセス）実行時、作業部屋の外への書き込みを拒否する。
 
@@ -1033,6 +1044,65 @@ def delegate_to_specialist(role: str, task: str,
         label=role[:15], verify_cmd=verify_cmd,
         expected_files=list(expected_files or []),
     )
+
+
+@tools.register(
+    name="run_host_command",
+    description=(
+        "【要ユーザー承認】ホスト環境で直接コマンドを実行する。実行前に必ずユーザーの"
+        "承認確認が入り、拒否されると実行されない（非対話実行では常に拒否）。"
+        "Workerの隔離環境では原理的に不可能な操作**のみ**に使うこと: "
+        "システムパッケージのインストール（apt等）、認証・ログイン状態が必要な操作"
+        "（vercel/gh/gcloud等のデプロイ・push）、ユーザー環境の設定変更。"
+        "通常のファイル操作・テスト・ビルドは delegate_to_specialist(can_execute/can_write) を使う"
+        "（承認不要で速い）。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "command": {
+                "type": "string",
+                "description": "実行するコマンド",
+            },
+            "reason": {
+                "type": "string",
+                "description": (
+                    "なぜWorkerへの委任ではなくホスト実行が必要かの説明"
+                    "（承認画面でユーザーに表示される。例: 'vercelのログイン状態が必要なため'）"
+                ),
+            },
+            "working_directory": {
+                "type": "string",
+                "description": "作業ディレクトリ（デフォルト: カレント）",
+                "default": "",
+            },
+            "timeout": {
+                "type": "integer",
+                "description": "タイムアウト秒数（デフォルト120）",
+                "default": 120,
+            },
+        },
+        "required": ["command", "reason"],
+    },
+)
+def run_host_command(command: str, reason: str,
+                      working_directory: str = "", timeout: int = 120) -> str:
+    if os.environ.get("MIMIC_NO_AUTOGIT"):
+        return ("エラー: run_host_command はWorker環境では使用できません。"
+                "必要な場合は最終回答でDirectorに依頼してください。")
+    if _host_exec_approval_handler is None:
+        return ("エラー: 承認ハンドラが未登録のため実行できません"
+                "（非対話モードではホスト実行は常に拒否されます）。")
+    try:
+        approved = _host_exec_approval_handler(command, reason)
+    except Exception as e:
+        return f"エラー: 承認処理に失敗しました: {e}"
+    if not approved:
+        return ("[実行拒否] ユーザーがホスト実行を承認しませんでした。\n"
+                "コマンドの内容・理由を見直して再提案するか、別の手段を検討してください。")
+    from .tools_linux import run_bash
+    return run_bash(command, timeout=timeout,
+                     working_directory=working_directory or None)
 
 
 @tools.register(

@@ -208,7 +208,9 @@ def main():
         from .autogit import AutoGit, NullAutoGit
         from .tools import tools as _base_tools
         from .monitoring import MonitoringToolRegistry, ToolCallLog
-        from .orchestrator import InteractiveOrchestrator, BASH_EXECUTOR_GUIDANCE, REACT_SYSTEM_PROMPT, WORKER_COMPLETION_GUIDANCE
+        from .orchestrator import (InteractiveOrchestrator, BASH_EXECUTOR_GUIDANCE,
+                                    REACT_SYSTEM_PROMPT, WORKER_REACT_SYSTEM_PROMPT,
+                                    WORKER_COMPLETION_GUIDANCE)
         from .main import auto_mode
         from .utils import set_log_sink, set_team_event_sink
 
@@ -241,6 +243,11 @@ def main():
                 "delegate_to_worker", "delegate_research",
                 # 動的ロール委任・継続委任もWorkerには与えない（孫Workerの無限増殖防止）
                 "delegate_to_specialist", "continue_specialist",
+                # ホスト実行はDirector専用（Worker内ではツール自体も実行を拒否する）
+                "run_host_command",
+                # Director用の委任検証ツール。Workerに与えると委任機構の存在が
+                # ツール名から漏れる（Workerには委任の存在自体を知らせない方針）
+                "get_delegation_trace",
             }
             _worker_registry = ToolRegistry()
             for _name in _base_tools._tools:
@@ -255,9 +262,12 @@ def main():
         agent     = OpenRouterAgent(rotator, mon_tools)
         role_prompt  = os.environ.get("MIMIC_ROLE_PROMPT", "")
         plan_prompt  = (role_prompt + "\n\n" if role_prompt else "") + (system_prompt or "") + BASH_EXECUTOR_GUIDANCE
-        react_prompt = plan_prompt + REACT_SYSTEM_PROMPT
         if os.environ.get("MIMIC_NO_AUTOGIT"):
-            react_prompt += WORKER_COMPLETION_GUIDANCE
+            # Worker: 委任ツールへの言及を含まないプロンプトを使う
+            # （Workerのレジストリに委任ツールは存在しない。存在を知らせない）
+            react_prompt = plan_prompt + WORKER_REACT_SYSTEM_PROMPT + WORKER_COMPLETION_GUIDANCE
+        else:
+            react_prompt = plan_prompt + REACT_SYSTEM_PROMPT
         agent.set_system_prompt(react_prompt)
         # サブエージェント（delegate_to_subagent）として起動された場合は Git に触れない
         auto_git = NullAutoGit() if os.environ.get("MIMIC_NO_AUTOGIT") else AutoGit()
