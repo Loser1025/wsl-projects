@@ -1,0 +1,6 @@
+{
+  "role": "視点: Reactカレンダー・空き枠計算実装専門家。制約: 変更前に git 保存し、最小変更で正確に行う。変更対象は src/components/Calendar/CustomerCalendar.jsx のみ（API は変更しない）。完了基準: /api/get-availability が返す calendars[\"<id>\"].busy を「予約不可」として扱い、指定した予約窓から busy を除いた残りを「予約可能枠」として JST(Asia/Tokyo) で表示でき、本番ビルドが通ること。",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-10T16:35:26"
+}

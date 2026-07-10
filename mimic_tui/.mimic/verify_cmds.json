@@ -1,7 +1,7 @@
 {
   "/home/loser/wsl-projects/mission-control-v2": {
     "cmd": "cd /home/loser/wsl-projects/mission-control-v2 && npm run build 2>&1 | tail -20",
-    "passes": 1,
-    "last_used": "2026-07-10T16:09:02"
+    "passes": 2,
+    "last_used": "2026-07-10T16:35:26"
   }
 }
