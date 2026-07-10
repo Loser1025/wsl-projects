@@ -6,9 +6,16 @@ const CustomerCalendar = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    const now = new Date();
+    const body = {
+      calendarId1: 'drib189@gmail.com',
+      timeMin: now.toISOString(),
+      timeMax: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+    };
     fetch('/api/get-availability', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     })
       .then(async (res) => {
         let bodyText = '';
@@ -44,7 +51,15 @@ const CustomerCalendar = () => {
         return data;
       })
       .then((data) => {
-        setSlots(data.slots || []);
+        // data.calendars の構造: { "<calendarId>": { busy: [{start, end}] } }
+        const calendars = data.calendars || {};
+        const busySlots = Object.keys(calendars).reduce((acc, id) => {
+          const busy = calendars[id] && Array.isArray(calendars[id].busy)
+            ? calendars[id].busy
+            : [];
+          return acc.concat(busy.map((b) => ({ start: b.start, end: b.end })));
+        }, []);
+        setSlots(busySlots);
         setLoading(false);
       })
       .catch((err) => {

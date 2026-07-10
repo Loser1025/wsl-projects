@@ -1,0 +1,6 @@
+{
+  "role": "視点: Vercelサーバーレス関数(API)・Reactフロント連携修正専門家。制約: 変更前に git 保存し、最小変更で正確に行う。完了基準: 本番 /api/get-availability が calendarId1=drib189@gmail.com で freeBusy を呼び出し、フロントが取得した空き予定を描画できること（500 が出ず、定義済みカレンダーの busy 情報が返ること）。",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-10T16:09:02"
+}
