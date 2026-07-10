@@ -1,0 +1,6 @@
+{
+  "role": "視点: フロントエンドカレンダー描画バグ診断専門家。制約: コードの変更は一切行わない(読み取り専用)。完了基準: 現在の src/components/Calendar/CustomerCalendar.jsx において、useEffect 内の fetch 成功後に setSlots に何が渡されているか、generateAllSlots() で作ったスロットと API の busy をどう合成（予約可能/予約不可の判定）しているか、そしてなぜブラウザで「予約可能枠」の見出ししか表示されず <li> リストが空になるのかが file:line 付きで特定されていること。",
+  "uses": 1,
+  "mode": "read",
+  "last_used": "2026-07-10T16:43:38"
+}

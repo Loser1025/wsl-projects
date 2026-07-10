@@ -99,15 +99,27 @@ const CustomerCalendar = () => {
         return data;
       })
       .then((data) => {
-        // data.calendars の構造: { "<calendarId>": { busy: [{start, end}] } }
-        const calendars = data.calendars || {};
-        const busySlots = Object.keys(calendars).reduce((acc, id) => {
+        // 本番APIはトップレベルにカレンダーIDを置いて返す: { "<calendarId>": { busy: [{start, end}] } }
+        const calendars = data || {};
+        // API から得た busy 区間リストを収集
+        const busyIntervals = Object.keys(calendars).reduce((acc, id) => {
           const busy = calendars[id] && Array.isArray(calendars[id].busy)
             ? calendars[id].busy
             : [];
           return acc.concat(busy.map((b) => ({ start: b.start, end: b.end })));
         }, []);
-        setSlots(busySlots);
+        // allSlots と busy 区間を重なり判定で合成し、{start, end, busy} の配列を作る
+        const merged = allSlots.map((slot) => {
+          const slotStart = slot.start.getTime();
+          const slotEnd = slot.end.getTime();
+          const isBusy = busyIntervals.some((b) => {
+            const busyStart = new Date(b.start).getTime();
+            const busyEnd = new Date(b.end).getTime();
+            return slotStart < busyEnd && slotEnd > busyStart;
+          });
+          return { start: slot.start, end: slot.end, busy: isBusy };
+        });
+        setSlots(merged);
         setLoading(false);
       })
       .catch((err) => {
@@ -155,11 +167,26 @@ const CustomerCalendar = () => {
     <div className="calendar-container">
       <h2>予約可能枠</h2>
       <ul>
-        {slots.map((slot, index) => (
-          <li key={index} onClick={() => handleBooking(slot)} style={{ cursor: 'pointer', margin: '10px', padding: '5px', border: '1px solid #ccc' }}>
-            {slot.start} - {slot.end}
-          </li>
-        ))}
+        {slots.map((slot, index) => {
+          const jsx = (
+            <li
+              key={index}
+              onClick={slot.busy ? undefined : () => handleBooking(slot)}
+              style={{
+                margin: '10px',
+                padding: '5px',
+                border: '1px solid #ccc',
+                cursor: slot.busy ? 'default' : 'pointer',
+                backgroundColor: slot.busy ? '#e0e0e0' : '#e6ffe6',
+                color: slot.busy ? '#888' : '#000',
+                listStyle: 'none',
+              }}
+            >
+              {formatJstDateTime(slot.start)} - {formatJstDateTime(slot.end)}
+            </li>
+          );
+          return jsx;
+        })}
       </ul>
     </div>
   );
