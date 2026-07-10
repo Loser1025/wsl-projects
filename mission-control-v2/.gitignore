@@ -2,3 +2,4 @@
 .env.local
 dist/
 sa_credentials.json
+.env*
