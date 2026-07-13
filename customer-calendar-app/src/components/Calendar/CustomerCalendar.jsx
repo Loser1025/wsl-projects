@@ -188,7 +188,11 @@ const CustomerCalendar = ({
     fetch('/api/create-booking', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slot }),
+      body: JSON.stringify({
+        calendarId: 'drib189@gmail.com',
+        start: slot.start,
+        end: slot.end,
+      }),
     })
       .then(res => res.json())
       .then(data => {
