@@ -22,11 +22,29 @@ async function createBookingHandler(req, res) {
     return res.status(400).json({ error: 'Missing required booking fields: calendarId, start, end' });
   }
 
+  // Idempotency key from header (optional but recommended)
+  const idempotencyKey = req.headers['idempotency-key'] || req.headers['Idempotency-Key'];
+
   try {
     // Initialize Firebase Admin with robust guard
     initFirebaseAdmin(serviceAccount);
 
     const db = admin.firestore();
+
+    // If idempotency key provided, check for existing booking with that key
+    if (idempotencyKey) {
+      const idempotencyRef = db.collection('idempotency_keys').doc(idempotencyKey);
+      const idempotencySnap = await idempotencyRef.get();
+      
+      if (idempotencySnap.exists) {
+        // Return the existing booking ID
+        const existingData = idempotencySnap.data();
+        return res.status(200).json({ 
+          id: existingData.bookingId,
+          idempotent: true 
+        });
+      }
+    }
 
     // Use a transaction to prevent double-booking of the same time slot
     const docRef = await db.runTransaction(async (transaction) => {
@@ -55,10 +73,19 @@ async function createBookingHandler(req, res) {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      // If idempotency key provided, also store it in the same transaction
+      if (idempotencyKey) {
+        const idempotencyRef = db.collection('idempotency_keys').doc(idempotencyKey);
+        transaction.set(idempotencyRef, {
+          bookingId: newDocRef.id,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
       return newDocRef;
     });
 
-    res.status(200).json({ id: docRef.id });
+    res.status(200).json({ id: docRef.id, idempotent: false });
   } catch (error) {
     if (error.code === 'ALREADY_BOOKED' || error.statusCode === 409) {
       return res.status(409).json({ error: 'Time slot already booked' });

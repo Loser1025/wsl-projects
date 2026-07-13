@@ -16,19 +16,31 @@
 </head>
 <body>
 <div id="calendar-container"></div>
+
+<!-- React UMD globals loaded via script tags -->
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+<!-- Bundled CustomerCalendar component (depends on window.React, window.ReactDOM) -->
 <script src="/dist/CustomerCalendar.js"></script>
+
 <script>
   (function () {
     var container = document.getElementById('calendar-container');
+    var mounted = false;
 
     function mount() {
+      if (mounted) return true;
+      
+      // Check if all required globals are available
       if (!window.CustomerCalendar || typeof window.React === 'undefined' || typeof window.ReactDOM === 'undefined') {
         return false;
       }
+      
       try {
-        window.ReactDOM.render(window.React.createElement(window.CustomerCalendar), container);
+        var root = window.ReactDOM.createRoot(container);
+        root.render(window.React.createElement(window.CustomerCalendar));
+        mounted = true;
         return true;
       } catch (e) {
         console.error('CustomerCalendar mount failed:', e);
@@ -36,7 +48,27 @@
       }
     }
 
-    var deadline = Date.now() + 4000;
+    // Try mounting immediately in case scripts already loaded
+    if (mount()) {
+      return;
+    }
+
+    // Wait for all scripts to load using load event on the last script
+    var calendarScript = document.querySelector('script[src="/dist/CustomerCalendar.js"]');
+    if (calendarScript && calendarScript.readyState === 'loading') {
+      calendarScript.addEventListener('load', mount);
+    } else if (calendarScript) {
+      // Already loaded, try again
+      mount();
+    }
+
+    // Fallback: retry on window load
+    window.addEventListener('load', function () {
+      if (!mounted) mount();
+    });
+
+    // Final fallback: timeout-based retry (for slow CDN)
+    var deadline = Date.now() + 8000;
     var timer = setInterval(function () {
       if (mount()) {
         clearInterval(timer);
@@ -44,10 +76,12 @@
       }
       if (Date.now() > deadline) {
         clearInterval(timer);
+        if (!mounted) {
+          console.error('CustomerCalendar mount timeout: React/ReactDOM/CustomerCalendar not available');
+          container.innerHTML = '<div style="padding:20px;color:#d32f2f;">カレンダーの読み込みに失敗しました。ページを再読み込みしてください。</div>';
+        }
       }
-    }, 50);
-
-    window.addEventListener('load', mount);
+    }, 100);
   })();
 </script>
 </body>

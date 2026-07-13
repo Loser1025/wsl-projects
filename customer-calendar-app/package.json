@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "Standalone customer calendar app extracted from mission-control-v2",
   "scripts": {
-    "build": "esbuild src/components/Calendar/CustomerCalendar.jsx --bundle --format=iife --jsx=automatic --alias:react=./src/components/Calendar/react-shim.js --alias:react/jsx-runtime=./src/components/Calendar/react-shim.js --outfile=dist/CustomerCalendar.js --log-level=warning"
+    "build": "esbuild src/components/Calendar/CustomerCalendar.jsx --bundle --format=iife --jsx=automatic --alias:react=./src/components/Calendar/react-shim.js --alias:react/jsx-runtime=./src/components/Calendar/react-shim.js --outfile=dist/CustomerCalendar.js --log-level=warning --minify",
+    "build:dev": "esbuild src/components/Calendar/CustomerCalendar.jsx --bundle --format=iife --jsx=automatic --alias:react=./src/components/Calendar/react-shim.js --alias:react/jsx-runtime=./src/components/Calendar/react-shim.js --outfile=dist/CustomerCalendar.js --log-level=warning --sourcemap"
   },
   "keywords": [],
   "author": "",
