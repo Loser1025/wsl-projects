@@ -4,6 +4,7 @@
  */
 
 const admin = require('firebase-admin');
+const { credential } = admin;
 
 /**
  * Validates required environment variables
@@ -139,8 +140,11 @@ function initFirebaseAdmin(serviceAccount) {
       const existingApp = admin.apps[0];
       const existingCred = existingApp.options.credential;
       
-      // Compare credentials - check client_email as unique identifier
-      if (existingCred && existingCred.client_email === serviceAccount.client_email) {
+      // Get client_email from the existing credential
+      const existingClientEmail = existingCred?.client_email || existingCred?._client_email;
+      const newClientEmail = serviceAccount?.client_email;
+      
+      if (existingClientEmail && newClientEmail && existingClientEmail === newClientEmail) {
         return existingApp;
       }
       
@@ -148,6 +152,7 @@ function initFirebaseAdmin(serviceAccount) {
       console.warn('Firebase Admin already initialized with different credentials, re-initializing');
     }
     
+    // Initialize with the service account credentials
     return admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
@@ -170,7 +175,7 @@ function createApiHandler(handler) {
     // Set CORS headers for all responses
     setCorsHeaders(res);
     
-    // Handle OPTIONS preflight
+    // Handle OPTIONS preflight request
     if (handleOptions(req, res)) {
       return;
     }
