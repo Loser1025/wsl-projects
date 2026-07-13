@@ -2,3 +2,4 @@ node_modules/
 dist/
 sa_credentials.json
 .vercel
+.env*

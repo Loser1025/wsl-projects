@@ -4,7 +4,6 @@
  */
 
 const admin = require('firebase-admin');
-const { credential } = admin;
 
 /**
  * Validates required environment variables
@@ -135,10 +134,18 @@ function validateFreeBusyResponse(calendars) {
  */
 function initFirebaseAdmin(serviceAccount) {
   try {
-    // Check if already initialized with same credentials
-    if (admin.apps.length > 0) {
+    // Check if already initialized - use try-catch for safety
+    let isInitialized = false;
+    try {
+      const apps = admin.apps;
+      isInitialized = Array.isArray(apps) && apps.length > 0;
+    } catch (e) {
+      // admin.apps might not be available
+    }
+    
+    if (isInitialized) {
       const existingApp = admin.apps[0];
-      const existingCred = existingApp.options.credential;
+      const existingCred = existingApp?.options?.credential;
       
       // Get client_email from the existing credential
       const existingClientEmail = existingCred?.client_email || existingCred?._client_email;
@@ -153,8 +160,14 @@ function initFirebaseAdmin(serviceAccount) {
     }
     
     // Initialize with the service account credentials
+    // firebase-admin v14+ requires admin.credential.cert
+    const cert = admin.credential?.cert;
+    if (!cert) {
+      throw new Error('admin.credential.cert is not available');
+    }
+    
     return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+      credential: cert(serviceAccount),
     });
   } catch (error) {
     // If already initialized error, try to get existing app
