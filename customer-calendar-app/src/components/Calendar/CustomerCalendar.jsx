@@ -97,6 +97,7 @@ const CustomerCalendar = ({
       : new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
     const body = {
       calendarId1: 'drib189@gmail.com',
+      calendarId2: 'murayama@conscience-co.jp',
       timeMin,
       timeMax,
     };

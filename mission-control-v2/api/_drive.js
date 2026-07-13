@@ -1,43 +1,44 @@
 const { google } = require('googleapis');
 
-const SCOPES = ['https://www.googleapis.com/auth/drive'];
-
-function loadCredentials() {
-  const raw = process.env.SERVICE_ACCOUNT_JSON;
-  if (!raw) throw new Error('Missing SERVICE_ACCOUNT_JSON env var');
-  return JSON.parse(raw);
-}
-
 function getRootFolderId() {
   const id = process.env.DRIVE_ROOT_FOLDER_ID;
   if (!id) throw new Error('Missing DRIVE_ROOT_FOLDER_ID env var');
   return id;
 }
 
-function getAuth() {
-  const credentials = loadCredentials();
-  return new google.auth.GoogleAuth({ credentials, scopes: SCOPES });
+// Extracts the signed-in user's Google access token forwarded by the client
+// as `Authorization: Bearer <token>`. All Drive calls run as this user, so
+// they only ever see/touch what their own Google account has access to.
+function getBearerToken(req) {
+  const header = req.headers['authorization'] || req.headers['Authorization'];
+  if (!header || !header.startsWith('Bearer ')) return null;
+  return header.slice(7).trim() || null;
 }
 
-function getDriveClient() {
-  return google.drive({ version: 'v3', auth: getAuth() });
-}
-
-async function getAccessToken() {
-  const client = await getAuth().getClient();
-  const { token } = await client.getAccessToken();
+function requireBearerToken(req) {
+  const token = getBearerToken(req);
+  if (!token) {
+    const err = new Error('Not authenticated');
+    err.statusCode = 401;
+    throw err;
+  }
   return token;
 }
 
+function getDriveClient(token) {
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: token });
+  return google.drive({ version: 'v3', auth });
+}
+
 // Walks the parents chain from fileId up to the root folder, confirming
-// the file lives inside DRIVE_ROOT_FOLDER_ID. Prevents the service account
-// (which may have access to other files) from being used to touch anything
-// outside the shared folder.
-async function isUnderRoot(fileId) {
+// the file lives inside DRIVE_ROOT_FOLDER_ID. Prevents the signed-in user
+// from using this app to touch anything outside the shared folder.
+async function isUnderRoot(fileId, token) {
   const rootId = getRootFolderId();
   if (fileId === rootId) return true;
 
-  const drive = getDriveClient();
+  const drive = getDriveClient(token);
   let currentId = fileId;
   const seen = new Set();
 
@@ -64,4 +65,4 @@ async function isUnderRoot(fileId) {
   return false;
 }
 
-module.exports = { getDriveClient, getAccessToken, getRootFolderId, isUnderRoot };
+module.exports = { getDriveClient, getBearerToken, requireBearerToken, getRootFolderId, isUnderRoot };

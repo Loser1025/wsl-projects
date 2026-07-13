@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FULCRUM — 事業部タスクシステム</title>
 <script src="./support.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
 <script>
@@ -58,10 +59,28 @@
     .mc-urg-row{flex-wrap:wrap !important;gap:8px !important;}
     button,select{min-height:44px !important;}
     input[type=text]{min-height:40px !important;}
+    .mc-sidebar{width:84vw !important;max-width:300px !important;}
   }
 </style>
 </helmet>
 <div style="background:#FFFFFF; min-height:100vh; color:#0a0a0a; font-family:'Noto Sans JP','Inter',sans-serif; padding-bottom:96px; color-scheme:light;">
+
+  <!-- SIGN-IN SCREEN -->
+  <sc-if value="{{ notAuthed }}">
+    <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px;">
+      <div style="font-family:'Bebas Neue',sans-serif; font-size:40px; letter-spacing:0.18em; color:#000000; margin-bottom:8px;">FULCRUM</div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.16em; color:#aaaaaa; text-transform:uppercase; margin-bottom:40px;">{{ subtitle }}</div>
+      <button onClick="{{ onGoogleSignIn }}" style="display:flex; align-items:center; gap:10px; background:#000000; border:none; border-radius:0; color:#ffffff; font-size:13px; font-weight:600; letter-spacing:0.02em; padding:13px 24px; cursor:pointer; font-family:inherit;">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#ffffff" d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.2-7.27 3.09 0 4.9 1.97 4.9 1.97L19 4.72S16.56 2 12.1 2C6.42 2 2.03 6.8 2.03 12c0 5.05 4.13 10 10.22 10 5.35 0 9.25-3.67 9.25-9.09 0-1.15-.15-1.81-.15-1.81Z"/></svg>
+        Googleでログイン
+      </button>
+      <sc-if value="{{ authError }}">
+        <div style="margin-top:18px; font-size:12px; color:#c0392b; text-align:center; max-width:320px;">{{ authError }}</div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ authed }}" hint-placeholder-val="{{ true }}">
 
   <!-- LOADING OVERLAY -->
   <sc-if value="{{ isLoading }}">
@@ -78,6 +97,11 @@
   <!-- MASTHEAD -->
   <div style="border-bottom:2px solid #000000; background:#ffffff; position:sticky; top:0; z-index:100;">
     <div class="mc-mast-inner" style="{{ mastheadInnerStyle }}">
+
+      <!-- Sidebar toggle -->
+      <button onClick="{{ onSidebarToggle }}" aria-label="サイドバーを開閉" style="background:transparent; border:none; padding:6px; margin-right:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
 
       <!-- Brand -->
       <div style="display:flex; align-items:center; flex-shrink:0;">
@@ -108,20 +132,106 @@
           設定
         </button>
 
+        <button onClick="{{ onSignOut }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:2px; color:#6a6a6a; font-size:10px; letter-spacing:0.1em; padding:6px 14px; cursor:pointer; font-family:'IBM Plex Mono',monospace; white-space:nowrap; flex-shrink:0;">ログアウト</button>
+
       </div>
     </div>
   </div>
 
-  <!-- VIEW TABS -->
-  <div style="background:#ffffff; border-bottom:1px solid #ececec;">
-    <div style="max-width:1180px; margin:0 auto; padding:0 32px; display:flex;">
-      <button onClick="{{ onViewTasks }}" style="{{ viewTasksTabStyle }}">事業部タスク</button>
-      <button onClick="{{ onViewCustomers }}" style="{{ viewCustomersTabStyle }}">顧客管理</button>
-      <button onClick="{{ onViewDrive }}" style="{{ viewDriveTabStyle }}">ドライブ</button>
-    </div>
-  </div>
+  <div class="mc-shell" style="display:flex; align-items:flex-start;">
 
-  <div class="mc-wrap" style="max-width:1180px; margin:0 auto; padding:0 32px;">
+    <!-- SIDEBAR -->
+    <sc-if value="{{ sidebarOpen }}">
+    <div onClick="{{ onSidebarClose }}" style="position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:149;"></div>
+    <div class="mc-sidebar" style="width:236px; flex-shrink:0; border-right:1px solid #ececec; position:fixed; top:0; left:0; height:100vh; overflow-y:auto; padding:22px 18px; background:#ffffff; z-index:150; box-shadow:4px 0 24px rgba(0,0,0,0.12);">
+
+      <div style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-bottom:10px;">SECTIONS</div>
+      <div style="margin-bottom:22px;">
+        <sc-if value="{{ hasSidebarSections }}" hint-placeholder-val="{{ true }}">
+          <div style="position:relative;">
+            <select value="{{ sidebarSelectedSectionId }}" onChange="{{ onSidebarSectionSelectChange }}" style="{{ sidebarSectionSelectStyle }}">
+              <sc-for list="{{ sidebarSectionOptions }}" as="opt" hint-placeholder-count="4">
+                <option value="{{ opt.id }}" style="{{ opt.optionStyle }}">{{ opt.name }}</option>
+              </sc-for>
+            </select>
+            <span style="{{ sidebarSelectChevronStyle }}">▾</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noSidebarSections }}">
+          <div style="font-size:11px; color:#c4c4c4; padding:8px 0;">セクションがありません</div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ hasSidebarSection }}" hint-placeholder-val="{{ true }}">
+        <div style="border-top:1px solid #ececec; padding-top:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+            <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8;">TASKS</span>
+            <span style="font-size:10px; color:#b8b8b8;">{{ sidebarTaskCountLabel }}</span>
+          </div>
+          <div style="margin-bottom:18px;">
+            <sc-if value="{{ hasSidebarTasks }}" hint-placeholder-val="{{ true }}">
+              <sc-for list="{{ sidebarTaskRows }}" as="t" hint-placeholder-count="3">
+                <div style="display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #f4f4f4;">
+                  <span style="{{ t.dotStyle }}"></span>
+                  <span style="flex:1; min-width:0; font-size:12px; color:#0a0a0a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ t.title }}</span>
+                </div>
+              </sc-for>
+            </sc-if>
+            <sc-if value="{{ noSidebarTasks }}">
+              <div style="font-size:11px; color:#c4c4c4; padding:6px 0;">タスクはありません</div>
+            </sc-if>
+          </div>
+
+          <div style="border-top:1px solid #ececec; padding-top:16px;">
+            <div style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-bottom:10px;">DRIVE</div>
+            <sc-if value="{{ hasSidebarDriveFolder }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ onSidebarDriveToggle }}" style="width:100%; text-align:left; background:transparent; border:1px solid #e0e0e0; color:#5a5a5a; font-size:11px; padding:8px 10px; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:8px;">
+                <span>📁</span>
+                <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ sidebarDriveFolderName }}</span>
+              </button>
+              <sc-if value="{{ sidebarDriveOpen }}">
+                <div style="margin-top:8px;">
+                  <sc-if value="{{ sidebarDriveLoading }}">
+                    <div style="font-size:11px; color:#b8b8b8; padding:6px 0;">読み込み中…</div>
+                  </sc-if>
+                  <sc-if value="{{ sidebarDriveError }}">
+                    <div style="font-size:11px; color:#c0392b; padding:6px 0;">{{ sidebarDriveError }}</div>
+                  </sc-if>
+                  <sc-for list="{{ sidebarDriveRows }}" as="f" hint-placeholder-count="3">
+                    <div onClick="{{ f.onOpen }}" style="display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer;">
+                      <span style="font-size:13px;">{{ f.icon }}</span>
+                      <span style="flex:1; min-width:0; font-size:11px; color:#0a0a0a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ f.name }}</span>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ noSidebarDriveFiles }}">
+                    <div style="font-size:11px; color:#c4c4c4; padding:6px 0;">ファイルがありません</div>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </sc-if>
+            <sc-if value="{{ noSidebarDriveFolder }}">
+              <div style="font-size:11px; color:#c4c4c4; line-height:1.6;">ドライブが未設定です<br>設定 &gt; セクション管理 から設定できます</div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+    </sc-if>
+
+    <!-- MAIN COLUMN -->
+    <div style="flex:1; min-width:0;">
+
+    <!-- VIEW TABS -->
+    <div style="background:#ffffff; border-bottom:1px solid #ececec;">
+      <div style="max-width:1180px; margin:0 auto; padding:0 32px; display:flex;">
+        <button onClick="{{ onViewTasks }}" style="{{ viewTasksTabStyle }}">事業部タスク</button>
+        <button onClick="{{ onViewCustomers }}" style="{{ viewCustomersTabStyle }}">顧客管理</button>
+        <button onClick="{{ onViewDrive }}" style="{{ viewDriveTabStyle }}">ドライブ</button>
+      </div>
+    </div>
+
+    <div class="mc-wrap" style="max-width:1180px; margin:0 auto; padding:0 32px;">
 
   <sc-if value="{{ isViewTasks }}" hint-placeholder-val="{{ true }}">
 
@@ -653,7 +763,49 @@
     </div>
   </sc-if>
 
+  <!-- SECTION DRIVE-FOLDER PICKER MODAL -->
+  <sc-if value="{{ sectionFolderPickerOpen }}">
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:300; padding:24px;">
+      <div style="background:#FFFFFF; border:none; border-radius:0; width:100%; max-width:480px; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 24px 60px rgba(0,0,0,0.28);">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:2px solid #000000;">
+          <div style="font-size:14px; font-weight:700; letter-spacing:-0.01em; color:#000000;">割り当てるフォルダを選択</div>
+          <button onClick="{{ onSectionFolderPickerCancel }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:0; color:#8a8a8a; font-size:13px; width:28px; height:28px; cursor:pointer;">✕</button>
+        </div>
+        <div style="padding:14px 24px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; border-bottom:1px solid #ececec;">
+          <sc-for list="{{ sectionFolderPickerBreadcrumb }}" as="b" hint-placeholder-count="1">
+            <button onClick="{{ b.onClick }}" style="{{ b.style }}">{{ b.label }}</button>
+            <span style="{{ b.sepStyle }}">/</span>
+          </sc-for>
+        </div>
+        <div style="overflow-y:auto; flex:1; min-height:120px;">
+          <sc-if value="{{ sectionFolderPickerLoading }}">
+            <div style="padding:32px 24px; font-size:11px; color:#b8b8b8;">読み込み中…</div>
+          </sc-if>
+          <sc-if value="{{ hasSectionFolderPickerFolders }}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{ sectionFolderPickerRows }}" as="p" hint-placeholder-count="4">
+              <div onClick="{{ p.onOpen }}" style="display:flex; align-items:center; gap:12px; padding:12px 24px; border-top:1px solid #f4f4f4; cursor:pointer;">
+                <span style="font-size:16px;">📁</span>
+                <span style="font-size:12px; color:#0a0a0a;">{{ p.name }}</span>
+              </div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ noSectionFolderPickerFolders }}">
+            <div style="padding:32px 24px; font-size:11px; color:#b8b8b8;">サブフォルダはありません</div>
+          </sc-if>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; padding:16px 24px; border-top:1px solid #ececec;">
+          <button onClick="{{ onSectionFolderPickerCancel }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:12px; padding:9px 16px; cursor:pointer; font-family:inherit;">キャンセル</button>
+          <button onClick="{{ onSectionFolderPickerConfirm }}" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:12px; font-weight:600; letter-spacing:0.02em; padding:9px 18px; cursor:pointer;">「{{ sectionFolderPickerFolderName }}」を割り当てる</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
   </div>
+
+    </div><!-- /MAIN COLUMN -->
+
+  </div><!-- /mc-shell -->
 
   <!-- TASK ADD MODAL -->
   <sc-if value="{{ modalOpen }}">
@@ -982,6 +1134,17 @@
                 <input type="text" value="{{ sectionDraft.leader }}" onChange="{{ onSectionDraftLeader }}" placeholder="例: 田中 花子" style="width:100%; background:#ffffff; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
               </div>
 
+              <div style="margin-bottom:24px;">
+                <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">割り当てドライブ（サイドバーに表示）</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div style="flex:1; min-width:0; background:#fafafa; border:1px solid #d8d8d8; padding:10px 11px; font-size:12px; color:{{ sectionDraft.driveFolderId ? '#0a0a0a' : '#b8b8b8' }}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ sectionDraftFolderLabel }}</div>
+                  <button type="button" onClick="{{ onSectionFolderPickerButtonClick }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.02em; padding:10px 14px; cursor:pointer; white-space:nowrap; font-family:inherit;">フォルダを選択</button>
+                  <sc-if value="{{ sectionDraft.driveFolderId }}">
+                    <button type="button" onClick="{{ onSectionFolderClear }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:0; color:#b8b8b8; font-size:12px; width:34px; height:34px; flex-shrink:0; cursor:pointer;" title="割り当てを解除">✕</button>
+                  </sc-if>
+                </div>
+              </div>
+
               <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #ececec; padding-top:20px;">
                 <button onClick="{{ onSectionFormCancel }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.04em; padding:10px 18px; cursor:pointer; font-family:inherit;">キャンセル</button>
                 <button onClick="{{ onSectionFormSave }}" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:10px 22px; cursor:pointer; font-family:inherit;">{{ sectionFormSaveLabel }}</button>
@@ -1052,6 +1215,8 @@
     </div>
   </sc-if>
 
+  </sc-if><!-- /authed -->
+
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script>
@@ -1065,12 +1230,18 @@ class Component extends DCLogic {
     sortBy: 'default',
     scrolled: false,
     loading: !!window._db,
+
+    // Auth (Google OAuth via Google Identity Services, session-only)
+    authToken: null,
+    authTokenExpiry: 0,
+    authError: null,
+    googleClientId: null,
     modalOpen: false,
     draft: { title:'', goal:'', na:'', section: this.loadSections()[0]?.id || 'dev', priority:'medium', dueDate: this.nextWeek(), status:'todo' },
     settingsOpen: false,
     settingsTab: 'sections',
     sectionForm: null,
-    sectionDraft: { code:'', name:'', leader:'', color:'#0E9E96' },
+    sectionDraft: { code:'', name:'', leader:'', color:'#0E9E96', driveFolderId:null, driveFolderName:'' },
     subtitle: this.loadSubtitle(),
 
     customers: this.loadCustomers(),
@@ -1095,6 +1266,22 @@ class Component extends DCLogic {
     driveMovePickerStack: [],
     driveMovePickerFolders: [],
     driveMovePickerLoading: false,
+
+    // Sidebar (section nav / tasks / assigned drive)
+    sidebarOpen: false,
+    sidebarSelectedSectionId: null,
+    sidebarDriveOpen: false,
+    sidebarDriveFiles: [],
+    sidebarDriveLoading: false,
+    sidebarDriveError: null,
+
+    // Section drive-folder picker (used from settings > section form)
+    sectionFolderPickerOpen: false,
+    sectionFolderPickerFolderId: null,
+    sectionFolderPickerFolderName: 'ドライブ',
+    sectionFolderPickerStack: [],
+    sectionFolderPickerFolders: [],
+    sectionFolderPickerLoading: false,
 
     custStatusFilters: [],
     custSortBy: 'default',
@@ -1137,10 +1324,10 @@ class Component extends DCLogic {
 
   get INITIAL_SECTIONS(){
     return [
-      { id:'dev',      code:'SEC-01', name:'システム開発部',   leader:'山田 太郎', color:'#0E9E96' },
-      { id:'mktg',     code:'SEC-02', name:'マーケティング部', leader:'佐藤 美咲', color:'#3B7DD8' },
-      { id:'sales',    code:'SEC-03', name:'営業第一チーム',   leader:'高橋 健二', color:'#8B5FD6' },
-      { id:'planning', code:'SEC-04', name:'事業企画部',       leader:'鈴木 雅也', color:'#D45D8E' }
+      { id:'dev',      code:'SEC-01', name:'システム開発部',   leader:'山田 太郎', color:'#0E9E96', driveFolderId:null, driveFolderName:'' },
+      { id:'mktg',     code:'SEC-02', name:'マーケティング部', leader:'佐藤 美咲', color:'#3B7DD8', driveFolderId:null, driveFolderName:'' },
+      { id:'sales',    code:'SEC-03', name:'営業第一チーム',   leader:'高橋 健二', color:'#8B5FD6', driveFolderId:null, driveFolderName:'' },
+      { id:'planning', code:'SEC-04', name:'事業企画部',       leader:'鈴木 雅也', color:'#D45D8E', driveFolderId:null, driveFolderName:'' }
     ];
   }
 
@@ -1214,12 +1401,88 @@ class Component extends DCLogic {
   }
 
   // ---- DRIVE ----
+  // ---- AUTH ----
+  driveFetch(url, options){
+    const headers = Object.assign({}, (options && options.headers) || {}, { Authorization: 'Bearer ' + this.state.authToken });
+    return fetch(url, Object.assign({}, options, { headers }));
+  }
+  async handleAuthExpired(res, data){
+    if (res.status === 401) {
+      try { sessionStorage.removeItem('fulcrum_auth'); } catch(e){}
+      this.setState({ authToken: null, authTokenExpiry: 0, authError: 'セッションの有効期限が切れました。再度ログインしてください。' });
+      return true;
+    }
+    return false;
+  }
+  restoreAuthSession(){
+    try {
+      const raw = sessionStorage.getItem('fulcrum_auth');
+      if (!raw) return;
+      const { token, expiry } = JSON.parse(raw);
+      if (token && expiry && Date.now() < expiry) {
+        this.setState({ authToken: token, authTokenExpiry: expiry });
+        this.loadDriveFiles(null);
+      } else {
+        sessionStorage.removeItem('fulcrum_auth');
+      }
+    } catch(e){}
+  }
+  async loadGoogleClientId(){
+    try {
+      const res = await fetch('/api/config');
+      const data = await res.json();
+      this.setState({ googleClientId: data.googleClientId || null });
+      if (data.googleClientId) this.initGoogleTokenClient(data.googleClientId);
+      else this.setState({ authError: 'GOOGLE_CLIENT_ID が未設定です。Vercelの環境変数を確認してください。' });
+    } catch(e){
+      this.setState({ authError: '認証設定の取得に失敗しました。' });
+    }
+  }
+  initGoogleTokenClient(clientId){
+    if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+      setTimeout(() => this.initGoogleTokenClient(clientId), 300);
+      return;
+    }
+    this._tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/drive',
+      callback: (resp) => this.handleTokenResponse(resp),
+    });
+  }
+  onGoogleSignIn(){
+    this.setState({ authError: null });
+    if (!this._tokenClient) {
+      this.setState({ authError: 'Google認証の準備中です。数秒後に再度お試しください。' });
+      return;
+    }
+    this._tokenClient.requestAccessToken();
+  }
+  handleTokenResponse(resp){
+    if (!resp || resp.error) {
+      this.setState({ authError: '認証に失敗しました: ' + (resp && resp.error ? resp.error : '不明なエラー') });
+      return;
+    }
+    const expiry = Date.now() + (resp.expires_in || 3600) * 1000;
+    try { sessionStorage.setItem('fulcrum_auth', JSON.stringify({ token: resp.access_token, expiry })); } catch(e){}
+    this.setState({ authToken: resp.access_token, authTokenExpiry: expiry, authError: null });
+    this.loadDriveFiles(null);
+  }
+  onSignOut(){
+    try { sessionStorage.removeItem('fulcrum_auth'); } catch(e){}
+    const token = this.state.authToken;
+    if (window.google && window.google.accounts && window.google.accounts.oauth2 && token) {
+      window.google.accounts.oauth2.revoke(token, () => {});
+    }
+    this.setState({ authToken: null, authTokenExpiry: 0 });
+  }
+
   async loadDriveFiles(folderId){
     this.setState({ driveLoading: true, driveError: null });
     try {
       const url = folderId ? ('/api/drive-list?folderId=' + encodeURIComponent(folderId)) : '/api/drive-list';
-      const res = await fetch(url);
+      const res = await this.driveFetch(url);
       const data = await res.json();
+      if (await this.handleAuthExpired(res, data)) { this.setState({ driveLoading:false }); return; }
       if (!res.ok) throw new Error(data.error || '一覧取得に失敗しました');
       const ns = { driveFiles: data.files || [], driveFolderId: data.folderId, driveLoading: false };
       if (!this.state.driveRootId) ns.driveRootId = data.folderId;
@@ -1252,7 +1515,7 @@ class Component extends DCLogic {
   async createDriveFolder(name){
     this.setState({ driveError: null });
     try {
-      const res = await fetch('/api/drive-create-folder', {
+      const res = await this.driveFetch('/api/drive-create-folder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ folderId: this.state.driveFolderId, name }),
@@ -1272,7 +1535,7 @@ class Component extends DCLogic {
   async renameDriveFile(fileId, name){
     this.setState({ driveError: null });
     try {
-      const res = await fetch('/api/drive-rename', {
+      const res = await this.driveFetch('/api/drive-rename', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileId, name }),
@@ -1306,8 +1569,9 @@ class Component extends DCLogic {
   async loadDriveMovePickerFolders(folderId){
     this.setState({ driveMovePickerLoading: true });
     try {
-      const res = await fetch('/api/drive-list?folderId=' + encodeURIComponent(folderId));
+      const res = await this.driveFetch('/api/drive-list?folderId=' + encodeURIComponent(folderId));
       const data = await res.json();
+      if (await this.handleAuthExpired(res, data)) { this.setState({ driveMovePickerLoading:false }); return; }
       if (!res.ok) throw new Error(data.error || '一覧取得に失敗しました');
       const folders = (data.files || []).filter(f => f.mimeType === 'application/vnd.google-apps.folder');
       this.setState({ driveMovePickerFolders: folders, driveMovePickerLoading: false });
@@ -1332,7 +1596,7 @@ class Component extends DCLogic {
   async moveDriveFile(fileId, newParentId){
     this.setState({ driveError: null });
     try {
-      const res = await fetch('/api/drive-move', {
+      const res = await this.driveFetch('/api/drive-move', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileId, newParentId }),
@@ -1351,7 +1615,7 @@ class Component extends DCLogic {
   async deleteDriveFile(fileId){
     this.setState({ driveError: null });
     try {
-      const res = await fetch('/api/drive-delete', {
+      const res = await this.driveFetch('/api/drive-delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileId }),
@@ -1386,7 +1650,7 @@ class Component extends DCLogic {
     this.loadDriveFiles(this.state.driveFolderId);
   }
   async uploadOneDriveFile(file){
-    const initRes = await fetch('/api/drive-upload-init', {
+    const initRes = await this.driveFetch('/api/drive-upload-init', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ folderId: this.state.driveFolderId, name: file.name, mimeType: file.type, size: file.size }),
@@ -1413,7 +1677,8 @@ class Component extends DCLogic {
   }
 
   componentDidMount(){
-    this.loadDriveFiles(null);
+    this.restoreAuthSession();
+    this.loadGoogleClientId();
     this._key = (e) => {
       if ((e.metaKey || e.ctrlKey) && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); this.setState({ modalOpen:true }); }
       if (e.key === 'Escape') {
@@ -1496,12 +1761,12 @@ class Component extends DCLogic {
   openSectionAdd(){
     const nextColor = this.PRESET_COLORS[this.state.sections.length % this.PRESET_COLORS.length];
     const nextCode = 'SEC-' + String(this.state.sections.length + 1).padStart(2,'0');
-    this.setState({ sectionForm:'add', sectionDraft:{ code:nextCode, name:'', leader:'', color:nextColor } });
+    this.setState({ sectionForm:'add', sectionDraft:{ code:nextCode, name:'', leader:'', color:nextColor, driveFolderId:null, driveFolderName:'' } });
   }
   openSectionEdit(id){
     const sec = this.state.sections.find(s => s.id === id);
     if (!sec) return;
-    this.setState({ sectionForm:id, sectionDraft:{ code:sec.code, name:sec.name, leader:sec.leader, color:sec.color } });
+    this.setState({ sectionForm:id, sectionDraft:{ code:sec.code, name:sec.name, leader:sec.leader, color:sec.color, driveFolderId: sec.driveFolderId || null, driveFolderName: sec.driveFolderName || '' } });
   }
   saveSectionForm(){
     const d = this.state.sectionDraft;
@@ -1509,9 +1774,9 @@ class Component extends DCLogic {
     let sections;
     if (this.state.sectionForm === 'add'){
       const id = 'sec_' + Date.now();
-      sections = [...this.state.sections, { id, code:d.code.trim(), name:d.name.trim(), leader:d.leader.trim(), color:d.color }];
+      sections = [...this.state.sections, { id, code:d.code.trim(), name:d.name.trim(), leader:d.leader.trim(), color:d.color, driveFolderId:d.driveFolderId||null, driveFolderName:d.driveFolderName||'' }];
     } else {
-      sections = this.state.sections.map(s => s.id === this.state.sectionForm ? { ...s, code:d.code.trim(), name:d.name.trim(), leader:d.leader.trim(), color:d.color } : s);
+      sections = this.state.sections.map(s => s.id === this.state.sectionForm ? { ...s, code:d.code.trim(), name:d.name.trim(), leader:d.leader.trim(), color:d.color, driveFolderId:d.driveFolderId||null, driveFolderName:d.driveFolderName||'' } : s);
     }
     this.persistSections(sections);
     this.setState({ sections, sectionForm:null });
@@ -1523,6 +1788,84 @@ class Component extends DCLogic {
     this.setState({ sections, sectionForm:null });
   }
   setSectionDraft(field, val){ this.setState({ sectionDraft:{ ...this.state.sectionDraft, [field]:val } }); }
+
+  // ---- SECTION DRIVE-FOLDER PICKER (settings > section form) ----
+  openSectionFolderPicker(){
+    this.setState({
+      sectionFolderPickerOpen: true,
+      sectionFolderPickerFolderId: this.state.driveRootId,
+      sectionFolderPickerFolderName: 'ドライブ',
+      sectionFolderPickerStack: [],
+    });
+    this.loadSectionFolderPickerFolders(this.state.driveRootId);
+  }
+  async loadSectionFolderPickerFolders(folderId){
+    this.setState({ sectionFolderPickerLoading: true });
+    try {
+      const url = folderId ? ('/api/drive-list?folderId=' + encodeURIComponent(folderId)) : '/api/drive-list';
+      const res = await this.driveFetch(url);
+      const data = await res.json();
+      if (await this.handleAuthExpired(res, data)) { this.setState({ sectionFolderPickerLoading:false }); return; }
+      if (!res.ok) throw new Error(data.error || 'フォルダの取得に失敗しました');
+      const ns = { sectionFolderPickerLoading: false };
+      if (!this.state.driveRootId) ns.driveRootId = data.folderId;
+      if (!this.state.sectionFolderPickerFolderId) ns.sectionFolderPickerFolderId = data.folderId;
+      ns.sectionFolderPickerFolders = (data.files || []).filter(f => f.mimeType === 'application/vnd.google-apps.folder');
+      this.setState(ns);
+    } catch(e){
+      this.setState({ sectionFolderPickerLoading: false });
+    }
+  }
+  onSectionFolderPickerOpen(folder){
+    this.setState({
+      sectionFolderPickerStack: [...this.state.sectionFolderPickerStack, { id: this.state.sectionFolderPickerFolderId, name: this.state.sectionFolderPickerFolderName }],
+      sectionFolderPickerFolderId: folder.id,
+      sectionFolderPickerFolderName: folder.name,
+    });
+    this.loadSectionFolderPickerFolders(folder.id);
+  }
+  onSectionFolderPickerBreadcrumbClick(idx){
+    const stack = this.state.sectionFolderPickerStack;
+    const target = stack[idx];
+    this.setState({ sectionFolderPickerStack: stack.slice(0, idx), sectionFolderPickerFolderId: target.id, sectionFolderPickerFolderName: target.name });
+    this.loadSectionFolderPickerFolders(target.id);
+  }
+  onSectionFolderPickerCancel(){
+    this.setState({ sectionFolderPickerOpen: false });
+  }
+  onSectionFolderPickerConfirm(){
+    this.setSectionDraft('driveFolderId', this.state.sectionFolderPickerFolderId);
+    this.setSectionDraft('driveFolderName', this.state.sectionFolderPickerFolderName);
+    this.setState({ sectionFolderPickerOpen: false });
+  }
+  onSectionFolderClear(){
+    this.setSectionDraft('driveFolderId', null);
+    this.setSectionDraft('driveFolderName', '');
+  }
+
+  // ---- SIDEBAR ----
+  onSidebarToggle(){ this.setState({ sidebarOpen: !this.state.sidebarOpen }); }
+  onSidebarClose(){ this.setState({ sidebarOpen: false }); }
+  onSidebarSelectSection(id){
+    this.setState({ sidebarSelectedSectionId: id, sidebarDriveOpen: false, sidebarDriveFiles: [], sidebarDriveError: null });
+  }
+  onSidebarDriveToggle(sec){
+    const willOpen = !this.state.sidebarDriveOpen;
+    this.setState({ sidebarDriveOpen: willOpen });
+    if (willOpen && sec && sec.driveFolderId) this.loadSidebarDriveFiles(sec.driveFolderId);
+  }
+  async loadSidebarDriveFiles(folderId){
+    this.setState({ sidebarDriveLoading: true, sidebarDriveError: null });
+    try {
+      const res = await this.driveFetch('/api/drive-list?folderId=' + encodeURIComponent(folderId));
+      const data = await res.json();
+      if (await this.handleAuthExpired(res, data)) { this.setState({ sidebarDriveLoading:false }); return; }
+      if (!res.ok) throw new Error(data.error || 'ファイルの取得に失敗しました');
+      this.setState({ sidebarDriveFiles: data.files || [], sidebarDriveLoading: false });
+    } catch(e){
+      this.setState({ sidebarDriveError: e.message, sidebarDriveLoading: false });
+    }
+  }
 
   setCustDraft(field, val){ this.setState({ custDraft: { ...this.state.custDraft, [field]:val } }); }
   openCustAdd(){ this.setState({ custModalOpen:true, custEditId:null, custDraft:this.emptyCustomerDraft() }); }
@@ -1761,6 +2104,63 @@ class Component extends DCLogic {
       },
     ];
 
+    // ---- SIDEBAR ----
+    const sidebarSelId = this.state.sidebarSelectedSectionId || (sections[0] ? sections[0].id : null);
+    const sidebarSection = sections.find(s => s.id === sidebarSelId) || null;
+    const sidebarSectionColor = sidebarSection ? (sidebarSection.color || '#8a8a8a') : '#c4c4c4';
+    const sidebarSectionOptions = sections.map(sec => ({
+      id: sec.id,
+      name: sec.name,
+      optionStyle: { color: sec.color || '#0a0a0a' },
+    }));
+    const sidebarSectionSelectStyle = {
+      width:'100%', background:'#ffffff', border:'1px solid #d8d8d8', borderLeft:'4px solid '+sidebarSectionColor,
+      borderRadius:'0', color:'#0a0a0a', fontSize:'12px', fontWeight:'600',
+      padding:'9px 28px 9px 12px', cursor:'pointer', fontFamily:'inherit',
+      WebkitAppearance:'none', MozAppearance:'none', appearance:'none'
+    };
+    const sidebarSelectChevronStyle = {
+      position:'absolute', right:'11px', top:'50%', transform:'translateY(-50%)',
+      fontSize:'10px', color:'#8a8a8a', pointerEvents:'none'
+    };
+    const sidebarTasks = sidebarSection ? tasks.filter(t => t.section === sidebarSection.id) : [];
+    const sidebarTaskRows = sidebarTasks.map(t => ({
+      id: t.id,
+      title: t.title,
+      dotStyle: { width:'6px', height:'6px', borderRadius:'50%', flexShrink:0, background: this.STATUS_COLORS[t.status] || this.EMPTY_DOT },
+    }));
+    const sidebarDriveFiles = this.state.sidebarDriveFiles;
+    const sidebarDriveRows = sidebarDriveFiles.map(f => {
+      const folder = isDriveFolder(f);
+      return {
+        id: f.id,
+        name: f.name,
+        icon: folder ? '📁' : '📄',
+        onOpen: () => { if (!folder && f.webViewLink) window.open(f.webViewLink, '_blank'); },
+      };
+    });
+
+    // ---- SECTION DRIVE-FOLDER PICKER ----
+    const sectionFolderPickerRows = this.state.sectionFolderPickerFolders.map(f => ({
+      id: f.id,
+      name: f.name,
+      onOpen: () => this.onSectionFolderPickerOpen(f),
+    }));
+    const sectionFolderPickerBreadcrumb = [
+      ...this.state.sectionFolderPickerStack.map((b, idx) => ({
+        label: b.name,
+        style: { background:'transparent', border:'none', color:'#8a8a8a', fontSize:'11px', letterSpacing:'0.02em', padding:'2px 0', cursor:'pointer', fontFamily:'inherit' },
+        sepStyle: { fontSize:'11px', color:'#d8d8d8' },
+        onClick: () => this.onSectionFolderPickerBreadcrumbClick(idx),
+      })),
+      {
+        label: this.state.sectionFolderPickerFolderName,
+        style: { background:'transparent', border:'none', color:'#0a0a0a', fontWeight:'700', fontSize:'11px', letterSpacing:'0.02em', padding:'2px 0', cursor:'default', fontFamily:'inherit' },
+        sepStyle: { display:'none' },
+        onClick: () => {},
+      },
+    ];
+
     const customerRows = filteredCustomers.map((c, idx) => {
       const subParts = [];
       if (c.occupation) subParts.push(c.occupation);
@@ -1982,6 +2382,13 @@ class Component extends DCLogic {
     return {
       isLoading: this.state.loading,
 
+      // Auth
+      authed: !!this.state.authToken,
+      notAuthed: !this.state.authToken,
+      authError: this.state.authError,
+      onGoogleSignIn: () => this.onGoogleSignIn(),
+      onSignOut: () => this.onSignOut(),
+
       // Header
       mastheadInnerStyle,
       fulcrumTitleStyle,
@@ -2139,6 +2546,46 @@ class Component extends DCLogic {
       ],
       onDriveMoveCancel: () => this.onDriveMoveCancel(),
       onDriveMoveConfirm: () => this.onDriveMoveConfirm(),
+
+      // Sidebar
+      sidebarOpen: this.state.sidebarOpen,
+      onSidebarToggle: () => this.onSidebarToggle(),
+      onSidebarClose: () => this.onSidebarClose(),
+      sidebarSectionOptions,
+      sidebarSectionSelectStyle,
+      sidebarSelectChevronStyle,
+      hasSidebarSections: sections.length > 0,
+      noSidebarSections: sections.length === 0,
+      sidebarSelectedSectionId: sidebarSelId,
+      onSidebarSectionSelectChange: (e) => this.onSidebarSelectSection(e.target.value),
+      hasSidebarSection: !!sidebarSection,
+      sidebarTaskCountLabel: sidebarTasks.length + ' 件',
+      sidebarTaskRows,
+      hasSidebarTasks: sidebarTaskRows.length > 0,
+      noSidebarTasks: sidebarTaskRows.length === 0,
+      hasSidebarDriveFolder: !!(sidebarSection && sidebarSection.driveFolderId),
+      noSidebarDriveFolder: !(sidebarSection && sidebarSection.driveFolderId),
+      sidebarDriveFolderName: sidebarSection ? sidebarSection.driveFolderName : '',
+      sidebarDriveOpen: this.state.sidebarDriveOpen,
+      sidebarDriveLoading: this.state.sidebarDriveLoading,
+      sidebarDriveError: this.state.sidebarDriveError,
+      sidebarDriveRows,
+      noSidebarDriveFiles: !this.state.sidebarDriveLoading && sidebarDriveRows.length === 0,
+      onSidebarDriveToggle: () => this.onSidebarDriveToggle(sidebarSection),
+
+      // Section drive-folder picker (settings)
+      sectionDraftFolderLabel: sd.driveFolderId ? sd.driveFolderName : '未設定',
+      onSectionFolderPickerButtonClick: () => this.openSectionFolderPicker(),
+      onSectionFolderClear: () => this.onSectionFolderClear(),
+      sectionFolderPickerOpen: this.state.sectionFolderPickerOpen,
+      sectionFolderPickerLoading: this.state.sectionFolderPickerLoading,
+      sectionFolderPickerFolderName: this.state.sectionFolderPickerFolderName,
+      hasSectionFolderPickerFolders: !this.state.sectionFolderPickerLoading && sectionFolderPickerRows.length > 0,
+      noSectionFolderPickerFolders: !this.state.sectionFolderPickerLoading && sectionFolderPickerRows.length === 0,
+      sectionFolderPickerRows,
+      sectionFolderPickerBreadcrumb,
+      onSectionFolderPickerCancel: () => this.onSectionFolderPickerCancel(),
+      onSectionFolderPickerConfirm: () => this.onSectionFolderPickerConfirm(),
 
       // Customer KPI
       custAcquisitionCount, custTrialCount, custMeetingCount, custWonCount,

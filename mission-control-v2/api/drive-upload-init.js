@@ -1,17 +1,16 @@
-const { getAccessToken, getRootFolderId, isUnderRoot } = require('./_drive');
+const { requireBearerToken, getRootFolderId, isUnderRoot } = require('./_drive');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   try {
+    const token = requireBearerToken(req);
     const { folderId, name, mimeType, size } = req.body || {};
     if (!name || !size) return res.status(400).json({ error: 'Missing name or size' });
 
     const targetFolderId = folderId || getRootFolderId();
-    const allowed = await isUnderRoot(targetFolderId);
+    const allowed = await isUnderRoot(targetFolderId, token);
     if (!allowed) return res.status(403).json({ error: 'Invalid folder' });
-
-    const token = await getAccessToken();
 
     const initRes = await fetch(
       'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true',
@@ -38,6 +37,6 @@ module.exports = async function handler(req, res) {
     res.status(200).json({ uploadUrl });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Drive API error: ' + error.message });
+    res.status(error.statusCode || 500).json({ error: error.statusCode === 401 ? 'Not authenticated' : ('Drive API error: ' + error.message) });
   }
 };

@@ -1,0 +1,6 @@
+{
+  "role": "視点: Vercelサーバーレス関数(Node/CommonJS)とフロントエンドのAPI呼び出し連携調査専門家。制約: コードの変更は一切行わない(読み取り専用)。完了基準: (1) api/get-availability.js が期待するリクエストボディのパラメータと、(2) フロントエンドが実際に /api/get-availability を呼び出している箇所（ファイル・行・送信しているパラメータ名）が特定され、(3) 今回の400エラー「Missing required parameters: calendarId1, calendarId2, timeMin, timeMax」が何故発生したか（フロントが呼ばれていない/パラメータを送っていない/送信先が異なる等）の原因が断定されていること",
+  "uses": 1,
+  "mode": "read",
+  "last_used": "2026-07-13T17:32:05"
+}
