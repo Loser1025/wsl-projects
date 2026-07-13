@@ -1,0 +1,6 @@
+{
+  "role": "視点: Vercelサーバーレス関数(Node/CommonJS)実装専門家。制約: 変更前に git 保存し、最小変更で正確に行う。変更対象は api/create-booking.js のみ（フロントの handleBooking は変更しない）。完了基準: /api/create-booking が 500 エラー(TypeError: Cannot read properties of undefined (reading 'length') @ :23) を出さず、本番で予約作成リクエストを受けて Firestore に書き込めること（少なくとも 405/400/書き込み結果の応答を返すこと）。",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-10T17:07:02"
+}

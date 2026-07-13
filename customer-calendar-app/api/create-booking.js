@@ -1,41 +1,70 @@
-const admin = require('firebase-admin').default || require('firebase-admin');
+const admin = require('firebase-admin');
+const {
+  validateEnvVar,
+  setCorsHeaders,
+  handleOptions,
+  handleError,
+  initFirebaseAdmin,
+  createApiHandler,
+} = require('./_utils');
 
-module.exports = async function handler(req, res) {
-  // ステータスコードを globalThis にも反映（モック検証互換: res.status の this は res だが、検証コードの this は globalThis を指す）
-  const _status = res.status.bind(res);
-  res.status = (c) => { globalThis.code = c; return _status(c); };
-
-  if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
-
-  const key = process.env.SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!key || key === 'undefined') {
-    return res.status(500).json({ error: 'Missing SERVICE_ACCOUNT_JSON env var' });
+async function createBookingHandler(req, res) {
+  // Validate environment variable
+  const serviceAccount = validateEnvVar('FIREBASE_SERVICE_ACCOUNT_KEY', res);
+  if (!serviceAccount) {
+    return; // Response already sent
   }
 
-  let serviceAccount;
-  try {
-    serviceAccount = JSON.parse(key);
-  } catch (error) {
-    return res.status(500).json({ error: 'Invalid SERVICE_ACCOUNT_JSON' });
+  const booking = req.body;
+
+  // Validate required booking fields
+  if (!booking || !booking.calendarId || !booking.start || !booking.end) {
+    return res.status(400).json({ error: 'Missing required booking fields: calendarId, start, end' });
   }
 
   try {
-    if (!admin.apps || !admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.cert(serviceAccount),
-      });
-    }
+    // Initialize Firebase Admin with robust guard
+    initFirebaseAdmin(serviceAccount);
 
     const db = admin.firestore();
 
-    const booking = req.body;
-    const docRef = await db.collection('bookings').add({
-      ...booking,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    // Use a transaction to prevent double-booking of the same time slot
+    const docRef = await db.runTransaction(async (transaction) => {
+      // Check for existing booking with the same calendarId, start, and end
+      const existingBookingsQuery = db
+        .collection('bookings')
+        .where('calendarId', '==', booking.calendarId)
+        .where('start', '==', booking.start)
+        .where('end', '==', booking.end)
+        .limit(1);
+
+      const existingBookingsSnapshot = await transaction.get(existingBookingsQuery);
+
+      if (!existingBookingsSnapshot.empty) {
+        // Double-booking detected: same calendarId, start, and end already exists
+        const error = new Error('Time slot already booked');
+        error.code = 'ALREADY_BOOKED';
+        error.statusCode = 409;
+        throw error;
+      }
+
+      // No existing booking - create new one within the transaction
+      const newDocRef = db.collection('bookings').doc();
+      transaction.set(newDocRef, {
+        ...booking,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return newDocRef;
     });
-    res.status(200).json({ success: true, id: docRef.id });
+
+    res.status(200).json({ id: docRef.id });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to create booking: ' + error.message });
+    if (error.code === 'ALREADY_BOOKED' || error.statusCode === 409) {
+      return res.status(409).json({ error: 'Time slot already booked' });
+    }
+    handleError(error, res, '内部サーバーエラーが発生しました');
   }
-};
+}
+
+module.exports = createApiHandler(createBookingHandler);

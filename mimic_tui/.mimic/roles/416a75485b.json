@@ -1,0 +1,6 @@
+{
+  "role": "視点: React カレンダーコンポーネント実装専門家。制約: 変更前に git 保存し、最小変更で正確に行う。変更対象は src/components/Calendar/CustomerCalendar.jsx のみ（API は変更しない）。完了基準: CustomerCalendar.jsx において、タイムゾーンを props または設定で指定可能（デフォルト 'Asia/Tokyo'）、スロット生成・表示・API リクエストの timeMin/timeMax が指定タイムゾーン基準で動作し、ビルド（npm run build）が通ること",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-13T11:09:37"
+}

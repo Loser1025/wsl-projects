@@ -1,0 +1,6 @@
+{
+  "role": "視点: Vercel Serverless Functions (Node/CommonJS)・Firebase Admin SDK トランザクション専門家。制約: 最小変更で正確に行う。変更対象は api/create-booking.js のみ。完了基準: Firestore トランザクションを使用した予約重複防止（同一スロットへの二重予約ブロック）が実装され、構文チェックが通ること",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-13T11:00:00"
+}

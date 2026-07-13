@@ -1,0 +1,6 @@
+{
+  "role": "視点: Vercel Serverless Functions (Node/CommonJS) セキュリティ・堅牢性強化専門家。制約: 変更前に git 保存し、最小変更で正確に行う。変更対象は api/get-availability.js と api/create-booking.js のみ。完了基準: 両APIファイルで (1) 環境変数バリデーション強化、(2) CORS ヘッダー追加、(3) エラーレスポンスの機密情報マスキング、(4) Google Calendar API 403エラー時の分かりやすいメッセージ、(5) Firebase Admin 初期化の多重実行ガード強化が実装され、ビルド・構文チェックが通ること",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-13T10:45:01"
+}

@@ -1,0 +1,6 @@
+{
+  "role": "視点: Vercel 設定・デプロイ専門家。制約: 最小変更で正確に行う。完了基準: vercel.json に functions 設定（maxDuration, memory 等）と Node.js バージョン指定が追加され、既存の rewrites 設定が維持されること",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-13T11:12:26"
+}

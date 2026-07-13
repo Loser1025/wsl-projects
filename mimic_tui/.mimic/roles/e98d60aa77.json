@@ -1,0 +1,6 @@
+{
+  "role": "視点: React UMD・CommonJS 相互運用専門家。制約: 最小変更で正確に行う。変更対象は src/components/Calendar/react-shim.js のみ。完了基準: react-shim.js が CommonJS (require) と ESM (import) 両方で動作し、window.React/window.ReactDOM が遅延ロードされ、esbuild ビルドが通ること",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-13T11:17:11"
+}

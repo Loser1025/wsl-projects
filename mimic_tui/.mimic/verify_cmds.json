@@ -1,7 +1,12 @@
 {
   "/home/loser/wsl-projects/mission-control-v2": {
-    "cmd": "cd /home/loser/wsl-projects/mission-control-v2 && npm run build 2>&1 | tail -20",
-    "passes": 3,
-    "last_used": "2026-07-10T16:51:40"
+    "cmd": "cd /home/loser/wsl-projects/mission-control-v2 && node -e \"const a=require('firebase-admin'); console.log('type',typeof a,'default',typeof a?.default,'credential',typeof a?.credential,'default.credential',typeof a?.default?.credential,'keys',Object.keys(a).slice(0,20))\" && node --check api/create-booking.js && echo SYNTAX_OK",
+    "passes": 1,
+    "last_used": "2026-07-10T17:25:41"
+  },
+  "/home/loser/wsl-projects": {
+    "cmd": "node -c api/get-availability.js && node -c api/create-booking.js",
+    "passes": 5,
+    "last_used": "2026-07-13T11:17:11"
   }
 }

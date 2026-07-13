@@ -1,0 +1,6 @@
+{
+  "role": "視点: Vercelサーバーレス関数(Node/CommonJS)実装・APIエラー診断専門家。制約: コードの変更は一切行わない(読み取り専用)。完了基準: api/create-booking.js において 23行目で「undefined の .length を読んでいる」直接原因が特定され、その undefined になっている変数/プロパティが req.body のどのフィールドか、またフロントエンドの handleBooking(CustomerCalendar.jsx) が実際にどのような body を送っているかが file:line 付きで説明されていること。",
+  "uses": 1,
+  "mode": "read",
+  "last_used": "2026-07-10T17:04:55"
+}

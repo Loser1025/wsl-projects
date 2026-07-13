@@ -4,9 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FULCRUM — 事業部タスクシステム</title>
+<script src="./support.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
+<script>
+(function(){
+  var cfg = {
+    apiKey:            "AIzaSyAtCtS9R5ARU-TPQzg2Z6WQBuSZzccGpvU",
+    authDomain:        "fulcrum-tasks.firebaseapp.com",
+    databaseURL:       "https://fulcrum-tasks-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:         "fulcrum-tasks",
+    storageBucket:     "fulcrum-tasks.firebasestorage.app",
+    messagingSenderId: "821698920096",
+    appId:             "1:821698920096:web:6b40a10e2f53635fb113c5"
+  };
+  if (cfg.databaseURL !== "★REPLACE★") {
+    firebase.initializeApp(cfg);
+    window._db = firebase.database();
+  }
+})();
+</script>
+</head>
+<body>
+<x-dc>
+<helmet>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Bebas+Neue&display=swap">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -36,73 +60,2178 @@
     input[type=text]{min-height:40px !important;}
   }
 </style>
-<script src="./support.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
-<script>
-(function(){
-  var cfg = {
-    apiKey:            "AIzaSyAtCtS9R5ARU-TPQzg2Z6WQBuSZzccGpvU",
-    authDomain:        "fulcrum-tasks.firebaseapp.com",
-    databaseURL:       "https://fulcrum-tasks-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId:         "fulcrum-tasks",
-    storageBucket:     "fulcrum-tasks.firebasestorage.app",
-    messagingSenderId: "821698920096",
-    appId:             "1:821698920096:web:6b40a10e2f53635fb113c5"
+</helmet>
+<div style="background:#FFFFFF; min-height:100vh; color:#0a0a0a; font-family:'Noto Sans JP','Inter',sans-serif; padding-bottom:96px; color-scheme:light;">
+
+  <!-- LOADING OVERLAY -->
+  <sc-if value="{{ isLoading }}">
+    <div style="position:fixed; inset:0; background:#ffffff; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:999;">
+      <div style="font-family:'Bebas Neue',sans-serif; font-size:32px; letter-spacing:0.18em; color:#000000; margin-bottom:18px;">FULCRUM</div>
+      <div style="display:flex; gap:6px;">
+        <span style="width:6px; height:6px; border-radius:50%; background:#000000; animation:pulse 1.2s ease-in-out 0s infinite;"></span>
+        <span style="width:6px; height:6px; border-radius:50%; background:#000000; animation:pulse 1.2s ease-in-out 0.2s infinite;"></span>
+        <span style="width:6px; height:6px; border-radius:50%; background:#000000; animation:pulse 1.2s ease-in-out 0.4s infinite;"></span>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- MASTHEAD -->
+  <div style="border-bottom:2px solid #000000; background:#ffffff; position:sticky; top:0; z-index:100;">
+    <div class="mc-mast-inner" style="{{ mastheadInnerStyle }}">
+
+      <!-- Brand -->
+      <div style="display:flex; align-items:center; flex-shrink:0;">
+        <div id="fulcrum-title" style="{{ fulcrumTitleStyle }}">FULCRUM</div>
+      </div>
+
+      <!-- Separator + Subtitle (fade out on scroll) -->
+      <div class="mc-sub-grp" style="{{ headerSubtitleGroupStyle }}">
+        <div style="width:1px; height:20px; background:#d8d8d8; margin:0 22px; flex-shrink:0;"></div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.16em; color:#aaaaaa; text-transform:uppercase; white-space:nowrap;">{{ subtitle }}</div>
+      </div>
+
+      <!-- Right group -->
+      <div style="margin-left:auto; display:flex; align-items:center; gap:22px;">
+
+        <!-- Online + Date (fade out on scroll) -->
+        <div class="mc-meta-fade" style="{{ headerMetaFadeStyle }}">
+          <div style="display:flex; align-items:center; gap:7px; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#8a8a8a;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#16A34A; display:inline-block; animation:pulse 2.4s ease-in-out infinite; flex-shrink:0;"></span>
+            ONLINE
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#aaaaaa; margin-left:22px;">{{ todayLabel }}</div>
+        </div>
+
+        <!-- Settings -->
+        <button onClick="{{ onOpenSettings }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:2px; color:#6a6a6a; font-size:10px; letter-spacing:0.1em; padding:6px 14px; cursor:pointer; font-family:'IBM Plex Mono',monospace; display:flex; align-items:center; gap:7px; white-space:nowrap; flex-shrink:0;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          設定
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW TABS -->
+  <div style="background:#ffffff; border-bottom:1px solid #ececec;">
+    <div style="max-width:1180px; margin:0 auto; padding:0 32px; display:flex;">
+      <button onClick="{{ onViewTasks }}" style="{{ viewTasksTabStyle }}">事業部タスク</button>
+      <button onClick="{{ onViewCustomers }}" style="{{ viewCustomersTabStyle }}">顧客管理</button>
+      <button onClick="{{ onViewDrive }}" style="{{ viewDriveTabStyle }}">ドライブ</button>
+    </div>
+  </div>
+
+  <div class="mc-wrap" style="max-width:1180px; margin:0 auto; padding:0 32px;">
+
+  <sc-if value="{{ isViewTasks }}" hint-placeholder-val="{{ true }}">
+
+    <!-- STAT GRID -->
+    <div class="mc-kpi" style="display:grid; grid-template-columns:repeat(4,1fr); border-bottom:1px solid #ececec; animation:fadeUp .5s cubic-bezier(.16,1,.3,1) .05s both;">
+      <div class="mc-kpi-c" style="padding:34px 28px 30px;">
+        <div style="font-size:10px; letter-spacing:0.12em; color:#b8b8b8; text-transform:uppercase; margin-bottom:10px;">稼働中</div>
+        <div style="font-size:38px; font-weight:700; letter-spacing:-0.03em; color:#000000; line-height:1;">{{ activeCount }}</div>
+      </div>
+      <div class="mc-kpi-c" style="padding:34px 28px 30px; border-left:1px solid #ececec;">
+        <div style="font-size:10px; letter-spacing:0.12em; color:#b8b8b8; text-transform:uppercase; margin-bottom:10px;">進行中</div>
+        <div style="font-size:38px; font-weight:700; letter-spacing:-0.03em; color:#2563EB; line-height:1;">{{ doingCount }}</div>
+      </div>
+      <div class="mc-kpi-c" style="padding:34px 28px 30px; border-left:1px solid #ececec;">
+        <div style="font-size:10px; letter-spacing:0.12em; color:#b8b8b8; text-transform:uppercase; margin-bottom:10px;">レビュー</div>
+        <div style="font-size:38px; font-weight:700; letter-spacing:-0.03em; color:#D97706; line-height:1;">{{ reviewCount }}</div>
+      </div>
+      <div class="mc-kpi-c" style="padding:34px 28px 30px; border-left:1px solid #ececec;">
+        <div style="font-size:10px; letter-spacing:0.12em; color:#b8b8b8; text-transform:uppercase; margin-bottom:10px;">未着手</div>
+        <div style="font-size:38px; font-weight:700; letter-spacing:-0.03em; color:#D0D0D0; line-height:1;">{{ todoCount }}</div>
+      </div>
+    </div>
+
+    <!-- OVERALL PROGRESS RULE -->
+    <div style="padding:24px 0 40px; animation:fadeUp .5s cubic-bezier(.16,1,.3,1) .2s both;">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px;">
+        <span style="font-size:11px; letter-spacing:0.06em; color:#8a8a8a;">事業部 タスク構成内訳</span>
+        <div style="display:flex; gap:22px; flex-wrap:wrap;">
+          <sc-for list="{{ divisionLegend }}" as="lg" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:7px;">
+              <span style="{{ lg.dotStyle }}"></span>
+              <span style="{{ lg.textStyle }}">{{ lg.label }}</span>
+              <span style="font-size:12px; font-weight:700; color:#000000;">{{ lg.count }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      {{ overallMeter }}
+    </div>
+
+    <!-- ATTENTION REQUIRED -->
+    <div style="display:flex; align-items:baseline; justify-content:space-between; border-bottom:2px solid #000000; padding-bottom:8px; margin-bottom:2px; animation:fadeUp .5s cubic-bezier(.16,1,.3,1) .35s both;">
+      <h2 style="margin:0; font-size:15px; font-weight:700; letter-spacing:-0.01em; color:#000000;">今すぐ対応が必要なタスク</h2>
+      <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8;">ATTENTION</span>
+    </div>
+    <sc-if value="{{ hasUrgent }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <sc-for list="{{ urgentList }}" as="u" hint-placeholder-count="3">
+          <div class="mc-urg-row" style="display:flex; align-items:center; gap:18px; padding:16px 4px; border-bottom:1px solid #f0f0f0;">
+            <div style="width:4px; height:14px; background:#E84040; flex-shrink:0; border-radius:1px;"></div>
+            <div style="font-size:12px; font-weight:600; color:#E84040; width:96px; flex-shrink:0;">{{ u.tag }}</div>
+            <div style="flex:1; min-width:0; font-size:14px; font-weight:500; color:#0a0a0a;">{{ u.title }}</div>
+            <div style="display:inline-flex; align-items:center; gap:7px; font-size:11px; letter-spacing:0.02em; color:#8a8a8a; white-space:nowrap;"><span style="{{ u.secTickStyle }}"></span>{{ u.secName }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ allClear }}">
+      <div style="padding:20px 4px; font-size:12px; letter-spacing:0.02em; color:#1a7a4a;">緊急対応が必要なタスクはありません</div>
+    </sc-if>
+
+    <!-- SECTION CARDS -->
+    <div style="display:flex; align-items:baseline; justify-content:space-between; border-bottom:2px solid #000000; padding-bottom:8px; margin:52px 0 2px; animation:fadeUp .5s cubic-bezier(.16,1,.3,1) .5s both;">
+      <h2 style="margin:0; font-size:15px; font-weight:700; letter-spacing:-0.01em; color:#000000;">セクション別 進捗ステータス</h2>
+      <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8;">SECTIONS</span>
+    </div>
+    <div class="mc-secs" style="display:grid; grid-template-columns:repeat(2,1fr);">
+      <sc-for list="{{ sectionCards }}" as="sec" hint-placeholder-count="4">
+        <div style="{{ sec.cardStyle }}">
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">
+            <div style="min-width:0;">
+              <div style="{{ sec.codeStyle }}">{{ sec.code }}</div>
+              <div style="{{ sec.nameStyle }}">{{ sec.name }}</div>
+              <div style="font-size:11px; letter-spacing:0.02em; color:#b8b8b8; margin-top:6px;">担当 / {{ sec.leader }}</div>
+            </div>
+            <div style="{{ sec.healthStyle }}">{{ sec.health }}</div>
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:10px; margin:18px 0 12px;">
+            <div style="font-size:38px; font-weight:700; letter-spacing:-0.03em; color:#000000; line-height:1;">{{ sec.active }}</div>
+            <div style="font-size:12px; letter-spacing:0.04em; color:#8a8a8a; padding-bottom:6px;">件 稼働中</div>
+          </div>
+          <div style="margin-bottom:14px;">{{ sec.meter }}</div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div style="display:flex; gap:18px; flex-wrap:wrap;">
+              <sc-for list="{{ sec.legend }}" as="lg" hint-placeholder-count="3">
+                <div style="display:flex; align-items:center; gap:5px;">
+                  <span style="{{ lg.dotStyle }}"></span>
+                  <span style="{{ lg.labelStyle }}">{{ lg.label }}</span>
+                  <span style="{{ lg.countStyle }}">{{ lg.count }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="{{ sec.alertStyle }}">{{ sec.alertText }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- TASK BOARD -->
+    <div style="margin:52px 0 0; animation:fadeUp .5s cubic-bezier(.16,1,.3,1) .65s both;">
+      <div class="mc-board-top" style="display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-bottom:14px;">
+        <div>
+          <div style="display:flex; align-items:baseline; gap:10px;">
+            <h2 style="margin:0; font-size:15px; font-weight:700; letter-spacing:-0.01em; color:#000000;">事業部タスク管理ボード</h2>
+            <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8;">TASKS</span>
+            <span style="{{ taskCountStyle }}">{{ taskCountLabel }}</span>
+          </div>
+          <p style="margin:8px 0 0; font-size:11px; color:#b8b8b8;">GOAL・NA の欄をクリックでその場編集（自動保存）</p>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <sc-if value="{{ hasActiveFilters }}">
+            <button onClick="{{ onClearFilters }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#8a8a8a; font-size:11px; letter-spacing:0.02em; padding:7px 12px; cursor:pointer; font-family:inherit;">✕ フィルターをクリア</button>
+          </sc-if>
+          <button onClick="{{ onOpenModal }}" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:9px 16px; cursor:pointer;">+ タスク追加</button>
+        </div>
+      </div>
+
+      <!-- FILTER BAR -->
+      <div style="border:1px solid #e8e8e8; background:#fafafa; padding:12px 16px; display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
+        <!-- Section chips -->
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-right:2px;">SEC</span>
+          <button onClick="{{ onSecFilterAll }}" style="{{ secAllChipStyle }}">全て</button>
+          <sc-for list="{{ sectionFilterChips }}" as="chip" hint-placeholder-count="4">
+            <button onClick="{{ chip.onToggle }}" style="{{ chip.chipStyle }}">{{ chip.name }}</button>
+          </sc-for>
+        </div>
+        <!-- Divider -->
+        <div class="mc-divider" style="width:1px; height:20px; background:#e0e0e0; flex-shrink:0;"></div>
+        <!-- Status chips -->
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-right:2px;">STATUS</span>
+          <sc-for list="{{ statusFilterChips }}" as="chip">
+            <button onClick="{{ chip.onToggle }}" style="{{ chip.chipStyle }}">{{ chip.label }}</button>
+          </sc-for>
+        </div>
+        <!-- Sort -->
+        <div class="mc-sort" style="margin-left:auto; display:flex; align-items:center; gap:8px; flex-shrink:0;">
+          <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8;">SORT</span>
+          <select value="{{ sortBy }}" onChange="{{ onSortChange }}" style="background:#ffffff; border:1px solid #d8d8d8; border-radius:0; color:#1a1a1a; font-size:11px; letter-spacing:0.02em; padding:7px 28px 7px 11px;">
+            <option value="default">追加順</option>
+            <option value="dueAsc">期限 近い順</option>
+            <option value="dueDesc">期限 遠い順</option>
+            <option value="priorityHigh">優先度 高い順</option>
+            <option value="priorityLow">優先度 低い順</option>
+            <option value="status">ステータス順</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- TASK ROWS -->
+    <div class="mc-task-wrap" style="border-top:2px solid #000000;">
+      <sc-if value="{{ hasTasks }}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{ tasks }}" as="task" hint-placeholder-count="6">
+          <div style="{{ task.rowStyle }}">
+            <div style="display:flex; gap:16px; flex:1; min-width:0; align-items:flex-start;">
+              <div style="{{ task.numStyle }}">{{ task.num }}</div>
+              <div style="flex:1; min-width:0;">
+                <div style="{{ task.secChipStyle }}">{{ task.secName }}</div>
+                <div style="{{ task.titleStyle }}">{{ task.title }}</div>
+                <div style="margin-top:14px; display:flex; flex-direction:column; gap:9px;">
+                  <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:10px; font-weight:700; letter-spacing:0.06em; color:#E84040; flex-shrink:0; width:38px;">GOAL</span>
+                    <input type="text" value="{{ task.goal }}" onChange="{{ task.onGoal }}" placeholder="最終目標を入力" style="flex:1; min-width:0; background:transparent; border:none; border-bottom:1px solid #ececec; border-radius:0; color:#1a1a1a; font-size:14px; padding:4px 2px;">
+                  </div>
+                  <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:10px; font-weight:700; letter-spacing:0.06em; color:#b8b8b8; flex-shrink:0; width:38px;">NA</span>
+                    <input type="text" value="{{ task.na }}" onChange="{{ task.onNa }}" placeholder="次の具体アクションを入力" style="flex:1; min-width:0; background:transparent; border:none; border-bottom:1px solid #ececec; border-radius:0; color:#1a1a1a; font-size:14px; padding:4px 2px;">
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px; width:196px; flex-shrink:0; align-self:center;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <div style="{{ task.urgencyBadgeStyle }}">{{ task.urgencyLabel }}</div>
+                <button onClick="{{ task.onDelete }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:0; color:#b8b8b8; font-size:12px; line-height:1; width:24px; height:24px; flex-shrink:0; cursor:pointer;" title="削除">✕</button>
+              </div>
+              <select value="{{ task.status }}" onChange="{{ task.onStatus }}" style="{{ task.selectStyle }}">
+                <option value="todo">未着手</option>
+                <option value="doing">進行中</option>
+                <option value="review">レビュー</option>
+                <option value="done">完了</option>
+              </select>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="{{ task.dateStyle }}">{{ task.dateText }}</div>
+                <div style="{{ task.pStyle }}">{{ task.pLabel }}</div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{ noTasks }}">
+        <div style="padding:48px 4px; font-size:11px; letter-spacing:0.02em; color:#b8b8b8;">該当するタスクはありません</div>
+      </sc-if>
+    </div>
+
+    <!-- ADD BAR -->
+    <button onClick="{{ onOpenModal }}" style="width:100%; margin-top:0; background:transparent; border:none; border-top:1px dashed #d8d8d8; border-radius:0; color:#8a8a8a; text-align:left; font-size:12px; letter-spacing:0.02em; padding:18px 4px; cursor:pointer;">+ 新規タスク追加 <span style="color:#c4c4c4;">(CMD+N)</span></button>
+
+  </sc-if>
+
+  <sc-if value="{{ isViewCustomers }}">
+
+    <!-- CUSTOMER KPI GRID -->
+    <div class="mc-kpi" style="display:grid; grid-template-columns:repeat(4,1fr); border-bottom:1px solid #ececec; animation:fadeUp .5s cubic-bezier(.16,1,.3,1) .05s both;">
+      <div class="mc-kpi-c" style="padding:34px 28px 30px;">
+        <div style="font-size:10px; letter-spacing:0.12em; color:#b8b8b8; text-transform:uppercase; margin-bottom:10px;">集客</div>
+        <div style="font-size:38px; font-weight:700; letter-spacing:-0.03em; color:#000000; line-height:1;">{{ custAcquisitionCount }}</div>
+      </div>
+      <div class="mc-kpi-c" style="padding:34px 28px 30px; border-left:1px solid #ececec;">
+        <div style="font-size:10px; letter-spacing:0.12em; color:#b8b8b8; text-transform:uppercase; margin-bottom:10px;">結果</div>
+        <div style="font-size:38px; font-weight:700; letter-spacing:-0.03em; color:#D97706; line-height:1;">{{ custTrialCount }}</div>
+      </div>
+      <div class="mc-kpi-c" style="padding:34px 28px 30px; border-left:1px solid #ececec;">
+        <div style="font-size:10px; letter-spacing:0.12em; color:#b8b8b8; text-transform:uppercase; margin-bottom:10px;">面談</div>
+        <div style="font-size:38px; font-weight:700; letter-spacing:-0.03em; color:#2563EB; line-height:1;">{{ custMeetingCount }}</div>
+      </div>
+      <div class="mc-kpi-c" style="padding:34px 28px 30px; border-left:1px solid #ececec;">
+        <div style="font-size:10px; letter-spacing:0.12em; color:#b8b8b8; text-transform:uppercase; margin-bottom:10px;">成約</div>
+        <div style="font-size:38px; font-weight:700; letter-spacing:-0.03em; color:#16A34A; line-height:1;">{{ custWonCount }}</div>
+      </div>
+    </div>
+
+    <!-- CUSTOMER ANALYTICS DASHBOARD -->
+    <div style="margin:40px 0 0;">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; border-bottom:2px solid #000000; padding-bottom:8px; margin-bottom:18px;">
+        <h2 style="margin:0; font-size:15px; font-weight:700; letter-spacing:-0.01em; color:#000000;">案件分析ダッシュボード</h2>
+        <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8;">ANALYTICS</span>
+      </div>
+
+      <!-- 集計期間 -->
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap;">
+        <span style="font-size:11px; letter-spacing:0.06em; color:#8a8a8a;">集計期間（初回接触日）</span>
+        <input type="date" value="{{ dashFrom }}" onChange="{{ onDashFrom }}" style="background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:12px; padding:7px 10px;">
+        <span style="font-size:11px; color:#c4c4c4;">〜</span>
+        <input type="date" value="{{ dashTo }}" onChange="{{ onDashTo }}" style="background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:12px; padding:7px 10px;">
+        <sc-if value="{{ hasDashRange }}">
+          <button onClick="{{ onDashRangeClear }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#8a8a8a; font-size:11px; padding:7px 12px; cursor:pointer; font-family:inherit;">✕ 期間クリア</button>
+        </sc-if>
+      </div>
+
+      <!-- SUMMARY STRIP -->
+      <div class="mc-secs" style="display:grid; grid-template-columns:repeat(6,1fr); border:1px solid #ececec; margin-bottom:28px;">
+        <div style="padding:20px 16px; border-right:1px solid #ececec;">
+          <div style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-bottom:8px;">総件数</div>
+          <div style="font-size:24px; font-weight:700; color:#000000;">{{ dashTotal }}<span style="font-size:12px; color:#b8b8b8; font-weight:400;">件</span></div>
+        </div>
+        <div style="padding:20px 16px; border-right:1px solid #ececec;">
+          <div style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-bottom:8px;">成約数</div>
+          <div style="font-size:24px; font-weight:700; color:#16A34A;">{{ dashWon }}<span style="font-size:12px; color:#b8b8b8; font-weight:400;">件</span></div>
+        </div>
+        <div style="padding:20px 16px; border-right:1px solid #ececec;">
+          <div style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-bottom:8px;">成約率</div>
+          <div style="font-size:24px; font-weight:700; color:#000000;">{{ dashWonRate }}<span style="font-size:12px; color:#b8b8b8; font-weight:400;">%</span></div>
+        </div>
+        <div style="padding:20px 16px; border-right:1px solid #ececec;">
+          <div style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-bottom:8px;">売上</div>
+          <div style="font-size:19px; font-weight:700; color:#000000;">{{ dashRevenueText }}</div>
+        </div>
+        <div style="padding:20px 16px; border-right:1px solid #ececec;">
+          <div style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-bottom:8px;">広告費</div>
+          <div style="font-size:19px; font-weight:700; color:#000000;">{{ dashAdCostText }}</div>
+        </div>
+        <div style="padding:20px 16px;">
+          <div style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-bottom:8px;">平均年齢</div>
+          <div style="font-size:24px; font-weight:700; color:#000000;">{{ dashAvgAge }}<span style="font-size:12px; color:#b8b8b8; font-weight:400;">歳</span></div>
+        </div>
+      </div>
+
+      <!-- 担当者別着座率 + 流入経路 -->
+      <div class="mc-secs" style="display:grid; grid-template-columns:1.3fr 1fr; gap:24px; margin-bottom:28px; align-items:start;">
+        <div style="border:1px solid #ececec;">
+          <div style="padding:14px 18px; border-bottom:1px solid #ececec; font-size:12px; font-weight:700; color:#000000;">担当者別 着座率</div>
+          <div style="padding:0 18px 8px;">
+            <div style="display:flex; font-size:10px; letter-spacing:0.06em; color:#b8b8b8; padding:12px 0 8px;">
+              <div style="flex:1;">担当</div>
+              <div style="width:90px; text-align:right;">1次→2次</div>
+              <div style="width:90px; text-align:right;">2次→成約</div>
+              <div style="width:100px; text-align:right;">売上</div>
+            </div>
+            <sc-if value="{{ hasAssigneeStats }}" hint-placeholder-val="{{ true }}">
+              <sc-for list="{{ assigneeStatRows }}" as="a" hint-placeholder-count="4">
+                <div style="display:flex; align-items:center; padding:9px 0; border-top:1px solid #f4f4f4; font-size:12px;">
+                  <div style="flex:1; color:#0a0a0a; font-weight:600;">{{ a.name }}</div>
+                  <div style="width:90px; text-align:right; color:#5a5a5a;">{{ a.rate1to2Text }}</div>
+                  <div style="width:90px; text-align:right; color:#5a5a5a;">{{ a.rate2toWonText }}</div>
+                  <div style="width:100px; text-align:right; color:#000000; font-weight:700;">{{ a.revenueText }}</div>
+                </div>
+              </sc-for>
+            </sc-if>
+            <sc-if value="{{ noAssigneeStats }}">
+              <div style="padding:20px 0; font-size:11px; color:#b8b8b8;">1次対応者が設定された顧客がいません</div>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="border:1px solid #ececec;">
+          <div style="padding:14px 18px; border-bottom:1px solid #ececec; font-size:12px; font-weight:700; color:#000000;">流入経路</div>
+          <div style="padding:6px 18px 14px;">
+            <sc-if value="{{ hasChannelStats }}" hint-placeholder-val="{{ true }}">
+              <sc-for list="{{ channelStatRows }}" as="ch" hint-placeholder-count="5">
+                <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid #f4f4f4;">
+                  <div style="flex:1; font-size:12px; color:#0a0a0a;">{{ ch.label }}</div>
+                  <div style="{{ ch.barWrapStyle }}"><div style="{{ ch.barStyle }}"></div></div>
+                  <div style="width:34px; text-align:right; font-size:12px; font-weight:700; color:#000000;">{{ ch.count }}</div>
+                </div>
+              </sc-for>
+            </sc-if>
+            <sc-if value="{{ noChannelStats }}">
+              <div style="padding:20px 0; font-size:11px; color:#b8b8b8;">データがありません</div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+
+      <!-- 案件状況内訳 -->
+      <div style="border:1px solid #ececec; margin-bottom:8px;">
+        <div style="padding:14px 18px; border-bottom:1px solid #ececec; font-size:12px; font-weight:700; color:#000000;">案件状況内訳</div>
+        <div class="mc-kpi" style="display:grid; grid-template-columns:repeat(3,1fr); padding:6px 8px;">
+          <sc-for list="{{ statusStatRows }}" as="s" hint-placeholder-count="15">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 10px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="{{ s.dotStyle }}"></span>
+                <span style="font-size:12px; color:#5a5a5a;">{{ s.label }}</span>
+              </div>
+              <span style="font-size:13px; font-weight:700; color:#000000;">{{ s.count }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUSTOMER BOARD -->
+    <div style="margin:40px 0 0;">
+      <div class="mc-board-top" style="display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-bottom:14px;">
+        <div>
+          <div style="display:flex; align-items:baseline; gap:10px;">
+            <h2 style="margin:0; font-size:15px; font-weight:700; letter-spacing:-0.01em; color:#000000;">顧客管理リスト</h2>
+            <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8;">CRM</span>
+            <span style="{{ custCountStyle }}">{{ custCountLabel }}</span>
+          </div>
+          <p style="margin:8px 0 0; font-size:11px; color:#b8b8b8;">ステータスはその場で変更（自動保存）／詳細は「編集」から</p>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <sc-if value="{{ hasActiveCustFilters }}">
+            <button onClick="{{ onClearCustFilters }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#8a8a8a; font-size:11px; letter-spacing:0.02em; padding:7px 12px; cursor:pointer; font-family:inherit;">✕ フィルターをクリア</button>
+          </sc-if>
+          <button onClick="{{ onExportCustomersCSV }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.02em; padding:9px 14px; cursor:pointer; font-family:inherit;">⬇ CSVエクスポート</button>
+          <button onClick="{{ onOpenCustModal }}" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:9px 16px; cursor:pointer;">+ 顧客追加</button>
+        </div>
+      </div>
+
+      <!-- CUSTOMER FILTER BAR -->
+      <div style="border:1px solid #e8e8e8; background:#fafafa; padding:12px 16px; display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-right:2px;">STATUS</span>
+          <button onClick="{{ onCustStatusFilterAll }}" style="{{ custStatusAllChipStyle }}">全て</button>
+          <sc-for list="{{ custStatusFilterChips }}" as="chip" hint-placeholder-count="4">
+            <button onClick="{{ chip.onToggle }}" style="{{ chip.chipStyle }}">{{ chip.label }}</button>
+          </sc-for>
+        </div>
+        <div class="mc-sort" style="margin-left:auto; display:flex; align-items:center; gap:8px; flex-shrink:0;">
+          <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8;">SORT</span>
+          <select value="{{ custSortBy }}" onChange="{{ onCustSortChange }}" style="background:#ffffff; border:1px solid #d8d8d8; border-radius:0; color:#1a1a1a; font-size:11px; letter-spacing:0.02em; padding:7px 28px 7px 11px;">
+            <option value="default">追加順</option>
+            <option value="naAsc">NA日時 近い順</option>
+            <option value="amountDesc">契約金額 高い順</option>
+            <option value="status">ステータス順</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUSTOMER ROWS -->
+    <div class="mc-task-wrap" style="border-top:2px solid #000000;">
+      <sc-if value="{{ hasCustomers }}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{ customerRows }}" as="c" hint-placeholder-count="6">
+          <div style="{{ c.rowStyle }}">
+            <div style="display:flex; gap:16px; flex:1; min-width:0; align-items:flex-start;">
+              <div style="{{ c.numStyle }}">{{ c.num }}</div>
+              <div style="flex:1; min-width:0;">
+                <div style="{{ c.channelChipStyle }}">{{ c.channelLabel }}</div>
+                <div style="{{ c.nameStyle }}">{{ c.name }}</div>
+                <div style="font-size:11px; letter-spacing:0.02em; color:#b8b8b8; margin-top:6px;">{{ c.subInfo }}</div>
+                <div style="font-size:12px; color:#8a8a8a; margin-top:8px;">{{ c.memoPreview }}</div>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px; width:216px; flex-shrink:0; align-self:center;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <div style="{{ c.amountStyle }}">{{ c.amountText }}</div>
+                <div style="display:flex; gap:6px; flex-shrink:0;">
+                  <button onClick="{{ c.onEdit }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.02em; padding:5px 10px; cursor:pointer; font-family:inherit;">編集</button>
+                  <button onClick="{{ c.onDelete }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:0; color:#b8b8b8; font-size:12px; line-height:1; width:24px; height:24px; flex-shrink:0; cursor:pointer;" title="削除">✕</button>
+                </div>
+              </div>
+              <select value="{{ c.status }}" onChange="{{ c.onStatus }}" style="{{ c.selectStyle }}">
+                <option value="new">未接触</option>
+                <option value="distro_requested">配布依頼</option>
+                <option value="unread">未読無視</option>
+                <option value="read_ignored">既読無視</option>
+                <option value="replied">回答→知りたい</option>
+                <option value="wait_1st">1次対応待ち</option>
+                <option value="cancel_before_1st">1次前キャン</option>
+                <option value="wait_trial">体験待ち</option>
+                <option value="cancel_before_trial">体験前キャン</option>
+                <option value="in_session">セッション中</option>
+                <option value="follow_up">追客中</option>
+                <option value="wait_payment">決済待ち</option>
+                <option value="won">成約</option>
+                <option value="lost">失注</option>
+                <option value="closed">終了</option>
+              </select>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="{{ c.naStyle }}">{{ c.naText }}</div>
+                <div style="{{ c.assigneeStyle }}">{{ c.assigneeLabel }}</div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{ noCustomers }}">
+        <div style="padding:48px 4px; font-size:11px; letter-spacing:0.02em; color:#b8b8b8;">該当する顧客はありません</div>
+      </sc-if>
+    </div>
+
+    <!-- ADD BAR -->
+    <button onClick="{{ onOpenCustModal }}" style="width:100%; margin-top:0; background:transparent; border:none; border-top:1px dashed #d8d8d8; border-radius:0; color:#8a8a8a; text-align:left; font-size:12px; letter-spacing:0.02em; padding:18px 4px; cursor:pointer;">+ 新規顧客追加</button>
+
+  </sc-if>
+
+  <!-- DRIVE VIEW -->
+  <sc-if value="{{ isViewDrive }}">
+    <div style="margin:40px 0 0;">
+      <div class="mc-board-top" style="display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-bottom:14px;">
+        <div>
+          <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+            <h2 style="margin:0; font-size:15px; font-weight:700; letter-spacing:-0.01em; color:#000000;">ドライブ</h2>
+            <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8;">FILES</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px;">
+            <sc-for list="{{ driveBreadcrumb }}" as="b" hint-placeholder-count="1">
+              <button onClick="{{ b.onClick }}" style="{{ b.style }}">{{ b.label }}</button>
+              <span style="{{ b.sepStyle }}">/</span>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button onClick="{{ onDriveRefresh }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.02em; padding:9px 14px; cursor:pointer; font-family:inherit;">再読み込み</button>
+          <button onClick="{{ onDriveCreateFolderPrompt }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.02em; padding:9px 14px; cursor:pointer; font-family:inherit;">＋ 新規フォルダ</button>
+          <label style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:9px 16px; cursor:pointer;">
+            ＋ アップロード
+            <input type="file" multiple onChange="{{ onDriveFileInputChange }}" style="display:none;">
+          </label>
+        </div>
+      </div>
+
+      <sc-if value="{{ driveError }}">
+        <div style="border:1px solid #f2c4c4; background:#fff5f5; color:#c0392b; font-size:12px; padding:12px 16px; margin-bottom:14px;">{{ driveError }}</div>
+      </sc-if>
+
+      <sc-if value="{{ driveUploading }}">
+        <div style="border:1px solid #ececec; background:#fafafa; font-size:12px; color:#5a5a5a; padding:12px 16px; margin-bottom:14px;">アップロード中（{{ driveUploadFileIndex }}/{{ driveUploadFileCount }}）「{{ driveUploadFileName }}」… {{ driveUploadProgress }}%</div>
+      </sc-if>
+
+      <!-- DRIVE ROWS -->
+      <div class="mc-task-wrap" style="border-top:2px solid #000000;">
+        <sc-if value="{{ driveLoading }}">
+          <div style="padding:48px 4px; font-size:11px; letter-spacing:0.02em; color:#b8b8b8;">読み込み中…</div>
+        </sc-if>
+        <sc-if value="{{ hasDriveFiles }}" hint-placeholder-val="{{ true }}">
+          <sc-for list="{{ driveRows }}" as="f" hint-placeholder-count="6">
+            <div style="display:flex; align-items:center; gap:16px; padding:16px 4px; border-top:1px solid #ececec;">
+              <div style="{{ f.iconStyle }}">{{ f.icon }}</div>
+              <div style="flex:1; min-width:0; cursor:pointer;" onClick="{{ f.onOpen }}">
+                <div style="font-size:13px; font-weight:600; color:#0a0a0a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ f.name }}</div>
+                <div style="font-size:11px; color:#b8b8b8; margin-top:4px;">{{ f.metaText }}</div>
+              </div>
+              <div style="display:flex; gap:6px; flex-shrink:0;">
+                <button onClick="{{ f.onRename }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; padding:5px 10px; cursor:pointer; font-family:inherit;">名前変更</button>
+                <button onClick="{{ f.onMove }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; padding:5px 10px; cursor:pointer; font-family:inherit;">移動</button>
+                <button onClick="{{ f.onDelete }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:0; color:#b8b8b8; font-size:12px; line-height:1; width:24px; height:24px; flex-shrink:0; cursor:pointer;" title="削除">✕</button>
+              </div>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{ noDriveFiles }}">
+          <div style="padding:48px 4px; font-size:11px; letter-spacing:0.02em; color:#b8b8b8;">ファイルがありません</div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- DRIVE MOVE MODAL -->
+  <sc-if value="{{ driveMoveModalOpen }}">
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:200; padding:24px;">
+      <div style="background:#FFFFFF; border:none; border-radius:0; width:100%; max-width:480px; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 24px 60px rgba(0,0,0,0.28);">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:2px solid #000000;">
+          <div style="font-size:14px; font-weight:700; letter-spacing:-0.01em; color:#000000;">移動先フォルダを選択 — 「{{ driveMoveTargetName }}」</div>
+          <button onClick="{{ onDriveMoveCancel }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:0; color:#8a8a8a; font-size:13px; width:28px; height:28px; cursor:pointer;">✕</button>
+        </div>
+        <div style="padding:14px 24px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; border-bottom:1px solid #ececec;">
+          <sc-for list="{{ driveMovePickerBreadcrumb }}" as="b" hint-placeholder-count="1">
+            <button onClick="{{ b.onClick }}" style="{{ b.style }}">{{ b.label }}</button>
+            <span style="{{ b.sepStyle }}">/</span>
+          </sc-for>
+        </div>
+        <div style="overflow-y:auto; flex:1; min-height:120px;">
+          <sc-if value="{{ driveMovePickerLoading }}">
+            <div style="padding:32px 24px; font-size:11px; color:#b8b8b8;">読み込み中…</div>
+          </sc-if>
+          <sc-if value="{{ hasDriveMovePickerFolders }}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{ driveMovePickerRows }}" as="p" hint-placeholder-count="4">
+              <div onClick="{{ p.onOpen }}" style="display:flex; align-items:center; gap:12px; padding:12px 24px; border-top:1px solid #f4f4f4; cursor:pointer;">
+                <span style="font-size:16px;">📁</span>
+                <span style="font-size:12px; color:#0a0a0a;">{{ p.name }}</span>
+              </div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ noDriveMovePickerFolders }}">
+            <div style="padding:32px 24px; font-size:11px; color:#b8b8b8;">サブフォルダはありません</div>
+          </sc-if>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; padding:16px 24px; border-top:1px solid #ececec;">
+          <button onClick="{{ onDriveMoveCancel }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:12px; padding:9px 16px; cursor:pointer; font-family:inherit;">キャンセル</button>
+          <button onClick="{{ onDriveMoveConfirm }}" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:12px; font-weight:600; letter-spacing:0.02em; padding:9px 18px; cursor:pointer;">「{{ driveMovePickerFolderName }}」へ移動</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  </div>
+
+  <!-- TASK ADD MODAL -->
+  <sc-if value="{{ modalOpen }}">
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:200; padding:24px;">
+      <div style="background:#FFFFFF; border:none; border-radius:0; width:100%; max-width:540px; box-shadow:0 24px 60px rgba(0,0,0,0.28);">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:24px 28px; border-bottom:2px solid #000000;">
+          <div style="font-size:15px; font-weight:700; letter-spacing:-0.01em; color:#000000;">新規タスクの追加</div>
+          <button onClick="{{ onCloseModal }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:0; color:#8a8a8a; font-size:13px; width:28px; height:28px; cursor:pointer;">✕</button>
+        </div>
+        <form onSubmit="{{ onAddSubmit }}" style="padding:28px;">
+          <div style="margin-bottom:20px;">
+            <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">タスク名 *</div>
+            <input type="text" required value="{{ draft.title }}" onChange="{{ onDraftTitle }}" placeholder="例: 夏期セールス資料のアップデート" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+          </div>
+          <div style="margin-bottom:20px;">
+            <div style="font-size:10px; letter-spacing:0.06em; color:#E84040; margin-bottom:7px;">GOAL（達成すべき目的）*</div>
+            <input type="text" required value="{{ draft.goal }}" onChange="{{ onDraftGoal }}" placeholder="例: 成約率の5%向上" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+          </div>
+          <div style="margin-bottom:20px;">
+            <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">NA（直近のネクストアクション）*</div>
+            <input type="text" required value="{{ draft.na }}" onChange="{{ onDraftNa }}" placeholder="例: 各メンバーへアンケート実施" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">セクション *</div>
+              <select value="{{ draft.section }}" onChange="{{ onDraftSection }}" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+                <sc-for list="{{ sectionOptions }}" as="opt" hint-placeholder-count="4">
+                  <option value="{{ opt.id }}">{{ opt.name }}</option>
+                </sc-for>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">優先度</div>
+              <select value="{{ draft.priority }}" onChange="{{ onDraftPriority }}" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+                <option value="high">高</option>
+                <option value="medium">中</option>
+                <option value="low">低</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:28px;">
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">期限 *</div>
+              <input type="date" required value="{{ draft.dueDate }}" onChange="{{ onDraftDue }}" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:9px 11px;">
+            </div>
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">初期ステータス</div>
+              <select value="{{ draft.status }}" onChange="{{ onDraftStatus }}" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+                <option value="todo">未着手</option>
+                <option value="doing">進行中</option>
+                <option value="review">レビュー</option>
+                <option value="done">完了</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #ececec; padding-top:20px;">
+            <button type="button" onClick="{{ onCloseModal }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.04em; padding:10px 18px; cursor:pointer;">キャンセル</button>
+            <button type="submit" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:10px 22px; cursor:pointer;">タスクを追加</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- CUSTOMER ADD/EDIT MODAL -->
+  <sc-if value="{{ custModalOpen }}">
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:200; padding:24px;">
+      <div style="background:#FFFFFF; border:none; border-radius:0; width:100%; max-width:640px; max-height:88vh; overflow-y:auto; box-shadow:0 24px 60px rgba(0,0,0,0.28);">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:24px 28px; border-bottom:2px solid #000000; position:sticky; top:0; background:#ffffff;">
+          <div style="font-size:15px; font-weight:700; letter-spacing:-0.01em; color:#000000;">{{ custModalTitle }}</div>
+          <button onClick="{{ onCloseCustModal }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:0; color:#8a8a8a; font-size:13px; width:28px; height:28px; cursor:pointer;">✕</button>
+        </div>
+        <form onSubmit="{{ onCustSubmit }}" style="padding:28px;">
+
+          <div style="margin-bottom:20px;">
+            <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">名前 *</div>
+            <input type="text" required value="{{ custDraft.name }}" onChange="{{ onCustName }}" placeholder="例: 山田 太郎" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">流入経路</div>
+              <select value="{{ custDraft.channel }}" onChange="{{ onCustChannel }}" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+                <option value="シェアフル">シェアフル</option>
+                <option value="紹介">紹介</option>
+                <option value="診断アンケート">診断アンケート</option>
+                <option value="退職代行">退職代行</option>
+                <option value="SNS">SNS</option>
+                <option value="GM">GM</option>
+                <option value="キャリア面談">キャリア面談</option>
+                <option value="街中">街中</option>
+                <option value="飯アポ">飯アポ</option>
+                <option value="LINE配布">LINE配布</option>
+                <option value="その他">その他</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">年齢</div>
+              <input type="number" value="{{ custDraft.age }}" onChange="{{ onCustAge }}" placeholder="例: 28" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">職業</div>
+              <input type="text" value="{{ custDraft.occupation }}" onChange="{{ onCustOccupation }}" placeholder="例: 営業" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+            </div>
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">配布者・紹介者</div>
+              <input type="text" value="{{ custDraft.referrer }}" onChange="{{ onCustReferrer }}" placeholder="例: 村山" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">関係値</div>
+              <select value="{{ custDraft.relationValue }}" onChange="{{ onCustRelationValue }}" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+                <option value="">未設定</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">広告費用（円）</div>
+              <input type="number" value="{{ custDraft.adCost }}" onChange="{{ onCustAdCost }}" placeholder="例: 2000" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">1次対応者</div>
+              <input type="text" value="{{ custDraft.assignee1 }}" onChange="{{ onCustAssignee1 }}" placeholder="例: 村山" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+            </div>
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">2次対応者</div>
+              <input type="text" value="{{ custDraft.assignee2 }}" onChange="{{ onCustAssignee2 }}" placeholder="例: 冨樫" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">初回接触日</div>
+              <input type="date" value="{{ custDraft.contactDate }}" onChange="{{ onCustContactDate }}" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:9px 11px;">
+            </div>
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">NA日時</div>
+              <input type="date" value="{{ custDraft.nextActionDate }}" onChange="{{ onCustNa }}" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:9px 11px;">
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">面談結果</div>
+              <select value="{{ custDraft.meetingResult }}" onChange="{{ onCustMeetingResult }}" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+                <option value="none">未実施</option>
+                <option value="ok">OK</option>
+                <option value="ng">NG</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">体験結果</div>
+              <select value="{{ custDraft.trialResult }}" onChange="{{ onCustTrialResult }}" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+                <option value="none">未実施</option>
+                <option value="ok">OK</option>
+                <option value="ng">NG</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">案件状況</div>
+              <select value="{{ custDraft.status }}" onChange="{{ onCustStatus }}" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+                <option value="new">未接触</option>
+                <option value="distro_requested">配布依頼</option>
+                <option value="unread">未読無視</option>
+                <option value="read_ignored">既読無視</option>
+                <option value="replied">回答→知りたい</option>
+                <option value="wait_1st">1次対応待ち</option>
+                <option value="cancel_before_1st">1次前キャン</option>
+                <option value="wait_trial">体験待ち</option>
+                <option value="cancel_before_trial">体験前キャン</option>
+                <option value="in_session">セッション中</option>
+                <option value="follow_up">追客中</option>
+                <option value="wait_payment">決済待ち</option>
+                <option value="won">成約</option>
+                <option value="lost">失注</option>
+                <option value="closed">終了</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">プラン</div>
+              <input type="text" value="{{ custDraft.plan }}" onChange="{{ onCustPlan }}" placeholder="例: スタンダードプラン" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">回数</div>
+              <input type="number" value="{{ custDraft.sessionCount }}" onChange="{{ onCustSessionCount }}" placeholder="例: 3" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+            </div>
+            <div>
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">契約金額（円）</div>
+              <input type="number" value="{{ custDraft.contractAmount }}" onChange="{{ onCustContractAmount }}" placeholder="例: 220000" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+            </div>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">1次対応メモ</div>
+            <input type="text" value="{{ custDraft.memo1 }}" onChange="{{ onCustMemo1 }}" placeholder="1次対応の内容メモ" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">2次対応メモ</div>
+            <input type="text" value="{{ custDraft.memo2 }}" onChange="{{ onCustMemo2 }}" placeholder="2次対応の内容メモ" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+          </div>
+
+          <div style="margin-bottom:28px;">
+            <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">メモ・備考</div>
+            <textarea value="{{ custDraft.note }}" onChange="{{ onCustNote }}" placeholder="投稿内容・その他メモ" rows="3" style="width:100%; background:#FFFFFF; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px; resize:vertical; font-family:inherit;"></textarea>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; gap:10px; border-top:1px solid #ececec; padding-top:20px;">
+            <sc-if value="{{ custIsEdit }}">
+              <button type="button" onClick="{{ onCustDeleteFromModal }}" style="background:transparent; border:1px solid #f0c8c8; border-radius:0; color:#E84040; font-size:11px; letter-spacing:0.02em; padding:10px 18px; cursor:pointer; font-family:inherit;">削除</button>
+            </sc-if>
+            <div style="display:flex; gap:10px; margin-left:auto;">
+              <button type="button" onClick="{{ onCloseCustModal }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.04em; padding:10px 18px; cursor:pointer;">キャンセル</button>
+              <button type="submit" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:10px 22px; cursor:pointer;">{{ custSubmitLabel }}</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- SETTINGS OVERLAY -->
+  <sc-if value="{{ settingsOpen }}">
+    <div style="position:fixed; inset:0; background:#f7f6f3; z-index:200; overflow-y:auto; color-scheme:light;">
+
+      <!-- Settings Header -->
+      <div style="border-bottom:2px solid #000000; background:#ffffff; position:sticky; top:0; z-index:10;">
+        <div style="max-width:860px; margin:0 auto; padding:20px 32px; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:0.16em; color:#000000; line-height:1;">FULCRUM</span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#aaaaaa; margin-left:4px;">/ 設定</span>
+        </div>
+          <button onClick="{{ onCloseSettings }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:13px; width:32px; height:32px; cursor:pointer; font-family:inherit;">✕</button>
+        </div>
+      </div>
+
+      <!-- Settings Tabs -->
+      <div style="background:#ffffff; border-bottom:1px solid #ececec;">
+        <div style="max-width:860px; margin:0 auto; padding:0 32px; display:flex;">
+          <button onClick="{{ onTabSections }}" style="{{ tabSectionsStyle }}">セクション管理</button>
+          <button onClick="{{ onTabSystem }}" style="{{ tabSystemStyle }}">システム設定</button>
+          <button onClick="{{ onTabData }}" style="{{ tabDataStyle }}">データ管理</button>
+        </div>
+      </div>
+
+      <!-- Tab: セクション管理 -->
+      <sc-if value="{{ isTabSections }}">
+        <div style="max-width:860px; margin:0 auto; padding:32px;">
+
+          <!-- Header row -->
+          <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:4px;">
+            <div>
+              <div style="font-size:13px; font-weight:700; color:#000000;">セクション一覧</div>
+              <div style="font-size:11px; color:#b8b8b8; margin-top:4px;">事業部・チーム・部署を管理します。削除しても既存タスクは保持されます。</div>
+            </div>
+            <button onClick="{{ onSectionAdd }}" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:9px 16px; cursor:pointer; white-space:nowrap; font-family:inherit;">+ セクション追加</button>
+          </div>
+
+          <!-- Section list -->
+          <div style="background:#ffffff; border:1px solid #ececec; margin-bottom:24px;">
+            <sc-for list="{{ settingSections }}" as="ss" hint-placeholder-count="4">
+              <div style="{{ ss.rowStyle }}">
+                <div style="{{ ss.swatchStyle }}"></div>
+                <div style="font-size:11px; font-weight:700; letter-spacing:0.06em; color:#8a8a8a; width:64px; flex-shrink:0; font-family:'Inter',monospace;">{{ ss.code }}</div>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:14px; font-weight:600; color:#0a0a0a; letter-spacing:-0.01em;">{{ ss.name }}</div>
+                  <div style="font-size:11px; color:#b8b8b8; margin-top:2px;">担当: {{ ss.leader }}</div>
+                </div>
+                <div style="display:flex; gap:8px; flex-shrink:0;">
+                  <button onClick="{{ ss.onEdit }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.02em; padding:6px 14px; cursor:pointer; font-family:inherit;">編集</button>
+                  <button onClick="{{ ss.onDelete }}" style="background:transparent; border:1px solid #f0c8c8; border-radius:0; color:#E84040; font-size:11px; letter-spacing:0.02em; padding:6px 14px; cursor:pointer; font-family:inherit;">削除</button>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ noSections }}">
+              <div style="padding:32px; text-align:center; font-size:12px; color:#b8b8b8;">セクションがありません。「+ セクション追加」から追加してください。</div>
+            </sc-if>
+          </div>
+
+          <!-- Section add/edit form -->
+          <sc-if value="{{ sectionFormOpen }}">
+            <div style="background:#ffffff; border:2px solid #000000; padding:28px;">
+              <div style="font-size:13px; font-weight:700; color:#000000; margin-bottom:22px; display:flex; align-items:center; gap:10px;">
+                <span style="{{ sectionFormAccent }}"></span>
+                {{ sectionFormTitle }}
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+                <div>
+                  <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">セクションコード</div>
+                  <input type="text" value="{{ sectionDraft.code }}" onChange="{{ onSectionDraftCode }}" placeholder="例: SEC-05" style="width:100%; background:#ffffff; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+                </div>
+                <div>
+                  <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">テーマカラー</div>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="color" value="{{ sectionDraft.color }}" onChange="{{ onSectionDraftColor }}" style="width:44px; height:40px; border:1px solid #d8d8d8; border-radius:0; background:#ffffff; flex-shrink:0;">
+                    <span style="font-size:12px; color:#8a8a8a; font-family:'Inter',monospace; letter-spacing:0.04em;">{{ sectionDraft.color }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-bottom:16px;">
+                <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">セクション名 *</div>
+                <input type="text" value="{{ sectionDraft.name }}" onChange="{{ onSectionDraftName }}" placeholder="例: 人事総務部" style="width:100%; background:#ffffff; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+              </div>
+
+              <div style="margin-bottom:24px;">
+                <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">担当者名</div>
+                <input type="text" value="{{ sectionDraft.leader }}" onChange="{{ onSectionDraftLeader }}" placeholder="例: 田中 花子" style="width:100%; background:#ffffff; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+              </div>
+
+              <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #ececec; padding-top:20px;">
+                <button onClick="{{ onSectionFormCancel }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.04em; padding:10px 18px; cursor:pointer; font-family:inherit;">キャンセル</button>
+                <button onClick="{{ onSectionFormSave }}" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:10px 22px; cursor:pointer; font-family:inherit;">{{ sectionFormSaveLabel }}</button>
+              </div>
+            </div>
+          </sc-if>
+
+        </div>
+      </sc-if>
+
+      <!-- Tab: システム設定 -->
+      <sc-if value="{{ isTabSystem }}">
+        <div style="max-width:860px; margin:0 auto; padding:32px;">
+
+          <div style="background:#ffffff; border:1px solid #ececec; padding:28px; margin-bottom:20px;">
+            <div style="font-size:13px; font-weight:700; color:#000000; border-bottom:1px solid #ececec; padding-bottom:14px; margin-bottom:20px;">アプリ表示設定</div>
+
+            <div style="margin-bottom:20px;">
+              <div style="font-size:10px; letter-spacing:0.06em; color:#8a8a8a; margin-bottom:7px;">ヘッダーサブタイトル</div>
+              <input type="text" value="{{ subtitle }}" onChange="{{ onSubtitleChange }}" placeholder="例: 事業部タスクシステム" style="width:100%; max-width:400px; background:#ffffff; border:1px solid #d8d8d8; border-radius:0; color:#0a0a0a; font-size:13px; padding:10px 11px;">
+              <div style="font-size:11px; color:#b8b8b8; margin-top:6px;">ヘッダー右に表示されるテキストです。変更は即時反映されます。</div>
+            </div>
+          </div>
+
+        </div>
+      </sc-if>
+
+      <!-- Tab: データ管理 -->
+      <sc-if value="{{ isTabData }}">
+        <div style="max-width:860px; margin:0 auto; padding:32px;">
+
+          <div style="background:#ffffff; border:1px solid #ececec; padding:28px; margin-bottom:20px;">
+            <div style="font-size:13px; font-weight:700; color:#000000; border-bottom:1px solid #ececec; padding-bottom:14px; margin-bottom:20px;">データエクスポート</div>
+            <div style="font-size:12px; color:#5a5a5a; margin-bottom:16px;">現在のタスクデータをJSON形式でダウンロードします。</div>
+            <button onClick="{{ onExportTasks }}" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:10px 18px; cursor:pointer; font-family:inherit;">タスクデータをエクスポート</button>
+          </div>
+
+          <div style="background:#ffffff; border:1px solid #f0c8c8; padding:28px;">
+            <div style="font-size:13px; font-weight:700; color:#E84040; border-bottom:1px solid #f0c8c8; padding-bottom:14px; margin-bottom:20px;">危険ゾーン</div>
+            <div style="display:flex; flex-direction:column; gap:16px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:20px; padding:16px; background:#fff8f8; border:1px solid #f0c8c8;">
+                <div>
+                  <div style="font-size:13px; font-weight:600; color:#0a0a0a;">タスクをリセット</div>
+                  <div style="font-size:11px; color:#8a8a8a; margin-top:3px;">全タスクを初期サンプルデータに戻します。この操作は取り消せません。</div>
+                </div>
+                <button onClick="{{ onResetTasks }}" style="background:transparent; border:1px solid #E84040; border-radius:0; color:#E84040; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:9px 16px; cursor:pointer; white-space:nowrap; font-family:inherit;">リセット</button>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:20px; padding:16px; background:#fff8f8; border:1px solid #f0c8c8;">
+                <div>
+                  <div style="font-size:13px; font-weight:600; color:#0a0a0a;">セクションをリセット</div>
+                  <div style="font-size:11px; color:#8a8a8a; margin-top:3px;">セクション設定を初期値（4部署）に戻します。この操作は取り消せません。</div>
+                </div>
+                <button onClick="{{ onResetSections }}" style="background:transparent; border:1px solid #E84040; border-radius:0; color:#E84040; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:9px 16px; cursor:pointer; white-space:nowrap; font-family:inherit;">リセット</button>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:20px; padding:16px; background:#fff8f8; border:1px solid #f0c8c8;">
+                <div>
+                  <div style="font-size:13px; font-weight:600; color:#0a0a0a;">全データを消去</div>
+                  <div style="font-size:11px; color:#8a8a8a; margin-top:3px;">タスク・セクション・設定を含む全データを削除します。初期状態に戻ります。</div>
+                </div>
+                <button onClick="{{ onResetAll }}" style="background:#E84040; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:9px 16px; cursor:pointer; white-space:nowrap; font-family:inherit;">全消去</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </sc-if>
+
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    activeView: 'tasks',
+    tasks: this.loadTasks(),
+    sections: this.loadSections(),
+    activeSecFilters: [],
+    activeStatusFilters: ['doing', 'review', 'todo'],
+    sortBy: 'default',
+    scrolled: false,
+    loading: !!window._db,
+    modalOpen: false,
+    draft: { title:'', goal:'', na:'', section: this.loadSections()[0]?.id || 'dev', priority:'medium', dueDate: this.nextWeek(), status:'todo' },
+    settingsOpen: false,
+    settingsTab: 'sections',
+    sectionForm: null,
+    sectionDraft: { code:'', name:'', leader:'', color:'#0E9E96' },
+    subtitle: this.loadSubtitle(),
+
+    customers: this.loadCustomers(),
+
+    driveRootId: null,           // set from /api/drive-list on first load
+    driveFolderId: null,
+    driveFolderName: 'ドライブ',
+    driveFolderStack: [],        // [{ id, name }] excluding current folder
+    driveFiles: [],
+    driveLoading: false,
+    driveError: null,
+    driveUploading: false,
+    driveUploadProgress: 0,
+    driveUploadFileIndex: 0,
+    driveUploadFileCount: 0,
+    driveUploadFileName: '',
+
+    driveMoveModalOpen: false,
+    driveMoveTarget: null,        // the file/folder being moved
+    driveMovePickerFolderId: null,
+    driveMovePickerFolderName: 'ドライブ',
+    driveMovePickerStack: [],
+    driveMovePickerFolders: [],
+    driveMovePickerLoading: false,
+
+    custStatusFilters: [],
+    custSortBy: 'default',
+    custModalOpen: false,
+    custEditId: null,
+    custDraft: this.emptyCustomerDraft(),
+    dashFrom: '',
+    dashTo: ''
   };
-  if (cfg.databaseURL !== "★REPLACE★") {
-    firebase.initializeApp(cfg);
-    window._db = firebase.database();
+
+  get STATUS_COLORS(){ return { todo:'#D0D0D0', doing:'#2563EB', review:'#D97706', done:'#16A34A' }; }
+  get STATUS_LABELS(){ return { todo:'未着手', doing:'進行中', review:'レビュー', done:'完了' }; }
+  get EMPTY_SEG(){ return '#ececec'; }
+  get EMPTY_DOT(){ return '#e0e0e0'; }
+
+  get CUST_STATUS_LABELS(){
+    return {
+      new:'未接触', distro_requested:'配布依頼', unread:'未読無視', read_ignored:'既読無視',
+      replied:'回答→知りたい', wait_1st:'1次対応待ち', cancel_before_1st:'1次前キャン',
+      wait_trial:'体験待ち', cancel_before_trial:'体験前キャン', in_session:'セッション中',
+      follow_up:'追客中', wait_payment:'決済待ち', won:'成約', lost:'失注', closed:'終了'
+    };
   }
-})();
-</script>
-</head>
-<body>
-<div id="calendar-container"></div>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-<script src="/dist/CustomerCalendar.js"></script>
-<script>
-  (function () {
-    var container = document.getElementById('calendar-container');
+  get CUST_STATUS_BUCKET(){
+    return {
+      new:'active', distro_requested:'active', unread:'active', read_ignored:'active',
+      replied:'active', wait_1st:'active', cancel_before_1st:'active', wait_trial:'active',
+      cancel_before_trial:'active', in_session:'active', follow_up:'active', wait_payment:'active',
+      won:'won', lost:'lost', closed:'closed'
+    };
+  }
+  get CUST_STATUS_COLORS(){
+    return {
+      new:'#8a8a8a', distro_requested:'#8a8a8a', unread:'#8a8a8a', read_ignored:'#8a8a8a',
+      replied:'#2563EB', wait_1st:'#2563EB', cancel_before_1st:'#b8b8b8',
+      wait_trial:'#2563EB', cancel_before_trial:'#b8b8b8', in_session:'#D97706',
+      follow_up:'#D97706', wait_payment:'#D97706', won:'#16A34A', lost:'#E84040', closed:'#b8b8b8'
+    };
+  }
 
-    function removeOverlay() {
-      var overlay = document.getElementById('calendar-overlay');
-      if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  get INITIAL_SECTIONS(){
+    return [
+      { id:'dev',      code:'SEC-01', name:'システム開発部',   leader:'山田 太郎', color:'#0E9E96' },
+      { id:'mktg',     code:'SEC-02', name:'マーケティング部', leader:'佐藤 美咲', color:'#3B7DD8' },
+      { id:'sales',    code:'SEC-03', name:'営業第一チーム',   leader:'高橋 健二', color:'#8B5FD6' },
+      { id:'planning', code:'SEC-04', name:'事業企画部',       leader:'鈴木 雅也', color:'#D45D8E' }
+    ];
+  }
+
+  get PRESET_COLORS(){ return ['#0E9E96','#3B7DD8','#8B5FD6','#D45D8E','#E87040','#2E9B6B','#B5860A','#5A6980']; }
+
+  get INITIAL(){
+    return [
+      { id:1,  section:'dev',      title:'メインデータベースの移行作業',       status:'doing',  priority:'high',   dueDate:'2026-07-05', goal:'新サーバーでのデータベース安定稼働率99.99%達成',          na:'移行手順書の最終レビューと夜間実施シミュレーション' },
+      { id:2,  section:'dev',      title:'フロントエンド パフォーマンス改善',  status:'done',   priority:'medium', dueDate:'2026-06-25', goal:'主要ページの読み込み時間（LCP）を2.5秒以下にする',       na:'未使用ライブラリの削除と全画像の最適化処理の適用' },
+      { id:3,  section:'dev',      title:'セキュリティ脆弱性パッチ適用',       status:'todo',   priority:'high',   dueDate:'2026-07-10', goal:'監査指摘のあった全3箇所の重要セキュリティリスクの排除', na:'検証環境への先行インストールと他モジュールへの影響検証' },
+      { id:4,  section:'mktg',     title:'夏期プロモーションLP制作',           status:'review', priority:'high',   dueDate:'2026-06-30', goal:'新キャンペーンによる新規ユーザー登録数 200件突破',       na:'スマホ表示崩れの修正確認とリーダー最終承認の取得' },
+      { id:5,  section:'mktg',     title:'SNS広告運用レポート作成',            status:'done',   priority:'low',    dueDate:'2026-06-20', goal:'CPA（獲得単価）高騰の原因を特定し改善方針を決定する',   na:'配信セグメント別実績データの抽出と週報フォーマットへの反映' },
+      { id:6,  section:'mktg',     title:'新規リード獲得施策の選定',           status:'todo',   priority:'medium', dueDate:'2026-07-15', goal:'費用対効果の高いアライアンス施策を2件厳選する',          na:'アライアンス候補企業のリストアップとアプローチ文面の準備' },
+      { id:7,  section:'sales',    title:'大口クライアントA社 提案資料作成',   status:'doing',  priority:'high',   dueDate:'2026-06-29', goal:'年間契約額5,000万円の見込み案件でコンペ競合に勝つ',     na:'提案書の技術連携部分に関する技術部山田さんとの最終相談' },
+      { id:8,  section:'sales',    title:'今期売上進捗の集計と分析',           status:'done',   priority:'medium', dueDate:'2026-06-24', goal:'各営業の行動ボトルネックをグラフ化して可視化する',       na:'未提出の営業マン2名へチャットにて回収リマインド' },
+      { id:9,  section:'planning', title:'来期事業戦略ドラフト策定',           status:'doing',  priority:'high',   dueDate:'2026-07-15', goal:'役員会議の第1次審査をノー修正で通過できる計画骨子の合意', na:'各部門長リーダーへの現在の課題と来期構想のヒアリング' },
+      { id:10, section:'planning', title:'社内ワークフロー改善案の策定',       status:'review', priority:'low',    dueDate:'2026-06-28', goal:'各種経費申請承認にかかるリードタイムを2日短縮する',     na:'テスト協力部署から回収したフィードバック集計と改善要約' }
+    ];
+  }
+
+  nextWeek(){
+    const d = new Date(Date.now() + 7*86400000);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  loadTasks(){
+    try { const s = JSON.parse(localStorage.getItem('portal_tasks')); if (s && s.length) return s; } catch(e){}
+    return this.INITIAL;
+  }
+  persist(tasks){
+    try { localStorage.setItem('portal_tasks', JSON.stringify(tasks)); } catch(e){}
+    if (window._db) window._db.ref('tasks').set(tasks);
+  }
+
+  loadSections(){
+    try { const s = JSON.parse(localStorage.getItem('portal_sections')); if (s && s.length) return s; } catch(e){}
+    return this.INITIAL_SECTIONS;
+  }
+  persistSections(secs){
+    try { localStorage.setItem('portal_sections', JSON.stringify(secs)); } catch(e){}
+    if (window._db) window._db.ref('sections').set(secs);
+  }
+
+  loadSubtitle(){
+    try { return localStorage.getItem('portal_subtitle') || 'DIVISION TASK SYSTEM'; } catch(e){ return 'DIVISION TASK SYSTEM'; }
+  }
+  persistSubtitle(s){
+    try { localStorage.setItem('portal_subtitle', s); } catch(e){}
+    if (window._db) window._db.ref('subtitle').set(s);
+  }
+
+  emptyCustomerDraft(){
+    return {
+      name:'', age:'', occupation:'',
+      channel:'シェアフル', referrer:'', relationValue:'',
+      assignee1:'', assignee2:'',
+      contactDate:'', nextActionDate:'',
+      meetingResult:'none', trialResult:'none',
+      status:'new', adCost:'',
+      plan:'', sessionCount:'', contractAmount:'',
+      memo1:'', memo2:'', note:''
+    };
+  }
+  loadCustomers(){
+    try { const s = JSON.parse(localStorage.getItem('portal_customers')); if (s && s.length) return s; } catch(e){}
+    return [];
+  }
+  persistCustomers(customers){
+    try { localStorage.setItem('portal_customers', JSON.stringify(customers)); } catch(e){}
+    if (window._db) window._db.ref('customers').set(customers);
+  }
+
+  // ---- DRIVE ----
+  async loadDriveFiles(folderId){
+    this.setState({ driveLoading: true, driveError: null });
+    try {
+      const url = folderId ? ('/api/drive-list?folderId=' + encodeURIComponent(folderId)) : '/api/drive-list';
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '一覧取得に失敗しました');
+      const ns = { driveFiles: data.files || [], driveFolderId: data.folderId, driveLoading: false };
+      if (!this.state.driveRootId) ns.driveRootId = data.folderId;
+      this.setState(ns);
+    } catch (e) {
+      this.setState({ driveError: e.message, driveLoading: false });
     }
-
-    function mount() {
-      if (!window.CustomerCalendar || typeof window.React === 'undefined' || typeof window.ReactDOM === 'undefined') {
-        return false;
-      }
-      try {
-        window.ReactDOM.render(window.React.createElement(window.CustomerCalendar), container);
-        removeOverlay();
-        return true;
-      } catch (e) {
-        console.error('CustomerCalendar mount failed:', e);
-        return false;
-      }
-    }
-
-    var deadline = Date.now() + 4000;
-    var timer = setInterval(function () {
-      if (mount()) {
-        clearInterval(timer);
-        return;
-      }
-      if (Date.now() > deadline) {
-        clearInterval(timer);
-        // タイムアウト: オーバーレイを強制削除して永続表示を防ぐ
-        removeOverlay();
-      }
-    }, 50);
-
-    window.addEventListener('load', function () {
-      mount();
-      setTimeout(removeOverlay, 4200);
+  }
+  onDriveRefresh(){
+    this.loadDriveFiles(this.state.driveFolderId);
+  }
+  onDriveFolderOpen(folder){
+    this.setState({
+      driveFolderStack: [...this.state.driveFolderStack, { id: this.state.driveFolderId, name: this.state.driveFolderName }],
+      driveFolderName: folder.name,
     });
-  })();
+    this.loadDriveFiles(folder.id);
+  }
+  onDriveBreadcrumbClick(idx){
+    const stack = this.state.driveFolderStack;
+    const target = stack[idx];
+    this.setState({ driveFolderStack: stack.slice(0, idx), driveFolderName: target.name });
+    this.loadDriveFiles(target.id);
+  }
+  onDriveCreateFolderPrompt(){
+    const name = window.prompt('新規フォルダ名を入力してください');
+    if (!name || !name.trim()) return;
+    this.createDriveFolder(name.trim());
+  }
+  async createDriveFolder(name){
+    this.setState({ driveError: null });
+    try {
+      const res = await fetch('/api/drive-create-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderId: this.state.driveFolderId, name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'フォルダ作成に失敗しました');
+      this.loadDriveFiles(this.state.driveFolderId);
+    } catch (e) {
+      this.setState({ driveError: e.message });
+    }
+  }
+  onDriveRenamePrompt(file){
+    const name = window.prompt('新しい名前を入力してください', file.name);
+    if (!name || !name.trim() || name.trim() === file.name) return;
+    this.renameDriveFile(file.id, name.trim());
+  }
+  async renameDriveFile(fileId, name){
+    this.setState({ driveError: null });
+    try {
+      const res = await fetch('/api/drive-rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId, name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '名前の変更に失敗しました');
+      this.loadDriveFiles(this.state.driveFolderId);
+    } catch (e) {
+      this.setState({ driveError: e.message });
+    }
+  }
+  onDriveMovePrompt(file){
+    this.setState({
+      driveMoveModalOpen: true,
+      driveMoveTarget: file,
+      driveMovePickerFolderId: this.state.driveRootId,
+      driveMovePickerFolderName: 'ドライブ',
+      driveMovePickerStack: [],
+    });
+    this.loadDriveMovePickerFolders(this.state.driveRootId);
+  }
+  onDriveMoveCancel(){
+    this.setState({ driveMoveModalOpen: false, driveMoveTarget: null });
+  }
+  onDriveMoveConfirm(){
+    const target = this.state.driveMoveTarget;
+    const destFolderId = this.state.driveMovePickerFolderId;
+    this.setState({ driveMoveModalOpen: false, driveMoveTarget: null });
+    if (target && destFolderId) this.moveDriveFile(target.id, destFolderId);
+  }
+  async loadDriveMovePickerFolders(folderId){
+    this.setState({ driveMovePickerLoading: true });
+    try {
+      const res = await fetch('/api/drive-list?folderId=' + encodeURIComponent(folderId));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '一覧取得に失敗しました');
+      const folders = (data.files || []).filter(f => f.mimeType === 'application/vnd.google-apps.folder');
+      this.setState({ driveMovePickerFolders: folders, driveMovePickerLoading: false });
+    } catch (e) {
+      this.setState({ driveMovePickerLoading: false, driveError: e.message });
+    }
+  }
+  onDriveMovePickerOpen(folder){
+    this.setState({
+      driveMovePickerStack: [...this.state.driveMovePickerStack, { id: this.state.driveMovePickerFolderId, name: this.state.driveMovePickerFolderName }],
+      driveMovePickerFolderId: folder.id,
+      driveMovePickerFolderName: folder.name,
+    });
+    this.loadDriveMovePickerFolders(folder.id);
+  }
+  onDriveMovePickerBreadcrumbClick(idx){
+    const stack = this.state.driveMovePickerStack;
+    const target = stack[idx];
+    this.setState({ driveMovePickerStack: stack.slice(0, idx), driveMovePickerFolderId: target.id, driveMovePickerFolderName: target.name });
+    this.loadDriveMovePickerFolders(target.id);
+  }
+  async moveDriveFile(fileId, newParentId){
+    this.setState({ driveError: null });
+    try {
+      const res = await fetch('/api/drive-move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId, newParentId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '移動に失敗しました');
+      this.loadDriveFiles(this.state.driveFolderId);
+    } catch (e) {
+      this.setState({ driveError: e.message });
+    }
+  }
+  onDriveDeletePrompt(file){
+    if (!window.confirm('「' + file.name + '」をゴミ箱に移動しますか？')) return;
+    this.deleteDriveFile(file.id);
+  }
+  async deleteDriveFile(fileId){
+    this.setState({ driveError: null });
+    try {
+      const res = await fetch('/api/drive-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '削除に失敗しました');
+      this.loadDriveFiles(this.state.driveFolderId);
+    } catch (e) {
+      this.setState({ driveError: e.message });
+    }
+  }
+  onDriveFileInputChange(e){
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (files.length) this.uploadDriveFiles(files);
+  }
+  async uploadDriveFiles(files){
+    this.setState({ driveUploading: true, driveUploadProgress: 0, driveUploadFileIndex: 0, driveUploadFileCount: files.length, driveUploadFileName: files[0].name, driveError: null });
+    const failed = [];
+    for (let i = 0; i < files.length; i++) {
+      this.setState({ driveUploadFileIndex: i + 1, driveUploadFileName: files[i].name, driveUploadProgress: 0 });
+      try {
+        await this.uploadOneDriveFile(files[i]);
+      } catch (e) {
+        failed.push(files[i].name + ': ' + e.message);
+      }
+    }
+    this.setState({
+      driveUploading: false,
+      driveError: failed.length ? ('一部のアップロードに失敗しました - ' + failed.join(' / ')) : null,
+    });
+    this.loadDriveFiles(this.state.driveFolderId);
+  }
+  async uploadOneDriveFile(file){
+    const initRes = await fetch('/api/drive-upload-init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId: this.state.driveFolderId, name: file.name, mimeType: file.type, size: file.size }),
+    });
+    const init = await initRes.json();
+    if (!initRes.ok) throw new Error(init.error || 'アップロード準備に失敗しました');
+
+    const CHUNK = 8 * 1024 * 1024;
+    let offset = 0;
+    while (offset < file.size) {
+      const end = Math.min(offset + CHUNK, file.size);
+      const chunk = file.slice(offset, end);
+      const res = await fetch(init.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Range': `bytes ${offset}-${end - 1}/${file.size}` },
+        body: chunk,
+      });
+      if (res.status === 200 || res.status === 201) { offset = file.size; break; }
+      if (res.status !== 308) throw new Error('status ' + res.status);
+      offset = end;
+      this.setState({ driveUploadProgress: Math.round((offset / file.size) * 100) });
+    }
+    this.setState({ driveUploadProgress: 100 });
+  }
+
+  componentDidMount(){
+    this.loadDriveFiles(null);
+    this._key = (e) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); this.setState({ modalOpen:true }); }
+      if (e.key === 'Escape') {
+        if (this.state.modalOpen) this.setState({ modalOpen:false });
+        if (this.state.settingsOpen && this.state.sectionForm !== null) this.setState({ sectionForm:null });
+        else if (this.state.settingsOpen) this.setState({ settingsOpen:false });
+      }
+    };
+    window.addEventListener('keydown', this._key);
+    this._scroll = () => {
+      const s = window.scrollY > 10;
+      if (s !== this.state.scrolled) this.setState({ scrolled: s });
+    };
+    window.addEventListener('scroll', this._scroll, { passive: true });
+    setTimeout(() => this.scrambleTitle(), 250);
+    if (window._db) {
+      this._fbRef = window._db.ref('/');
+      this._loadTimer = setTimeout(() => this.setState({ loading: false }), 5000);
+      this._fbRef.on('value', snap => {
+        clearTimeout(this._loadTimer);
+        const d = snap.val();
+        const ns = { loading: false };
+        if (d) {
+          if (d.tasks)     ns.tasks     = Object.values(d.tasks);
+          if (d.sections)  ns.sections  = Object.values(d.sections);
+          if (d.customers) ns.customers = Object.values(d.customers);
+          if (typeof d.subtitle === 'string') ns.subtitle = d.subtitle;
+        }
+        this.setState(ns);
+      });
+    }
+  }
+  componentWillUnmount(){
+    window.removeEventListener('keydown', this._key);
+    window.removeEventListener('scroll', this._scroll);
+    if (this._fbRef) this._fbRef.off();
+    clearTimeout(this._loadTimer);
+  }
+
+  scrambleTitle(){
+    const el = document.getElementById('fulcrum-title');
+    if (!el) return;
+    const target = 'FULCRUM';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let iter = 0;
+    const steps = 20;
+    const t = setInterval(() => {
+      el.textContent = target.split('').map((c, i) =>
+        iter >= i * (steps / target.length) + (steps / target.length)
+          ? c
+          : chars[Math.floor(Math.random() * chars.length)]
+      ).join('');
+      if (++iter > steps + 3) { el.textContent = target; clearInterval(t); }
+    }, 45);
+  }
+
+  updateField(id, field, val){
+    const tasks = this.state.tasks.map(t => t.id === id ? { ...t, [field]:val } : t);
+    this.persist(tasks);
+    this.setState({ tasks });
+  }
+  updateStatus(id, val){ this.updateField(id, 'status', val); }
+  deleteTask(id){
+    const tasks = this.state.tasks.filter(t => t.id !== id);
+    this.persist(tasks);
+    this.setState({ tasks });
+  }
+  setDraft(field, val){ this.setState({ draft: { ...this.state.draft, [field]:val } }); }
+  addTask(e){
+    e.preventDefault();
+    const d = this.state.draft;
+    if (!d.title || !d.goal || !d.na || !d.dueDate) return;
+    const task = { id:Date.now(), title:d.title, goal:d.goal, na:d.na, section:d.section, priority:d.priority, dueDate:d.dueDate, status:d.status };
+    const tasks = [...this.state.tasks, task];
+    this.persist(tasks);
+    const firstSec = this.state.sections[0]?.id || 'dev';
+    this.setState({ tasks, modalOpen:false, draft:{ title:'', goal:'', na:'', section:firstSec, priority:'medium', dueDate:this.nextWeek(), status:'todo' } });
+  }
+
+  openSectionAdd(){
+    const nextColor = this.PRESET_COLORS[this.state.sections.length % this.PRESET_COLORS.length];
+    const nextCode = 'SEC-' + String(this.state.sections.length + 1).padStart(2,'0');
+    this.setState({ sectionForm:'add', sectionDraft:{ code:nextCode, name:'', leader:'', color:nextColor } });
+  }
+  openSectionEdit(id){
+    const sec = this.state.sections.find(s => s.id === id);
+    if (!sec) return;
+    this.setState({ sectionForm:id, sectionDraft:{ code:sec.code, name:sec.name, leader:sec.leader, color:sec.color } });
+  }
+  saveSectionForm(){
+    const d = this.state.sectionDraft;
+    if (!d.name.trim()) return;
+    let sections;
+    if (this.state.sectionForm === 'add'){
+      const id = 'sec_' + Date.now();
+      sections = [...this.state.sections, { id, code:d.code.trim(), name:d.name.trim(), leader:d.leader.trim(), color:d.color }];
+    } else {
+      sections = this.state.sections.map(s => s.id === this.state.sectionForm ? { ...s, code:d.code.trim(), name:d.name.trim(), leader:d.leader.trim(), color:d.color } : s);
+    }
+    this.persistSections(sections);
+    this.setState({ sections, sectionForm:null });
+  }
+  deleteSection(id){
+    if (!window.confirm('このセクションを削除しますか？\n（このセクションのタスクは「未割当」として残ります）')) return;
+    const sections = this.state.sections.filter(s => s.id !== id);
+    this.persistSections(sections);
+    this.setState({ sections, sectionForm:null });
+  }
+  setSectionDraft(field, val){ this.setState({ sectionDraft:{ ...this.state.sectionDraft, [field]:val } }); }
+
+  setCustDraft(field, val){ this.setState({ custDraft: { ...this.state.custDraft, [field]:val } }); }
+  openCustAdd(){ this.setState({ custModalOpen:true, custEditId:null, custDraft:this.emptyCustomerDraft() }); }
+  openCustEdit(id){
+    const c = this.state.customers.find(x => x.id === id);
+    if (!c) return;
+    this.setState({ custModalOpen:true, custEditId:id, custDraft:{ ...this.emptyCustomerDraft(), ...c } });
+  }
+  closeCustModal(){ this.setState({ custModalOpen:false, custEditId:null }); }
+  saveCustomer(e){
+    e.preventDefault();
+    const d = this.state.custDraft;
+    if (!d.name || !d.name.trim()) return;
+    let customers;
+    if (this.state.custEditId){
+      customers = this.state.customers.map(c => c.id === this.state.custEditId ? { ...c, ...d, id:c.id } : c);
+    } else {
+      customers = [...this.state.customers, { ...d, id: Date.now() }];
+    }
+    this.persistCustomers(customers);
+    this.setState({ customers, custModalOpen:false, custEditId:null, custDraft:this.emptyCustomerDraft() });
+  }
+  updateCustomerField(id, field, val){
+    const customers = this.state.customers.map(c => c.id === id ? { ...c, [field]:val } : c);
+    this.persistCustomers(customers);
+    this.setState({ customers });
+  }
+  updateCustomerStatus(id, val){ this.updateCustomerField(id, 'status', val); }
+  deleteCustomer(id){
+    if (!window.confirm('この顧客を削除しますか？')) return;
+    const customers = this.state.customers.filter(c => c.id !== id);
+    this.persistCustomers(customers);
+    this.setState({ customers, custModalOpen:false, custEditId:null });
+  }
+  toggleCustStatusFilter(key){
+    const cur = this.state.custStatusFilters;
+    this.setState({ custStatusFilters: cur.includes(key) ? cur.filter(x => x !== key) : [...cur, key] });
+  }
+
+  exportCustomersCSV(){
+    const RESULT_LABELS = { none:'未実施', ok:'OK', ng:'NG' };
+    const headers = ['名前','年齢','職業','流入経路','配布者・紹介者','関係値','1次対応者','2次対応者','初回接触日','NA日時','面談結果','体験結果','案件状況','広告費用','プラン','回数','契約金額','1次対応メモ','2次対応メモ','メモ備考'];
+    const esc = (v) => {
+      const s = (v === undefined || v === null) ? '' : String(v);
+      return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const rows = this.state.customers.map(c => [
+      c.name, c.age, c.occupation, c.channel, c.referrer, c.relationValue,
+      c.assignee1, c.assignee2, c.contactDate, c.nextActionDate,
+      RESULT_LABELS[c.meetingResult] || '未実施', RESULT_LABELS[c.trialResult] || '未実施',
+      this.CUST_STATUS_LABELS[c.status] || c.status, c.adCost, c.plan, c.sessionCount, c.contractAmount,
+      c.memo1, c.memo2, c.note
+    ].map(esc).join(','));
+    const csv = '\uFEFF' + [headers.map(esc).join(','), ...rows].join('\r\n');
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+    const today = new Date();
+    const stamp = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'customers_export_' + stamp + '.csv';
+    a.click();
+  }
+
+  toggleSecFilter(id){
+    const cur = this.state.activeSecFilters;
+    this.setState({ activeSecFilters: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] });
+  }
+  toggleStatusFilter(key){
+    const cur = this.state.activeStatusFilters;
+    this.setState({ activeStatusFilters: cur.includes(key) ? cur.filter(x => x !== key) : [...cur, key] });
+  }
+
+  diffDays(due){
+    const today = new Date(); today.setHours(0,0,0,0);
+    return Math.ceil((new Date(due) - today) / 86400000);
+  }
+
+  buildStackedMeter(counts, count, height, gap){
+    const order = ['done','review','doing','todo'];
+    const colors = this.STATUS_COLORS;
+    const total = order.reduce((s,k) => s+counts[k], 0);
+    const segColors = [];
+    if (total === 0){
+      for (let i=0;i<count;i++) segColors.push(this.EMPTY_SEG);
+    } else {
+      const raw = order.map(k => counts[k]/total*count);
+      const floor = raw.map(v => Math.floor(v));
+      let used = floor.reduce((a,b) => a+b, 0);
+      const rema = raw.map((v,i) => ({i, r:v-floor[i]})).sort((a,b) => b.r-a.r);
+      let idx=0;
+      while (used < count && rema.length){ floor[rema[idx % rema.length].i]++; used++; idx++; }
+      order.forEach((k,oi) => { for(let j=0;j<floor[oi];j++) segColors.push(colors[k]); });
+      while (segColors.length < count) segColors.push(this.EMPTY_SEG);
+    }
+    const segs = segColors.map((c,i) => React.createElement('div',{key:i,style:{flex:'1 1 0',height,background:c}}));
+    return React.createElement('div',{style:{display:'flex',gap,width:'100%'}},segs);
+  }
+
+  renderVals(){
+    const tasks = this.state.tasks;
+    const sections = this.state.sections;
+    const total = tasks.length;
+    const divCounts = { todo:0, doing:0, review:0, done:0 };
+    tasks.forEach(t => { if (divCounts[t.status] !== undefined) divCounts[t.status]++; });
+    const active = divCounts.todo + divCounts.doing + divCounts.review;
+
+    const divisionLegend = ['doing','review','todo'].map(k => ({
+      label: this.STATUS_LABELS[k], count: divCounts[k],
+      dotStyle: { width:'9px', height:'9px', borderRadius:'50%', flexShrink:0, background: divCounts[k] > 0 ? this.STATUS_COLORS[k] : this.EMPTY_DOT },
+      textStyle: { fontSize:'12px', letterSpacing:'0.02em', color:'#8a8a8a' }
+    }));
+
+    const alertCount = tasks.filter(t => t.status !== 'done' && this.diffDays(t.dueDate) <= 3).length;
+
+    const urgentList = tasks
+      .filter(t => t.status !== 'done' && this.diffDays(t.dueDate) <= 3)
+      .sort((a,b) => this.diffDays(a.dueDate) - this.diffDays(b.dueDate))
+      .map(t => {
+        const sec = sections.find(s => s.id === t.section);
+        const dd = this.diffDays(t.dueDate);
+        return {
+          title: t.title,
+          secName: sec ? sec.name : '未割当',
+          secTickStyle: { width:'6px', height:'6px', borderRadius:'50%', flexShrink:0, background:'#c4c4c4' },
+          tag: dd < 0 ? (Math.abs(dd) + '日 超過') : (dd === 0 ? '本日締切' : ('あと ' + dd + '日'))
+        };
+      });
+
+    const sectionCards = sections.map(sec => {
+      const st = tasks.filter(t => t.section === sec.id);
+      const tot = st.length;
+      const c = { todo:0, doing:0, review:0, done:0 };
+      st.forEach(t => c[t.status]++);
+      const percent = tot ? Math.round(c.done / tot * 100) : 0;
+      const warn = st.filter(t => t.status !== 'done' && this.diffDays(t.dueDate) <= 3).length;
+      const col = sec.color || '#8a8a8a';
+      const SCc = this.STATUS_COLORS, SLl = this.STATUS_LABELS;
+      const legend = ['doing','review','todo'].map(k => ({
+        label: SLl[k],
+        count: c[k],
+        dotStyle: { width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: c[k] > 0 ? SCc[k] : this.EMPTY_DOT },
+        labelStyle: { fontSize:'11px', letterSpacing:'0.01em', color: c[k] > 0 ? '#6a6a6a' : '#c4c4c4' },
+        countStyle: { fontSize:'16px', fontWeight:'700', letterSpacing:'-0.01em', lineHeight:'1', color: c[k] > 0 ? SCc[k] : '#c4c4c4' }
+      }));
+      return {
+        code: sec.code, name: sec.name, leader: sec.leader,
+        total: tot, active: c.doing + c.review + c.todo, legend,
+        health: warn > 0 ? '要注意' : '順調',
+        healthStyle: { fontSize:'10px', fontWeight:'600', letterSpacing:'0.04em', padding:'3px 8px', whiteSpace:'nowrap', flexShrink:0, color: warn > 0 ? '#E84040' : '#16A34A', border:'1px solid ' + (warn > 0 ? '#E84040' : '#16A34A') },
+        alertText: warn > 0 ? ('要フォロー ' + warn + '件') : '遅延なし',
+        alertStyle: { fontSize:'11px', letterSpacing:'0.01em', whiteSpace:'nowrap', color: warn > 0 ? '#E84040' : '#b8b8b8' },
+        codeStyle: { display:'inline-block', fontSize:'10px', fontWeight:'700', letterSpacing:'0.06em', color:'#ffffff', background:col, padding:'3px 9px' },
+        nameStyle: { fontSize:'18px', fontWeight:'700', letterSpacing:'-0.01em', color:'#000000', marginTop:'10px' },
+        cardStyle: { background:'#FFFFFF', padding:'24px', borderLeft:'5px solid ' + col },
+        meter: this.buildStackedMeter({ ...c, done: 0 }, 30, '5px', '2px')
+      };
+    });
+
+    // ---- CUSTOMER (CRM) DATA ----
+    const customers = this.state.customers;
+    const CSL = this.CUST_STATUS_LABELS, CSB = this.CUST_STATUS_BUCKET, CSC = this.CUST_STATUS_COLORS;
+
+    const custAcquisitionCount = customers.length;
+    const custMeetingCount = customers.filter(c => c.meetingResult && c.meetingResult !== 'none').length;
+    const custTrialCount = customers.filter(c => c.trialResult && c.trialResult !== 'none').length;
+    const custWonCount = customers.filter(c => c.status === 'won').length;
+
+    const custBucketFilters = this.state.custStatusFilters;
+    const CUST_BUCKET_LABELS = [
+      { key:'active', label:'対応中' },
+      { key:'won',    label:'成約' },
+      { key:'lost',   label:'失注' },
+      { key:'closed', label:'終了' }
+    ];
+    const custStatusFilterChips = CUST_BUCKET_LABELS.map(b => {
+      const active = custBucketFilters.includes(b.key);
+      return {
+        label: b.label,
+        chipStyle: active
+          ? { background:'#000000', color:'#ffffff', border:'1px solid #000000', borderRadius:'0', fontSize:'11px', fontWeight:'600', letterSpacing:'0.02em', padding:'5px 11px', cursor:'pointer', fontFamily:'inherit' }
+          : { background:'transparent', color:'#5a5a5a', border:'1px solid #d8d8d8', borderRadius:'0', fontSize:'11px', fontWeight:'400', letterSpacing:'0.02em', padding:'5px 11px', cursor:'pointer', fontFamily:'inherit' },
+        onToggle: () => this.toggleCustStatusFilter(b.key)
+      };
+    });
+    const custStatusAllChipStyle = custBucketFilters.length === 0
+      ? { background:'#000000', color:'#ffffff', border:'1px solid #000000', borderRadius:'0', fontSize:'11px', fontWeight:'600', letterSpacing:'0.02em', padding:'5px 11px', cursor:'pointer', fontFamily:'inherit' }
+      : { background:'transparent', color:'#5a5a5a', border:'1px solid #d8d8d8', borderRadius:'0', fontSize:'11px', fontWeight:'400', letterSpacing:'0.02em', padding:'5px 11px', cursor:'pointer', fontFamily:'inherit' };
+
+    let filteredCustomers = customers.filter(c => custBucketFilters.length === 0 || custBucketFilters.includes(CSB[c.status] || 'active'));
+    const custSortBy = this.state.custSortBy;
+    if      (custSortBy === 'naAsc')      filteredCustomers = [...filteredCustomers].sort((a,b) => new Date(a.nextActionDate||'9999-12-31') - new Date(b.nextActionDate||'9999-12-31'));
+    else if (custSortBy === 'amountDesc') filteredCustomers = [...filteredCustomers].sort((a,b) => (Number(b.contractAmount)||0) - (Number(a.contractAmount)||0));
+    else if (custSortBy === 'status')     filteredCustomers = [...filteredCustomers].sort((a,b) => (Object.keys(CSL).indexOf(a.status)) - (Object.keys(CSL).indexOf(b.status)));
+
+    // ---- DRIVE ----
+    const driveFiles = this.state.driveFiles;
+    const isDriveFolder = (f) => f.mimeType === 'application/vnd.google-apps.folder';
+    const fmtDriveSize = (bytes) => {
+      if (!bytes) return '';
+      const n = Number(bytes);
+      if (n < 1024) return n + ' B';
+      if (n < 1024*1024) return Math.round(n/1024) + ' KB';
+      if (n < 1024*1024*1024) return (n/1024/1024).toFixed(1) + ' MB';
+      return (n/1024/1024/1024).toFixed(1) + ' GB';
+    };
+    const fmtDriveDate = (iso) => iso ? iso.slice(0,10).replace(/-/g,'.') : '';
+    const driveRows = driveFiles.map(f => {
+      const folder = isDriveFolder(f);
+      const metaParts = [folder ? 'フォルダ' : (f.mimeType || 'ファイル')];
+      if (!folder && f.size) metaParts.push(fmtDriveSize(f.size));
+      if (f.modifiedTime) metaParts.push(fmtDriveDate(f.modifiedTime));
+      return {
+        id: f.id,
+        name: f.name,
+        icon: folder ? '📁' : '📄',
+        iconStyle: { fontSize:'18px', width:'28px', textAlign:'center', flexShrink:0 },
+        metaText: metaParts.join(' ・ '),
+        onOpen: () => folder ? this.onDriveFolderOpen(f) : window.open(f.webViewLink, '_blank'),
+        onRename: () => this.onDriveRenamePrompt(f),
+        onMove: () => this.onDriveMovePrompt(f),
+        onDelete: () => this.onDriveDeletePrompt(f),
+      };
+    });
+    const driveBreadcrumb = [
+      ...this.state.driveFolderStack.map((b, idx) => ({
+        label: b.name,
+        style: { background:'transparent', border:'none', color:'#8a8a8a', fontSize:'11px', letterSpacing:'0.02em', padding:'2px 0', cursor:'pointer', fontFamily:'inherit' },
+        sepStyle: { fontSize:'11px', color:'#d8d8d8' },
+        onClick: () => this.onDriveBreadcrumbClick(idx),
+      })),
+      {
+        label: this.state.driveFolderName,
+        style: { background:'transparent', border:'none', color:'#0a0a0a', fontWeight:'700', fontSize:'11px', letterSpacing:'0.02em', padding:'2px 0', cursor:'default', fontFamily:'inherit' },
+        sepStyle: { display:'none' },
+        onClick: () => {},
+      },
+    ];
+
+    const customerRows = filteredCustomers.map((c, idx) => {
+      const subParts = [];
+      if (c.occupation) subParts.push(c.occupation);
+      if (c.age) subParts.push(c.age + '歳');
+      if (c.referrer) subParts.push('紹介: ' + c.referrer);
+      const memoParts = [];
+      if (c.memo1) memoParts.push('1次: ' + c.memo1);
+      if (c.memo2) memoParts.push('2次: ' + c.memo2);
+      const assigneeParts = [c.assignee1, c.assignee2].filter(Boolean);
+      const statColor = CSC[c.status] || '#8a8a8a';
+      const selBase = { fontSize:'11px', fontWeight:'600', letterSpacing:'0.02em', padding:'9px 11px', width:'100%', borderRadius:'0', cursor:'pointer' };
+
+      return {
+        id: c.id,
+        num: String(idx+1).padStart(2,'0'),
+        name: c.name,
+        channelLabel: c.channel || '未設定',
+        channelChipStyle: { display:'inline-block', fontSize:'10px', fontWeight:'700', letterSpacing:'0.04em', color:'#ffffff', background:'#8a8a8a', padding:'3px 8px', marginBottom:'9px' },
+        nameStyle: { fontSize:'18px', fontWeight:'700', letterSpacing:'-0.01em', lineHeight:'1.35', color:'#0a0a0a' },
+        subInfo: subParts.join(' / ') || '—',
+        memoPreview: memoParts.join('　') || '',
+        amountText: c.contractAmount ? ('¥' + Number(c.contractAmount).toLocaleString()) : '—',
+        amountStyle: { fontSize:'16px', fontWeight:'700', letterSpacing:'-0.01em', color: c.contractAmount ? '#16A34A' : '#c4c4c4' },
+        status: c.status || 'new',
+        selectStyle: { ...selBase, background:statColor, color:'#ffffff', border:'1px solid '+statColor },
+        naText: c.nextActionDate ? ('NA ' + c.nextActionDate.replace(/-/g,'.')) : 'NA未設定',
+        naStyle: { fontSize:'11px', letterSpacing:'0.01em', color:'#8a8a8a', whiteSpace:'nowrap' },
+        assigneeLabel: assigneeParts.join('→') || '未割当',
+        assigneeStyle: { fontSize:'11px', letterSpacing:'0.01em', color:'#b8b8b8', whiteSpace:'nowrap', textAlign:'right', flex:1 },
+        numStyle: { fontSize:'12px', color:'#b8b8b8', letterSpacing:'0.01em', marginTop:'3px', fontWeight:'600' },
+        rowStyle: { display:'flex', gap:'20px', alignItems:'flex-start', padding:'20px 16px 20px 18px', borderTop: idx === 0 ? 'none' : '1px solid #ececec', borderLeft: '5px solid ' + statColor },
+        onStatus: (e) => this.updateCustomerStatus(c.id, e.target.value),
+        onEdit:   () => this.openCustEdit(c.id),
+        onDelete: () => this.deleteCustomer(c.id)
+      };
+    });
+
+    const custDraft = this.state.custDraft;
+    const custIsEdit = this.state.custEditId !== null;
+
+    // ---- CUSTOMER ANALYTICS DASHBOARD ----
+    const dashFrom = this.state.dashFrom;
+    const dashTo = this.state.dashTo;
+    const dashCustomers = customers.filter(c => {
+      if (!dashFrom && !dashTo) return true;
+      if (!c.contactDate) return false;
+      if (dashFrom && c.contactDate < dashFrom) return false;
+      if (dashTo && c.contactDate > dashTo) return false;
+      return true;
+    });
+
+    const dashTotal = dashCustomers.length;
+    const dashWon = dashCustomers.filter(c => c.status === 'won').length;
+    const dashWonRate = dashTotal ? Math.round(dashWon / dashTotal * 100) : 0;
+    const dashRevenue = dashCustomers.reduce((s,c) => s + (Number(c.contractAmount) || 0), 0);
+    const dashAdCost = dashCustomers.reduce((s,c) => s + (Number(c.adCost) || 0), 0);
+    const dashAges = dashCustomers.map(c => Number(c.age)).filter(a => a > 0);
+    const dashAvgAge = dashAges.length ? Math.round(dashAges.reduce((a,b) => a+b, 0) / dashAges.length * 10) / 10 : 0;
+    const dashRevenueText = '¥' + dashRevenue.toLocaleString();
+    const dashAdCostText = '¥' + dashAdCost.toLocaleString();
+
+    const fmtPct = (n, d) => d ? Math.round(n / d * 100) + '%' : '—';
+    const fmtYen = (n) => '¥' + (n || 0).toLocaleString();
+    const buildAssigneeRow = (name, list) => {
+      const total = list.length;
+      const to2nd = list.filter(c => c.assignee2).length;
+      const won = list.filter(c => c.status === 'won').length;
+      const revenue = list.filter(c => c.status === 'won').reduce((s,c) => s + (Number(c.contractAmount) || 0), 0);
+      return { name, rate1to2Text: fmtPct(to2nd, total), rate2toWonText: fmtPct(won, to2nd), revenueText: fmtYen(revenue) };
+    };
+    const assigneeNames = Array.from(new Set(dashCustomers.map(c => c.assignee1).filter(Boolean)));
+    const assigneeStatRows = assigneeNames.map(name => buildAssigneeRow(name, dashCustomers.filter(c => c.assignee1 === name)));
+    if (assigneeStatRows.length) assigneeStatRows.push(buildAssigneeRow('全体', dashCustomers));
+
+    const channelCounts = {};
+    dashCustomers.forEach(c => { const ch = c.channel || '未設定'; channelCounts[ch] = (channelCounts[ch] || 0) + 1; });
+    const channelMax = Math.max(1, ...Object.values(channelCounts));
+    const channelStatRows = Object.entries(channelCounts).sort((a,b) => b[1]-a[1]).map(([label, count]) => ({
+      label, count,
+      barWrapStyle: { flex:'0 0 90px', height:'8px', background:'#f0f0f0' },
+      barStyle: { height:'100%', width: Math.round(count / channelMax * 100) + '%', background:'#2563EB' }
+    }));
+
+    const STATUS_ORDER_LIST = ['new','distro_requested','unread','read_ignored','replied','wait_1st','cancel_before_1st','wait_trial','cancel_before_trial','in_session','follow_up','wait_payment','won','lost','closed'];
+    const statusStatRows = STATUS_ORDER_LIST.map(key => {
+      const count = dashCustomers.filter(c => (c.status || 'new') === key).length;
+      return { label: CSL[key], count, dotStyle: { width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: count > 0 ? (CSC[key] || '#8a8a8a') : '#e0e0e0' } };
+    });
+
+    const pLabel = { high:'高', medium:'中', low:'低' };
+
+    const secF  = this.state.activeSecFilters;
+    const statF = this.state.activeStatusFilters;
+    const PRIORITY_ORDER = { high:0, medium:1, low:2 };
+    const STATUS_ORDER   = { doing:0, review:1, todo:2, done:3 };
+    const sortBy = this.state.sortBy;
+
+    let filteredTasks = tasks.filter(t => {
+      const ms  = secF.length  === 0 || secF.includes(t.section);
+      const mst = statF.length === 0 || statF.includes(t.status);
+      return ms && mst;
+    });
+    if      (sortBy === 'dueAsc')       filteredTasks = [...filteredTasks].sort((a,b) => new Date(a.dueDate) - new Date(b.dueDate));
+    else if (sortBy === 'dueDesc')      filteredTasks = [...filteredTasks].sort((a,b) => new Date(b.dueDate) - new Date(a.dueDate));
+    else if (sortBy === 'priorityHigh') filteredTasks = [...filteredTasks].sort((a,b) => (PRIORITY_ORDER[a.priority]??1) - (PRIORITY_ORDER[b.priority]??1));
+    else if (sortBy === 'priorityLow')  filteredTasks = [...filteredTasks].sort((a,b) => (PRIORITY_ORDER[b.priority]??1) - (PRIORITY_ORDER[a.priority]??1));
+    else if (sortBy === 'status')       filteredTasks = [...filteredTasks].sort((a,b) => (STATUS_ORDER[a.status]??2)   - (STATUS_ORDER[b.status]??2));
+
+    const filtered = filteredTasks.map((task, idx) => {
+      const sec = sections.find(s => s.id === task.section);
+      const secColor = sec?.color || '#8a8a8a';
+      const dd = this.diffDays(task.dueDate);
+      const dateText = task.dueDate.replace(/-/g, '.');
+
+      let uLevel, uLabel, uColor, uFill;
+      if (task.status === 'done')    { uLevel='done';    uLabel='完了';                          uColor='#b8b8b8'; uFill=false; }
+      else if (dd < 0)               { uLevel='overdue'; uLabel='超過 ' + Math.abs(dd) + '日';  uColor='#E84040'; uFill=true;  }
+      else if (dd <= 3)              { uLevel='soon';    uLabel='切迫 あと' + dd + '日';         uColor='#E84040'; uFill=false; }
+      else if (dd <= 7)              { uLevel='watch';   uLabel='注意 あと' + dd + '日';         uColor='#0a0a0a'; uFill=false; }
+      else                           { uLevel='normal';  uLabel='あと' + dd + '日';              uColor='#b8b8b8'; uFill=false; }
+
+      const urgencyBadgeStyle = {
+        fontSize:'11px', fontWeight:'600', letterSpacing:'0.02em', whiteSpace:'nowrap',
+        padding:'5px 10px', display:'inline-block', textAlign:'center', minWidth:'90px',
+        color: uFill ? '#ffffff' : uColor,
+        background: uFill ? uColor : 'transparent',
+        border: '1px solid ' + (uLevel==='normal' ? '#e0e0e0' : uLevel==='done' ? '#e8e8e8' : uColor)
+      };
+      const selBase = { fontSize:'11px', fontWeight:'600', letterSpacing:'0.02em', padding:'9px 11px', width:'140px', borderRadius:'0', cursor:'pointer' };
+      const selectStyle =
+        task.status === 'doing'  ? { ...selBase, background:'#2563EB', color:'#ffffff', border:'1px solid #2563EB' } :
+        task.status === 'review' ? { ...selBase, background:'#D97706', color:'#ffffff', border:'1px solid #D97706' } :
+        task.status === 'done'   ? { ...selBase, background:'#16A34A', color:'#ffffff', border:'1px solid #16A34A' } :
+                                   { ...selBase, background:'#FFFFFF',  color:'#5a5a5a', border:'1px solid #d8d8d8' };
+      const rowStyle = {
+        display:'flex', gap:'20px', alignItems:'flex-start',
+        padding:'20px 16px 20px 18px',
+        borderTop: idx === 0 ? 'none' : '1px solid #ececec',
+        borderLeft: '5px solid ' + secColor
+      };
+      return {
+        id: task.id,
+        num: String(idx+1).padStart(2,'0'),
+        title: task.title,
+        goal: task.goal || '',
+        na: task.na || '',
+        secName: sec ? sec.name : '未割当',
+        dateText,
+        dateStyle: { fontSize:'11px', letterSpacing:'0.01em', color: task.status==='done' ? '#c4c4c4' : '#8a8a8a', whiteSpace:'nowrap' },
+        pLabel: pLabel[task.priority] || '中',
+        pStyle: {
+          fontSize:'10px', fontWeight:'700', letterSpacing:'0.02em', lineHeight:'1', padding:'3px 7px', whiteSpace:'nowrap',
+          color: task.priority==='high' ? '#E84040' : task.priority==='medium' ? '#8a8a8a' : '#c4c4c4',
+          border: '1px solid ' + (task.priority==='high' ? '#E84040' : task.priority==='medium' ? '#d8d8d8' : '#ececec')
+        },
+        numStyle: { fontSize:'12px', color: task.status==='done' ? '#d8d8d8' : '#b8b8b8', letterSpacing:'0.01em', marginTop:'3px', fontWeight:'600' },
+        titleStyle: { fontSize:'18px', fontWeight:'700', letterSpacing:'-0.01em', lineHeight:'1.35', color: task.status==='done' ? '#c4c4c4' : '#0a0a0a', textDecoration: task.status==='done' ? 'line-through' : 'none' },
+        status: task.status,
+        selectStyle, rowStyle,
+        urgencyLabel: uLabel, urgencyBadgeStyle,
+        secChipStyle: { display:'inline-block', fontSize:'10px', fontWeight:'700', letterSpacing:'0.04em', color:'#ffffff', background:secColor, padding:'3px 8px', marginBottom:'9px' },
+        onGoal:   (e) => this.updateField(task.id, 'goal', e.target.value),
+        onNa:     (e) => this.updateField(task.id, 'na', e.target.value),
+        onStatus: (e) => this.updateStatus(task.id, e.target.value),
+        onDelete: ()  => this.deleteTask(task.id)
+      };
+    });
+
+    // Today label
+    const now = new Date();
+    const todayLabel = now.getFullYear() + '.' + String(now.getMonth()+1).padStart(2,'0') + '.' + String(now.getDate()).padStart(2,'0');
+
+    // Settings: section list
+    const settingSections = sections.map((sec, i) => ({
+      ...sec,
+      swatchStyle: { width:'14px', height:'14px', background:sec.color, flexShrink:0, borderRadius:'2px' },
+      rowStyle: { display:'flex', alignItems:'center', gap:'16px', padding:'14px 20px', borderBottom: i < sections.length-1 ? '1px solid #f0f0f0' : 'none' },
+      onEdit:   () => this.openSectionEdit(sec.id),
+      onDelete: () => this.deleteSection(sec.id)
+    }));
+
+    // Settings: section form
+    const sectionFormOpen = this.state.sectionForm !== null;
+    const sectionFormIsAdd = this.state.sectionForm === 'add';
+    const sd = this.state.sectionDraft;
+
+    // Settings: tab styles
+    const tabBase = { background:'transparent', border:'none', borderBottom:'2px solid transparent', borderRadius:'0', fontSize:'12px', fontWeight:'500', letterSpacing:'0.04em', padding:'13px 20px', cursor:'pointer', fontFamily:'inherit', transition:'none' };
+    const tabActive   = { ...tabBase, borderBottom:'2px solid #000000', color:'#000000', fontWeight:'700' };
+    const tabInactive = { ...tabBase, color:'#8a8a8a' };
+
+    // Header animation styles (案4: scroll compression)
+    const scrolled = this.state.scrolled;
+    const mastheadInnerStyle = {
+      maxWidth:'1180px', margin:'0 auto', padding:'0 32px',
+      height: scrolled ? '44px' : '60px',
+      display:'flex', alignItems:'center', gap:'0',
+      transition:'height 0.3s cubic-bezier(0.4,0,0.2,1)'
+    };
+    const fulcrumTitleStyle = {
+      fontFamily:"'Bebas Neue', sans-serif",
+      fontSize: scrolled ? '24px' : '30px',
+      letterSpacing:'0.18em', color:'#000000', lineHeight:'1', flexShrink:0,
+      transition:'font-size 0.3s cubic-bezier(0.4,0,0.2,1)'
+    };
+    const headerSubtitleGroupStyle = {
+      display:'flex', alignItems:'center', flexShrink:0,
+      opacity: scrolled ? 0 : 1,
+      transition:'opacity 0.2s ease',
+      pointerEvents: scrolled ? 'none' : 'auto'
+    };
+    const headerMetaFadeStyle = {
+      display:'flex', alignItems:'center',
+      opacity: scrolled ? 0 : 1,
+      transition:'opacity 0.2s ease',
+      pointerEvents: scrolled ? 'none' : 'auto'
+    };
+
+    return {
+      isLoading: this.state.loading,
+
+      // Header
+      mastheadInnerStyle,
+      fulcrumTitleStyle,
+      headerSubtitleGroupStyle,
+      headerMetaFadeStyle,
+
+      // Main
+      subtitle: this.state.subtitle,
+      todayLabel,
+      overallMeter: this.buildStackedMeter({ ...divCounts, done: 0 }, 60, '4px', '2px'),
+      totalCount: total, activeCount: active,
+      doingCount: divCounts.doing, reviewCount: divCounts.review, todoCount: divCounts.todo,
+      alertCount,
+      alertNumStyle: { fontSize:'38px', fontWeight:'700', letterSpacing:'-0.03em', lineHeight:'1', color: alertCount > 0 ? '#E84040' : '#000000' },
+      divisionLegend,
+      urgentList,
+      hasUrgent: urgentList.length > 0,
+      allClear: urgentList.length === 0,
+      sectionCards,
+      tasks: filtered,
+      hasTasks: filtered.length > 0,
+      noTasks: filtered.length === 0,
+      sectionOptions: sections,
+
+      // Filter chips
+      sectionFilterChips: sections.map(sec => ({
+        ...sec,
+        chipStyle: secF.includes(sec.id)
+          ? { background:sec.color, color:'#ffffff', border:'1px solid '+sec.color, borderRadius:'0', fontSize:'11px', fontWeight:'600', letterSpacing:'0.02em', padding:'5px 11px', cursor:'pointer', fontFamily:'inherit' }
+          : { background:'transparent', color:'#5a5a5a', border:'1px solid #d8d8d8', borderRadius:'0', fontSize:'11px', fontWeight:'400', letterSpacing:'0.02em', padding:'5px 11px', cursor:'pointer', fontFamily:'inherit' },
+        onToggle: () => this.toggleSecFilter(sec.id)
+      })),
+      statusFilterChips: ['doing','review','todo','done'].map(k => {
+        const CHIP_COLOR = { todo:'#D0D0D0', doing:'#2563EB', review:'#D97706', done:'#16A34A' };
+        const active = statF.includes(k);
+        return {
+          key: k,
+          label: this.STATUS_LABELS[k],
+          chipStyle: active
+            ? { background:CHIP_COLOR[k], color: k==='todo' ? '#5a5a5a' : '#ffffff', border:'1px solid '+CHIP_COLOR[k], borderRadius:'0', fontSize:'11px', fontWeight:'600', letterSpacing:'0.02em', padding:'5px 11px', cursor:'pointer', fontFamily:'inherit' }
+            : { background:'transparent', color:'#5a5a5a', border:'1px solid #d8d8d8', borderRadius:'0', fontSize:'11px', fontWeight:'400', letterSpacing:'0.02em', padding:'5px 11px', cursor:'pointer', fontFamily:'inherit' },
+          onToggle: () => this.toggleStatusFilter(k)
+        };
+      }),
+      secAllChipStyle: secF.length === 0
+        ? { background:'#000000', color:'#ffffff', border:'1px solid #000000', borderRadius:'0', fontSize:'11px', fontWeight:'600', letterSpacing:'0.02em', padding:'5px 11px', cursor:'pointer', fontFamily:'inherit' }
+        : { background:'transparent', color:'#5a5a5a', border:'1px solid #d8d8d8', borderRadius:'0', fontSize:'11px', fontWeight:'400', letterSpacing:'0.02em', padding:'5px 11px', cursor:'pointer', fontFamily:'inherit' },
+      hasActiveFilters: secF.length > 0 || statF.length > 0,
+      taskCountLabel: (secF.length > 0 || statF.length > 0) ? (filteredTasks.length + ' / ' + tasks.length + ' 件') : (tasks.length + ' 件'),
+      taskCountStyle: { fontSize:'11px', letterSpacing:'0.02em', color: (secF.length > 0 || statF.length > 0) ? '#2563EB' : '#b8b8b8' },
+      sortBy,
+      onSortChange:   (e) => this.setState({ sortBy: e.target.value }),
+      onClearFilters: () => this.setState({ activeSecFilters:[], activeStatusFilters:[] }),
+      onSecFilterAll: () => this.setState({ activeSecFilters:[] }),
+
+      // Task modal
+      modalOpen: this.state.modalOpen,
+      draft: this.state.draft,
+      onOpenModal:   () => this.setState({ modalOpen:true }),
+      onCloseModal:  () => this.setState({ modalOpen:false }),
+      onAddSubmit:   (e) => this.addTask(e),
+      onDraftTitle:  (e) => this.setDraft('title', e.target.value),
+      onDraftGoal:   (e) => this.setDraft('goal', e.target.value),
+      onDraftNa:     (e) => this.setDraft('na', e.target.value),
+      onDraftSection:(e) => this.setDraft('section', e.target.value),
+      onDraftPriority:(e)=> this.setDraft('priority', e.target.value),
+      onDraftDue:    (e) => this.setDraft('dueDate', e.target.value),
+      onDraftStatus: (e) => this.setDraft('status', e.target.value),
+
+      // Settings overlay
+      settingsOpen: this.state.settingsOpen,
+      onOpenSettings:  () => this.setState({ settingsOpen:true, sectionForm:null }),
+      onCloseSettings: () => this.setState({ settingsOpen:false, sectionForm:null }),
+      isTabSections: this.state.settingsTab === 'sections',
+      isTabSystem:   this.state.settingsTab === 'system',
+      isTabData:     this.state.settingsTab === 'data',
+      tabSectionsStyle: this.state.settingsTab === 'sections' ? tabActive : tabInactive,
+      tabSystemStyle:   this.state.settingsTab === 'system'   ? tabActive : tabInactive,
+      tabDataStyle:     this.state.settingsTab === 'data'     ? tabActive : tabInactive,
+      onTabSections: () => this.setState({ settingsTab:'sections', sectionForm:null }),
+      onTabSystem:   () => this.setState({ settingsTab:'system' }),
+      onTabData:     () => this.setState({ settingsTab:'data' }),
+
+      // Section management
+      settingSections,
+      noSections: sections.length === 0,
+      sectionFormOpen,
+      sectionFormTitle: sectionFormIsAdd ? '新規セクション追加' : 'セクションを編集',
+      sectionFormSaveLabel: sectionFormIsAdd ? 'セクションを追加' : '変更を保存',
+      sectionFormAccent: { width:'4px', height:'16px', background: sd.color, flexShrink:0 },
+      sectionDraft: sd,
+      onSectionAdd:        () => this.openSectionAdd(),
+      onSectionDraftCode:  (e) => this.setSectionDraft('code', e.target.value),
+      onSectionDraftName:  (e) => this.setSectionDraft('name', e.target.value),
+      onSectionDraftLeader:(e) => this.setSectionDraft('leader', e.target.value),
+      onSectionDraftColor: (e) => this.setSectionDraft('color', e.target.value),
+      onSectionFormCancel: () => this.setState({ sectionForm:null }),
+      onSectionFormSave:   () => this.saveSectionForm(),
+
+      // System settings
+      onSubtitleChange: (e) => { this.persistSubtitle(e.target.value); this.setState({ subtitle:e.target.value }); },
+
+      // View tabs
+      isViewTasks: this.state.activeView === 'tasks',
+      isViewCustomers: this.state.activeView === 'customers',
+      isViewDrive: this.state.activeView === 'drive',
+      viewTasksTabStyle: this.state.activeView === 'tasks' ? tabActive : tabInactive,
+      viewCustomersTabStyle: this.state.activeView === 'customers' ? tabActive : tabInactive,
+      viewDriveTabStyle: this.state.activeView === 'drive' ? tabActive : tabInactive,
+      onViewTasks: () => this.setState({ activeView:'tasks' }),
+      onViewCustomers: () => this.setState({ activeView:'customers' }),
+      onViewDrive: () => this.setState({ activeView:'drive' }),
+
+      // Drive
+      driveError: this.state.driveError,
+      driveLoading: this.state.driveLoading,
+      driveUploading: this.state.driveUploading,
+      driveUploadProgress: this.state.driveUploadProgress,
+      driveUploadFileIndex: this.state.driveUploadFileIndex,
+      driveUploadFileCount: this.state.driveUploadFileCount,
+      driveUploadFileName: this.state.driveUploadFileName,
+      onDriveRefresh: () => this.onDriveRefresh(),
+      onDriveCreateFolderPrompt: () => this.onDriveCreateFolderPrompt(),
+      onDriveFileInputChange: (e) => this.onDriveFileInputChange(e),
+      hasDriveFiles: !this.state.driveLoading && driveFiles.length > 0,
+      noDriveFiles: !this.state.driveLoading && driveFiles.length === 0,
+      driveRows,
+      driveBreadcrumb,
+
+      // Drive move modal
+      driveMoveModalOpen: this.state.driveMoveModalOpen,
+      driveMoveTargetName: this.state.driveMoveTarget ? this.state.driveMoveTarget.name : '',
+      driveMovePickerLoading: this.state.driveMovePickerLoading,
+      driveMovePickerFolderName: this.state.driveMovePickerFolderName,
+      hasDriveMovePickerFolders: !this.state.driveMovePickerLoading && this.state.driveMovePickerFolders.length > 0,
+      noDriveMovePickerFolders: !this.state.driveMovePickerLoading && this.state.driveMovePickerFolders.length === 0,
+      driveMovePickerRows: this.state.driveMovePickerFolders.map(f => ({
+        id: f.id,
+        name: f.name,
+        onOpen: () => this.onDriveMovePickerOpen(f),
+      })),
+      driveMovePickerBreadcrumb: [
+        ...this.state.driveMovePickerStack.map((b, idx) => ({
+          label: b.name,
+          style: { background:'transparent', border:'none', color:'#8a8a8a', fontSize:'11px', letterSpacing:'0.02em', padding:'2px 0', cursor:'pointer', fontFamily:'inherit' },
+          sepStyle: { fontSize:'11px', color:'#d8d8d8' },
+          onClick: () => this.onDriveMovePickerBreadcrumbClick(idx),
+        })),
+        {
+          label: this.state.driveMovePickerFolderName,
+          style: { background:'transparent', border:'none', color:'#0a0a0a', fontWeight:'700', fontSize:'11px', letterSpacing:'0.02em', padding:'2px 0', cursor:'default', fontFamily:'inherit' },
+          sepStyle: { display:'none' },
+          onClick: () => {},
+        },
+      ],
+      onDriveMoveCancel: () => this.onDriveMoveCancel(),
+      onDriveMoveConfirm: () => this.onDriveMoveConfirm(),
+
+      // Customer KPI
+      custAcquisitionCount, custTrialCount, custMeetingCount, custWonCount,
+
+      // Customer analytics dashboard
+      dashFrom, dashTo,
+      hasDashRange: !!(dashFrom || dashTo),
+      onDashFrom: (e) => this.setState({ dashFrom: e.target.value }),
+      onDashTo:   (e) => this.setState({ dashTo: e.target.value }),
+      onDashRangeClear: () => this.setState({ dashFrom:'', dashTo:'' }),
+      dashTotal, dashWon, dashWonRate, dashRevenueText, dashAdCostText, dashAvgAge,
+      assigneeStatRows,
+      hasAssigneeStats: assigneeStatRows.length > 0,
+      noAssigneeStats: assigneeStatRows.length === 0,
+      channelStatRows,
+      hasChannelStats: channelStatRows.length > 0,
+      noChannelStats: channelStatRows.length === 0,
+      statusStatRows,
+
+      // Customer board
+      custCountLabel: (custBucketFilters.length > 0) ? (filteredCustomers.length + ' / ' + customers.length + ' 件') : (customers.length + ' 件'),
+      custCountStyle: { fontSize:'11px', letterSpacing:'0.02em', color: custBucketFilters.length > 0 ? '#2563EB' : '#b8b8b8' },
+      hasActiveCustFilters: custBucketFilters.length > 0,
+      onClearCustFilters: () => this.setState({ custStatusFilters:[] }),
+      custStatusFilterChips, custStatusAllChipStyle,
+      onCustStatusFilterAll: () => this.setState({ custStatusFilters:[] }),
+      custSortBy,
+      onCustSortChange: (e) => this.setState({ custSortBy: e.target.value }),
+      customerRows,
+      hasCustomers: customerRows.length > 0,
+      noCustomers: customerRows.length === 0,
+
+      // Customer modal
+      custModalOpen: this.state.custModalOpen,
+      custIsEdit,
+      custModalTitle: custIsEdit ? '顧客情報の編集' : '新規顧客の追加',
+      custSubmitLabel: custIsEdit ? '変更を保存' : '顧客を追加',
+      custDraft,
+      onExportCustomersCSV: () => this.exportCustomersCSV(),
+      onOpenCustModal:  () => this.openCustAdd(),
+      onCloseCustModal: () => this.closeCustModal(),
+      onCustSubmit:     (e) => this.saveCustomer(e),
+      onCustDeleteFromModal: () => { if (this.state.custEditId !== null) this.deleteCustomer(this.state.custEditId); },
+      onCustName:            (e) => this.setCustDraft('name', e.target.value),
+      onCustChannel:         (e) => this.setCustDraft('channel', e.target.value),
+      onCustAge:             (e) => this.setCustDraft('age', e.target.value),
+      onCustOccupation:      (e) => this.setCustDraft('occupation', e.target.value),
+      onCustReferrer:        (e) => this.setCustDraft('referrer', e.target.value),
+      onCustRelationValue:   (e) => this.setCustDraft('relationValue', e.target.value),
+      onCustAdCost:          (e) => this.setCustDraft('adCost', e.target.value),
+      onCustAssignee1:       (e) => this.setCustDraft('assignee1', e.target.value),
+      onCustAssignee2:       (e) => this.setCustDraft('assignee2', e.target.value),
+      onCustContactDate:     (e) => this.setCustDraft('contactDate', e.target.value),
+      onCustNa:              (e) => this.setCustDraft('nextActionDate', e.target.value),
+      onCustMeetingResult:   (e) => this.setCustDraft('meetingResult', e.target.value),
+      onCustTrialResult:     (e) => this.setCustDraft('trialResult', e.target.value),
+      onCustStatus:          (e) => this.setCustDraft('status', e.target.value),
+      onCustPlan:            (e) => this.setCustDraft('plan', e.target.value),
+      onCustSessionCount:    (e) => this.setCustDraft('sessionCount', e.target.value),
+      onCustContractAmount:  (e) => this.setCustDraft('contractAmount', e.target.value),
+      onCustMemo1:           (e) => this.setCustDraft('memo1', e.target.value),
+      onCustMemo2:           (e) => this.setCustDraft('memo2', e.target.value),
+      onCustNote:            (e) => this.setCustDraft('note', e.target.value),
+
+      // Data management
+      onExportTasks: () => {
+        const blob = new Blob([JSON.stringify({ tasks: this.state.tasks, sections: this.state.sections }, null, 2)], { type:'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'mission_control_export_' + todayLabel.replace(/\./g,'-') + '.json';
+        a.click();
+      },
+      onResetTasks: () => {
+        if (!window.confirm('全タスクを初期サンプルデータにリセットしますか？\nこの操作は取り消せません。')) return;
+        this.persist(this.INITIAL);
+        this.setState({ tasks: this.INITIAL });
+      },
+      onResetSections: () => {
+        if (!window.confirm('セクションを初期値にリセットしますか？\nこの操作は取り消せません。')) return;
+        this.persistSections(this.INITIAL_SECTIONS);
+        this.setState({ sections: this.INITIAL_SECTIONS });
+      },
+      onResetAll: () => {
+        if (!window.confirm('全データを消去しますか？\nタスク・セクション・設定が全て初期状態に戻ります。この操作は取り消せません。')) return;
+        localStorage.removeItem('portal_tasks');
+        localStorage.removeItem('portal_sections');
+        localStorage.removeItem('portal_subtitle');
+        if (window._db) window._db.ref('/').set({ tasks: this.INITIAL, sections: this.INITIAL_SECTIONS, subtitle: 'DIVISION TASK SYSTEM' });
+        this.setState({ tasks: this.INITIAL, sections: this.INITIAL_SECTIONS, subtitle:'事業部タスクシステム', settingsOpen:false });
+      }
+    };
+  }
+}
 </script>
 </body>
 </html>

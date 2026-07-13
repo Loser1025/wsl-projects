@@ -1,55 +1,95 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
-const JST = 'Asia/Tokyo';
+// デフォルトタイムゾーン
+const DEFAULT_TIMEZONE = 'Asia/Tokyo';
 
-// JST の壁時計基準で日付文字列 'YYYY-MM-DD' を取得
-function getJstDateStr(base) {
+// デフォルト営業時間
+const DEFAULT_BUSINESS_HOURS = { start: 9, end: 21 };
+// デフォルトスロット間隔（分）
+const DEFAULT_SLOT_DURATION_MINUTES = 60;
+// デフォルト予約可能日数（今日・明日＝2日）
+const DEFAULT_DAYS_AHEAD = 2;
+
+// 指定タイムゾーンの壁時計基準で日付文字列 'YYYY-MM-DD' を取得
+function getDateStr(base, tz) {
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: JST, year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
   }).formatToParts(base);
   const get = (t) => parts.find((p) => p.type === t).value;
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
-// 予約窓（今日・明日の 09:00–21:00 JST、1時間刻み＝1日12枠・計24枠）の全スロットを生成。
-// 「現在時刻より過去に終わる枠」は除外。時刻はオフセット付き ISO で構築し UTC インスタントとして扱う。
-function generateAllSlots() {
+// 予約窓（営業時間、スロット間隔、予約可能日数を指定可能）の全スロットを生成。
+// 「指定タイムゾーンの現在時刻より過去に終わる枠」は除外。時刻はオフセット付き ISO で構築し UTC インスタントとして扱う。
+function generateAllSlots(tz, options = {}) {
+  const {
+    businessHours = DEFAULT_BUSINESS_HOURS,
+    slotDurationMinutes = DEFAULT_SLOT_DURATION_MINUTES,
+    daysAhead = DEFAULT_DAYS_AHEAD,
+  } = options;
+  
+  const { start: startHour, end: endHour } = businessHours;
   const now = new Date();
   const slots = [];
-  for (let d = 0; d < 2; d++) {
+  
+  for (let d = 0; d < daysAhead; d++) {
     const base = new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
-    const dateStr = getJstDateStr(base);
-    for (let h = 9; h < 21; h++) {
-      const start = new Date(`${dateStr}T${String(h).padStart(2, '0')}:00:00+09:00`);
-      const end = new Date(`${dateStr}T${String(h + 1).padStart(2, '0')}:00:00+09:00`);
-      if (end.getTime() <= now.getTime()) continue;
+    const dateStr = getDateStr(base, tz);
+    
+    for (let h = startHour; h < endHour; h += slotDurationMinutes / 60) {
+      // オフセットを計算して正しいタイムゾーンで時刻を構築
+      const start = new Date(`${dateStr}T${String(h).padStart(2, '0')}:00:00`);
+      const endMinutes = h + slotDurationMinutes / 60;
+      const end = new Date(`${dateStr}T${String(endMinutes).padStart(2, '0')}:00:00`);
+      
+      // 指定タイムゾーンでの「現在時刻」を取得して過去枠判定
+      const nowInTz = new Date(
+        new Intl.DateTimeFormat('en-CA', {
+          timeZone: tz,
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          hour12: false
+        }).formatToParts(now).map(p => p.value).join('')
+      );
+      
+      if (end.getTime() <= nowInTz.getTime()) continue;
       slots.push({ start, end });
     }
   }
   return slots;
 }
 
-// JST 表示用フォーマット: '7/10 18:00'
-function formatJstDateTime(date) {
+// 指定タイムゾーン表示用フォーマット: '7/10 18:00'
+function formatDateTime(date, tz) {
   return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: JST, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: tz, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date);
 }
 
-// JST 表示用フォーマット（時刻のみ）: '19:00'
-function formatJstTime(date) {
+// 指定タイムゾーン表示用フォーマット（時刻のみ）: '19:00'
+function formatTime(date, tz) {
   return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: JST, hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date);
 }
 
-const CustomerCalendar = () => {
+const CustomerCalendar = ({
+  timezone = DEFAULT_TIMEZONE,
+  businessHours = DEFAULT_BUSINESS_HOURS,
+  slotDurationMinutes = DEFAULT_SLOT_DURATION_MINUTES,
+  daysAhead = DEFAULT_DAYS_AHEAD,
+}) => {
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const allSlots = generateAllSlots();
+    const allSlots = generateAllSlots(timezone, {
+      businessHours,
+      slotDurationMinutes,
+      daysAhead,
+    });
     // 予約窓の全スロットの開始〜終了で上書き（calendarId1 は維持）
     const timeMin = allSlots.length ? allSlots[0].start.toISOString() : new Date().toISOString();
     const timeMax = allSlots.length
@@ -141,7 +181,7 @@ const CustomerCalendar = () => {
         setError(message);
         setLoading(false);
       });
-  }, []);
+  }, [timezone]);
 
   const handleBooking = (slot) => {
     fetch('/api/create-booking', {
@@ -182,7 +222,7 @@ const CustomerCalendar = () => {
                 listStyle: 'none',
               }}
             >
-              {formatJstDateTime(slot.start)} - {formatJstDateTime(slot.end)}
+              {formatDateTime(slot.start, timezone)} - {formatDateTime(slot.end, timezone)}
             </li>
           );
           return jsx;
@@ -190,6 +230,23 @@ const CustomerCalendar = () => {
       </ul>
     </div>
   );
+};
+
+CustomerCalendar.propTypes = {
+  timezone: PropTypes.string,
+  businessHours: PropTypes.shape({
+    start: PropTypes.number.isRequired,
+    end: PropTypes.number.isRequired,
+  }),
+  slotDurationMinutes: PropTypes.number,
+  daysAhead: PropTypes.number,
+};
+
+CustomerCalendar.defaultProps = {
+  timezone: DEFAULT_TIMEZONE,
+  businessHours: DEFAULT_BUSINESS_HOURS,
+  slotDurationMinutes: DEFAULT_SLOT_DURATION_MINUTES,
+  daysAhead: DEFAULT_DAYS_AHEAD,
 };
 
 export default CustomerCalendar;

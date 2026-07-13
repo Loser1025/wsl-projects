@@ -1,25 +1,27 @@
 const { google } = require('googleapis');
+const {
+  validateEnvVar,
+  setCorsHeaders,
+  handleOptions,
+  handleGoogleCalendarError,
+  handleError,
+  validateFreeBusyResponse,
+  createApiHandler,
+} = require('./_utils');
 
-module.exports = async function handler(req, res) {
-  // ステータスコードを globalThis にも反映（モック検証互換: res.status の this は res だが、検証コードの this は globalThis を指す）
-  const _status = res.status.bind(res);
-  res.status = (c) => { globalThis.code = c; return _status(c); };
-
-  if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
-
-  const key = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!key || key === 'undefined') {
-    return res.status(500).json({ error: 'Missing GOOGLE_SERVICE_ACCOUNT_KEY env var' });
-  }
-
-  let credentials;
-  try {
-    credentials = JSON.parse(key);
-  } catch (error) {
-    return res.status(500).json({ error: 'Invalid GOOGLE_SERVICE_ACCOUNT_KEY' });
+async function getAvailabilityHandler(req, res) {
+  // Validate environment variable
+  const credentials = validateEnvVar('GOOGLE_SERVICE_ACCOUNT_KEY', res);
+  if (!credentials) {
+    return; // Response already sent
   }
 
   const { calendarId1, calendarId2, timeMin, timeMax } = req.body || {};
+
+  // Validate required fields
+  if (!calendarId1 || !calendarId2 || !timeMin || !timeMax) {
+    return res.status(400).json({ error: 'Missing required parameters: calendarId1, calendarId2, timeMin, timeMax' });
+  }
 
   try {
     const auth = new google.auth.GoogleAuth({
@@ -36,9 +38,18 @@ module.exports = async function handler(req, res) {
         items: [{ id: calendarId1 }, { id: calendarId2 }],
       },
     });
+
+    // Defensive check on response structure
+    if (!validateFreeBusyResponse(response.data.calendars)) {
+      console.error('Invalid FreeBusy response structure:', response.data);
+      return handleError(new Error('Invalid calendar response structure'), res, 'カレンダー情報の取得に失敗しました');
+    }
+
     res.status(200).json(response.data.calendars);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Calendar API error: ' + error.message });
+    const userMessage = handleGoogleCalendarError(error);
+    handleError(error, res, userMessage);
   }
-};
+}
+
+module.exports = createApiHandler(getAvailabilityHandler);

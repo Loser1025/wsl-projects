@@ -2,5 +2,12 @@
   "outputDirectory": ".",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/*.js": {
+      "maxDuration": 30,
+      "memory": 512,
+      "runtime": "nodejs20.x"
+    }
+  }
 }
