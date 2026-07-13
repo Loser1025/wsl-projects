@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customer Calendar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Bebas+Neue&display=swap">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:#FFFFFF;color-scheme:light;font-family:'Noto Sans JP','Inter',sans-serif;}
+  input,select,button,textarea{font-family:inherit;color-scheme:light;color:inherit;}
+</style>
+</head>
+<body>
+<div id="calendar-container"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="/dist/CustomerCalendar.js"></script>
+<script>
+  (function () {
+    var container = document.getElementById('calendar-container');
+
+    function mount() {
+      if (!window.CustomerCalendar || typeof window.React === 'undefined' || typeof window.ReactDOM === 'undefined') {
+        return false;
+      }
+      try {
+        window.ReactDOM.render(window.React.createElement(window.CustomerCalendar), container);
+        return true;
+      } catch (e) {
+        console.error('CustomerCalendar mount failed:', e);
+        return false;
+      }
+    }
+
+    var deadline = Date.now() + 4000;
+    var timer = setInterval(function () {
+      if (mount()) {
+        clearInterval(timer);
+        return;
+      }
+      if (Date.now() > deadline) {
+        clearInterval(timer);
+      }
+    }, 50);
+
+    window.addEventListener('load', mount);
+  })();
+</script>
+</body>
+</html>
