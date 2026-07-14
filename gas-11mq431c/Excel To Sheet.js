@@ -1,3 +1,14 @@
+function testSheetAccess() {
+  const targetSS = SpreadsheetApp.getActiveSpreadsheet();
+  const targetSheet = targetSS.getSheetByName('LU');
+  if (!targetSheet) throw new Error('シート「LU」が見つかりません');
+  const headers = targetSheet.getRange(2, 1, 1, 5).getValues();
+  Logger.log(JSON.stringify(headers));
+  const blob = Utilities.newBlob('a,b\n1,2', 'text/csv', 'test.csv');
+  Logger.log(blob.getDataAsString('UTF-8'));
+  Logger.log('OK');
+}
+
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📁 CSVインポート')
@@ -14,11 +25,9 @@ function showUploadForm() {
 }
 
 /**
- * HTMLから送信されたファイルオブジェクトを受け取り、
- * 一時ファイル化を利用してPERMISSION_DENIEDを100%回避しながらLUシートに出力する
+ * HTMLから送信されたファイルオブジェクトを受け取り、LUシートに出力する
  */
 function processCsvViaBlob(fileObject) {
-  let tempFile = null;
   try {
     const targetSS = SpreadsheetApp.getActiveSpreadsheet();
     const targetSheet = targetSS.getSheetByName('LU'); 
@@ -28,15 +37,9 @@ function processCsvViaBlob(fileObject) {
     const LU_DATA_COL_COUNT = 5; 
     const robustTrim = (s) => (typeof s === 'string' ? s.replace(/^[\s\uFEFF\u00A0]+|[\s\uFEFF\u00A0]+$/g, "") : s);
 
-    // 【ここが肝】大容量データを一度Driveの裏側に避難させる（ブラウザ通信のエラーを完全回避）
-    // ファイルオブジェクトから直接Blobを作成
+    // ファイルオブジェクトから直接Blobを作成してテキスト化
     const blob = Utilities.newBlob(Utilities.base64Decode(fileObject.data), fileObject.mimeType, fileObject.name);
-    
-    // 一時ファイルとしてマイドライブに保存（※処理後に自動消去されます）
-    tempFile = DriveApp.createFile(blob);
-    
-    // 避難させたファイルからテキストを一括取得（サーバー内処理なので超高速＆エラーなし）
-    const csvRawText = tempFile.getDataAsString('UTF-8'); 
+    const csvRawText = blob.getDataAsString('UTF-8');
     const lines = csvRawText.split(/\r\n|\n|\r/).filter(line => line.trim() !== "");
     if (lines.length < 1) throw new Error("CSVファイルが空、または解析可能なデータがありません。");
 
@@ -85,18 +88,12 @@ function processCsvViaBlob(fileObject) {
     if (rowsToAppend.length > 0) {
       targetSheet.getRange(3, 1, rowsToAppend.length, LU_DATA_COL_COUNT).setValues(rowsToAppend);
       targetSheet.getRange(3, 1, rowsToAppend.length, 1).setNumberFormat('#,##0');
-      
-      // 一時ファイルを自動消去
-      tempFile.setTrashed(true);
       return `✅ アップロード成功！\n${rowsToAppend.length} 行のデータを「LU」シートへ出力しました。`;
     } else {
-      if (tempFile) tempFile.setTrashed(true);
       return "ℹ️ 取り込むデータ行がありませんでした。";
     }
 
   } catch (e) {
-    // エラーが起きても確実に一時ファイルを消去する安心設計
-    if (tempFile) tempFile.setTrashed(true);
     throw new Error(e.message);
   }
 }
