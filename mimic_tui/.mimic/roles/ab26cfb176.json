@@ -1,0 +1,6 @@
+{
+  "role": "視点: Vercel Serverless Functions (Node/CommonJS) 実装専門家。制約: 最小変更で正確に行う。変更対象は api/_utils.js のみ。完了基準: initFirebaseAdmin 関数で firebase-admin v14+ 正しい初期化 (require('firebase-admin/app') を先に実行してから admin.credential.cert を使用) を行い、create-booking API が 500 エラーを出さず正常動作すること",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-14T19:14:56"
+}
