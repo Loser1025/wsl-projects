@@ -3,6 +3,8 @@
  * Common utilities for environment validation, CORS, error handling, and Firebase Admin init
  */
 
+// Use correct import for firebase-admin v14+
+require('firebase-admin/app');
 const admin = require('firebase-admin');
 
 /**

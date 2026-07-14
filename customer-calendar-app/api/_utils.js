@@ -4,6 +4,7 @@
  */
 
 // Use correct import for firebase-admin v14+
+require('firebase-admin/app');
 const admin = require('firebase-admin');
 
 /**
