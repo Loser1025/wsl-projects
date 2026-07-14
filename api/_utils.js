@@ -4,7 +4,7 @@
  */
 
 // Use correct import for firebase-admin v14+
-require('firebase-admin/app');
+const { cert } = require('firebase-admin/app');
 const admin = require('firebase-admin');
 
 /**
@@ -151,7 +151,7 @@ function initFirebaseAdmin(serviceAccount) {
     }
     
     return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+      credential: cert(serviceAccount),
     });
   } catch (error) {
     // If already initialized error, try to get existing app

@@ -136,14 +136,26 @@ function validateFreeBusyResponse(calendars) {
  */
 function initFirebaseAdmin(serviceAccount) {
   try {
-    // Check if already initialized with same credentials
-    const existingApps = admin.getApps();
-    if (existingApps.length > 0) {
-      const existingApp = existingApps[0];
-      const existingCred = existingApp.options.credential;
+    // Check if already initialized - use try-catch for safety
+    let isInitialized = false;
+    let existingApp = null;
+    try {
+      if (admin.apps && Array.isArray(admin.apps) && admin.apps.length > 0) {
+        isInitialized = true;
+        existingApp = admin.apps[0];
+      }
+    } catch (e) {
+      // admin.apps might not be available
+    }
+    
+    if (isInitialized) {
+      const existingCred = existingApp?.options?.credential;
       
-      // Compare credentials - check client_email as unique identifier
-      if (existingCred && existingCred.client_email === serviceAccount.client_email) {
+      // Get client_email from the existing credential
+      const existingClientEmail = existingCred?.client_email || existingCred?._client_email;
+      const newClientEmail = serviceAccount?.client_email;
+      
+      if (existingClientEmail && newClientEmail && existingClientEmail === newClientEmail) {
         return existingApp;
       }
       
@@ -151,13 +163,15 @@ function initFirebaseAdmin(serviceAccount) {
       console.warn('Firebase Admin already initialized with different credentials, re-initializing');
     }
     
+    // Initialize with the service account credentials
+    // Use cert from firebase-admin/app for firebase-admin v14+
     return admin.initializeApp({
       credential: cert(serviceAccount),
     });
   } catch (error) {
     // If already initialized error, try to get existing app
     if (error.code === 'app/duplicate-app') {
-      return admin.getApp();
+      return admin.app();
     }
     throw error;
   }
