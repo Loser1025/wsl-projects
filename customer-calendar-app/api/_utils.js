@@ -5,7 +5,6 @@
 
 // Use correct import for firebase-admin v14+
 const admin = require('firebase-admin');
-const { credential } = require('firebase-admin/app');
 
 /**
  * Validates required environment variables
@@ -164,11 +163,9 @@ function initFirebaseAdmin(serviceAccount) {
     }
     
     // Initialize with the service account credentials
-    // Import credential from firebase-admin/app (v14+)
-    const { credential } = require('firebase-admin/app');
-    
+    // Use admin.credential.cert for firebase-admin v14+
     return admin.initializeApp({
-      credential: credential.cert(serviceAccount),
+      credential: admin.credential.cert(serviceAccount),
     });
   } catch (error) {
     // If already initialized error, try to get existing app
