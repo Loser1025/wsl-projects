@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <title>File Upload</title>
+    <style>
+      :root {
+        --primary: #ff007f;
+        --primary-hover: #ff3399;
+        --glass-bg: rgba(255, 255, 255, 0.07);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --text: #ffffff;
+        --text-muted: #aaaaaa;
+        --success: #00ffcc;
+        --error: #ff3366;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: sans-serif; min-height: 100vh; display: flex; justify-content: center; align-items: center; color: var(--text); overflow: hidden; position: relative; background-color: #0a0a0c; }
+      .bg-gif { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('https://livedoor.blogimg.jp/laughgif/imgs/7/b/7bf653e1.gif') center/cover no-repeat; filter: blur(4px) brightness(0.5); z-index: 1; }
+      .container { position: relative; z-index: 2; width: 100%; max-width: 400px; padding: 35px 25px; background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: 24px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); text-align: center; }
+      h2 { font-size: 1.6rem; font-weight: 700; margin-bottom: 25px; letter-spacing: 2px; text-transform: uppercase; background: linear-gradient(45deg, #fff, var(--primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+      .file-drop-zone { border: 2px dashed var(--glass-border); border-radius: 16px; padding: 30px 20px; cursor: pointer; transition: all 0.3s ease; background: rgba(0,0,0,0.2); position: relative; margin-bottom: 20px; }
+      .file-drop-zone:hover { border-color: var(--primary); background: rgba(255, 0, 127, 0.05); }
+      .file-drop-zone p { font-size: 0.9rem; color: var(--text-muted); pointer-events: none; }
+      .file-drop-zone .file-name { margin-top: 10px; font-size: 0.85rem; color: var(--primary); font-weight: bold; word-break: break-all; }
+      #fileInput { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+      #uploadButton { width: 100%; background: linear-gradient(135deg, var(--primary), #8a2be2); color: white; border: none; padding: 15px; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 0 15px rgba(255, 0, 127, 0.4); letter-spacing: 1px; }
+      #uploadButton:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 25px rgba(255, 0, 127, 0.7); background: linear-gradient(135deg, var(--primary-hover), #9433ff); }
+      #uploadButton:disabled { background: #444; box-shadow: none; color: #888; cursor: not-allowed; }
+      #status { margin-top: 20px; font-size: 0.9rem; line-height: 1.5; font-weight: 500; white-space: pre-wrap; min-height: 24px; }
+      .processing { color: var(--text-muted); animation: pulse 1.5s infinite; }
+      .error { color: var(--error); text-shadow: 0 0 10px rgba(255,51,102,0.3); }
+      @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+    </style>
+  </head>
+  <body>
+    <div class="bg-gif"></div>
+    <div class="container">
+      <h2>Select File</h2>
+      <div id="uploadForm">
+        <div class="file-drop-zone">
+          <p>CSVファイルをここにドロップするか<br>クリックして選択してください</p>
+          <div id="fileNameDisplay" class="file-name"></div>
+          <input type="file" id="fileInput" accept=".csv, text/csv" onchange="updateFileName()">
+        </div>
+        <input type="button" value="UPLOAD" id="uploadButton" onclick="uploadFile()">
+      </div>
+      <div id="status"></div>
+    </div>
+
+<script>
+  function updateFileName() {
+    const fileInput = document.getElementById('fileInput');
+    const nameDisplay = document.getElementById('fileNameDisplay');
+    if (fileInput.files.length > 0) {
+      nameDisplay.innerText = `選択中: ${fileInput.files[0].name}`;
+    } else {
+      nameDisplay.innerText = '';
+    }
+  }
+
+  function uploadFile() {
+    const file = document.getElementById('fileInput').files[0];
+    const statusDiv = document.getElementById('status');
+    const uploadButton = document.getElementById('uploadButton');
+
+    if (!file) {
+      statusDiv.innerText = 'ファイルが選択されていません。';
+      statusDiv.className = 'error';
+      return;
+    }
+
+    const reader = new FileReader();
+    statusDiv.innerText = '🚀 サーバー通信を確立中...';
+    statusDiv.className = 'processing';
+    uploadButton.disabled = true;
+
+    reader.onload = function(e) {
+      const bytes = new Uint8Array(e.target.result);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64Data = btoa(binary);
+
+      const fileObject = {
+        data: base64Data,
+        mimeType: file.type || 'text/csv',
+        name: file.name
+      };
+
+      statusDiv.innerText = '⚡ ドライブ経由で超高速解析中...\n（画面を閉じずに少々お待ちください）';
+
+      // GASのメイン処理を呼び出し
+      google.script.run
+        .withSuccessHandler(function(response) {
+          alert(response);
+          google.script.host.close();
+        })
+        .withFailureHandler(function(error) {
+          statusDiv.innerText = `エラー: ${error.message || error}`;
+          statusDiv.className = 'error';
+          uploadButton.disabled = false;
+        })
+        .processCsvViaBlob(fileObject);
+    };
+
+    // ファイルをバイナリ配列として一気に読み込み（超高速）
+    reader.readAsArrayBuffer(file);
+  }
+</script>
+  </body>
+</html>
