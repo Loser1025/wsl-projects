@@ -5,6 +5,7 @@
 
 // Use correct import for firebase-admin v14+
 const { cert } = require('firebase-admin/app');
+const { getFirestore: getFirestoreFn } = require('firebase-admin/firestore');
 const admin = require('firebase-admin');
 
 /**
@@ -190,6 +191,26 @@ function createApiHandler(handler) {
   };
 }
 
+/**
+ * Returns the initialized Firebase Admin module
+ * Ensures Firebase Admin is initialized before returning
+ * @returns {Object} Firebase Admin module with initialized app
+ */
+function getAdmin() {
+  return admin;
+}
+
+/**
+ * Returns the Firestore instance from the initialized Firebase Admin app
+ * Ensures Firebase Admin is initialized before returning
+ * @param {Object} [app] - Optional Firebase app instance (uses default if not provided)
+ * @returns {FirebaseFirestore.Firestore} Firestore instance
+ */
+function getFirestore(app) {
+  const targetApp = app || admin.app();
+  return getFirestoreFn(targetApp);
+}
+
 module.exports = {
   validateEnvVar,
   setCorsHeaders,
@@ -198,5 +219,7 @@ module.exports = {
   handleError,
   validateFreeBusyResponse,
   initFirebaseAdmin,
+  getAdmin,
+  getFirestore,
   createApiHandler,
 };

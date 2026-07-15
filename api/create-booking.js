@@ -1,12 +1,14 @@
-const admin = require('firebase-admin');
 const {
   validateEnvVar,
   setCorsHeaders,
   handleOptions,
   handleError,
   initFirebaseAdmin,
+  getFirestore,
   createApiHandler,
 } = require('./_utils');
+
+const { FieldValue } = require('firebase-admin/firestore');
 
 async function createBookingHandler(req, res) {
   // Validate environment variable
@@ -24,9 +26,9 @@ async function createBookingHandler(req, res) {
 
   try {
     // Initialize Firebase Admin with robust guard
-    initFirebaseAdmin(serviceAccount);
+    const app = initFirebaseAdmin(serviceAccount);
 
-    const db = admin.firestore();
+    const db = getFirestore(app);
 
     // Use a transaction to prevent double-booking of the same time slot
     const docRef = await db.runTransaction(async (transaction) => {
@@ -52,7 +54,7 @@ async function createBookingHandler(req, res) {
       const newDocRef = db.collection('bookings').doc();
       transaction.set(newDocRef, {
         ...booking,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       });
 
       return newDocRef;

@@ -5,8 +5,8 @@
     "last_used": "2026-07-10T17:25:41"
   },
   "/home/loser/wsl-projects": {
-    "cmd": "cd /home/loser/wsl-projects/customer-calendar-app && node -c api/_utils.js && echo \"Syntax OK\"",
-    "passes": 4,
-    "last_used": "2026-07-14T19:14:56"
+    "cmd": "cd /home/loser/wsl-projects/customer-calendar-app && node -c api/_utils.js && node -c api/create-booking.js && echo \"Syntax OK\"",
+    "passes": 2,
+    "last_used": "2026-07-14T20:48:50"
   }
 }

@@ -1,0 +1,6 @@
+{
+  "role": "視点: Vercel Serverless Functions (Node/CommonJS) 実装専門家。制約: 最小変更で正確に行う。変更対象は api/_utils.js と api/create-booking.js のみ。完了基準: initFirebaseAdmin が初期化済み admin app を返し、create-booking.js がそれを使って admin.firestore() を呼べるようになり、create-booking API が 500 エラーを出さず正常動作すること",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-14T20:48:50"
+}

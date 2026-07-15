@@ -1,12 +1,14 @@
-const admin = require('firebase-admin');
 const {
   validateEnvVar,
   setCorsHeaders,
   handleOptions,
   handleError,
   initFirebaseAdmin,
+  getFirestore,
   createApiHandler,
 } = require('./_utils');
+
+const { FieldValue } = require('firebase-admin/firestore');
 
 async function createBookingHandler(req, res) {
   // Validate environment variable
@@ -27,9 +29,9 @@ async function createBookingHandler(req, res) {
 
   try {
     // Initialize Firebase Admin with robust guard
-    initFirebaseAdmin(serviceAccount);
+    const app = initFirebaseAdmin(serviceAccount);
 
-    const db = admin.firestore();
+    const db = getFirestore(app);
 
     // If idempotency key provided, check for existing booking with that key
     if (idempotencyKey) {
@@ -70,7 +72,7 @@ async function createBookingHandler(req, res) {
       const newDocRef = db.collection('bookings').doc();
       transaction.set(newDocRef, {
         ...booking,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       });
 
       // If idempotency key provided, also store it in the same transaction
@@ -78,7 +80,7 @@ async function createBookingHandler(req, res) {
         const idempotencyRef = db.collection('idempotency_keys').doc(idempotencyKey);
         transaction.set(idempotencyRef, {
           bookingId: newDocRef.id,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
         });
       }
 
