@@ -8,6 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 directly to OpenRouter / Google AI Studio (Gemini) / Mistral chat-completions APIs over raw
 `urllib` (no SDKs), runs an agentic tool-call loop, and can spin up sandboxed sub-agents of itself.
 
+**Project thesis**: mimic's core bet is that a weak/free-tier LLM API, wrapped in a sufficiently
+rigid and well-engineered harness (tool loop, delegation, verification scaffolding, session
+logging), can be driven to match or exceed the practical output quality of commercial coding
+agents built on frontier models. Harness rigor is the lever, not model strength — design/review
+decisions in this repo should be weighed against that goal.
+
 ## Running
 
 ```bash
@@ -43,15 +49,22 @@ oldest session `.md`/`.jsonl` pairs beyond the most recent 200, and warns (via `
 `team.list_orphaned_delegations()` has any entry whose `started_at` is more than 24h old, pointing
 the user at `/delegations` to inspect/discard it.
 
-**Extreme React mode** (`/mode extreme`): An alternate tool registry `extreme_tools` is built at
-startup with write tools, shell tools, and all read/search tools removed
-(`_EXTREME_EXCLUDED_TOOLS`). In this mode the agent is forced to route all code changes and
-research through `delegate_to_team`/`delegate_to_team_parallel` and `delegate_research`.
+**Two agent modes** (`/mode <name>`, `app.py::_cmd_mode`). There is no "extreme" mode — an earlier
+extreme-mode design was consolidated into `specialist`; only these two exist in the current code:
 
-**Specialist mode** (`/mode specialist`): Like extreme but also removes the fixed-role delegation
-tools (`_SPECIALIST_EXCLUDED_TOOLS`), leaving `delegate_to_specialist` as the only delegation
-path. On mode switch, `team.load_saved_roles_section()` is appended to the system prompt to
-surface previously successful role definitions (see `delegate_to_specialist` below).
+- **Interactive** (`/mode interactive`, aliases `react`/`i`): the full tool registry
+  (`mon_tools`), including write tools, shell tools, and delegation tools. Described as the
+  fallback/退避用 mode.
+- **Specialist** (`/mode specialist`, aliases `spec`/`s`, and the default via
+  `MIMIC_DEFAULT_MODE`, default value `"specialist"`): write tools, shell tools, `smart_read`,
+  `get_repo_map`, `web_search`/`fetch_webpage`, and the fixed-role delegation tools
+  (`delegate_to_team[_parallel]`, `delegate_to_worker`, `delegate_research`) are all removed
+  (`__main__.py::_SPECIALIST_EXCLUDED_TOOLS`), leaving `delegate_to_specialist` as the only
+  delegation path. `read_file`/`grep_codebase`/`file_info` remain available as "peek" tools, but
+  their observations are truncated to `_PEEK_OBS_MAX_CHARS` so deep reading still has to go
+  through a delegated specialist. On switching to this mode, `team.load_saved_roles_section()` is
+  appended to the system prompt to surface previously successful role definitions from
+  `.mimic/roles/*.json` (see `delegate_to_specialist` below).
 
 ### Agent core (`agent.py`)
 `OpenRouterAgent` is provider-agnostic despite the name — `self._config` can be an
@@ -122,8 +135,10 @@ the agent's operating rules — notably a "Pipeline-First" policy (prefer `searc
 "aggressive team delegation" policy (`delegate_to_team[_parallel]`, see below).
 `WORKER_COMPLETION_GUIDANCE` is additionally appended for sub-agents started with
 `MIMIC_NO_AUTOGIT=1`, instructing them to report completion and exit cleanly.
-`EXTREME_REACT_SYSTEM_PROMPT` is an alternate prompt selectable via `/mode extreme` (Director-only
-mode, described above).
+`SPECIALIST_REACT_SYSTEM_PROMPT` (`orchestrator.py`) is appended in place of `REACT_SYSTEM_PROMPT`
+when switching to Specialist mode (`app.py::_cmd_mode`, described above).
+`WORKER_REACT_SYSTEM_PROMPT` is the variant used for sub-agent Workers — it omits any mention of
+delegation tools entirely, since Workers have them stripped from their registry.
 
 ### Tools (`tools.py`, `tools_linux.py`, `pipeline.py`)
 `ToolRegistry` (in `tools.py`) holds all tool specs/functions; tools self-register via
