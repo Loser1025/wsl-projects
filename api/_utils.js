@@ -131,33 +131,28 @@ function validateFreeBusyResponse(calendars) {
 
 /**
  * Firebase Admin initialization with robust guard
- * Prevents re-initialization with different credentials
+ * Prevents re-initialization error by checking for existing default app
  * @param {Object} serviceAccount - Parsed service account credentials
  * @returns {admin.app.App} Firebase app instance
  */
 function initFirebaseAdmin(serviceAccount) {
   try {
-    // Check if already initialized with same credentials
-    if (admin.apps.length > 0) {
-      const existingApp = admin.apps[0];
-      const existingCred = existingApp.options.credential;
-      
-      // Compare credentials - check client_email as unique identifier
-      if (existingCred && existingCred.client_email === serviceAccount.client_email) {
-        return existingApp;
-      }
-      
-      // Different credentials - this shouldn't happen in serverless but handle gracefully
-      console.warn('Firebase Admin already initialized with different credentials, re-initializing');
+    // Check if default app already exists by name
+    const existingApps = admin.getApps();
+    const defaultApp = existingApps.find(app => app.name === '[DEFAULT]');
+    if (defaultApp) {
+      // Default app already exists, reuse it
+      return defaultApp;
     }
     
+    // No default app exists, initialize new one
     return admin.initializeApp({
       credential: cert(serviceAccount),
     });
   } catch (error) {
-    // If already initialized error, try to get existing app
+    // If already initialized error (race condition), get existing app
     if (error.code === 'app/duplicate-app') {
-      return admin.app();
+      return admin.getApp();
     }
     throw error;
   }

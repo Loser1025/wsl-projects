@@ -1,6 +1,0 @@
-{
-  "role": "esbuildバンドル・Reactエクスポート修正専門家。esbuild の build 設定ミス（--global-name と --format=iife の組み合わせによる名前空間 object 化）を最小変更で直し、ブラウザ側で window.CustomerCalendar が確実に「関数」として登録されるようにする。変更前に git 保存。",
-  "uses": 1,
-  "mode": "write",
-  "last_used": "2026-07-09T15:23:23"
-}

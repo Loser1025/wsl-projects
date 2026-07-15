@@ -130,48 +130,28 @@ function validateFreeBusyResponse(calendars) {
 
 /**
  * Firebase Admin initialization with robust guard
- * Prevents re-initialization with different credentials
+ * Prevents re-initialization error by checking for existing default app
  * @param {Object} serviceAccount - Parsed service account credentials
  * @returns {admin.app.App} Firebase app instance
  */
 function initFirebaseAdmin(serviceAccount) {
   try {
-    // Check if already initialized - use try-catch for safety
-    let isInitialized = false;
-    let existingApp = null;
-    try {
-      if (admin.apps && Array.isArray(admin.apps) && admin.apps.length > 0) {
-        isInitialized = true;
-        existingApp = admin.apps[0];
-      }
-    } catch (e) {
-      // admin.apps might not be available
+    // Check if default app already exists by name
+    const existingApps = admin.getApps();
+    const defaultApp = existingApps.find(app => app.name === '[DEFAULT]');
+    if (defaultApp) {
+      // Default app already exists, reuse it
+      return defaultApp;
     }
     
-    if (isInitialized) {
-      const existingCred = existingApp?.options?.credential;
-      
-      // Get client_email from the existing credential
-      const existingClientEmail = existingCred?.client_email || existingCred?._client_email;
-      const newClientEmail = serviceAccount?.client_email;
-      
-      if (existingClientEmail && newClientEmail && existingClientEmail === newClientEmail) {
-        return existingApp;
-      }
-      
-      // Different credentials - this shouldn't happen in serverless but handle gracefully
-      console.warn('Firebase Admin already initialized with different credentials, re-initializing');
-    }
-    
-    // Initialize with the service account credentials
-    // Use cert from firebase-admin/app for firebase-admin v14+
+    // No default app exists, initialize new one
     return admin.initializeApp({
       credential: cert(serviceAccount),
     });
   } catch (error) {
-    // If already initialized error, try to get existing app
+    // If already initialized error (race condition), get existing app
     if (error.code === 'app/duplicate-app') {
-      return admin.app();
+      return admin.getApp();
     }
     throw error;
   }
