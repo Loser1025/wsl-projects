@@ -1,6 +1,6 @@
 {
   "role": "視点: Vercel Serverless Functions (Node/CommonJS) 実装専門家。制約: 最小変更で正確に行う。変更対象は api/_utils.js のみ。完了基準: initFirebaseAdmin 関数で Firebase Admin 重複初期化エラーを防ぎ、既存アプリがあれば再利用し、create-booking API が 500 エラーを出さず正常動作すること",
-  "uses": 1,
+  "uses": 2,
   "mode": "write",
-  "last_used": "2026-07-15T16:50:31"
+  "last_used": "2026-07-15T16:56:01"
 }
