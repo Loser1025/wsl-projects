@@ -1,0 +1,6 @@
+{
+  "role": "視点: React フロントエンド修正専門家。制約: src/components/Calendar/CustomerCalendar.jsx のみ変更、最小変更で正確に修正する。完了基準: handleBooking 関数が data.id の有無で成功判定し、idempotent 時にも対応する",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-07-16T15:59:28"
+}

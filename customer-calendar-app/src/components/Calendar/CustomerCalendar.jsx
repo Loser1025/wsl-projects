@@ -196,10 +196,12 @@ const CustomerCalendar = ({
     })
       .then(res => res.json())
       .then(data => {
-        if (data.success) {
-          alert('予約が完了しました！');
+        if (data.id) {
+          alert(data.idempotent ? '予約済みです（重複リクエスト）' : '予約が完了しました！');
+        } else if (data.error) {
+          alert('予約に失敗しました: ' + data.error);
         } else {
-          alert('予約に失敗しました: ' + (data.message || '不明なエラー'));
+          alert('予約に失敗しました: 不明なエラー');
         }
       })
       .catch(() => alert('予約リクエストの送信に失敗しました。'));

@@ -1,8 +1,10 @@
+const { google } = require('googleapis');
 const {
   validateEnvVar,
   setCorsHeaders,
   handleOptions,
   handleError,
+  handleGoogleCalendarError,
   initFirebaseAdmin,
   getFirestore,
   createApiHandler,
@@ -11,7 +13,7 @@ const {
 const { FieldValue } = require('firebase-admin/firestore');
 
 async function createBookingHandler(req, res) {
-  // Validate environment variable
+  // Validate environment variables
   const serviceAccount = validateEnvVar('FIREBASE_SERVICE_ACCOUNT_KEY', res);
   if (!serviceAccount) {
     return; // Response already sent
@@ -24,14 +26,17 @@ async function createBookingHandler(req, res) {
     return res.status(400).json({ error: 'Missing required booking fields: calendarId, start, end' });
   }
 
+  let docRef = null;
+  let db = null;
+
   try {
     // Initialize Firebase Admin with robust guard
     const app = initFirebaseAdmin(serviceAccount);
 
-    const db = getFirestore(app);
+    db = getFirestore(app);
 
     // Use a transaction to prevent double-booking of the same time slot
-    const docRef = await db.runTransaction(async (transaction) => {
+    docRef = await db.runTransaction(async (transaction) => {
       // Check for existing booking with the same calendarId, start, and end
       const existingBookingsQuery = db
         .collection('bookings')
@@ -60,12 +65,49 @@ async function createBookingHandler(req, res) {
       return newDocRef;
     });
 
-    res.status(200).json({ id: docRef.id });
+    // Firestore booking created successfully - now create Google Calendar event
+    const credentials = validateEnvVar('GOOGLE_SERVICE_ACCOUNT_KEY', res);
+    if (!credentials) {
+      return; // Response already sent
+    }
+
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/calendar'],
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth });
+
+    const calendarResponse = await calendar.events.insert({
+      calendarId: booking.calendarId,
+      requestBody: {
+        summary: '予約',
+        start: { dateTime: booking.start, timeZone: 'Asia/Tokyo' },
+        end: { dateTime: booking.end, timeZone: 'Asia/Tokyo' },
+      },
+    });
+
+    const googleEventId = calendarResponse.data.id;
+
+    res.status(200).json({ id: docRef.id, googleEventId });
   } catch (error) {
     if (error.code === 'ALREADY_BOOKED' || error.statusCode === 409) {
       return res.status(409).json({ error: 'Time slot already booked' });
     }
-    handleError(error, res, '内部サーバーエラーが発生しました');
+
+    // If Google Calendar API failed after Firestore booking was created,
+    // we need to delete the Firestore booking to maintain consistency
+    if (docRef && docRef.id && db) {
+      try {
+        await db.collection('bookings').doc(docRef.id).delete();
+        console.log('Rolled back Firestore booking due to Calendar API failure:', docRef.id);
+      } catch (deleteError) {
+        console.error('Failed to rollback Firestore booking:', deleteError);
+      }
+    }
+
+    const userMessage = handleGoogleCalendarError ? handleGoogleCalendarError(error) : '内部サーバーエラーが発生しました';
+    handleError(error, res, userMessage);
   }
 }
 
