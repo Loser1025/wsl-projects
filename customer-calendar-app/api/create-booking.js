@@ -8,10 +8,11 @@ const {
   createApiHandler,
 } = require('./_utils');
 
+const { google } = require('googleapis');
 const { FieldValue } = require('firebase-admin/firestore');
 
 async function createBookingHandler(req, res) {
-  // Validate environment variable
+  // Validate Firebase environment variable
   const serviceAccount = validateEnvVar('FIREBASE_SERVICE_ACCOUNT_KEY', res);
   if (!serviceAccount) {
     return; // Response already sent
@@ -27,10 +28,12 @@ async function createBookingHandler(req, res) {
   // Idempotency key from header (optional but recommended)
   const idempotencyKey = req.headers['idempotency-key'] || req.headers['Idempotency-Key'];
 
+  let createdDocRef = null;
+  let googleEventId = null;
+
   try {
     // Initialize Firebase Admin with robust guard
     const app = initFirebaseAdmin(serviceAccount);
-
     const db = getFirestore(app);
 
     // If idempotency key provided, check for existing booking with that key
@@ -87,8 +90,66 @@ async function createBookingHandler(req, res) {
       return newDocRef;
     });
 
-    res.status(200).json({ id: docRef.id, idempotent: false });
+    createdDocRef = docRef;
+
+    // Now create the event in Google Calendar
+    const googleCredentials = validateEnvVar('GOOGLE_SERVICE_ACCOUNT_KEY', res);
+    if (googleCredentials) {
+      const auth = new google.auth.GoogleAuth({
+        credentials: googleCredentials,
+        scopes: ['https://www.googleapis.com/auth/calendar.events'],
+      });
+
+      const calendar = google.calendar({ version: 'v3', auth });
+
+      const event = {
+        summary: '予約',
+        start: { dateTime: booking.start, timeZone: 'Asia/Tokyo' },
+        end: { dateTime: booking.end, timeZone: 'Asia/Tokyo' },
+      };
+
+      const response = await calendar.events.insert({
+        calendarId: booking.calendarId,
+        requestBody: event,
+      });
+
+      googleEventId = response.data.id;
+
+      // Update the booking document with the Google Calendar event ID
+      await db.collection('bookings').doc(docRef.id).update({
+        googleEventId: googleEventId,
+        googleCalendarSyncedAt: FieldValue.serverTimestamp(),
+      });
+
+      // If idempotency key provided, also update it with googleEventId
+      if (idempotencyKey) {
+        await db.collection('idempotency_keys').doc(idempotencyKey).update({
+          googleEventId: googleEventId,
+        });
+      }
+    }
+
+    res.status(200).json({ 
+      id: docRef.id, 
+      idempotent: false,
+      googleEventId: googleEventId 
+    });
   } catch (error) {
+    // If Google Calendar creation failed but Firestore booking was created, delete it
+    if (createdDocRef && !googleEventId) {
+      try {
+        const app = initFirebaseAdmin(serviceAccount);
+        const db = getFirestore(app);
+        await db.collection('bookings').doc(createdDocRef.id).delete();
+        
+        if (idempotencyKey) {
+          await db.collection('idempotency_keys').doc(idempotencyKey).delete();
+        }
+      } catch (cleanupError) {
+        console.error('Cleanup failed:', cleanupError);
+      }
+    }
+
     if (error.code === 'ALREADY_BOOKED' || error.statusCode === 409) {
       return res.status(409).json({ error: 'Time slot already booked' });
     }
