@@ -1191,3 +1191,6 @@ from . import tools_sns    # noqa: F401, E402
 
 # ── Threads API ツールを登録 ────────────────────────────────
 from . import tools_threads  # noqa: F401, E402
+
+# ── 画像生成ツール（Pollinations.ai写真 + Pillowテキストオーバーレイ）を登録 ──
+from . import tools_image  # noqa: F401, E402

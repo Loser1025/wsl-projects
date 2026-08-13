@@ -36,3 +36,9 @@ mimic_tui/mimic.log
 
 # Vitest test cache
 .vitest-cache/
+
+# Windows Zone.Identifier files (WSL downloads)
+*:Zone.Identifier
+
+# GCP service account credentials
+slides_design_tool/credentials.json

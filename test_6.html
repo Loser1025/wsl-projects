@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>診断テスト | ANCARI</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;500&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0A1628;--navy2:#1A2E4A;--gold:#C9A84C;--teal:#2ABFA0;--sand:#E8F1FC;--warm:#D0E4F5;--sub:#4A6480;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--sand);color:var(--navy);}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;height:60px;padding:0 5vw;display:flex;align-items:center;justify-content:space-between;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.08);border-bottom:1px solid rgba(201,168,76,.2);}
+.nav-logo{font-family:'Zen Kaku Gothic New',sans-serif;font-weight:900;font-size:1.1rem;color:var(--navy);}
+.nav-logo span{color:var(--gold);}
+.nav-prog{display:flex;align-items:center;gap:.8rem;}
+.nav-prog-bg{width:120px;height:3px;background:rgba(10,22,40,.1);border-radius:2px;overflow:hidden;}
+.nav-prog-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--teal));border-radius:2px;transition:width .4s;width:0%;}
+.nav-prog-label{font-size:.72rem;font-weight:700;color:rgba(10,22,40,.4);white-space:nowrap;}
+.hero{background:var(--navy);padding:100px 5vw 60px;text-align:center;position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 60% at 50% 80%,rgba(201,168,76,.07),transparent 70%);pointer-events:none;}
+.hero-inner{max-width:640px;margin:0 auto;position:relative;z-index:1;}
+.hero-eye{font-size:.7rem;letter-spacing:.25em;color:var(--teal);margin-bottom:1.2rem;font-weight:700;}
+.hero-h1{font-family:'Zen Kaku Gothic New',sans-serif;font-size:clamp(1.8rem,4vw,2.8rem);font-weight:900;color:#fff;line-height:1.3;margin-bottom:.8rem;}
+.hero-h1 em{font-family:'Playfair Display',serif;font-style:italic;color:var(--teal);}
+.hero-lead{font-size:.88rem;color:rgba(255,255,255,.5);line-height:1.9;margin-bottom:1.6rem;}
+.hero-meta{display:flex;justify-content:center;gap:1.5rem;flex-wrap:wrap;}
+.hero-meta span{font-size:.72rem;color:rgba(255,255,255,.35);display:flex;align-items:center;gap:.3rem;}
+.hero-meta span::before{content:'✓';color:var(--teal);}
+.hero-divider{height:40px;background:linear-gradient(180deg,var(--navy),var(--sand));}
+.quiz{max-width:640px;margin:0 auto;padding:12px 5vw 100px;}
+.prog-sticky{position:sticky;top:60px;z-index:50;background:var(--sand);padding:.5rem 0 .4rem;margin-bottom:.8rem;}
+.prog-bar{display:flex;align-items:center;gap:.8rem;}
+.prog-bg{flex:1;height:4px;background:var(--warm);border-radius:2px;overflow:hidden;}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--teal));border-radius:2px;transition:width .4s;width:0%;}
+.prog-label{font-size:.72rem;font-weight:700;color:var(--sub);white-space:nowrap;}
+.sec-label{display:flex;align-items:center;gap:.8rem;padding:.8rem 1.1rem;background:var(--navy);border-radius:8px;margin:1.6rem 0 .8rem;}
+.sec-num{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;color:var(--gold);}
+.sec-title{font-family:'Zen Kaku Gothic New',sans-serif;font-size:.85rem;font-weight:700;color:#fff;}
+.sec-sub{font-size:.7rem;color:rgba(255,255,255,.4);margin-top:.1rem;}
+.q-card{background:#fff;border-radius:12px;padding:1.6rem 1.8rem;margin-bottom:.7rem;box-shadow:0 2px 16px rgba(13,27,46,.06);transition:opacity .3s;}
+.q-card.done{opacity:.55;}
+.q-num{font-size:.68rem;font-weight:700;color:var(--gold);letter-spacing:.1em;margin-bottom:.5rem;}
+.q-text{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1rem;font-weight:700;line-height:1.55;margin-bottom:1rem;}
+.opts{display:flex;flex-direction:column;gap:.45rem;}
+.opt{display:flex;align-items:center;gap:.8rem;padding:.7rem .9rem;border:1.5px solid var(--warm);border-radius:8px;cursor:pointer;font-size:.86rem;transition:border-color .15s,background .15s;user-select:none;}
+.opt:hover{border-color:var(--gold);background:rgba(201,168,76,.04);}
+.opt.sel{border-color:var(--gold);background:rgba(201,168,76,.08);}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--warm);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.opt.sel .dot{border-color:var(--gold);background:var(--gold);}
+.opt.sel .dot::after{content:'';width:5px;height:5px;border-radius:50%;background:white;}
+.scale-wrap{display:flex;flex-direction:column;gap:.5rem;}
+.scale-labels{display:flex;justify-content:space-between;font-size:.65rem;color:var(--sub);}
+.scale-btns{display:flex;gap:.35rem;}
+.scale-btn{flex:1;padding:.65rem .2rem;border:1.5px solid var(--warm);border-radius:8px;background:#fff;cursor:pointer;font-family:'Zen Kaku Gothic New',sans-serif;font-size:.9rem;font-weight:700;color:var(--sub);transition:all .15s;text-align:center;}
+.scale-btn:hover{border-color:var(--gold);color:var(--gold);}
+.scale-btn.sel{border-color:var(--gold);background:var(--gold);color:white;}
+.result{border-radius:16px;overflow:hidden;margin-top:1rem;box-shadow:0 8px 40px rgba(13,27,46,.12);opacity:0;transform:translateY(16px);transition:opacity .4s,transform .4s;}
+.result.show{opacity:1;transform:none;}
+.res-head{padding:2rem 1.8rem 1.6rem;text-align:center;}
+.res-eye{font-size:.65rem;letter-spacing:.22em;color:rgba(255,255,255,.5);margin-bottom:.6rem;display:inline-block;border:1px solid rgba(255,255,255,.2);padding:.2rem .7rem;border-radius:20px;}
+.res-char{display:flex;justify-content:center;margin-bottom:.6rem;}
+.res-name{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1.8rem;font-weight:900;color:white;margin-bottom:.3rem;}
+.res-catch{font-size:.85rem;color:rgba(255,255,255,.6);font-style:italic;}
+.res-body{background:white;padding:1.6rem 1.8rem;}
+.res-sec{font-size:.72rem;font-weight:700;letter-spacing:.12em;color:var(--sub);padding-bottom:.4rem;border-bottom:1px solid var(--warm);margin-bottom:.8rem;text-transform:uppercase;}
+.neg-box{background:linear-gradient(135deg,rgba(10,22,40,.04),rgba(201,168,76,.07));border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:1.1rem 1.3rem;margin-bottom:1.4rem;}
+.neg-label{font-size:.65rem;letter-spacing:.15em;color:var(--gold);font-weight:700;margin-bottom:.5rem;}
+.neg-title{font-family:'Zen Kaku Gothic New',sans-serif;font-size:.95rem;font-weight:700;color:var(--navy);line-height:1.6;margin-bottom:.4rem;}
+.neg-sub{font-size:.8rem;color:var(--sub);line-height:1.8;}
+.type-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:.8rem;}.type-list>*{}
+.tl-item{border-radius:8px;padding:.7rem .5rem;text-align:center;}
+.tl-num{font-size:.58rem;color:rgba(255,255,255,.5);letter-spacing:.1em;margin-bottom:.25rem;}
+.tl-name{font-size:.7rem;font-weight:700;color:white;line-height:1.3;}.tl-item svg{width:55px;height:66px;display:block;margin:0 auto .2rem;}.tl-catch{font-size:.62rem;color:rgba(255,255,255,.6);margin-top:.2rem;line-height:1.4;}.tl-item{cursor:pointer;transition:transform .15s;}.tl-item:hover{transform:scale(1.03);}
+.type-note{font-size:.75rem;color:var(--sub);line-height:1.7;margin-bottom:1.4rem;}
+.teaser-wrap{position:relative;margin-bottom:1.4rem;}
+.teaser-blur{filter:blur(2px);user-select:none;pointer-events:none;}
+.str-box{background:rgba(42,191,160,.05);border:1px solid rgba(42,191,160,.2);border-radius:10px;padding:1rem 1.2rem;margin-bottom:1rem;}
+.str-label{font-size:.65rem;letter-spacing:.15em;color:var(--teal);font-weight:700;margin-bottom:.5rem;}
+.str-item{font-size:.84rem;display:flex;align-items:flex-start;gap:.4rem;line-height:1.65;margin-bottom:.3rem;}
+.str-item::before{content:'✦';color:var(--teal);font-size:.65rem;margin-top:.2rem;flex-shrink:0;}
+.bar-row{margin-bottom:.8rem;}
+.bar-top{display:flex;justify-content:space-between;font-size:.75rem;color:var(--sub);margin-bottom:.3rem;}
+.bar-bg{height:5px;background:var(--warm);border-radius:3px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:3px;}
+.teaser-overlay{position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,transparent 50%,rgba(255,255,255,.85) 70%,rgba(255,255,255,1) 100%);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:1.2rem;}
+.teaser-lock{font-size:1.8rem;margin-bottom:.4rem;}
+.teaser-msg{font-family:'Zen Kaku Gothic New',sans-serif;font-size:.95rem;font-weight:700;color:var(--navy);margin-bottom:.2rem;text-align:center;}
+.teaser-sub{font-size:.75rem;color:var(--sub);text-align:center;}
+.line-cta{padding:1.8rem;text-align:center;}
+.line-eye{font-size:.65rem;letter-spacing:.18em;color:rgba(255,255,255,.35);margin-bottom:.4rem;}
+.line-title{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1.15rem;font-weight:900;color:white;line-height:1.5;margin-bottom:.4rem;}
+.line-sub{font-size:.8rem;color:rgba(255,255,255,.45);line-height:1.8;margin-bottom:1.1rem;}
+.line-pts{display:flex;flex-direction:column;gap:.4rem;margin-bottom:1.2rem;text-align:left;max-width:280px;margin-left:auto;margin-right:auto;}
+.line-pt{font-size:.8rem;color:rgba(255,255,255,.65);display:flex;gap:.4rem;}
+.line-pt::before{content:'✓';color:var(--teal);flex-shrink:0;}
+.btn-line{display:inline-flex;align-items:center;justify-content:center;width:100%;max-width:320px;padding:1rem 1.4rem;background:#06C755;color:white;border:none;border-radius:8px;font-family:'Zen Kaku Gothic New',sans-serif;font-size:.95rem;font-weight:900;cursor:pointer;text-decoration:none;transition:all .2s;box-shadow:0 4px 20px rgba(6,199,85,.3);}
+.btn-line:hover{background:#05a849;transform:translateY(-2px);}
+.line-note{font-size:.65rem;color:rgba(255,255,255,.25);margin-top:.7rem;}
+@media(max-width:560px){.q-card{padding:1.2rem 1rem;}.scale-btn{font-size:.8rem;}nav{padding:0 4vw;}.nav-prog{display:none;}.res-name{font-size:1.5rem;}.type-list{grid-template-columns:repeat(2,1fr);}}
+
+.form-box{background:#f8f9ff;border:1px solid rgba(201,168,76,.25);border-radius:12px;padding:1.4rem 1.6rem;margin-bottom:1.2rem;}
+.form-box-title{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1rem;font-weight:700;color:var(--navy);margin-bottom:.3rem;}
+.form-box-sub{font-size:.78rem;color:var(--sub);margin-bottom:1rem;line-height:1.6;}
+.form-field{margin-bottom:.8rem;}
+.form-label{display:block;font-size:.7rem;font-weight:700;letter-spacing:.08em;color:var(--sub);margin-bottom:.3rem;}
+.form-input{width:100%;padding:.75rem .9rem;border:1.5px solid var(--warm);border-radius:8px;font-family:'Noto Sans JP',sans-serif;font-size:.88rem;color:var(--navy);background:#fff;outline:none;transition:border-color .2s;}
+.form-input:focus{border-color:var(--gold);}
+.btn-submit{width:100%;padding:.95rem;background:var(--navy);color:#fff;border:none;border-radius:8px;font-family:'Zen Kaku Gothic New',sans-serif;font-size:.95rem;font-weight:900;cursor:pointer;transition:all .2s;margin-bottom:.6rem;}
+.btn-submit:hover{background:#1A2E4A;}
+.btn-submit:disabled{opacity:.5;cursor:not-allowed;}
+.form-done{text-align:center;padding:1rem 0;}
+.form-done-icon{font-size:2rem;margin-bottom:.5rem;}
+.form-done-text{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1rem;font-weight:700;color:var(--navy);margin-bottom:.3rem;}
+.form-done-sub{font-size:.78rem;color:var(--sub);line-height:1.7;}
+
+.form-box{background:#f8f9ff;border:1px solid rgba(201,168,76,.25);border-radius:12px;padding:1.4rem 1.6rem;margin-bottom:1.2rem;}
+.form-box-title{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1rem;font-weight:700;color:var(--navy);margin-bottom:.3rem;}
+.form-box-sub{font-size:.78rem;color:var(--sub);margin-bottom:1rem;line-height:1.6;}
+.form-field{margin-bottom:.8rem;}
+.form-label{display:block;font-size:.7rem;font-weight:700;letter-spacing:.08em;color:var(--sub);margin-bottom:.3rem;}
+.form-input{width:100%;padding:.75rem .9rem;border:1.5px solid var(--warm);border-radius:8px;font-family:'Noto Sans JP',sans-serif;font-size:.88rem;color:var(--navy);background:#fff;outline:none;transition:border-color .2s;}
+.form-input:focus{border-color:var(--gold);}
+.btn-submit{width:100%;padding:.95rem;background:var(--navy);color:#fff;border:none;border-radius:8px;font-family:'Zen Kaku Gothic New',sans-serif;font-size:.95rem;font-weight:900;cursor:pointer;transition:all .2s;margin-bottom:.6rem;}
+.btn-submit:hover{background:#1A2E4A;}
+.btn-submit:disabled{opacity:.5;cursor:not-allowed;}
+.form-done{text-align:center;padding:1rem 0;}
+.form-done-icon{font-size:2rem;margin-bottom:.5rem;}
+.form-done-text{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1rem;font-weight:700;color:var(--navy);margin-bottom:.3rem;}
+.form-done-sub{font-size:.78rem;color:var(--sub);line-height:1.7;}
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QCMRXhpZgAATU0AKgAAAAgABQESAAMAAAABAAEAAAEaAAUAAAABAAAASgEbAAUAAAABAAAAUgEoAAMAAAABAAIAAIdpAAQAAAABAAAAWgAAAAAAAABIAAAAAQAAAEgAAAABAAOgAQADAAAAAQABAACgAgAEAAAAAQAAAgWgAwAEAAAAAQAAAUQAAAAA/+0AOFBob3Rvc2hvcCAzLjAAOEJJTQQEAAAAAAAAOEJJTQQlAAAAAAAQ1B2M2Y8AsgTpgAmY7PhCfv/AABEIAUQCBQMBIgACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgv/xAC1EAACAQMDAgQDBQUEBAAAAX0BAgMABBEFEiExQQYTUWEHInEUMoGRoQgjQrHBFVLR8CQzYnKCCQoWFxgZGiUmJygpKjQ1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4eLj5OXm5+jp6vHy8/T19vf4+fr/xAAfAQADAQEBAQEBAQEBAAAAAAAAAQIDBAUGBwgJCgv/xAC1EQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2wBDAAICAgICAgQCAgQGBAQEBggGBgYGCAoICAgICAoMCgoKCgoKDAwMDAwMDAwODg4ODg4QEBAQEBISEhISEhISEhL/2wBDAQMDAwUEBQgEBAgTDQsNExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExP/3QAEACH/2gAMAwEAAhEDEQA/AP34pmTTz0qOgBcmjJpKKAFyaMmkooAXJoyaSigBcmjJpKKAFyaMmkooAXJoyaSigBcmjJpKKAFyaTJoooAKKKKACiiigAooooAKKKKAFyaTJoooAMmiiigAyaKKKAFyaMmkooAXJoyaSigBcmjJpKKAFyaMmkooAXJoyaSigBcmjJpKKAFyaMmkooAXJoyaSigBcmkoooAXJpKKKADJooooAKKKKAFyaMmkooAMmiiigBcmjJpKKAFyaq3p+WP/AK6J/OrNVLz7sf8A10T+dAF+iiigD//Q/fcntTKU80lABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFOwBRRRSAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAqpefdj/wCuifzq3VS8+7H/ANdE/nTQF0HFLuFMopAf/9H99TSUppKACiiincAooopAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUVQBRRRTAKKKKm4BRRRSAKKKKACiiincAooopAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABVW7+7H/ANdE/nVqqt392P8A66J/OmgLVFFFID//0v32b1ptPPSmUAFFFFABRRRTYBRRRSAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoooouAUUUUAFFFFABRRRTsAUUUUgCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKqXn3Y/+uifzq3VS7+7H/10T+dNAW6KKKQH/9P99mptOam0AFFFFABRRRRcAooooAKKKKACiiigAooooAKKKKAClAzSUvbFADiBimAgnbnkV89fH79ofwp8C9EDXpF7rN2hNnp6Nhn7eZIedkIPViOTwoJ6eP8A7FfxA8TfE0eMfF3i24NzeT39uueiRoIARFGnIWNc/KOuSSSWJJ9enkteWCnmUlaCsl5tu2nku55FXOaEMbDLYu85Xb8klfX17H3NgikqSo68g9cKKKKACiiigAooooAKKKKACiiim2AUUUUgCiiigAooooAKKKKACiiigAooooAKKKKACiiinYAooopWAKKKKACiiigAooooAKKKKACiiigAooooAKqXn3Y/+uifzq3VS8+7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" alt="ANCARI" style="height:36px;width:auto;object-fit:contain"></div>
+  <div class="nav-prog">
+    <div class="nav-prog-bg"><div class="nav-prog-fill" id="navFill"></div></div>
+    <div class="nav-prog-label" id="navLabel">0 / 15</div>
+  </div>
+</nav>
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-eye">ANCARI — AND+UN CAREER</div>
+    <h1 class="hero-h1">「なんとなく不安」の正体が<br><em>わかる。</em></h1>
+    <p class="hero-lead">15問の診断で、あなたの認知スタイルと行動を止めているパターンを明らかにします。</p>
+    <div class="hero-meta">
+      <span>所要時間 約3分</span>
+      <span>登録不要</span>
+      <span>完全無料</span>
+    </div>
+  </div>
+</div>
+<div class="hero-divider"></div>
+<div class="quiz" id="quiz">
+  <div class="prog-sticky">
+    <div class="prog-bar">
+      <div class="prog-bg"><div class="prog-fill" id="progFill"></div></div>
+      <div class="prog-label" id="progLabel">0 / 15 回答済み</div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+
+var GAS_URL='https://script.google.com/macros/s/AKfycbwk2fH5V61sbTbknmoDjvkLfNaDcb_NQrzZRw-8rBx-ctgVVfdLFsi6SwEeL-9US0KhpQ/exec';
+var sid='sess_'+Date.now()+'_'+Math.random().toString(36).substr(2,9);
+function track(data){try{data.sid=sid;fetch(GAS_URL,{method:'POST',body:JSON.stringify(data),headers:{'Content-Type':'text/plain'}}).catch(function(){});}catch(e){}}
+track({type:'test_start'});
+var LINE_URL='https://lin.ee/5zoEIgQ';
+var SECS=[
+  {num:'①',title:'認知スタイル',sub:'Q1〜Q6：思考・コミュニケーションのクセ',r0:0},
+  {num:'②',title:'行動ブレーキ診断',sub:'Q7〜Q12：行動を止めているパターン（5段階）',r0:6},
+  {num:'③',title:'今の自分チェック',sub:'Q13〜Q15：現在地の確認',r0:12}
+];
+var QS=[
+  {t:'ab',q:'話し始めるとき、どちらが近い？',o:['話しながら考え、言葉があとから整っていく','話す前に頭の中でまとまってから話す']},
+  {t:'ab',q:'説明するとき、自然とやってしまうのは？',o:['例え話や補足が増えて話が広がる','要点だけ絞って短く伝える']},
+  {t:'ab',q:'相手の表情や空気の変化に気づくのは？',o:['あとから気づくことが多い','その場でリアルタイムに感じ取れる']},
+  {t:'ab',q:'大事な場面で意見を言うとき、よくあるのは？',o:['引いてしまうことが多い','自分の意図を持って伝えられる']},
+  {t:'ab',q:'問題が起きたとき、最初に動くのは？',o:['原因を深く分析してから対処する','とりあえず動いて考える']},
+  {t:'ab',q:'自分の感情を言葉にするのは？',o:['言語化に時間がかかる','すぐに言葉にできる']},
+  {t:'scale',q:'行動しようとすると「まだ準備が足りない」と感じる'},
+  {t:'scale',q:'頼みごとをする前に「迷惑かもしれない」が浮かぶ'},
+  {t:'scale',q:'完璧でない状態で出すことに強い抵抗がある'},
+  {t:'scale',q:'自分の希望を言う前に、相手の都合を優先してしまう'},
+  {t:'scale',q:'今の自分のままではまだ足りないと感じ続けている'},
+  {t:'scale',q:'実力を比べられそうな場面を避けることがある'},
+  {t:'ab',q:'最近、当てはまる感覚は？',o:['頑張っているのに同じところを回っている','やりたいことはあるが決めきれない','環境や人に左右されやすい','何かを探しているが言語化できない']},
+  {t:'ab',q:'今いちばん近い悩みは？',o:['決断が遅れる','自信が揺れやすい','行動が続かない','本音を出しにくい']},
+  {t:'ab',q:'自分の頑張り方以外にも見直すポイントがありそうと感じますか？',o:['YES、強く感じる','少し感じる','あまり感じない']}
+];
+var TYPES={
+  DEEP:{grad:'linear-gradient(145deg,#1A3A6F,#2A5AAF)',lineBg:'linear-gradient(145deg,#0A2A5F,#1A3A8F)',eye:'TYPE 01',name:'Deep Thinker',catch:'考えるほど、深くなる。',negTitle:'考えすぎて、動けないループから抜け出せていない。',negSub:'分析力は武器なのに、その力が逆に自分を縛っている。なぜ動けないのか、本当の理由がある。',strengths:['誰より深く物事を考えられる','細部の矛盾に気づく観察眼がある','一度動き出したら質が圧倒的に高い'],bars:[{l:'思考の深さ',v:90,c:'#4A90D9'},{l:'行動への速さ',v:32,c:'#7B9EC4'},{l:'分析精度',v:85,c:'#2ABFA0'}],svg:'<svg width="100" height="120" viewBox="0 0 110 130"><circle cx="55" cy="65" r="52" fill="rgba(255,255,255,.08)"/><circle cx="55" cy="42" r="14" fill="rgba(255,255,255,.9)"/><path d="M38 62 Q38 95 42 98 L68 98 Q72 95 72 62 Q63 68 55 68 Q47 68 38 62Z" fill="rgba(255,255,255,.9)"/><rect x="49" y="54" width="12" height="10" rx="4" fill="rgba(255,255,255,.9)"/><path d="M38 68 Q26 70 22 82" stroke="rgba(255,255,255,.9)" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M72 68 Q84 66 88 78" stroke="rgba(255,255,255,.9)" stroke-width="8" fill="none" stroke-linecap="round"/><rect x="41" y="35" width="28" height="10" rx="5" fill="rgba(255,255,255,.9)"/><rect x="14" y="78" width="18" height="13" rx="2" fill="#C9A84C"/><rect x="44" y="96" width="10" height="22" rx="4" fill="rgba(255,255,255,.85)"/><rect x="56" y="96" width="10" height="22" rx="4" fill="rgba(255,255,255,.85)"/></svg>'},
+  EMPATH:{grad:'linear-gradient(145deg,#0D7A62,#1AAF8E)',lineBg:'linear-gradient(145deg,#065A42,#0D8A6E)',eye:'TYPE 02',name:'Empath Navigator',catch:'あなたの気持ち、ちゃんと見えてる。',negTitle:'自分のことは後回しが、じわじわ自分を削っている。',negSub:'人の気持ちに敏感なのに、自分の気持ちには鈍感。そのギャップが疲弊の原因かもしれない。',strengths:['場の空気を瞬時に読める','相手が言語化できないニーズを感じ取れる','関係性を深めるのが自然とうまい'],bars:[{l:'共感力',v:88,c:'#1AAF8E'},{l:'自己主張',v:32,c:'#7BD4C4'},{l:'対人感受性',v:85,c:'#2ABFA0'}],svg:'<svg width="100" height="120" viewBox="0 0 110 130"><circle cx="55" cy="65" r="52" fill="rgba(255,255,255,.08)"/><circle cx="55" cy="41" r="16" fill="rgba(255,255,255,.9)"/><circle cx="39" cy="44" r="9" fill="rgba(255,255,255,.9)"/><circle cx="71" cy="44" r="9" fill="rgba(255,255,255,.9)"/><circle cx="44" cy="36" r="8" fill="rgba(255,255,255,.9)"/><circle cx="66" cy="36" r="8" fill="rgba(255,255,255,.9)"/><path d="M37 62 Q35 98 42 100 L68 100 Q75 98 73 62 Q63 70 55 70 Q47 70 37 62Z" fill="rgba(255,255,255,.9)"/><rect x="49" y="55" width="12" height="9" rx="4" fill="rgba(255,255,255,.9)"/><path d="M37 68 Q22 65 16 72" stroke="rgba(255,255,255,.9)" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M73 68 Q88 65 94 72" stroke="rgba(255,255,255,.9)" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M55 80 C55 78 53 76 51 77.2 C49 78.4 49 81.2 51 83 L55 87 L59 83 C61 81.2 61 78.4 59 77.2 C57 76 55 78 55 80Z" fill="#FF6B8A"/><rect x="45" y="98" width="10" height="20" rx="4" fill="rgba(255,255,255,.85)"/><rect x="55" y="98" width="10" height="20" rx="4" fill="rgba(255,255,255,.85)"/></svg>'},
+  QUALITY:{grad:'linear-gradient(145deg,#7A5800,#C9A84C)',lineBg:'linear-gradient(145deg,#5A3800,#A08030)',eye:'TYPE 03',name:'Quality Master',catch:'妥協しないから、本物になる。',negTitle:'完璧じゃないと出せないが、チャンスを逃し続けている。',negSub:'こだわりは才能なのに、それが行動のブレーキになっている。その構造を知る人は少ない。',strengths:['アウトプットの質に妥協しない','自分にも他者にも誠実でいられる','一度信頼を得ると長く続く関係を作れる'],bars:[{l:'品質へのこだわり',v:92,c:'#C9A84C'},{l:'発信スピード',v:28,c:'#C4B47B'},{l:'完成度',v:88,c:'#2ABFA0'}],svg:'<svg width="100" height="120" viewBox="0 0 110 130"><circle cx="55" cy="65" r="52" fill="rgba(255,255,255,.08)"/><circle cx="55" cy="42" r="14" fill="rgba(255,255,255,.9)"/><rect x="41" y="35" width="28" height="12" rx="6" fill="rgba(255,255,255,.9)"/><path d="M69 38 Q86 34 86 50 Q86 62 76 66" stroke="rgba(255,255,255,.9)" stroke-width="10" fill="none" stroke-linecap="round"/><path d="M38 62 Q38 98 43 100 L67 100 Q72 98 72 62 Q63 68 55 68 Q47 68 38 62Z" fill="rgba(255,255,255,.9)"/><rect x="49" y="54" width="12" height="10" rx="4" fill="rgba(255,255,255,.9)"/><path d="M38 34 L42 22 L49 30 L55 18 L61 30 L68 22 L72 34Z" fill="#FFD700"/><rect x="38" y="33" width="34" height="4" rx="2" fill="#FFD700"/><circle cx="55" cy="19" r="3" fill="white"/><rect x="44" y="98" width="10" height="20" rx="4" fill="rgba(255,255,255,.85)"/><rect x="56" y="98" width="10" height="20" rx="4" fill="rgba(255,255,255,.85)"/></svg>'},
+  EXPLORER:{grad:'linear-gradient(145deg,#3D1E8A,#7C4FD4)',lineBg:'linear-gradient(145deg,#2A0E6A,#5C2FB4)',eye:'TYPE 04',name:'Vision Explorer',catch:'可能性は、まだ見ぬ先にある。',negTitle:'全部やりたいが、結局何もできないになっている。',negSub:'可能性を広く見られるのに、選べないせいで停滞している。突破口はひとつに絞ることだけ。',strengths:['可能性を広く同時に見渡せる','新しいアイデアが次々と浮かぶ','変化への適応が早い'],bars:[{l:'発想力',v:88,c:'#8B5CF6'},{l:'決断速度',v:30,c:'#A49BC4'},{l:'可能性感知',v:85,c:'#2ABFA0'}],svg:'<svg width="100" height="120" viewBox="0 0 110 130"><circle cx="55" cy="65" r="52" fill="rgba(255,255,255,.08)"/><circle cx="55" cy="42" r="14" fill="rgba(255,255,255,.9)"/><rect x="41" y="35" width="28" height="12" rx="6" fill="rgba(255,255,255,.9)"/><path d="M41 38 Q20 34 18 52 Q17 64 28 68" stroke="rgba(255,255,255,.9)" stroke-width="10" fill="none" stroke-linecap="round"/><path d="M69 38 Q90 34 92 52 Q93 64 82 68" stroke="rgba(255,255,255,.9)" stroke-width="10" fill="none" stroke-linecap="round"/><ellipse cx="41" cy="38" rx="6" ry="4" fill="rgba(255,255,255,.7)"/><ellipse cx="69" cy="38" rx="6" ry="4" fill="rgba(255,255,255,.7)"/><path d="M38 62 Q38 98 43 100 L67 100 Q72 98 72 62 Q63 69 55 69 Q47 69 38 62Z" fill="rgba(255,255,255,.9)"/><rect x="49" y="54" width="12" height="10" rx="4" fill="rgba(255,255,255,.9)"/><polygon points="16,42 17.2,46 21,46 18.2,48.5 19.2,52.5 16,50.5 12.8,52.5 13.8,48.5 11,46 14.8,46" fill="rgba(255,255,255,.8)"/><rect x="44" y="98" width="10" height="20" rx="4" fill="rgba(255,255,255,.85)"/><rect x="56" y="98" width="10" height="20" rx="4" fill="rgba(255,255,255,.85)"/></svg>'},
+  HARMONY:{grad:'linear-gradient(145deg,#1A5C30,#2E9E52)',lineBg:'linear-gradient(145deg,#0A3C20,#1A7E3A)',eye:'TYPE 05',name:'Harmony Keeper',catch:'場を整える力が、あなたの才能。',negTitle:'波風を立てたくないが、本当の自分を消している。',negSub:'場を整える力があるのに、自分の声だけが届いていない。それが一番のコストになっている。',strengths:['場の空気を整えるのが自然とうまい','対立をやわらかく収められる','長期的な関係性を大切に育てられる'],bars:[{l:'調和力',v:86,c:'#2E9E52'},{l:'自己表現',v:30,c:'#7BC49A'},{l:'関係維持力',v:88,c:'#2ABFA0'}],svg:'<svg width="100" height="120" viewBox="0 0 110 130"><circle cx="55" cy="65" r="52" fill="rgba(255,255,255,.08)"/><circle cx="55" cy="42" r="14" fill="rgba(255,255,255,.9)"/><rect x="41" y="38" width="28" height="10" rx="5" fill="rgba(255,255,255,.9)"/><path d="M41 42 Q36 56 38 72 Q40 80 44 84" stroke="rgba(255,255,255,.9)" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M69 42 Q74 56 72 72 Q70 80 66 84" stroke="rgba(255,255,255,.9)" stroke-width="8" fill="none" stroke-linecap="round"/><ellipse cx="70" cy="38" rx="9" ry="5" fill="rgba(255,255,255,.6)" transform="rotate(-25 70 38)"/><path d="M38 62 Q38 98 43 100 L67 100 Q72 98 72 62 Q63 69 55 69 Q47 69 38 62Z" fill="rgba(255,255,255,.9)"/><rect x="49" y="54" width="12" height="10" rx="4" fill="rgba(255,255,255,.9)"/><path d="M38 68 Q24 70 20 82" stroke="rgba(255,255,255,.9)" stroke-width="8" fill="none" stroke-linecap="round"/><rect x="44" y="98" width="10" height="20" rx="4" fill="rgba(255,255,255,.85)"/><rect x="56" y="98" width="10" height="20" rx="4" fill="rgba(255,255,255,.85)"/></svg>'},
+  SEEKER:{grad:'linear-gradient(145deg,#8A2800,#E8601A)',lineBg:'linear-gradient(145deg,#6A1800,#C04010)',eye:'TYPE 06',name:'Essence Seeker',catch:'本質を掴んだとき、世界が動く。',negTitle:'意味を見つけてから動くが、永遠に動けない理由になっている。',negSub:'本質を問える力があるのに、始動できない。意味は動いた後に見つかるものだと知ると変わる。',strengths:['物事の本質を見抜く力がある','意味を感じると誰より深く動ける','問いを立てる力で周囲を動かせる'],bars:[{l:'本質追求力',v:90,c:'#E8601A'},{l:'即時行動力',v:32,c:'#C4907B'},{l:'意味感度',v:88,c:'#C9A84C'}],svg:'<svg width="100" height="120" viewBox="0 0 110 130"><circle cx="55" cy="65" r="52" fill="rgba(255,255,255,.08)"/><circle cx="55" cy="44" r="14" fill="rgba(255,255,255,.9)"/><path d="M41 42 Q40 26 48 20 Q46 30 50 25 Q52 32 54 26 Q56 32 58 25 Q60 32 62 26 Q64 30 62 20 Q70 26 69 42" fill="rgba(255,255,255,.9)"/><path d="M43 42 Q44 30 49 26 Q48 33 52 29 Q54 35 56 29 Q58 35 60 29 Q62 33 61 26 Q66 30 67 42" fill="#FFB830" opacity=".6"/><path d="M38 64 Q38 100 43 102 L67 102 Q72 100 72 64 Q63 70 55 70 Q47 70 38 64Z" fill="rgba(255,255,255,.9)"/><rect x="49" y="56" width="12" height="10" rx="4" fill="rgba(255,255,255,.9)"/><path d="M38 68 Q24 66 18 54" stroke="rgba(255,255,255,.9)" stroke-width="8" fill="none" stroke-linecap="round"/><ellipse cx="17" cy="51" rx="5" ry="6" fill="rgba(255,255,255,.9)"/><path d="M72 68 Q86 64 92 52" stroke="rgba(255,255,255,.9)" stroke-width="8" fill="none" stroke-linecap="round"/><ellipse cx="93" cy="49" rx="5" ry="6" fill="rgba(255,255,255,.9)"/><rect x="44" y="100" width="10" height="20" rx="4" fill="rgba(255,255,255,.85)"/><rect x="56" y="100" width="10" height="20" rx="4" fill="rgba(255,255,255,.85)"/></svg>'}
+};
+var TOTAL=QS.length,answers=new Array(TOTAL).fill(null),quiz=document.getElementById('quiz');
+function calcType(){
+  var a=answers;
+  // 各タイプのスコアを加算して一番高いものを返す
+  var scores={DEEP:0,EMPATH:0,QUALITY:0,EXPLORER:0,HARMONY:0,SEEKER:0};
+
+  // Q1-Q6 認知スタイル
+  if(a[0]===0) scores.DEEP+=2;      // 話しながら考える
+  if(a[0]===1) scores.SEEKER+=1;    // まとめてから話す
+  if(a[1]===0) scores.EXPLORER+=2;  // 話が広がる
+  if(a[1]===1) scores.QUALITY+=2;   // 要点を絞る
+  if(a[2]===0) scores.DEEP+=1;      // あとから気づく
+  if(a[2]===1) scores.EMPATH+=2;    // リアルタイムに感じる
+  if(a[3]===0) scores.EMPATH+=2;    // 引いてしまう
+  if(a[3]===0) scores.HARMONY+=1;
+  if(a[3]===1) scores.SEEKER+=1;    // 伝えられる
+  if(a[4]===0) scores.DEEP+=2;      // 分析してから
+  if(a[4]===1) scores.EXPLORER+=1;  // とりあえず動く
+  if(a[5]===0) scores.DEEP+=1;      // 言語化に時間
+  if(a[5]===1) scores.EMPATH+=1;    // すぐ言葉に
+
+  // Q7-Q12 ブレーキ診断（5段階）
+  var bp=a[6]||0,br=a[7]||0,bpe=a[8]||0,bs=a[9]||0,bw=a[10]||0,bc=a[11]||0;
+  scores.DEEP    += bp * 0.8;   // 準備不足感
+  scores.EMPATH  += br * 0.8;   // 迷惑かも
+  scores.QUALITY += bpe * 0.8;  // 完璧主義
+  scores.EMPATH  += bs * 0.6;   // 相手優先
+  scores.HARMONY += bs * 0.4;
+  scores.SEEKER  += bw * 0.8;   // まだ足りない
+  scores.QUALITY += bw * 0.4;
+  scores.HARMONY += bc * 0.8;   // 比べられるのを避ける
+
+  // Q13 現在地
+  if(a[12]===0) scores.DEEP+=2;      // 同じところを回っている
+  if(a[12]===1) scores.EXPLORER+=2;  // 決めきれない
+  if(a[12]===2) scores.EMPATH+=2;    // 左右されやすい
+  if(a[12]===3) scores.SEEKER+=2;    // 言語化できない
+
+  // Q14 悩み
+  if(a[13]===0) scores.DEEP+=1;      // 決断が遅れる
+  if(a[13]===0) scores.EXPLORER+=1;
+  if(a[13]===1) scores.QUALITY+=2;   // 自信が揺れる
+  if(a[13]===2) scores.SEEKER+=2;    // 行動が続かない
+  if(a[13]===3) scores.HARMONY+=2;   // 本音出しにくい
+  if(a[13]===3) scores.EMPATH+=1;
+
+  // Q15 オープン度（スコアに影響なし）
+
+  // 最高スコアのタイプを返す
+  var best='DEEP',maxScore=0,k;
+  for(k in scores){
+    if(scores[k]>maxScore){maxScore=scores[k];best=k;}
+  }
+  return best;
+}
+function updateProg(){
+  var n=answers.filter(function(x){return x!==null;}).length,p=(n/TOTAL*100).toFixed(1);
+  document.getElementById('progFill').style.width=p+'%';
+  document.getElementById('progLabel').textContent=n+' / '+TOTAL+' 回答済み';
+  document.getElementById('navFill').style.width=p+'%';
+  document.getElementById('navLabel').textContent=n+' / '+TOTAL;
+}
+function addSec(i){
+  var s;
+  for(s=0;s<SECS.length;s++){
+    if(SECS[s].r0===i){
+      var el=document.createElement('div');
+      el.className='sec-label';
+      el.innerHTML='<div class="sec-num">'+SECS[s].num+'</div><div><div class="sec-title">'+SECS[s].title+'</div><div class="sec-sub">'+SECS[s].sub+'</div></div>';
+      quiz.appendChild(el);
+    }
+  }
+}
+function renderQ(i){
+  addSec(i);
+  var q=QS[i],card=document.createElement('div');
+  card.className='q-card';card.id='q'+i;
+  var h='<div class="q-num">Q'+(i+1)+'</div><div class="q-text">'+q.q+'</div>';
+  if(q.t==='ab'){
+    h+='<div class="opts" id="opts'+i+'">';
+    var j;
+    for(j=0;j<q.o.length;j++){h+='<div class="opt" onclick="pick('+i+','+j+')"><div class="dot"></div><span>'+q.o[j]+'</span></div>';}
+    h+='</div>';
+  }else{
+    h+='<div class="scale-wrap"><div class="scale-labels"><span>全く当てはまらない</span><span>とても当てはまる</span></div><div class="scale-btns" id="opts'+i+'">';
+    var v;
+    for(v=1;v<=5;v++){h+='<button class="scale-btn" onclick="sc('+i+','+v+')">'+v+'</button>';}
+    h+='</div></div>';
+  }
+  card.innerHTML=h;quiz.appendChild(card);
+}
+
+window.submitForm=function(tk,tn){
+  var name=document.getElementById('inputName').value.trim();
+  var email=document.getElementById('inputEmail').value.trim();
+  if(!name){alert('お名前を入力してください');return;}
+  if(!email||email.indexOf('@')<0){alert('メールアドレスを入力してください');return;}
+  var btn=document.getElementById('submitBtn');
+  btn.textContent='送信中...';btn.disabled=true;
+  track({type:'form_submit',typeKey:tk,typeName:tn,name:name,email:email});
+  setTimeout(function(){
+    document.getElementById('formWrap').style.display='none';
+    document.getElementById('formDone').style.display='block';
+  },800);
+};
+window.toggleType=function(key){
+  var desc=document.getElementById('tldesc-'+key);
+  if(!desc)return;
+  desc.style.display=(desc.style.display==='none')?'block':'none';
+};
+window.pick=function(i,j){
+  var isNew=answers[i]===null;answers[i]=j;
+  var opts=document.querySelectorAll('#opts'+i+' .opt'),k;
+  for(k=0;k<opts.length;k++){opts[k].classList.toggle('sel',k===j);}
+  after(i,isNew);
+};
+window.sc=function(i,v){
+  var isNew=answers[i]===null;answers[i]=v;
+  var btns=document.querySelectorAll('#opts'+i+' .scale-btn'),k;
+  for(k=0;k<btns.length;k++){btns[k].classList.toggle('sel',k+1===v);}
+  after(i,isNew);
+};
+function after(i,isNew){
+  updateProg();
+  var card=document.getElementById('q'+i);
+  if(card)card.classList.add('done');
+  var ex=document.getElementById('result');
+  if(ex){ex.remove();setTimeout(showResult,50);return;}
+  if(!isNew)return;
+  setTimeout(function(){
+    var next=i+1;
+    if(next<TOTAL){var el=document.getElementById('q'+next);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});}
+    else showResult();
+  },200);
+}
+function showResult(){
+  // 全問回答チェック
+  var unanswered=answers.filter(function(x){return x===null;}).length;
+  if(unanswered>0){
+    var firstNull=-1;
+    var fi;
+    for(fi=0;fi<answers.length;fi++){if(answers[fi]===null){firstNull=fi;break;}}
+    if(firstNull>=0){var el=document.getElementById('q'+firstNull);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});}
+    return;
+  }
+  updateProg();
+  var key=calcType(),t=TYPES[key];
+  track({type:'test_complete',typeKey:key,typeName:t.name,answers:answers.join(',')});
+  var el=document.createElement('div');
+  el.className='result';el.id='result';
+  var typeKeys=['DEEP','EMPATH','QUALITY','EXPLORER','HARMONY','SEEKER'],tlHtml='',k;
+  for(k=0;k<typeKeys.length;k++){var tp=TYPES[typeKeys[k]];tlHtml+='<div class="tl-item" style="background:'+tp.grad+'"><div class="tl-num">'+tp.eye+'</div><div class="tl-name">'+tp.name+'</div></div>';}
+  var strHtml='',si;
+  for(si=0;si<t.strengths.length;si++){strHtml+='<div class="str-item">'+t.strengths[si]+'</div>';}
+  var firstStrength=t.strengths[0];
+  var restStrHtml='';
+  for(si=1;si<t.strengths.length;si++){restStrHtml+='<div class="str-item">'+t.strengths[si]+'</div>';}
+  var barHtml='',bi;
+  for(bi=0;bi<t.bars.length;bi++){var b=t.bars[bi];barHtml+='<div class="bar-row"><div class="bar-top"><span>'+b.l+'</span><span>'+b.v+'%</span></div><div class="bar-bg"><div class="bar-fill" style="background:'+b.c+';width:'+b.v+'%"></div></div></div>';}
+  el.innerHTML=
+    '<div class="res-head" style="background:'+t.grad+'">'+
+      '<div class="res-eye">'+t.eye+'</div>'+
+      '<div class="res-char">'+t.svg+'</div>'+
+      '<div class="res-name">'+t.name+'</div>'+
+      '<div class="res-catch">'+t.catch+'</div>'+
+    '</div>'+
+    '<div class="res-body">'+
+
+      // 1. 強み（1つ全見せ）
+      '<div class="res-sec">あなたの強み</div>'+
+      '<div class="str-box" style="margin-bottom:1.4rem">'+
+        '<div class="str-label">YOUR STRENGTH</div>'+
+        '<div class="str-item" style="font-size:.95rem;font-weight:700;color:var(--navy)">'+firstStrength+'</div>'+
+      '</div>'+
+
+      // 2. ネガ訴求（全見せ）
+      '<div class="res-sec">ただ、こんなところが邪魔しています</div>'+
+      '<div class="neg-box" style="margin-bottom:1.4rem">'+
+        '<div class="neg-label">HIDDEN BLOCK</div>'+
+        '<div class="neg-title">'+t.negTitle+'</div>'+
+        '<div class="neg-sub">'+t.negSub+'</div>'+
+      '</div>'+
+
+      // 3. 詳細プロフィール（バーだけぼかし）
+      '<div class="res-sec">あなたの詳細プロフィール</div>'+
+      '<div class="teaser-wrap">'+
+        '<div class="teaser-blur">'+
+          '<div class="str-box"><div class="str-label">MORE STRENGTHS</div>'+restStrHtml+'</div>'+
+          barHtml+
+        '</div>'+
+        '<div class="teaser-overlay">'+
+          '<div class="teaser-lock">&#128274;</div>'+
+          '<div class="teaser-msg">詳細はLINEで受け取れます</div>'+
+          '<div class="teaser-sub">強み・認知プロフィールの詳細を無料でお届け</div>'+
+        '</div>'+
+      '</div>'+
+
+      // 3. 6タイプ一覧（キャラ付き）
+      '<div class="res-sec">6つの認知タイプ</div>'+
+      '<div class="type-list">'+tlHtml+'</div>'+
+      '<p class="type-note">あなたは<strong>'+t.name+'</strong>タイプ。各タイプには固有の強みとブロックがある。</p>'+
+    '</div>'+
+    '<input type="hidden" id="resultTypeKey">'+
+    '<input type="hidden" id="resultTypeName">'+
+    '<div class="form-box">'+
+      '<div class="form-box-title">詳細レポートを受け取る</div>'+
+      '<div class="form-box-sub">お名前とメールアドレスを入力してください。あなたのタイプに合わせた詳細レポートをお届けします。</div>'+
+      '<div id="formWrap">'+
+        '<div class="form-field"><label class="form-label">お名前（ニックネームでもOK）</label>'+
+        '<input class="form-input" type="text" id="inputName" placeholder="例：たなか / Yuki"></div>'+
+        '<div class="form-field"><label class="form-label">メールアドレス</label>'+
+        '<input class="form-input" type="email" id="inputEmail" placeholder="example@email.com"></div>'+
+        '<button class="btn-submit" id="submitBtn" onclick="submitForm(\'' + key + '\',\'' + t.name + '\')">送信してLINEへ進む &#8594;</button>'+
+        '<div style="font-size:.68rem;color:var(--sub);text-align:center">スパムメールは送りません。いつでも解除できます。</div>'+
+      '</div>'+
+      '<div id="formDone" style="display:none" class="form-done">'+
+        '<div class="form-done-icon">&#9989;</div>'+
+        '<div class="form-done-text">ありがとうございます！</div>'+
+        '<div class="form-done-sub">まもなく詳細レポートをお届けします。続けてLINEを登録してください。</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="line-cta" style="background:'+t.lineBg+'">'+
+      '<div class="line-eye">NEXT STEP</div>'+
+      '<div class="line-title">もっと知りたいですか？<br>LINEで全部お届けします。</div>'+
+      '<div class="line-sub">LINEを登録すると、認知タイプの詳細レポートと無料30分の結果面談にご招待します。</div>'+
+      '<div class="line-pts">'+
+        '<div class="line-pt">強み・ブロックの詳細分析レポート</div>'+
+        '<div class="line-pt">無料30分の結果面談にご招待</div>'+
+        '<div class="line-pt">あなたに合ったアプローチを提案</div>'+
+      '</div>'+
+      '<a href="'+LINE_URL+'" target="_blank" rel="noopener" class="btn-line" onclick="track({type:\'line_click\',typeKey:key})">LINEで詳細レポートを受け取る</a>'+
+      '<div class="line-note">無料 ・ いつでも友だち解除OK</div>'+
+    '</div>';
+  quiz.appendChild(el);
+  var tkEl=document.getElementById('resultTypeKey');if(tkEl)tkEl.value=key;
+  var tnEl=document.getElementById('resultTypeName');if(tnEl)tnEl.value=t.name;
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      el.classList.add('show');
+      setTimeout(function(){el.scrollIntoView({behavior:'smooth',block:'start'});},80);
+    });
+  });
+}
+var i;
+for(i=0;i<TOTAL;i++){renderQ(i);}
+updateProg();
+})();
+</script>
+</body>
+</html>

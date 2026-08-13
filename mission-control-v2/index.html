@@ -143,7 +143,7 @@
     <!-- SIDEBAR -->
     <sc-if value="{{ sidebarOpen }}">
     <div onClick="{{ onSidebarClose }}" style="position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:149;"></div>
-    <div class="mc-sidebar" style="width:236px; flex-shrink:0; border-right:1px solid #ececec; position:fixed; top:0; left:0; height:100vh; overflow-y:auto; padding:22px 18px; background:#ffffff; z-index:150; box-shadow:4px 0 24px rgba(0,0,0,0.12);">
+    <div class="mc-sidebar" style="width:340px; max-width:88vw; flex-shrink:0; border-right:1px solid #ececec; position:fixed; top:0; left:0; height:100vh; overflow-y:auto; padding:22px 20px; background:#ffffff; z-index:150; box-shadow:4px 0 24px rgba(0,0,0,0.12);">
 
       <div style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8; margin-bottom:10px;">SECTIONS</div>
       <div style="margin-bottom:22px;">
@@ -168,18 +168,32 @@
             <span style="font-size:10px; letter-spacing:0.1em; color:#b8b8b8;">TASKS</span>
             <span style="font-size:10px; color:#b8b8b8;">{{ sidebarTaskCountLabel }}</span>
           </div>
-          <div style="margin-bottom:18px;">
+          <div style="margin-bottom:10px;">
             <sc-if value="{{ hasSidebarTasks }}" hint-placeholder-val="{{ true }}">
               <sc-for list="{{ sidebarTaskRows }}" as="t" hint-placeholder-count="3">
-                <div style="display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #f4f4f4;">
-                  <span style="{{ t.dotStyle }}"></span>
-                  <span style="flex:1; min-width:0; font-size:12px; color:#0a0a0a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ t.title }}</span>
+                <div style="padding:11px 0; border-bottom:1px solid #f4f4f4;">
+                  <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                    <span style="{{ t.dotStyle }}"></span>
+                    <span style="flex:1; min-width:0; font-size:13px; color:#0a0a0a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ t.title }}</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <select value="{{ t.status }}" onChange="{{ t.onStatus }}" style="{{ t.selectStyle }}">
+                      <option value="todo">未着手</option>
+                      <option value="doing">進行中</option>
+                      <option value="review">レビュー</option>
+                      <option value="done">完了</option>
+                    </select>
+                    <button onClick="{{ t.onEdit }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.02em; line-height:1; padding:8px 14px; flex-shrink:0; cursor:pointer; font-family:inherit;" title="編集">✎ 編集</button>
+                  </div>
                 </div>
               </sc-for>
             </sc-if>
             <sc-if value="{{ noSidebarTasks }}">
               <div style="font-size:11px; color:#c4c4c4; padding:6px 0;">タスクはありません</div>
             </sc-if>
+          </div>
+          <div style="margin-bottom:18px;">
+            <button onClick="{{ onSidebarAddTask }}" style="width:100%; text-align:left; background:transparent; border:none; border-top:1px dashed #d8d8d8; border-radius:0; color:#8a8a8a; font-size:12px; letter-spacing:0.02em; padding:14px 2px; cursor:pointer; font-family:inherit;">+ タスク追加</button>
           </div>
 
           <div style="border-top:1px solid #ececec; padding-top:16px;">
@@ -408,6 +422,7 @@
             <div style="display:flex; flex-direction:column; gap:8px; width:196px; flex-shrink:0; align-self:center;">
               <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                 <div style="{{ task.urgencyBadgeStyle }}">{{ task.urgencyLabel }}</div>
+                <button onClick="{{ task.onEdit }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:0; color:#8a8a8a; font-size:12px; line-height:1; width:24px; height:24px; flex-shrink:0; cursor:pointer;" title="編集">✎</button>
                 <button onClick="{{ task.onDelete }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:0; color:#b8b8b8; font-size:12px; line-height:1; width:24px; height:24px; flex-shrink:0; cursor:pointer;" title="削除">✕</button>
               </div>
               <select value="{{ task.status }}" onChange="{{ task.onStatus }}" style="{{ task.selectStyle }}">
@@ -812,7 +827,7 @@
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:200; padding:24px;">
       <div style="background:#FFFFFF; border:none; border-radius:0; width:100%; max-width:540px; box-shadow:0 24px 60px rgba(0,0,0,0.28);">
         <div style="display:flex; align-items:center; justify-content:space-between; padding:24px 28px; border-bottom:2px solid #000000;">
-          <div style="font-size:15px; font-weight:700; letter-spacing:-0.01em; color:#000000;">新規タスクの追加</div>
+          <div style="font-size:15px; font-weight:700; letter-spacing:-0.01em; color:#000000;">{{ taskModalTitle }}</div>
           <button onClick="{{ onCloseModal }}" style="background:transparent; border:1px solid #e0e0e0; border-radius:0; color:#8a8a8a; font-size:13px; width:28px; height:28px; cursor:pointer;">✕</button>
         </div>
         <form onSubmit="{{ onAddSubmit }}" style="padding:28px;">
@@ -863,7 +878,7 @@
           </div>
           <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #ececec; padding-top:20px;">
             <button type="button" onClick="{{ onCloseModal }}" style="background:transparent; border:1px solid #d8d8d8; border-radius:0; color:#5a5a5a; font-size:11px; letter-spacing:0.04em; padding:10px 18px; cursor:pointer;">キャンセル</button>
-            <button type="submit" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:10px 22px; cursor:pointer;">タスクを追加</button>
+            <button type="submit" style="background:#000000; border:none; border-radius:0; color:#ffffff; font-size:11px; font-weight:600; letter-spacing:0.04em; padding:10px 22px; cursor:pointer;">{{ taskSubmitLabel }}</button>
           </div>
         </form>
       </div>
@@ -1237,6 +1252,7 @@ class Component extends DCLogic {
     authError: null,
     googleClientId: null,
     modalOpen: false,
+    taskEditId: null,
     draft: { title:'', goal:'', na:'', section: this.loadSections()[0]?.id || 'dev', priority:'medium', dueDate: this.nextWeek(), status:'todo' },
     settingsOpen: false,
     settingsTab: 'sections',
@@ -1680,9 +1696,9 @@ class Component extends DCLogic {
     this.restoreAuthSession();
     this.loadGoogleClientId();
     this._key = (e) => {
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); this.setState({ modalOpen:true }); }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); this.openTaskAdd(); }
       if (e.key === 'Escape') {
-        if (this.state.modalOpen) this.setState({ modalOpen:false });
+        if (this.state.modalOpen) this.closeTaskModal();
         if (this.state.settingsOpen && this.state.sectionForm !== null) this.setState({ sectionForm:null });
         else if (this.state.settingsOpen) this.setState({ settingsOpen:false });
       }
@@ -1747,15 +1763,37 @@ class Component extends DCLogic {
     this.setState({ tasks });
   }
   setDraft(field, val){ this.setState({ draft: { ...this.state.draft, [field]:val } }); }
-  addTask(e){
+  emptyTaskDraft(){
+    const firstSec = this.state.sections[0]?.id || 'dev';
+    return { title:'', goal:'', na:'', section:firstSec, priority:'medium', dueDate:this.nextWeek(), status:'todo' };
+  }
+  openTaskAdd(sectionId){
+    const draft = this.emptyTaskDraft();
+    if (sectionId) draft.section = sectionId;
+    this.setState({ modalOpen:true, taskEditId:null, draft });
+  }
+  openTaskEdit(id){
+    const t = this.state.tasks.find(t => t.id === id);
+    if (!t) return;
+    this.setState({ modalOpen:true, taskEditId:id, draft:{ title:t.title, goal:t.goal, na:t.na, section:t.section, priority:t.priority, dueDate:t.dueDate, status:t.status } });
+  }
+  closeTaskModal(){
+    this.setState({ modalOpen:false, taskEditId:null });
+  }
+  saveTask(e){
     e.preventDefault();
     const d = this.state.draft;
     if (!d.title || !d.goal || !d.na || !d.dueDate) return;
-    const task = { id:Date.now(), title:d.title, goal:d.goal, na:d.na, section:d.section, priority:d.priority, dueDate:d.dueDate, status:d.status };
-    const tasks = [...this.state.tasks, task];
+    const editId = this.state.taskEditId;
+    let tasks;
+    if (editId != null) {
+      tasks = this.state.tasks.map(t => t.id === editId ? { ...t, title:d.title, goal:d.goal, na:d.na, section:d.section, priority:d.priority, dueDate:d.dueDate, status:d.status } : t);
+    } else {
+      const task = { id:Date.now(), title:d.title, goal:d.goal, na:d.na, section:d.section, priority:d.priority, dueDate:d.dueDate, status:d.status };
+      tasks = [...this.state.tasks, task];
+    }
     this.persist(tasks);
-    const firstSec = this.state.sections[0]?.id || 'dev';
-    this.setState({ tasks, modalOpen:false, draft:{ title:'', goal:'', na:'', section:firstSec, priority:'medium', dueDate:this.nextWeek(), status:'todo' } });
+    this.setState({ tasks, modalOpen:false, taskEditId:null, draft:this.emptyTaskDraft() });
   }
 
   openSectionAdd(){
@@ -2123,11 +2161,19 @@ class Component extends DCLogic {
       position:'absolute', right:'11px', top:'50%', transform:'translateY(-50%)',
       fontSize:'10px', color:'#8a8a8a', pointerEvents:'none'
     };
-    const sidebarTasks = sidebarSection ? tasks.filter(t => t.section === sidebarSection.id) : [];
+    const sidebarTasks = sidebarSection ? tasks.filter(t => t.section === sidebarSection.id && t.status !== 'done') : [];
+    const sidebarSelBase = { fontSize:'11px', fontWeight:'600', letterSpacing:'0.01em', padding:'8px 8px', flex:'1', minWidth:'0', borderRadius:'0', cursor:'pointer', fontFamily:'inherit' };
     const sidebarTaskRows = sidebarTasks.map(t => ({
       id: t.id,
       title: t.title,
+      status: t.status,
       dotStyle: { width:'6px', height:'6px', borderRadius:'50%', flexShrink:0, background: this.STATUS_COLORS[t.status] || this.EMPTY_DOT },
+      selectStyle:
+        t.status === 'doing'  ? { ...sidebarSelBase, background:'#2563EB', color:'#ffffff', border:'1px solid #2563EB' } :
+        t.status === 'review' ? { ...sidebarSelBase, background:'#D97706', color:'#ffffff', border:'1px solid #D97706' } :
+                                 { ...sidebarSelBase, background:'#FFFFFF', color:'#5a5a5a', border:'1px solid #d8d8d8' },
+      onStatus: (e) => this.updateStatus(t.id, e.target.value),
+      onEdit:   ()  => this.openTaskEdit(t.id),
     }));
     const sidebarDriveFiles = this.state.sidebarDriveFiles;
     const sidebarDriveRows = sidebarDriveFiles.map(f => {
@@ -2325,6 +2371,7 @@ class Component extends DCLogic {
         onGoal:   (e) => this.updateField(task.id, 'goal', e.target.value),
         onNa:     (e) => this.updateField(task.id, 'na', e.target.value),
         onStatus: (e) => this.updateStatus(task.id, e.target.value),
+        onEdit:   ()  => this.openTaskEdit(task.id),
         onDelete: ()  => this.deleteTask(task.id)
       };
     });
@@ -2447,9 +2494,11 @@ class Component extends DCLogic {
       // Task modal
       modalOpen: this.state.modalOpen,
       draft: this.state.draft,
-      onOpenModal:   () => this.setState({ modalOpen:true }),
-      onCloseModal:  () => this.setState({ modalOpen:false }),
-      onAddSubmit:   (e) => this.addTask(e),
+      taskModalTitle:  this.state.taskEditId != null ? 'タスクの編集' : '新規タスクの追加',
+      taskSubmitLabel: this.state.taskEditId != null ? '変更を保存' : 'タスクを追加',
+      onOpenModal:   () => this.openTaskAdd(),
+      onCloseModal:  () => this.closeTaskModal(),
+      onAddSubmit:   (e) => this.saveTask(e),
       onDraftTitle:  (e) => this.setDraft('title', e.target.value),
       onDraftGoal:   (e) => this.setDraft('goal', e.target.value),
       onDraftNa:     (e) => this.setDraft('na', e.target.value),
@@ -2563,6 +2612,7 @@ class Component extends DCLogic {
       sidebarTaskRows,
       hasSidebarTasks: sidebarTaskRows.length > 0,
       noSidebarTasks: sidebarTaskRows.length === 0,
+      onSidebarAddTask: () => this.openTaskAdd(sidebarSection ? sidebarSection.id : null),
       hasSidebarDriveFolder: !!(sidebarSection && sidebarSection.driveFolderId),
       noSidebarDriveFolder: !(sidebarSection && sidebarSection.driveFolderId),
       sidebarDriveFolderName: sidebarSection ? sidebarSection.driveFolderName : '',
