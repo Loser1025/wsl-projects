@@ -42,3 +42,5 @@ mimic_tui/mimic.log
 
 # GCP service account credentials
 slides_design_tool/credentials.json
+customer-calendar-app/firebase-service-account.json
+customer-calendar-app/google-service-account.json
