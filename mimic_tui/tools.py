@@ -230,6 +230,43 @@ _browser_registry = ToolRegistry()
 
 
 @tools.register(
+    name="load_skill",
+    description=(
+        "Skill（.claude/skills/<name>/SKILL.md）の本文をロードする。"
+        "利用可能なSkill名はコンテキストヘッダーの「利用可能なSkill」一覧を参照すること。"
+        "本文はプレーンな手順・知識のMarkdownであり、コードとして実行はされない。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Skill名（一覧のname）"}
+        },
+        "required": ["name"]
+    }
+)
+def load_skill(name: str) -> str:
+    from .skills import registry as _skill_registry
+    return _skill_registry.load_body(name)
+
+
+@tools.register(
+    name="list_skills",
+    description="利用可能なSkill一覧（name+description）を再取得する。ディレクトリを再スキャンする。",
+    parameters={"type": "object", "properties": {}}
+)
+def list_skills() -> str:
+    from .skills import registry as _skill_registry, default_skill_dirs
+    if not _skill_registry.list_summaries():
+        _skill_registry.scan(default_skill_dirs())
+    else:
+        _skill_registry.rescan()
+    skills = _skill_registry.list_summaries()
+    if not skills:
+        return "利用可能なSkillはありません（.claude/skills/ 配下にSKILL.mdが見つかりません）"
+    return "\n".join(f"- {s.name}: {s.description[:200]}" for s in skills)
+
+
+@tools.register(
     name="update_scratchpad",
     description="作業メモを更新する（800字以内）。ゴール・完了済み・次のステップ・発見事項を記録し記憶喪失を防ぐ。",
     parameters={

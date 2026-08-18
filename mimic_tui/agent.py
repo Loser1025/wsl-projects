@@ -646,12 +646,24 @@ class OpenRouterAgent:
             + "\n--- [自動記録 ここまで] ---\n"
         )
 
+    def _build_skills_section(self) -> str:
+        """利用可能Skill（.claude/skills/*/SKILL.md）の name+description 一覧。
+        本文は未ロード（progressive disclosure — design doc §3）。"""
+        try:
+            from .skills import registry as _skill_registry, default_skill_dirs
+            if not _skill_registry.list_summaries():
+                _skill_registry.scan(default_skill_dirs())
+            return _skill_registry.context_header_section()
+        except Exception:
+            return ""
+
     def _build_context_header(self) -> str:
         sep = "─" * 40
         return (
             f"[作業フォルダ] {self.cwd}\n"
             f"{sep}\n"
             f"{self._build_machine_notes()}"
+            f"{self._build_skills_section()}"
             f"--- [エージェントの自己記憶（Scratchpad）] ---\n"
             f"{get_scratchpad()}\n"
             f"--- [Scratchpad ここまで] ---"
