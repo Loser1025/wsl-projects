@@ -245,8 +245,11 @@ _browser_registry = ToolRegistry()
     }
 )
 def load_skill(name: str) -> str:
-    from .skills import registry as _skill_registry
-    return _skill_registry.load_body(name)
+    from .skills import registry as _skill_registry, mark_loaded
+    body = _skill_registry.load_body(name)
+    if _skill_registry.has(name):
+        mark_loaded(name)
+    return body
 
 
 @tools.register(

@@ -18,6 +18,43 @@ _BODY_MAX_CHARS = 6000        # load_skill() が一度に返す本文の上限�
 _SUMMARY_DESC_MAX_CHARS = 200  # 一覧表示1件あたりの description 上限
 _SUMMARY_TOTAL_MAX_CHARS = 1500  # 一覧表示の合計上限
 
+# ── ツール名エイリアス層（design doc P2） ────────────────────────────
+# SKILL.md本文はClaude Code固有のツール名を前提に書かれていることがある。
+# フォーマットは共有できてもツール体系は別物なので、本文中にこれらの名前が
+# 出現した場合だけ、Mimic側の対応ツール名への読み替えヒントを付加する
+# （本文自体は書き換えない＝非破壊。実害が出てから拡張する前提のP2）。
+_TOOL_ALIASES: dict[str, str] = {
+    "Read": "read_file",
+    "Write": "write_file",
+    "Edit": "edit_file",
+    "MultiEdit": "edit_file",
+    "Bash": "run_bash",
+    "Grep": "grep_codebase",
+    "Glob": "grep_codebase",
+    "WebFetch": "fetch_webpage",
+    "WebSearch": "web_search",
+    "TodoWrite": "update_scratchpad",
+    "Task": "delegate_to_specialist",
+}
+_TOOL_ALIAS_RE = re.compile(
+    r"\b(" + "|".join(re.escape(k) for k in _TOOL_ALIASES) + r")\b"
+)
+
+
+def _build_alias_hint(body: str) -> str:
+    """本文中に出現するClaude Code固有ツール名を検出し、Mimic側の対応ツールへの
+    読み替えヒントを返す。該当なしなら空文字（無関係なSkillにノイズを足さない）。"""
+    found = sorted(set(_TOOL_ALIAS_RE.findall(body)))
+    if not found:
+        return ""
+    lines = [f"  {name} → {_TOOL_ALIASES[name]}" for name in found]
+    return (
+        "\n\n[ハーネス注記: ツール名の読み替え]\n"
+        "このSkillはClaude Code向けに書かれており、本文中のツール名はMimicのツール体系と異なります。"
+        "実行時は以下のように読み替えてください:\n"
+        + "\n".join(lines)
+    )
+
 
 def _parse_frontmatter(text: str) -> tuple[dict, str]:
     """`---\\nkey: value\\n---\\n本文` を分解する。フォーマット外なら name/description なしで返す。
@@ -143,8 +180,9 @@ class SkillRegistry:
             return f"エラー: {sk.path} を読めませんでした ({e})"
         _, body = _parse_frontmatter(text)
         total = len(body)
+        alias_hint = _build_alias_hint(body)
         if total <= _BODY_MAX_CHARS:
-            return f"[Skill: {name}]\n{'─' * 60}\n{body}"
+            return f"[Skill: {name}]\n{'─' * 60}\n{body}{alias_hint}"
         try:
             from .utils import cache_tool_output
             cached = cache_tool_output(f"skill_{name}", body)
@@ -155,11 +193,73 @@ class SkillRegistry:
             f"[Skill: {name}  本文 {total:,}文字中 先頭 {_BODY_MAX_CHARS:,}文字]\n"
             f"{'─' * 60}\n{head}\n{'─' * 60}\n"
             f"⚠ 本文が長いため切り詰めました。続きは read_tool_cache(cache_key=\"skill_{name}\", offset={_BODY_MAX_CHARS}) で取得できます。"
+            f"{alias_hint}"
         )
 
     def has(self, name: str) -> bool:
         with self._lock:
             return name in self._skills
+
+
+# ── Skill使用トラッキング（P1: 信頼スコアリング統合の下地） ──────────────
+# in-process実行（Directorの直接呼び出し／_run_isolatedのRead-only Specialist）は
+# 同一スレッド内で完結するため、スレッドローカルに使用skill名を貯める方式で追跡できる。
+# delegate_to_team_parallel は ThreadPoolExecutor で並列実行されるが、
+# スレッドローカルなのでスレッドを跨いで混線することはない。
+_usage_tls = threading.local()
+
+
+def mark_loaded(name: str) -> None:
+    """load_skill ツールの実行時に呼ばれる。現在スレッドの使用済みskill集合に追加する。"""
+    used = getattr(_usage_tls, "used", None)
+    if used is None:
+        used = set()
+        _usage_tls.used = used
+    used.add(name)
+
+
+def pop_used() -> set:
+    """現在スレッドの使用済みskill集合を取り出してクリアする。"""
+    used = getattr(_usage_tls, "used", None)
+    _usage_tls.used = set()
+    return used or set()
+
+
+def find_session_skill_usages(sessions_dir: Path, trace_id: str) -> set:
+    """Worker（別プロセス）実行時: trace_id に対応するセッションJSONLを走査し、
+    load_skill が呼ばれた skill 名の集合を返す（viewer.get_session_trace_text と同じ
+    trace_id 相互リンクの仕組みを流用）。見つからない場合は空集合。"""
+    used: set = set()
+    try:
+        for jf in sorted(sessions_dir.glob("*.jsonl"), reverse=True):
+            try:
+                lines = jf.read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                continue
+            entries = []
+            hit = False
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    e = json.loads(line)
+                except Exception:
+                    continue
+                entries.append(e)
+                if e.get("type") == "session_start" and e.get("trace_id") == trace_id:
+                    hit = True
+            if not hit:
+                continue
+            for e in entries:
+                if e.get("type") == "action" and e.get("tool") == "load_skill":
+                    n = (e.get("args") or {}).get("name")
+                    if n:
+                        used.add(str(n))
+            break
+    except Exception:
+        return set()
+    return used
 
 
 # ── 信頼スコア（design doc §5: SKILL.md原本は非破壊、別ファイルで管理） ─────

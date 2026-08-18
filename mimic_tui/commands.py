@@ -379,6 +379,49 @@ def register_sessions_command(sessions_dir_getter):
             safe_print(C.gray(f"  「{arg}」に一致するセッションが見つかりません。"))
 
 
+def register_skills_command():
+    """.claude/skills/ から読み込んだSkillの一覧・信頼スコアを表示する /skills を登録する
+    (design doc P1)。/skills reload でディレクトリを再スキャンする。"""
+
+    @cmd_registry.register(
+        "skills",
+        "利用可能なSkill一覧と信頼スコアを表示 (/skills | /skills reload)",
+    )
+    def cmd_skills(agent: OpenRouterAgent, args: str):
+        from .skills import registry as skill_registry, default_skill_dirs, _load_trust
+
+        arg = args.strip().lower()
+        if arg == "reload":
+            n = skill_registry.scan(default_skill_dirs())
+            safe_print(C.gray(f"  再スキャン完了: {n} 件のSkillを読み込みました。"))
+            return
+        if not skill_registry.list_summaries():
+            skill_registry.scan(default_skill_dirs())
+
+        skills = skill_registry.list_summaries()
+        if not skills:
+            safe_print(C.gray(
+                "  利用可能なSkillはありません（~/.claude/skills, .claude/skills にSKILL.mdが見つかりません）。"
+            ))
+            return
+
+        trust = _load_trust()
+        safe_print(f"\n  {C.bold_green('利用可能なSkill')}  ({len(skills)} 件)\n")
+        for sk in skills:
+            t = trust.get(sk.name)
+            if t:
+                p, f = t.get("pass_count", 0), t.get("fail_count", 0)
+                score = C.green(f"✓通過{p}回") if p and not f else (
+                    C.yellow(f"✓{p} / ✗{f}") if p or f else C.gray("記録なし"))
+            else:
+                score = C.gray("※未検証")
+            safe_print(f"  {C.green_dim(sk.name)}  [{score}]")
+            safe_print(f"      {sk.description[:120]}")
+        safe_print(C.gray(
+            "\n  本文は load_skill(name) で遅延ロードされます。再スキャン: /skills reload\n"
+        ))
+
+
 def register_delegations_command():
     """Directorプロセスのクラッシュ等で中断された delegate_to_team/delegate_to_worker
     の一覧表示・再開・破棄を行う /delegations を登録する。

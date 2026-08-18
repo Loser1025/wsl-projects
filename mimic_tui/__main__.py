@@ -14,7 +14,8 @@ def _build_components(base_dir: str, active_config=None):
     """
     from .utils import safe_print, C, set_log_sink, set_team_event_sink, log
     from .commands import (register_search_command, register_sessions_command,
-                            register_viewer_command, register_delegations_command)
+                            register_viewer_command, register_delegations_command,
+                            register_skills_command)
     from .tools import set_sessions_dir, tools as _base_tools, ToolRegistry
     from . import config as _cfg
     from .config import load_config
@@ -121,6 +122,7 @@ def _build_components(base_dir: str, active_config=None):
     register_sessions_command(lambda: sessions_dir)
     register_viewer_command(lambda: sessions_dir)
     register_delegations_command()
+    register_skills_command()
     set_sessions_dir(sessions_dir)
 
     # 中断委任マニフェストに長時間（24h超）残ったままのエントリがあれば起動時に知らせる。

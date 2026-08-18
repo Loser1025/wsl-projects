@@ -322,6 +322,7 @@ _RESEARCHER_TOOLS = [
     "read_file", "read_tool_cache", "get_repo_map",
     "grep_codebase", "file_info", "smart_read",
     "web_search", "fetch_webpage",
+    "load_skill", "list_skills",
 ]
 # 読み取り専用Specialist/Researcherにもブラウザ観測を許可する（案5）。
 # 「デプロイ先の実ページを開いて表示・エラーを観測する」委任を可能にし、
@@ -832,6 +833,8 @@ def run_specialist_task(role: str, task: str, project_dir: str, config,
             _save_specialist_role(role, "write" if can_write else "execute")
         return result
     else:
+        from .skills import pop_used as _clear_used_skills
+        _clear_used_skills()  # 直前の別実行分の取りこぼしをこの委任の集計に混ぜないため破棄
         registry = _build_researcher_registry()
         prompt = (
             f"[作業フォルダ] {Path(project_dir).resolve()}\n\n"
@@ -844,7 +847,11 @@ def run_specialist_task(role: str, task: str, project_dir: str, config,
             label=effective_label, role=role[:20],
             require_structured=True,
         )
-        if answer and not answer.startswith("[ラウンド上限到達"):
+        from .skills import pop_used as _pop_used_skills, record_outcome as _record_skill_outcome
+        completed = bool(answer) and not answer.startswith("[ラウンド上限到達")
+        for _sk_name in _pop_used_skills():
+            _record_skill_outcome(_sk_name, completed)
+        if completed:
             _save_specialist_role(role, "read")
             _record_delegation(effective_label, task, "✓ 調査完了（読み取り専用）")
             _note_readonly_delegation()
@@ -1022,6 +1029,16 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
             verify_status = f" ✗検証失敗(exit={result.verify_exit}, {MAX_VERIFY_RETRIES}回試行後)"
         else:
             verify_status = " ?(検証結果取得失敗)"
+        # Workerがload_skillを使っていれば、機械検証の結果を信頼スコアに反映する
+        # （verify_cmd未指定の実行は自己申告のみなのでスコア対象外 — design doc §5）。
+        if result.verify_exit is not None:
+            try:
+                from .skills import find_session_skill_usages, record_outcome as _record_skill_outcome
+                sessions_dir = Path(__file__).parent / ".mimic" / "sessions"
+                for _sk_name in find_session_skill_usages(sessions_dir, trace_id):
+                    _record_skill_outcome(_sk_name, result.verify_exit == 0)
+            except Exception:
+                pass
     elif applied:
         # 検証なしの適用は「Workerの自己申告のみ」であることをハーネスが明示する。
         # 弱いDirectorモデルが「完了しました」とユーザーへ言い切るのを防ぐ。
