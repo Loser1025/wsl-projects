@@ -379,6 +379,26 @@ def register_sessions_command(sessions_dir_getter):
             safe_print(C.gray(f"  「{arg}」に一致するセッションが見つかりません。"))
 
 
+def register_bench_command():
+    """.mimic/ 配下の実績ログ（skill_trust.json / mcp_policy.json / verify_cmds.json /
+    sessions/*.jsonl）を集計してレポートを表示する /bench を登録する(bench設計書 Track A P1)。
+    新しいベンチマーク問題集は作らない — 既存ログを読むだけ。"""
+
+    @cmd_registry.register(
+        "bench",
+        "実績ログを集計してベンチマークレポートを表示・保存 (/bench)",
+    )
+    def cmd_bench(agent: OpenRouterAgent, args: str):
+        from . import mimic_bench
+
+        report = mimic_bench.run()
+        safe_print(C.gray(
+            f"\n  (スナップショットを .mimic/bench_history/ に保存、"
+            f"レポートは latest_report.md にも書き出し済み)\n"
+        ))
+        safe_print(report)
+
+
 def register_skills_command():
     """.claude/skills/ から読み込んだSkillの一覧・信頼スコアを表示する /skills を登録する
     (design doc P1)。/skills reload でディレクトリを再スキャンする。"""
@@ -419,6 +439,63 @@ def register_skills_command():
             safe_print(f"      {sk.description[:120]}")
         safe_print(C.gray(
             "\n  本文は load_skill(name) で遅延ロードされます。再スキャン: /skills reload\n"
+        ))
+
+
+def register_mcp_command():
+    """接続済みMCPサーバーの一覧・再接続・信頼設定を行う /mcp を登録する
+    (design doc P0/P1)。Directorプロセスでのみ登録すること。"""
+
+    @cmd_registry.register(
+        "mcp",
+        "MCPサーバーの一覧・状態表示 (/mcp | /mcp reconnect <server> | /mcp trust <server> [read-only|off])",
+    )
+    def cmd_mcp(agent: OpenRouterAgent, args: str):
+        from . import mcp_client
+
+        parts = args.strip().split()
+        action = parts[0].lower() if parts else ""
+
+        if action == "reconnect" and len(parts) >= 2:
+            safe_print(mcp_client.reconnect(parts[1]))
+            return
+
+        if action == "trust" and len(parts) >= 2:
+            server = parts[1]
+            mode = parts[2].lower() if len(parts) >= 3 else "read-only"
+            if mode not in ("read-only", "off"):
+                safe_print(C.gray("  使い方: /mcp trust <server> [read-only|off]"))
+                return
+            trust_value = "read-only" if mode == "read-only" else ""
+            mcp_client.set_server_trust(server, trust_value)
+            if trust_value:
+                safe_print(C.yellow(
+                    f"  ⚠ '{server}' を read-only 信頼設定にしました。以後、書込み承認なしで呼び出されます。"
+                    "実際に書込みを行うサーバーには設定しないでください。"
+                ))
+            else:
+                safe_print(C.gray(f"  '{server}' の信頼設定を解除しました（以後すべて承認必須）。"))
+            return
+
+        if action and action not in ("reconnect", "trust"):
+            safe_print(C.gray("  使い方: /mcp | /mcp reconnect <server> | /mcp trust <server> [read-only|off]"))
+            return
+
+        statuses = mcp_client.list_status()
+        if not statuses:
+            safe_print(C.gray(
+                "  接続対象のMCPサーバーはありません（~/.mcp.json, ./.mcp.json に mcpServers が見つかりません）。"
+            ))
+            return
+        safe_print(f"\n  {C.bold_green('MCPサーバー')}  ({len(statuses)} 件)\n")
+        for s in statuses:
+            if s["connected"]:
+                badge = C.green(f"✓ 接続中 ({s['tool_count']}ツール)")
+            else:
+                badge = C.red(f"✗ 未接続 ({s.get('error') or '?'})")
+            safe_print(f"  {C.green_dim(s['name'])}  [{badge}]  {C.gray(s['command'])}")
+        safe_print(C.gray(
+            "\n  再接続: /mcp reconnect <server>   信頼設定: /mcp trust <server> read-only\n"
         ))
 
 

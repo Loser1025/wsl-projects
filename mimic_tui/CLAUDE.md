@@ -7,6 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `mimic_tui` is a Python/Textual TUI for a self-contained ReAct coding agent ("mimic"). It talks
 directly to OpenRouter / Google AI Studio (Gemini) / Mistral chat-completions APIs over raw
 `urllib` (no SDKs), runs an agentic tool-call loop, and can spin up sandboxed sub-agents of itself.
+It also speaks two external-ecosystem protocols directly (no SDKs there either): Claude Code's
+`SKILL.md` format (`skills.py`) and MCP (`mcp_client.py`, stdio + remote Streamable HTTP) — see
+their sections under Architecture below.
 
 **Project thesis**: mimic's core bet is that a weak/free-tier LLM API, wrapped in a sufficiently
 rigid and well-engineered harness (tool loop, delegation, verification scaffolding, session
@@ -34,7 +37,17 @@ Configuration lives in `.env` (gitignored) at the package root: API keys for up 
 payload — see `GoogleAIConfig.thinking_setting` / `_build_openrouter_payload` in `agent.py`).
 Parsed in `config.py::load_config`.
 
-There is no test suite, linter, or build step configured for this project.
+There is no linter or build step configured for this project. There is a narrow, deliberately
+**non**-comprehensive test suite (`tests/`, stdlib `unittest` only, no new dependency) covering only
+the safety-boundary behavior of `skills.py`/`mcp_client.py` — see their Architecture sections below
+for what's tested. Run it with:
+
+```bash
+python -m unittest discover -s mimic_tui/tests -t .   # from the repo root, one level above mimic_tui/
+```
+
+There's also a benchmarking script (`mimic_bench.py`) that aggregates the harness's own runtime
+logs (not a synthetic eval suite) — see the Architecture section below.
 
 ## Architecture
 
@@ -161,6 +174,96 @@ delegation tools entirely, since Workers have them stripped from their registry.
   registry** when started with `MIMIC_NO_AUTOGIT=1` to prevent infinite sub-agent recursion.
 - Large tool outputs (>10000 chars) are auto-cached (`cache_tool_output`); the agent is told to
   page through them with `read_tool_cache(cache_key, offset)`.
+- Skills: `load_skill`, `list_skills` (see below). MCP: `mcp__<server>__<tool>`, dynamically
+  registered per connected server (see below).
+
+### Skills — Claude Code-compatible `SKILL.md` support (`skills.py`)
+Reads `SKILL.md` (YAML frontmatter + Markdown body) directly from `~/.claude/skills/` and
+`<cwd>/.claude/skills/` — the same format and directories Claude Code uses, so skill libraries are
+shared with zero conversion. **Progressive disclosure**: only `name`/`description` are loaded into
+the context header at all times (`SkillRegistry.context_header_section()`, capped at
+`_SUMMARY_TOTAL_MAX_CHARS = 1500` total); the full body is fetched only when the model explicitly
+calls `load_skill(name)` (capped at `_BODY_MAX_CHARS = 6000`, overflow paged via the existing
+`cache_tool_output`/`read_tool_cache` mechanism). `SKILL.md` files are never written to — trust
+tracking lives entirely in `.mimic/skill_trust.json` (`record_outcome`), which is separate,
+non-destructive bookkeeping.
+- Tool-name alias hints: `load_skill`'s response appends a short "read as" note when the body
+  mentions Claude Code-native tool names (`Read`, `Edit`, `Bash`, `Grep`, etc. — `_TOOL_ALIASES` in
+  `skills.py`), mapped to Mimic's equivalents (`read_file`, `edit_file`, `run_bash`, ...). The hint
+  only appears when a match is found, so unrelated skills aren't padded with noise.
+- Usage tracking feeds trust scoring: `load_skill` calls `mark_loaded()` (thread-local) so
+  in-process runs (Director, `_run_isolated` read-only Specialist — both added to
+  `_RESEARCHER_TOOLS` in `team.py`) can attribute skill usage to their own verify/completion
+  outcome. Worker subprocess runs are attributed by scanning the Worker's own session JSONL for
+  `load_skill` actions via `trace_id` (`find_session_skill_usages`, same trace-id linkage
+  `viewer.get_session_trace_text` uses) — trust is only recorded when a `verify_cmd` actually ran
+  (unverified applies don't move the score, matching the "don't trust self-report" principle used
+  elsewhere in this repo).
+- `/skills` (`commands.py::register_mcp_command`'s sibling `register_skills_command`) lists
+  skills with a trust badge and supports `/skills reload`.
+
+### MCP (Model Context Protocol) client (`mcp_client.py`)
+Connects to servers declared in `.mcp.json`'s `mcpServers` key (same format/keys as Claude Code;
+read from `~/.mcp.json` then `<cwd>/.mcp.json`, latter wins on name collision) and registers each
+server's tools into the base `ToolRegistry` as `mcp__<server>__<tool>`. Two transports, dispatched
+by whether a config entry has `"command"` (stdio) or `"url"` (remote):
+- **stdio** (`McpServerProcess`): `subprocess.Popen` + newline-delimited JSON-RPC
+  (`initialize` → `notifications/initialized` → `tools/list` → `tools/call`), one in-flight
+  request per server (`_lock`), lazy respawn on crash/timeout.
+- **Remote / Streamable HTTP** (`McpHttpServerProcess`, P2): stateless POST-per-call via `urllib`
+  only (no SDK, consistent with `agent.py`'s raw-HTTP policy), carries the `Mcp-Session-Id`
+  response header on subsequent requests, and does a minimal `data:`-line SSE parse if the server
+  responds with `text/event-stream`.
+
+**Trust boundary (unlike Skills, MCP servers execute real code, not just text the model reads):**
+every MCP tool call goes through the existing `_request_write_approval` hook by default — MCP's
+own `readOnlyHint` annotations are not trusted. The only way to skip approval is an explicit
+`/mcp trust <server> read-only`, persisted to `.mimic/mcp_policy.json` (never written into
+`.mcp.json` itself). `connect_all(readonly_only=...)` is the single entry point used everywhere:
+- **Director** (`_build_components` in `__main__.py`, plus the `--auto-prompt` path when
+  `MIMIC_NO_AUTOGIT` is *not* set — i.e. standalone autonomous mode, not a Worker):
+  `readonly_only=False`, connects to every configured server.
+- **Worker** (`--auto-prompt` with `MIMIC_NO_AUTOGIT=1`): `readonly_only=True`. Workers can't share
+  the Director's live subprocess/HTTP session across the process boundary, so a Worker connects to
+  MCP servers itself — but since Workers run with no write-approval handler installed at all
+  (`_write_approval_handler` stays `None`, so `_request_write_approval` is a silent no-op there),
+  "approval required" would be no protection in that context. The only real safety boundary for
+  Workers is therefore at *connection time*: only servers already marked `read-only` in
+  `.mimic/mcp_policy.json` are ever connected/registered for a Worker.
+- **Specialist mode** (`__main__.py`): all `mcp__`-prefixed tools are excluded from
+  `_specialist_registry` outright (P0/P1 has no allowlist mechanism yet — see design doc for the
+  planned per-tool whitelist).
+- `/mcp` (`commands.py::register_mcp_command`): status list, `/mcp reconnect <server>`,
+  `/mcp trust <server> [read-only|off]`. All MCP servers are shut down via `atexit` hooks
+  registered in both the Director and `--auto-prompt` entry points.
+
+### Benchmark aggregation (`mimic_bench.py`)
+Not a synthetic eval suite — it reads the harness's own already-existing runtime logs
+(`.mimic/skill_trust.json`, `.mimic/mcp_policy.json`, `.mimic/verify_cmds.json`,
+`.mimic/sessions/*.jsonl`) and turns them into a Markdown report (`collect_all()` → `build_report()`).
+`run()` also writes a dated snapshot to `.mimic/bench_history/<YYYY-MM-DD>.json` and diffs the
+current numbers against the most recent prior snapshot (`load_previous_snapshot()`) to show
+pass-rate deltas (`前回比 ±Npt`). Sample counts under `_MIN_SAMPLE = 5` are flagged as
+"reference only" (`low_sample`) rather than trusted outright — a single pass/fail shouldn't be read
+as a trend. `collect_session_usage()` fills the one real gap in the existing logs: it scans session
+JSONL `action` entries for `load_skill`/`mcp__*` calls to get raw usage counts, since
+`mcp_policy.json` doesn't track per-tool pass/fail the way `skill_trust.json` does for Skills (a
+known, explicitly-noted gap — MCP has no verify-outcome-based trust scoring yet). Invoked via
+`/bench` (`commands.py::register_bench_command`) or `python -m mimic_tui.mimic_bench` directly.
+
+### Tests (`tests/`)
+Deliberately narrow: only the safety-boundary behavior of `skills.py` and `mcp_client.py` is
+tested, not the rest of the codebase (the project's "no test suite" stance elsewhere is
+unchanged — these two modules are the exception because they mediate trust/approval boundaries
+where a silent regression would be dangerous, not just wrong). No new dependency —
+plain `unittest`, run via `python -m unittest discover -s mimic_tui/tests -t .` from one level
+above the package. `tests/fixtures/fake_mcp_server.py` / `fake_mcp_http_server.py` are minimal
+stdio/HTTP MCP servers (not the shipped product) used to exercise a real JSON-RPC handshake rather
+than mocking it. Covers: SKILL.md non-destructiveness, the `_BODY_MAX_CHARS` truncation budget,
+the tool-name alias hint only firing on an actual match, `find_session_skill_usages` trace-id
+matching, MCP write-approval actually blocking on rejection, `read-only` trust actually skipping
+approval, and — the one that matters most — `connect_all(readonly_only=True)` (the Worker path)
+only ever connecting servers already marked `read-only` in `.mimic/mcp_policy.json`.
 
 ### Sub-agents & team delegation (`subagent.py`, `team.py`)
 

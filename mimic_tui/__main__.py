@@ -15,7 +15,8 @@ def _build_components(base_dir: str, active_config=None):
     from .utils import safe_print, C, set_log_sink, set_team_event_sink, log
     from .commands import (register_search_command, register_sessions_command,
                             register_viewer_command, register_delegations_command,
-                            register_skills_command)
+                            register_skills_command, register_mcp_command,
+                            register_bench_command)
     from .tools import set_sessions_dir, tools as _base_tools, ToolRegistry
     from . import config as _cfg
     from .config import load_config
@@ -37,6 +38,18 @@ def _build_components(base_dir: str, active_config=None):
 
     from .team import set_team_config, set_team_autogit
     set_team_config(active_config)
+
+    # MCP(Model Context Protocol)サーバーへ接続し、ツールを _base_tools へ動的登録する。
+    # Directorプロセス（このTUI）でのみ行う — Workerサブプロセスは呼ばない
+    # （設計書: overlay隔離されたWorkerからMCPサーバーを直接呼ぶのは非対応）。
+    from . import mcp_client
+    for _srv_name, _ok, _detail in mcp_client.connect_all():
+        if _ok:
+            safe_print(C.gray(f"  [MCP] ✓ {_srv_name}: {_detail}"), flush=True)
+        else:
+            safe_print(C.yellow(f"  [MCP] ✗ {_srv_name}: 接続失敗 ({_detail})"), flush=True)
+    import atexit
+    atexit.register(mcp_client.shutdown_all)
 
     tool_log = ToolCallLog()
 
@@ -66,9 +79,11 @@ def _build_components(base_dir: str, active_config=None):
         "delegate_to_team", "delegate_to_team_parallel",
         "delegate_to_worker", "delegate_research",
     }
+    # MCPツール（mcp__<server>__<tool>）はSpecialistでは既定で除外する
+    # （設計書§6: ホワイトリスト方式。P0では明示許可の仕組みが未実装のため全除外）。
     _specialist_registry = ToolRegistry()
     for _name in _base_tools._tools:
-        if _name not in _SPECIALIST_EXCLUDED_TOOLS:
+        if _name not in _SPECIALIST_EXCLUDED_TOOLS and not _name.startswith("mcp__"):
             _specialist_registry.copy_tool(_name, _base_tools)
     specialist_tools = MonitoringToolRegistry(
         base       = _specialist_registry,
@@ -123,6 +138,8 @@ def _build_components(base_dir: str, active_config=None):
     register_viewer_command(lambda: sessions_dir)
     register_delegations_command()
     register_skills_command()
+    register_mcp_command()
+    register_bench_command()
     set_sessions_dir(sessions_dir)
 
     # 中断委任マニフェストに長時間（24h超）残ったままのエントリがあれば起動時に知らせる。
@@ -237,6 +254,16 @@ def main():
 
         from .team import set_team_config, set_team_autogit
         set_team_config(active_config)
+
+        # MCP接続（設計書P2）。Worker（MIMIC_NO_AUTOGIT=1）は承認ハンドラーを持たず
+        # 「承認必須」がノーガードになるため、read-only信頼済みサーバーのみに絞る。
+        # 独立したautonomousモード（--auto-promptのみ、Workerではない）はDirector相当なので
+        # 制限なしで全サーバーに接続する。
+        from . import mcp_client
+        mcp_client.connect_all(readonly_only=bool(os.environ.get("MIMIC_NO_AUTOGIT")))
+        import atexit as _atexit
+        _atexit.register(mcp_client.shutdown_all)
+
         # auto_gitはNullAutoGit（MIMIC_NO_AUTOGIT=1の場合）またはAutoGit()。
         # NullAutoGitの場合もset_team_autogitで渡し、team.pyのcheckpointをno-opにする。
         # Worker（delegate_to_team経由のサブエージェント、MIMIC_NO_AUTOGIT=1で起動）には
