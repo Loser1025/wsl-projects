@@ -128,9 +128,37 @@ func RunTeamTask(ctx context.Context, client *llm.Client, baseRegistry *tools.Re
 		workerTask = task + "\n\n[Researcherによる設計ワークフロー]\n" + research
 	}
 
-	result, err := RunWorkerOnce(ctx, workerTask, projectDir, verifyCmd)
+	result, err := RunWorkerOnce(ctx, workerTask, projectDir, verifyCmd, "", true)
 	if err != nil {
 		return "", err
 	}
 	return "[Team] Researcher調査 → " + result, nil
+}
+
+// researchQASystemPrompt はPython版 team.py::RESEARCH_QA_SYSTEM_PROMPT の移植。
+// delegate_research（調べ物専用の軽量委任）用。設計ワークフローではなく
+// 質問への回答だけを簡潔に返す点がresearcherSystemPromptと異なる。
+const researchQASystemPrompt = `あなたは調査役（Researcher）です。
+Director（指示役）から渡された「調べてほしいこと」について必要な調査を行い、
+その結果だけをユーザーへの回答として整理して返してください。
+
+# 調査
+- read_file, grep_codebase, file_info, smart_read, get_repo_map で
+  プロジェクト内の関連情報を確認できる
+- 必要であれば web_search / fetch_webpage で外部の仕様・公式ドキュメント等を調べる
+  （書き込みは一切できない）
+
+# 出力（最終回答）
+- 「調べてほしいこと」に対する答えだけを、簡潔に日本語で書くこと。
+  調査の過程・余談・関係ない情報は書かない。
+- Markdownの区切り線（---）を多用しない。見出しは最小限にする。
+- 情報源（URL等）があれば末尾に簡潔に添える。`
+
+// RunResearchQA はフレッシュな文脈で調べ物を行い、回答だけを返す
+// （Python版 team.py::run_research_qa の移植。Worker/サンドボックスは使わず、
+// runIsolatedによるin-process実行のみで完結する）。
+func RunResearchQA(ctx context.Context, client *llm.Client, baseRegistry *tools.Registry, question, projectDir string) (string, error) {
+	registry := baseRegistry.Subset(researcherTools)
+	prompt := fmt.Sprintf("[作業フォルダ] %s\n\n[調べてほしいこと]\n%s\n", projectDir, question)
+	return runIsolated(ctx, client, researchQASystemPrompt, prompt, registry)
 }

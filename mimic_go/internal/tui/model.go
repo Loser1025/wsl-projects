@@ -274,7 +274,7 @@ func (m Model) startTurn() (tea.Model, tea.Cmd) {
 		_, err := react.RunTurn(ctx, client, systemPrompt, registry, &histCopy,
 			func(text string) { ch <- turnEvent{text: text} },
 			func(activity react.ToolActivity) { ch <- turnEvent{tool: &activity} },
-			checkpointPath, autoGit, cwd, reactLog, callLog,
+			checkpointPath, autoGit, cwd, reactLog, callLog, false,
 		)
 		if err != nil && ctx.Err() == nil {
 			ch <- turnEvent{finalErr: err}

@@ -29,6 +29,7 @@ var execCapableTools = map[string]bool{
 	"delegate_to_worker":        true,
 	"delegate_to_team":          true,
 	"delegate_to_team_parallel": true,
+	"delegate_to_specialist":    true,
 }
 
 // detectCommandOffload は実行手段を持つのにユーザーへ実行を丸投げしている

@@ -28,7 +28,7 @@ func RegisterTools(r *tools.Registry, client *llm.Client) {
 		},
 		func(args map[string]any) (string, error) {
 			return RunWorkerOnce(context.Background(),
-				argStr(args, "task"), defaultDir(argStr(args, "project_dir")), argStr(args, "verify_cmd"))
+				argStr(args, "task"), defaultDir(argStr(args, "project_dir")), argStr(args, "verify_cmd"), "", true)
 		})
 
 	r.Register("delegate_to_team",
@@ -80,6 +80,72 @@ func RegisterTools(r *tools.Registry, client *llm.Client) {
 			}
 			return fmt.Sprintf("[delegate_to_team_parallel: %d件完了]\n\n%s", len(results), strings.Join(blocks, "\n\n")), nil
 		})
+
+	r.Register("delegate_research",
+		"外部の公式ドキュメント・仕様などを調べる「調べ物」を、フレッシュな文脈の調査役（Researcher）に委任し、調査結果（回答）だけを受け取る。"+
+			"複数回のweb_search/fetch_webpageが必要になりそうな調べ物は、自分（Director）で直接行わず必ずこれを使うこと。",
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"question":    map[string]any{"type": "string", "description": "調べてほしいこと（ユーザーの質問の意図が伝わるように具体的に書く）"},
+				"project_dir": map[string]any{"type": "string", "description": "作業対象のプロジェクトディレクトリのフルパス（デフォルト: 現在の作業フォルダ）", "default": "."},
+			},
+			"required": []string{"question"},
+		},
+		func(args map[string]any) (string, error) {
+			return RunResearchQA(context.Background(), client, r,
+				argStr(args, "question"), defaultDir(argStr(args, "project_dir")))
+		})
+
+	r.Register("delegate_to_specialist",
+		"指定したロール説明を持つ専門家エージェントにタスクを委任する。ロールはDirectorが自由に定義できる。"+
+			"権限は3段階: デフォルト（読み取り専用）、can_execute=True（コマンド実行可・変更は破棄）、can_write=True（実装・適用）。"+
+			"roleには「視点」「制約」「完了基準」を必ず含めること（「完了基準」の明記がないと機械チェックで差し戻される）。",
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"role":        map[string]any{"type": "string", "description": "専門家ロールの説明。「視点」「制約」「完了基準」の3要素を必ず含めること"},
+				"task":        map[string]any{"type": "string", "description": "そのロールに実行させるタスク"},
+				"can_write":   map[string]any{"type": "boolean", "description": "Trueでファイル変更可能（OverlayFS隔離、変更は適用される）、False（デフォルト）で読み取り専用", "default": false},
+				"can_execute": map[string]any{"type": "boolean", "description": "Trueで実行専用（コマンド実行可だが変更は破棄）。can_write=Trueが優先される", "default": false},
+				"project_dir": map[string]any{"type": "string", "description": "作業ディレクトリ（デフォルト: カレント）", "default": "."},
+				"verify_cmd":  map[string]any{"type": "string", "description": "can_write/can_execute時、実行後に評価する検証コマンド（省略可）", "default": ""},
+			},
+			"required": []string{"role", "task"},
+		},
+		func(args map[string]any) (string, error) {
+			role := argStr(args, "role")
+			if roleErr := validateSpecialistRole(role); roleErr != "" {
+				return roleErr, nil
+			}
+			return RunSpecialistTask(context.Background(), client, r,
+				role, argStr(args, "task"), defaultDir(argStr(args, "project_dir")), argStr(args, "verify_cmd"),
+				argBool(args, "can_write"), argBool(args, "can_execute"))
+		})
+
+	r.Register("continue_specialist",
+		"delegate_to_specialist(can_write=true)で保持されたセッションWorkerに追加指示を出し、前回の会話・作業内容の続きから実行する。"+
+			"新しいDirectorとのやり取りを踏まえて同じロールのWorkerに作業を継続させたい場合に使う。保持中のセッションが無い場合はエラーを返す。",
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"task":       map[string]any{"type": "string", "description": "追加で実行させたい指示"},
+				"verify_cmd": map[string]any{"type": "string", "description": "検証コマンド（省略時は前回のverify_cmdを引き継ぐ）", "default": ""},
+			},
+			"required": []string{"task"},
+		},
+		func(args map[string]any) (string, error) {
+			return RunSpecialistContinue(context.Background(), argStr(args, "task"), argStr(args, "verify_cmd"))
+		})
+}
+
+func argBool(args map[string]any, key string) bool {
+	if v, ok := args[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
 }
 
 // argStrArray はJSON配列引数([]any として来る)を[]stringへ変換する。

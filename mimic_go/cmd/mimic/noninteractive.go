@@ -52,10 +52,30 @@ func runNonInteractive(client *llm.Client, systemPrompt, prompt string, auto boo
 	}
 	reactLog.Add("session_start", map[string]any{"model": client.Model(), "provider": client.ProviderName()})
 
-	history := []llm.Message{{Role: "user", Content: prompt}}
+	// delegate_to_specialist経由で起動されたWorkerには、Directorが指定した
+	// ロール説明がMIMIC_ROLE_PROMPT環境変数で渡される（Python版と同じ仕組み）。
+	if rolePrompt := os.Getenv("MIMIC_ROLE_PROMPT"); rolePrompt != "" {
+		systemPrompt = rolePrompt + "\n\n" + systemPrompt
+	}
+
+	// continue_specialist経由の再起動時はMIMIC_KEEP_CHECKPOINTが立っており、
+	// このWorker専用チェックポイント（サンドボックス内なのでDirector側とは無関係）に
+	// 既存の会話履歴があれば読み込んで続きの指示として追記する
+	// （Python版 run_specialist_continue のresume_note注入に相当）。
+	const workerCheckpointPath = ".mimic/checkpoint.json"
+	keepCheckpoint := os.Getenv("MIMIC_KEEP_CHECKPOINT") != ""
+	checkpointPath := ""
+	var history []llm.Message
+	if keepCheckpoint {
+		checkpointPath = workerCheckpointPath
+		if loaded, err := react.LoadCheckpoint(checkpointPath); err == nil && len(loaded) > 0 {
+			history = loaded
+		}
+	}
+	history = append(history, llm.Message{Role: "user", Content: prompt})
 
 	result, err := react.RunTurn(context.Background(), client, systemPrompt, registry, &history,
-		func(string) {}, nil, "", autoGit, cwd, reactLog, vcs.NewToolCallLog())
+		func(string) {}, nil, checkpointPath, autoGit, cwd, reactLog, vcs.NewToolCallLog(), keepCheckpoint)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)

@@ -38,21 +38,35 @@ var abortExitCodes = map[int]bool{2: true, 126: true, 127: true}
 // RunWorkerOnce はサンドボックス内でWorker（自分自身のバイナリを--auto-promptで
 // 再帰起動）を実行し、verify_cmd指定時は失敗するたびに同じOverlay上で最大
 // MaxVerifyRetries回まで修正再試行してから、変更を実プロジェクトへ適用する。
-func RunWorkerOnce(ctx context.Context, task, projectDir, verifyCmd string) (string, error) {
-	if blocked := checkWriteInterlock(); blocked != "" {
-		return blocked, nil
+// rolePromptが空でなければ、Worker起動時にMIMIC_ROLE_PROMPT環境変数として渡し、
+// システムプロンプトの先頭に付加させる（delegate_to_specialist用）。
+// applyChanges=falseの場合、変更は実プロジェクトへ適用せず破棄する
+// （can_execute=True・実行専用Specialist用。verify/実行はそのまま行われる）。
+// Workroomは毎回新規作成し、完了後に破棄する（継続不可の単発実行）。
+func RunWorkerOnce(ctx context.Context, task, projectDir, verifyCmd, rolePrompt string, applyChanges bool) (string, error) {
+	w, err := sandbox.NewWorkroom(projectDir)
+	if err != nil {
+		return "", fmt.Errorf("workroom作成に失敗しました: %w", err)
+	}
+	defer w.Cleanup()
+	return runWorkerInWorkroom(ctx, w, task, verifyCmd, rolePrompt, applyChanges, false)
+}
+
+// runWorkerInWorkroom は既存のWorkroom内でWorkerを実行する共通処理。
+// keepSessionがtrueの場合、Worker起動時にMIMIC_KEEP_CHECKPOINT環境変数を立て、
+// Worker自身の会話履歴（サンドボックス内チェックポイント）を正常完了後も
+// 消さずに残す（continue_specialistでの追加指示継続用）。
+func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyCmd, rolePrompt string, applyChanges, keepSession bool) (string, error) {
+	if applyChanges {
+		if blocked := checkWriteInterlock(); blocked != "" {
+			return blocked, nil
+		}
 	}
 
 	mimicBin, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("自身の実行ファイルパスを取得できませんでした: %w", err)
 	}
-
-	w, err := sandbox.NewWorkroom(projectDir)
-	if err != nil {
-		return "", fmt.Errorf("workroom作成に失敗しました: %w", err)
-	}
-	defer w.Cleanup()
 
 	currentTask := task
 	var summary string
@@ -62,7 +76,7 @@ func RunWorkerOnce(ctx context.Context, task, projectDir, verifyCmd string) (str
 	var triedSummaries []string
 
 	for attempt := 1; attempt <= 1+MaxVerifyRetries; attempt++ {
-		launchRes, runErr := w.Run(ctx, launchCommand(mimicBin, currentTask), defaultWorkerTimeout)
+		launchRes, runErr := w.Run(ctx, launchCommand(mimicBin, currentTask, rolePrompt, keepSession), defaultWorkerTimeout)
 		if runErr != nil {
 			return "", fmt.Errorf("Worker実行に失敗しました: %w", runErr)
 		}
@@ -109,12 +123,17 @@ func RunWorkerOnce(ctx context.Context, task, projectDir, verifyCmd string) (str
 		return "", fmt.Errorf("差分の取得に失敗しました: %w", err)
 	}
 	changed = dedupe(changed)
-	if len(changed) > 0 {
-		if err := sandbox.ApplyChanges(w, changed); err != nil {
-			return "", fmt.Errorf("変更の適用に失敗しました: %w", err)
+	discardedNote := ""
+	if applyChanges {
+		if len(changed) > 0 {
+			if err := sandbox.ApplyChanges(w, changed); err != nil {
+				return "", fmt.Errorf("変更の適用に失敗しました: %w", err)
+			}
 		}
+		noteWriteDelegation(changed)
+	} else if len(changed) > 0 {
+		discardedNote = "（実行専用のため変更は適用されず破棄されました）"
 	}
-	noteWriteDelegation(changed)
 
 	verifySection := ""
 	if verifyCmd != "" {
@@ -137,16 +156,24 @@ func RunWorkerOnce(ctx context.Context, task, projectDir, verifyCmd string) (str
 		}
 	}
 
-	result := fmt.Sprintf("[Worker] 変更ファイル数: %d\n%s\n\n[Workerの報告]\n%s%s",
-		len(changed), strings.Join(changed, ", "), summary, verifySection)
+	result := fmt.Sprintf("[Worker] 変更ファイル数: %d %s\n%s\n\n[Workerの報告]\n%s%s",
+		len(changed), discardedNote, strings.Join(changed, ", "), summary, verifySection)
 	return result, nil
 }
 
-func launchCommand(mimicBin, task string) string {
+func launchCommand(mimicBin, task, rolePrompt string, keepSession bool) string {
 	// Worker自身にはAutoGitのbackup/checkpoint/squashを行わせない
 	// （upperdirに.gitの変更が混入し差分サマリが汚染されるのを防ぐ。
 	// Python版 NullAutoGit と同じ意図をMIMIC_NO_AUTOGIT環境変数で伝える）。
-	return fmt.Sprintf("export MIMIC_NO_AUTOGIT=1\n%s -auto-prompt %s", shellQuote(mimicBin), shellQuote(task))
+	roleExport := ""
+	if rolePrompt != "" {
+		roleExport = fmt.Sprintf("export MIMIC_ROLE_PROMPT=%s\n", shellQuote(rolePrompt))
+	}
+	keepExport := ""
+	if keepSession {
+		keepExport = "export MIMIC_KEEP_CHECKPOINT=1\n"
+	}
+	return fmt.Sprintf("export MIMIC_NO_AUTOGIT=1\n%s%s%s -auto-prompt %s", roleExport, keepExport, shellQuote(mimicBin), shellQuote(task))
 }
 
 // buildVerifyRetryTask はverify失敗フィードバックを含む修正指示文を生成する

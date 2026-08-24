@@ -43,15 +43,20 @@ type ToolActivity struct {
 // ループ中に発生したassistant/toolメッセージも同じスライスに追記される。
 // onText はテキストチャンク受信の都度呼ばれる（ライブ表示用）。
 // onTool はツール呼び出しの発生ごとに呼ばれる（実行前・実行後のUI表示用）。
-// checkpointPath が空でなければ、各ステップ完了ごとに履歴をそこへ保存し、
-// ターンが正常完了した時点で削除する（異常終了時は次回起動時の再開用に残す）。
+// checkpointPath が空でなければ、各ステップ完了ごとに履歴をそこへ保存する。
+// keepCheckpointがfalse（通常）ならターン正常完了時に削除する（異常終了時は
+// 次回起動時の再開用に残る）。keepCheckpointがtrueなら正常完了時も削除せず、
+// 会話履歴を保持し続ける（delegate_to_specialist(can_write=True)からの
+// continue_specialistによる追加指示継続で使う——次回起動時に同じ履歴へ
+// 追記して再開できるようにするため）。
 // autoGit が非nilなら、ターン開始時にバックアップコミット、書き込み系ツール
 // （write_file/edit_file/patch_file）成功後にチェックポイントコミットを行う
 // （Python版 orchestrator.py の AutoGit 連携を踏襲）。
 func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 	registry *tools.Registry, history *[]llm.Message,
 	onText func(string), onTool func(ToolActivity), checkpointPath string,
-	autoGit *vcs.AutoGit, cwd string, reactLog *vcs.ReactLog, callLog *vcs.ToolCallLog) (string, error) {
+	autoGit *vcs.AutoGit, cwd string, reactLog *vcs.ReactLog, callLog *vcs.ToolCallLog,
+	keepCheckpoint bool) (string, error) {
 
 	specs := registry.Specs()
 
@@ -109,7 +114,11 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 
 			// ツール呼び出しなし = 最終回答。履歴に記録して終了。
 			*history = append(*history, llm.Message{Role: "assistant", Content: result.Text})
-			ClearCheckpoint(checkpointPath)
+			if !keepCheckpoint {
+				ClearCheckpoint(checkpointPath)
+			} else {
+				SaveCheckpoint(checkpointPath, *history)
+			}
 			if autoGit != nil {
 				// ターン内の複数checkpointコミットを1つにまとめる（git logを読みやすくする）。
 				// チェックポイントが無い（書き込みなし）ターンではSquashは即noop。
