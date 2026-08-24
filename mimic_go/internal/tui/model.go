@@ -18,8 +18,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"mimic/internal/bench"
 	"mimic/internal/delegate"
 	"mimic/internal/llm"
+	"mimic/internal/mcp"
 	"mimic/internal/react"
 	"mimic/internal/tools"
 	"mimic/internal/vcs"
@@ -99,6 +101,15 @@ func NewModel(client *llm.Client, systemPrompt string) Model {
 
 	registry := tools.NewDefaultRegistry()
 	delegate.RegisterTools(registry, client)
+	if results := mcp.ConnectAll(registry, cwd, false); len(results) > 0 {
+		for _, r := range results {
+			status := "✗"
+			if r.OK {
+				status = "✓"
+			}
+			log = append(log, fmt.Sprintf("[MCP] %s %s: %s", status, r.Name, r.Message))
+		}
+	}
 
 	return Model{
 		input:        ta,
@@ -207,6 +218,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if text == "/stats" {
 				m.log = append(m.log, fmt.Sprintf("> %s", text), m.callLog.StatsText())
+				m.openLine = false
+				m.viewport.SetContent(m.renderLog())
+				m.viewport.GotoBottom()
+				return m, nil
+			}
+			if text == "/bench" {
+				report, err := bench.Run(m.cwd)
+				if err != nil {
+					report = fmt.Sprintf("ベンチマーク集計エラー: %v", err)
+				}
+				m.log = append(m.log, fmt.Sprintf("> %s", text), report)
 				m.openLine = false
 				m.viewport.SetContent(m.renderLog())
 				m.viewport.GotoBottom()

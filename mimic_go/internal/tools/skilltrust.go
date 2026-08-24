@@ -53,3 +53,15 @@ func RecordSkillOutcome(projectDir, name string, verifyPassed bool) {
 		os.WriteFile(path, out, 0o644)
 	}
 }
+
+// loadSkillTrust は.mimic/skill_trust.jsonを読み込む（list_skillsのバッジ表示用）。
+// ファイルが無い/壊れている場合は空mapを返す。
+func loadSkillTrust(projectDir string) map[string]skillTrustEntry {
+	data := make(map[string]skillTrustEntry)
+	raw, err := os.ReadFile(filepath.Join(projectDir, ".mimic", "skill_trust.json"))
+	if err != nil {
+		return data
+	}
+	json.Unmarshal(raw, &data)
+	return data
+}

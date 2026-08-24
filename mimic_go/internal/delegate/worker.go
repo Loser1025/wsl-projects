@@ -14,12 +14,15 @@ package delegate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"mimic/internal/sandbox"
+	"mimic/internal/tools"
 )
 
 const (
@@ -135,6 +138,15 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 		discardedNote = "（実行専用のため変更は適用されず破棄されました）"
 	}
 
+	// Workerがload_skillを使っていれば、machine verify結果を信頼スコアに反映する
+	// （verify_cmd未指定の実行は自己申告のみなのでスコア対象外。Python版
+	// team.py::_run_delegation_core_inner の該当ロジックの移植）。
+	if verifyExit != nil {
+		for _, skillName := range findSkillUsagesInUpper(w.Upper, changed) {
+			tools.RecordSkillOutcome(w.Lower, skillName, *verifyExit == 0)
+		}
+	}
+
 	verifySection := ""
 	if verifyCmd != "" {
 		switch {
@@ -215,6 +227,46 @@ func extractFinalAnswer(output string) string {
 		return strings.TrimSpace(output)
 	}
 	return strings.TrimSpace(output[idx+len(finalMarker):])
+}
+
+// findSkillUsagesInUpper はWorker自身のセッションJSONL（changedFiles中の
+// .mimic/sessions/*.jsonl、実体はupperdir上）を走査し、load_skillツールで
+// 使われたSkill名の集合を返す（Python版 skills.py::find_session_skill_usages
+// の縮小移植。trace_idによる紐付けは行わず、このWorker実行の変更ファイルに
+// 含まれるセッションログを全て対象にする）。
+func findSkillUsagesInUpper(upperDir string, changedFiles []string) []string {
+	seen := make(map[string]bool)
+	var names []string
+	for _, rel := range changedFiles {
+		if !strings.HasPrefix(rel, ".mimic/sessions/") || !strings.HasSuffix(rel, ".jsonl") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(upperDir, rel))
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			var entry struct {
+				Type string `json:"type"`
+				Tool string `json:"tool"`
+				Args struct {
+					Name string `json:"name"`
+				} `json:"args"`
+			}
+			if err := json.Unmarshal([]byte(line), &entry); err != nil {
+				continue
+			}
+			if entry.Type == "action" && entry.Tool == "load_skill" && entry.Args.Name != "" && !seen[entry.Args.Name] {
+				seen[entry.Args.Name] = true
+				names = append(names, entry.Args.Name)
+			}
+		}
+	}
+	return names
 }
 
 func dedupe(files []string) []string {

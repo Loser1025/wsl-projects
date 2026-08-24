@@ -11,6 +11,7 @@ import (
 
 	"mimic/internal/config"
 	"mimic/internal/llm"
+	"mimic/internal/selector"
 	"mimic/internal/tui"
 	"mimic/internal/viewer"
 )
@@ -28,20 +29,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	client := llm.NewClient(cfg.Active)
-
 	if *statusFlag {
-		runStatusMode(client.ProviderName(), client.Model(), len(cfg.Active.APIKeys))
+		runStatusMode(cfg.Active.Name, cfg.Active.Model, len(cfg.Active.APIKeys))
 		return
 	}
 	if *promptFlag != "" {
-		runNonInteractive(client, cfg.SystemPrompt, *promptFlag, false)
+		runNonInteractive(llm.NewClient(cfg.Active), cfg.SystemPrompt, *promptFlag, false)
 		return
 	}
 	if *autoPromptFlag != "" {
-		runNonInteractive(client, cfg.SystemPrompt, *autoPromptFlag, true)
+		runNonInteractive(llm.NewClient(cfg.Active), cfg.SystemPrompt, *autoPromptFlag, true)
 		return
 	}
+
+	// 対話モード起動前に、プロバイダ横断のモデルセレクター（一覧取得+疎通確認）を
+	// 必ず経由する（Python版 __main__.py の対話モード起動フローを踏襲）。
+	active := selector.SelectInteractively(cfg)
+	client := llm.NewClient(active)
 
 	fmt.Fprintf(os.Stderr, "[mimic-go] provider=%s model=%s\n", client.ProviderName(), client.Model())
 
@@ -52,13 +56,17 @@ func main() {
 		}
 	}
 
-	// あえて tea.WithAltScreen() を付けていない。
-	// Textualのalt-screen全面制御がスクロール/テキスト選択を阻害していた
-	// 疑いがあるため、フェーズ1ではまずネイティブのターミナルスクロール
-	// バックがそのまま機能するインラインモードで動作を確認する。
-	// マウスモードも同様の理由で有効化していない
-	// （設計書06章「マウスモードの選択的有効化」方針）。
-	p := tea.NewProgram(tui.NewModel(client, cfg.SystemPrompt))
+	// フェーズ1ではインラインモード+マウス無効を試したが、Bubble
+	// Teaのインライン描画は毎フレーム同じ画面領域を上書きするため、
+	// 端末本来のスクロールバックが「過去フレームの残骸」を表示してしまい
+	// 実用にならないことが判明した（実機診断済み）。
+	// alt-screen + マウスモードへ切り替える: viewport自身がPageUp/PageDown
+	// に加えマウスホイールでのスクロールも標準対応しているため、
+	// スクロールは常にviewport経由の一本化された挙動になり、崩れる余地が
+	// なくなる。テキスト選択は主要ターミナル（Windows Terminal/iTerm2/
+	// GNOME Terminal/Alacritty/kitty等）がShift+ドラッグでアプリの
+	// マウス捕捉を無視した選択を標準サポートしているため、両立できる。
+	p := tea.NewProgram(tui.NewModel(client, cfg.SystemPrompt), tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "エラー: %v\n", err)
 		os.Exit(1)

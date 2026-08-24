@@ -8,6 +8,7 @@ import (
 
 	"mimic/internal/delegate"
 	"mimic/internal/llm"
+	"mimic/internal/mcp"
 	"mimic/internal/react"
 	"mimic/internal/tools"
 	"mimic/internal/vcs"
@@ -40,6 +41,10 @@ func runNonInteractive(client *llm.Client, systemPrompt, prompt string, auto boo
 		// （Python版 __main__.py の _DELEGATE_TOOLS 除外ロジックを踏襲）。
 		delegate.RegisterTools(registry, client)
 	}
+	// Workerには承認ハンドラーが無いため「承認必須」がノーガードになる。
+	// 接続時のフィルタリング（read-only信頼済みサーバーのみ）だけが安全境界になる
+	// （Python版 connect_all(readonly_only=...) の方針を踏襲）。
+	mcp.ConnectAll(registry, cwd, isWorker)
 	var autoGit *vcs.AutoGit
 	if !isWorker {
 		autoGit = vcs.New()

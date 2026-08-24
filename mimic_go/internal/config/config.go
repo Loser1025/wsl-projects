@@ -41,6 +41,12 @@ const (
 	mistralAPIBase    = "https://api.mistral.ai/v1"
 )
 
+// OpenRouterAPIBase/GeminiAPIBase/MistralAPIBase はinternal/selector等の
+// 外部パッケージからAPIエンドポイントを参照するための公開アクセサ。
+func OpenRouterAPIBase() string { return openRouterAPIBase }
+func GeminiAPIBase() string     { return geminiAPIBase }
+func MistralAPIBase() string    { return mistralAPIBase }
+
 type Config struct {
 	Providers    map[string]*ProviderConfig // 利用可能な全プロバイダ（未設定なら空）
 	Active       *ProviderConfig            // 起動時に自動選択されたプロバイダ

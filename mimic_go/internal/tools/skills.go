@@ -183,13 +183,19 @@ func registerSkillTools(r *Registry) {
 			if len(skills) == 0 {
 				return "利用可能なSkillはありません（.claude/skills/ 配下にSKILL.mdが見つかりません）", nil
 			}
+			cwd, _ := os.Getwd()
+			trust := loadSkillTrust(cwd)
 			var lines []string
 			for _, s := range skills {
 				desc := s.description
 				if len(desc) > skillSummaryDescMax {
 					desc = desc[:skillSummaryDescMax]
 				}
-				lines = append(lines, fmt.Sprintf("- %s: %s", s.name, desc))
+				badge := "（※未検証）"
+				if t, ok := trust[s.name]; ok && t.PassCount > 0 {
+					badge = fmt.Sprintf("（検証通過%d回）", t.PassCount)
+				}
+				lines = append(lines, fmt.Sprintf("- %s%s: %s", s.name, badge, desc))
 			}
 			return strings.Join(lines, "\n"), nil
 		})
