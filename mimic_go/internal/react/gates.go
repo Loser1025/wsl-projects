@@ -21,13 +21,14 @@ var (
 )
 
 // execCapableTools はGate A判定の対象となる「実行手段を持つツール」の集合
-// （Python版 _EXEC_CAPABLE_TOOLS を踏襲。delegate_to_specialist/
-// delegate_to_team/delegate_to_team_parallelはまだGo側に存在しないため未追加）。
+// （Python版 _EXEC_CAPABLE_TOOLS を踏襲。delegate_to_specialistはまだ
+// Go側に存在しないため未追加）。
 var execCapableTools = map[string]bool{
-	"run_bash":           true,
-	"run_pipeline":       true,
-	"delegate_to_worker": true,
-	"delegate_to_team":   true,
+	"run_bash":                  true,
+	"run_pipeline":              true,
+	"delegate_to_worker":        true,
+	"delegate_to_team":          true,
+	"delegate_to_team_parallel": true,
 }
 
 // detectCommandOffload は実行手段を持つのにユーザーへ実行を丸投げしている
