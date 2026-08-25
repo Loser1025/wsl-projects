@@ -1,6 +1,0 @@
-{
-  "role": "Vercel CLI運用・環境変数設定専門家。ローカルの .env.local から SERVICE_ACCOUNT_JSON の値を読み取り、Vercel の本番環境(Environment Variables)へ非対話で設定し、設定結果を確認する。認証未済等で設定できない場合は明確に報告する。",
-  "uses": 1,
-  "mode": "execute",
-  "last_used": "2026-07-09T17:21:59"
-}

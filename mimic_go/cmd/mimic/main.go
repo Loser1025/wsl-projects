@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"mimic/internal/config"
 	"mimic/internal/llm"
@@ -56,17 +56,13 @@ func main() {
 		}
 	}
 
-	// フェーズ1ではインラインモード+マウス無効を試したが、Bubble
-	// Teaのインライン描画は毎フレーム同じ画面領域を上書きするため、
-	// 端末本来のスクロールバックが「過去フレームの残骸」を表示してしまい
-	// 実用にならないことが判明した（実機診断済み）。
-	// alt-screen + マウスモードへ切り替える: viewport自身がPageUp/PageDown
-	// に加えマウスホイールでのスクロールも標準対応しているため、
-	// スクロールは常にviewport経由の一本化された挙動になり、崩れる余地が
-	// なくなる。テキスト選択は主要ターミナル（Windows Terminal/iTerm2/
-	// GNOME Terminal/Alacritty/kitty等）がShift+ドラッグでアプリの
-	// マウス捕捉を無視した選択を標準サポートしているため、両立できる。
-	p := tea.NewProgram(tui.NewModel(client, cfg.SystemPrompt), tea.WithAltScreen(), tea.WithMouseCellMotion())
+	// alt-screen・マウスモードはv2ではView()が返すtea.Viewのフィールドとして
+	// tui.Model.View()側で指定する（NewProgramのオプションではない）。
+	// テキスト選択は主要ターミナル（Windows Terminal/iTerm2/GNOME Terminal/
+	// Alacritty/kitty等）がShift+ドラッグでアプリのマウス捕捉を無視した
+	// 選択を標準サポートしているため、マウスホイールでのviewportスクロールと
+	// 両立できる。
+	p := tea.NewProgram(tui.NewModel(client, cfg.SystemPrompt))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "エラー: %v\n", err)
 		os.Exit(1)
