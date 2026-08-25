@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -70,13 +71,13 @@ func ConnectAll(r *tools.Registry, projectDir string, readonlyOnly bool) []Conne
 		serversMu.Lock()
 		servers[name] = s
 		serversMu.Unlock()
-		n := registerToolsFor(r, name, toolMap)
+		n := registerToolsFor(r, name, toolMap, projectDir)
 		results = append(results, ConnectResult{name, true, fmt.Sprintf("%d件のツールを登録", n)})
 	}
 	return results
 }
 
-func registerToolsFor(r *tools.Registry, serverName string, toolMap map[string]ToolInfo) int {
+func registerToolsFor(r *tools.Registry, serverName string, toolMap map[string]ToolInfo, projectDir string) int {
 	n := 0
 	for toolName, spec := range toolMap {
 		fullName := fmt.Sprintf("mcp__%s__%s", serverName, toolName)
@@ -90,6 +91,19 @@ func registerToolsFor(r *tools.Registry, serverName string, toolMap map[string]T
 		}
 		toolNameCapture := toolName
 		r.Register(fullName, desc, params, func(args map[string]any) (string, error) {
+			// MCPサーバーの readOnlyHint 自己申告は信用せず、.mimic/mcp_policy.json で
+			// trust="read-only" と明示された場合のみ承認を省略する（Python版
+			// mcp_client.py::_make_tool_fn と同じ方針。/mcp trust による変更を
+			// 即座に反映できるよう呼び出しごとにポリシーを読み直す）。
+			trusted := loadPolicy(projectDir)[serverName].Trust == "read-only"
+			if !trusted {
+				argsJSON, _ := json.Marshal(args)
+				preview := fmt.Sprintf("MCPツール呼び出し: %s/%s\n引数: %s", serverName, toolNameCapture, truncateForPreview(string(argsJSON), 500))
+				if rejectErr := tools.RequestMCPApproval(fullName, preview); rejectErr != "" {
+					return rejectErr, nil
+				}
+			}
+
 			serversMu.Lock()
 			s := servers[serverName]
 			serversMu.Unlock()
@@ -101,6 +115,13 @@ func registerToolsFor(r *tools.Registry, serverName string, toolMap map[string]T
 		n++
 	}
 	return n
+}
+
+func truncateForPreview(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max]
 }
 
 // ShutdownAll は接続中の全MCPサーバーとの通信を終了する（プロセス終了時用）。

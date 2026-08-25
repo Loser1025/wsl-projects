@@ -18,9 +18,22 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
+
+// applyMu はApplyChangesの実行を全体で1件ずつに直列化する（Python版
+// team.py::_apply_lock の移植）。delegate_to_team_parallel等が複数goroutineから
+// 同じprojectDirへ同時にApplyChangesを呼ぶと、ファイルコピーの競合や
+// 中途半端な適用状態が起こりうるため。
+var applyMu sync.Mutex
+
+// applyExcludedPaths はapply対象から除外する内部管理ファイル
+// （Python版 subagent.py::_APPLY_EXCLUDED_PATHS の移植）。
+var applyExcludedPaths = map[string]bool{
+	".mimic_checkpoint.json": true,
+}
 
 // Mode はサンドボックスの実行方式。
 type Mode string
@@ -221,9 +234,40 @@ func changedFiles(upper string) ([]string, error) {
 	return changed, err
 }
 
-// ApplyChanges はupperdir上の変更を projectDir(lower) にコピーで反映する。
+// deletedFiles はupperdir内のwhiteoutマーカー（overlayfsの削除表現、
+// キャラクタデバイスファイルとして現れる）を走査し、削除された相対パス
+// 一覧を返す（Python版 subagent.py::apply_subagent_changes のwhiteout走査部分の移植）。
+func deletedFiles(upper string) ([]string, error) {
+	var deleted []string
+	err := filepath.Walk(upper, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.Mode()&os.ModeCharDevice == 0 {
+			return nil
+		}
+		rel, err := filepath.Rel(upper, path)
+		if err != nil {
+			return nil
+		}
+		deleted = append(deleted, rel)
+		return nil
+	})
+	return deleted, err
+}
+
+// ApplyChanges はupperdir上の変更をprojectDir(lower)にコピーで反映し、
+// whiteout(削除マーカー)に対応するファイルをlower側からも削除する
+// （Python版 apply_subagent_changes の移植）。.mimic_checkpoint.json等の
+// 内部管理ファイルはapplyExcludedPathsにより対象から除外する。
+// 複数goroutineから同じprojectDirへ並行してApplyChangesが呼ばれても
+// コピー処理が競合しないよう、全体を1件ずつに直列化する
+// （Python版 team.py::_apply_lock の移植）。
 func ApplyChanges(w *Workroom, changedFiles []string) error {
+	applyMu.Lock()
+	defer applyMu.Unlock()
+
 	for _, rel := range changedFiles {
+		if applyExcludedPaths[rel] {
+			continue
+		}
 		src := filepath.Join(w.Upper, rel)
 		dst := filepath.Join(w.Lower, rel)
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
@@ -235,6 +279,20 @@ func ApplyChanges(w *Workroom, changedFiles []string) error {
 		}
 		if err := os.WriteFile(dst, data, 0o644); err != nil {
 			return err
+		}
+	}
+
+	deleted, err := deletedFiles(w.Upper)
+	if err != nil {
+		return err
+	}
+	for _, rel := range deleted {
+		if applyExcludedPaths[rel] {
+			continue
+		}
+		dst := filepath.Join(w.Lower, rel)
+		if rmErr := os.Remove(dst); rmErr != nil && !os.IsNotExist(rmErr) {
+			return rmErr
 		}
 	}
 	return nil

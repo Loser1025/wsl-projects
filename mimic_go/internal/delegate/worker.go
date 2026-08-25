@@ -23,7 +23,20 @@ import (
 
 	"mimic/internal/sandbox"
 	"mimic/internal/tools"
+	"mimic/internal/vcs"
 )
+
+// teamAutoGit はDirector側のAutoGitインスタンスを共有するための参照
+// （Python版 team.py::set_team_autogit の移植）。これを設定しておくことで、
+// delegate_to_team/delegate_to_worker等の適用後チェックポイントコミットが
+// Directorの通常ターンと同じAutoGitインスタンスに積まれ、ターン終了時の
+// squash対象に含まれるようになる。
+var teamAutoGit *vcs.AutoGit
+
+// SetTeamAutoGit はDirector（TUI/非対話モード）起動時に一度だけ呼び出す。
+func SetTeamAutoGit(a *vcs.AutoGit) {
+	teamAutoGit = a
+}
 
 const (
 	defaultWorkerTimeout = 1800 * time.Second // Python版 _TIMEOUT_SEC を踏襲
@@ -131,6 +144,9 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 		if len(changed) > 0 {
 			if err := sandbox.ApplyChanges(w, changed); err != nil {
 				return "", fmt.Errorf("変更の適用に失敗しました: %w", err)
+			}
+			if teamAutoGit != nil {
+				teamAutoGit.Checkpoint(w.Lower, "delegate", strings.Join(changed, ", "))
 			}
 		}
 		noteWriteDelegation(changed)

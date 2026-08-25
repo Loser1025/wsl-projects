@@ -48,6 +48,9 @@ func runNonInteractive(client *llm.Client, systemPrompt, prompt string, auto boo
 	var autoGit *vcs.AutoGit
 	if !isWorker {
 		autoGit = vcs.New()
+		// Directorとして委任を行う場合のみ、適用後コミットを同じAutoGit
+		// インスタンスへ積ませる（Python版 team.py::set_team_autogit の移植）。
+		delegate.SetTeamAutoGit(autoGit)
 	}
 	reactLog := vcs.NewReactLog()
 	sessionsDir := filepath.Join(cwd, ".mimic", "sessions")

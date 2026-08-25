@@ -149,6 +149,15 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 			callStart := time.Now()
 			output := registry.Call(tc.Function.Name, tc.Function.Arguments)
 			elapsed := time.Since(callStart)
+
+			// 書き込み承認が拒否された場合はPython版 UserRejectedWriteError と同様に
+			// ターンを即中断する（リトライやループブレーカーへは進ませない）。
+			if tools.IsWriteRejected(output) {
+				if reactLog != nil {
+					reactLog.Add("system_event", map[string]any{"level": "warning", "content": "書き込みが拒否されました: " + output})
+				}
+				return "書き込みが拒否されたため処理を中断しました。", nil
+			}
 			isFailForLog := isFailure(output)
 			if callLog != nil {
 				status := "ok"

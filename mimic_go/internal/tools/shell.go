@@ -5,7 +5,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -16,6 +19,51 @@ const (
 	defaultPipelineTimeout = 120
 	maxPipelineLines       = 50000
 )
+
+// outsideWriteTargetRe はWorker実行時、リダイレクト・tee・cp/mv等で作業ディレクトリ外の
+// 絶対パスへ書き込むコマンドを検出するパターン（Python版 tools_linux.py::_OUTSIDE_WRITE_TARGET_RE の移植）。
+var outsideWriteTargetRe = regexp.MustCompile(`(?:>>?\s*|\btee\s+(?:-a\s+)?|\b(?:cp|mv)\s+(?:-\S+\s+)*\S+\s+)(/[^\s;|&'"<>]+)`)
+
+// workerOutsideWriteWarning はWorker実行時、作業ディレクトリ外への書き込みらしきコマンドを
+// 検出して警告を返す（Python版 tools_linux.py::_worker_outside_write_warning の移植）。
+// シェルコマンドを確実にブロックすることはできないため、検出＋警告に留める。
+func workerOutsideWriteWarning(command string) string {
+	if os.Getenv("MIMIC_NO_AUTOGIT") == "" {
+		return ""
+	}
+	root, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	root, err = filepath.Abs(root)
+	if err != nil {
+		return ""
+	}
+	var outside []string
+	for _, m := range outsideWriteTargetRe.FindAllStringSubmatch(command, -1) {
+		target := m[1]
+		if strings.HasPrefix(target, "/dev/") || strings.HasPrefix(target, "/proc/") || strings.HasPrefix(target, "/tmp/") {
+			continue
+		}
+		if target == root || strings.HasPrefix(target, root+"/") {
+			continue
+		}
+		outside = append(outside, target)
+	}
+	if len(outside) == 0 {
+		return ""
+	}
+	shown := outside
+	if len(shown) > 5 {
+		shown = shown[:5]
+	}
+	return fmt.Sprintf(
+		"\n⚠ 警告: 作業ディレクトリ（%s）外の絶対パスへの書き込みらしき操作を検出: %s\n"+
+			"この環境はOverlayFS隔離されており、外部への書き込みは差分として検出・適用されません"+
+			"（プロジェクトへの変更として扱われず、Directorにも見えません）。\n"+
+			"プロジェクトのファイルを変更する場合は、作業ディレクトリ内の相対パスを使用してください。",
+		root, strings.Join(shown, ", "))
+}
 
 // registerShellTools は run_bash / run_pipeline を登録する。
 // Python版はrun_bashをptyで実行し対話コマンド(npm/git等)に対応しているが、
@@ -101,7 +149,9 @@ func toolRunBash(args map[string]any) (string, error) {
 	if output != "" {
 		parts = append(parts, output)
 	}
-	return strings.Join(parts, "\n"), nil
+	result := strings.Join(parts, "\n")
+	result += workerOutsideWriteWarning(command)
+	return result, nil
 }
 
 func toolRunPipeline(args map[string]any) (string, error) {
@@ -180,7 +230,9 @@ func toolRunPipeline(args map[string]any) (string, error) {
 	if stderrOut := strings.TrimSpace(stderrBuf.String()); stderrOut != "" {
 		parts = append(parts, "STDERR:\n"+stderrOut)
 	}
-	return strings.Join(parts, "\n"), nil
+	result := strings.Join(parts, "\n")
+	result += workerOutsideWriteWarning(command)
+	return result, nil
 }
 
 func effectiveCwd(cwd string) string {

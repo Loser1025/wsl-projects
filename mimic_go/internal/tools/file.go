@@ -10,6 +10,40 @@ import (
 const largeFileThreshold = 5000 // Python版 _LARGE_FILE_THRESHOLD を踏襲
 const readFileChunk = 20000     // maxReadChars と同じ値でチャンク読みの単位とする
 
+// checkWorkerWriteBoundary はWorker（OverlayFS隔離サブプロセス）実行時、
+// 作業ディレクトリの外への書き込みを拒否する（Python版 tools.py::_check_worker_write_boundary
+// の移植）。Overlay隔離は作業ディレクトリ（merged）のマウントにしか効かないため、
+// 絶対パスで外部へ書くとホストFSへ直接書き込まれ、差分検出（changed_files）にも
+// 掛からず適用もロールバックもできない「見えない書き込み」になる。
+// 空文字列以外を返した場合、呼び出し元は書き込みを行わずそれをそのまま返すこと。
+func checkWorkerWriteBoundary(path string) string {
+	if os.Getenv("MIMIC_NO_AUTOGIT") == "" {
+		return ""
+	}
+	root, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	root, err = filepath.Abs(root)
+	if err != nil {
+		return ""
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return ""
+	}
+	rel, err := filepath.Rel(root, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Sprintf(
+			"エラー: 作業ディレクトリ（%s）の外への書き込みは禁止されています: %s\n"+
+				"この環境はOverlayFS隔離されており、外部への書き込みは差分として検出・適用されません。\n"+
+				"作業ディレクトリ内の相対パスで書き込んでください。"+
+				"外部ファイルの変更が必要な場合は、その旨を最終回答でDirectorに報告してください。",
+			root, path)
+	}
+	return ""
+}
+
 func registerFileTools(r *Registry) {
 	r.Register("read_file",
 		"ローカルファイルの内容を読み取る。大きいファイルはoffsetを指定して続きを読める。",
@@ -145,9 +179,26 @@ func toolReadFile(args map[string]any) (string, error) {
 	return header + sliced + footer, nil
 }
 
+// firstNLines は文字列の先頭n行を返す（承認プロンプトのプレビュー生成用）。
+func firstNLines(s string, n int) string {
+	lines := strings.Split(s, "\n")
+	if len(lines) > n {
+		lines = lines[:n]
+	}
+	return strings.Join(lines, "\n")
+}
+
 func toolWriteFile(args map[string]any) (string, error) {
 	path := argString(args, "path")
 	content := argString(args, "content")
+
+	if boundaryErr := checkWorkerWriteBoundary(path); boundaryErr != "" {
+		return boundaryErr, nil
+	}
+	preview := "  書き込み内容（先頭30行）:\n" + firstNLines(content, 30)
+	if rejectErr := requestWriteApproval("write_file", path, preview); rejectErr != "" {
+		return rejectErr, nil
+	}
 
 	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -164,6 +215,14 @@ func toolEditFile(args map[string]any) (string, error) {
 	path := argString(args, "path")
 	oldString := argString(args, "old_string")
 	newString := argString(args, "new_string")
+
+	if boundaryErr := checkWorkerWriteBoundary(path); boundaryErr != "" {
+		return boundaryErr, nil
+	}
+	preview := "  変更前（先頭15行）:\n" + firstNLines(oldString, 15) + "\n  変更後（先頭15行）:\n" + firstNLines(newString, 15)
+	if rejectErr := requestWriteApproval("edit_file", path, preview); rejectErr != "" {
+		return rejectErr, nil
+	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -187,12 +246,12 @@ func toolEditFile(args map[string]any) (string, error) {
 	if count > 1 {
 		return "", fmt.Errorf("指定した文字列が %d 箇所に存在します（一意に特定できません）。前後の文脈をより多く含めた文字列を指定してください。", count)
 	}
-	preview := oldString
-	if len(preview) > 120 {
-		preview = preview[:120]
+	notFoundPreview := oldString
+	if len(notFoundPreview) > 120 {
+		notFoundPreview = notFoundPreview[:120]
 	}
-	preview = strings.ReplaceAll(preview, "\n", "↵")
-	return "", fmt.Errorf("指定された 'old_string' がファイル内に見つかりません: %s\n検索対象（先頭120文字）: %s\ngrep_codebase や smart_read で現在のファイル内容を確認し、正確な文字列で再実行してください。", path, preview)
+	notFoundPreview = strings.ReplaceAll(notFoundPreview, "\n", "↵")
+	return "", fmt.Errorf("指定された 'old_string' がファイル内に見つかりません: %s\n検索対象（先頭120文字）: %s\ngrep_codebase や smart_read で現在のファイル内容を確認し、正確な文字列で再実行してください。", path, notFoundPreview)
 }
 
 // toolPatchFile はedit_fileより緩いマッチを試みる。
@@ -203,6 +262,14 @@ func toolPatchFile(args map[string]any) (string, error) {
 	path := argString(args, "path")
 	search := argString(args, "search")
 	replace := argString(args, "replace")
+
+	if boundaryErr := checkWorkerWriteBoundary(path); boundaryErr != "" {
+		return boundaryErr, nil
+	}
+	preview := "  検索文字列（先頭15行）:\n" + firstNLines(search, 15) + "\n  置換文字列（先頭15行）:\n" + firstNLines(replace, 15)
+	if rejectErr := requestWriteApproval("patch_file", path, preview); rejectErr != "" {
+		return rejectErr, nil
+	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -271,12 +338,12 @@ func toolPatchFile(args map[string]any) (string, error) {
 		return "", fmt.Errorf("検索ブロックが %d 箇所にマッチします（一意に特定できません）。", len(matches))
 	}
 
-	preview := search
-	if len(preview) > 120 {
-		preview = preview[:120]
+	notFoundPreview := search
+	if len(notFoundPreview) > 120 {
+		notFoundPreview = notFoundPreview[:120]
 	}
-	preview = strings.ReplaceAll(preview, "\n", "↵")
-	return "", fmt.Errorf("指定された検索文字列がファイル内に見つかりません: %s\n検索対象: %s...\nread_file で現在の内容を確認し、正確な（特にインデントや改行を含む）文字列を指定してください。", path, preview)
+	notFoundPreview = strings.ReplaceAll(notFoundPreview, "\n", "↵")
+	return "", fmt.Errorf("指定された検索文字列がファイル内に見つかりません: %s\n検索対象: %s...\nread_file で現在の内容を確認し、正確な（特にインデントや改行を含む）文字列を指定してください。", path, notFoundPreview)
 }
 
 func stripCommonIndent(text string) (string, int) {

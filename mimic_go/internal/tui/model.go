@@ -123,7 +123,26 @@ type Model struct {
 	filesScanned bool
 	filePreview  string
 	filePath     string
+
+	// 書き込み承認フロー（Python版 app.py の承認モーダルの移植）
+	approvalCh      chan approvalRequest
+	pendingApproval *approvalRequest
+	approvalSeq     int
 }
+
+// approvalRequest はtools.ApprovalHandler経由でツール実行goroutineから
+// Updateループへ渡される承認依頼（Python版のスレッド間コールバックに相当）。
+type approvalRequest struct {
+	id       int
+	toolName string
+	path     string
+	preview  string
+	respCh   chan bool
+}
+
+const approvalTimeoutSec = 30 // Python版 app.py::_APPROVAL_TIMEOUT
+
+type approvalTimeoutMsg struct{ id int }
 
 // turnEvent はReActループを回すゴルーチンからUpdateループへ渡すイベント。
 type turnEvent struct {
@@ -182,6 +201,22 @@ func NewModel(client *llm.Client, systemPrompt string) Model {
 		}
 	}
 
+	approvalCh := make(chan approvalRequest)
+	// 承認ハンドラはツール実行goroutine（RunTurn内）から呼ばれ、Updateループが
+	// 消費するまでブロックする（Python版のthreading.Event+call_from_threadと
+	// 同じ「UIスレッドへ判断を委ねて待つ」構造をチャンネルで実現する）。
+	tools.SetWriteApprovalHandler(func(toolName, path, preview string) bool {
+		respCh := make(chan bool, 1)
+		approvalCh <- approvalRequest{toolName: toolName, path: path, preview: preview, respCh: respCh}
+		return <-respCh
+	})
+
+	autoGit := vcs.New()
+	// delegate_to_team/delegate_to_worker等の適用後コミットを、通常ターンと
+	// 同じAutoGitインスタンスに積ませてsquash対象に含める
+	// （Python版 team.py::set_team_autogit の移植）。
+	delegate.SetTeamAutoGit(autoGit)
+
 	return Model{
 		input:        ta,
 		client:       client,
@@ -191,8 +226,9 @@ func NewModel(client *llm.Client, systemPrompt string) Model {
 		log:          log,
 		reactLog:     reactLog,
 		callLog:      vcs.NewToolCallLog(),
-		autoGit:      vcs.New(),
+		autoGit:      autoGit,
 		cwd:          cwd,
+		approvalCh:   approvalCh,
 	}
 }
 
@@ -205,7 +241,21 @@ func mustCwd() string {
 }
 
 func (m Model) Init() tea.Cmd {
-	return textarea.Blink
+	return tea.Batch(textarea.Blink, waitForApproval(m.approvalCh))
+}
+
+// waitForApproval は承認依頼チャンネルを1件読み、tea.Msgとして返す
+// （turnEventと同様、消費するたびにUpdate側で再度armし直すワンショット方式）。
+func waitForApproval(ch chan approvalRequest) tea.Cmd {
+	return func() tea.Msg {
+		return <-ch
+	}
+}
+
+func approvalTimeoutCmd(id int) tea.Cmd {
+	return tea.Tick(approvalTimeoutSec*time.Second, func(time.Time) tea.Msg {
+		return approvalTimeoutMsg{id: id}
+	})
 }
 
 func waitForTurnEvent(ch chan turnEvent) tea.Cmd {
@@ -280,12 +330,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.recalcLayout()
 
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "ctrl+c":
+		if msg.String() == "ctrl+c" {
 			if m.cancelFunc != nil {
 				m.cancelFunc()
 			}
 			return m, tea.Quit
+		}
+
+		// 書き込み承認待ち中はY/n入力の確定のみを特別扱いし、それ以外の
+		// タブ切替・チャット送信等は受け付けない（Python版の承認モード
+		// 中はinput barがY/n専用になる挙動の移植）。
+		if m.pendingApproval != nil {
+			if msg.String() == "enter" {
+				val := strings.ToLower(strings.TrimSpace(m.input.Value()))
+				approved := val == "" || val == "y"
+				m.input.Reset()
+				req := m.pendingApproval
+				req.respCh <- approved
+				respText := "  ✗ 拒否しました（処理を中断します）"
+				if approved {
+					respText = "  ✓ 承認しました"
+				}
+				m.log = append(m.log, respText)
+				m.pendingApproval = nil
+				m.openLine = false
+				m.viewport.SetContent(m.renderLog())
+				m.viewport.GotoBottom()
+				return m, waitForApproval(m.approvalCh)
+			}
+			m.input, taCmd = m.input.Update(msg)
+			return m, taCmd
+		}
+
+		switch msg.String() {
 		case "f1":
 			m.active = tabChat
 			return m, nil
@@ -375,6 +452,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.GotoBottom()
 			return m.startTurn()
 		}
+
+	case approvalRequest:
+		m.approvalSeq++
+		msg.id = m.approvalSeq
+		m.pendingApproval = &msg
+		m.closeOpenLine()
+		m.log = append(m.log, renderApprovalBox(msg))
+		m.viewport.SetContent(m.renderLog())
+		m.viewport.GotoBottom()
+		return m, approvalTimeoutCmd(msg.id)
+
+	case approvalTimeoutMsg:
+		if m.pendingApproval != nil && m.pendingApproval.id == msg.id {
+			req := m.pendingApproval
+			req.respCh <- true
+			m.log = append(m.log, fmt.Sprintf("  ⏱ %d秒経過 → 自動承認", approvalTimeoutSec))
+			m.pendingApproval = nil
+			m.viewport.SetContent(m.renderLog())
+			m.viewport.GotoBottom()
+			return m, waitForApproval(m.approvalCh)
+		}
+		return m, nil
 
 	case turnEvent:
 		switch {
@@ -500,6 +599,26 @@ func readPreview(path string) string {
 		content = content[:maxPreviewChars] + fmt.Sprintf("\n…(全%d文字中%d文字を表示)", len(content), maxPreviewChars)
 	}
 	return content
+}
+
+// renderApprovalBox はPython版 app.py::_make_approval_handler のASCII枠
+// （┌─ 書き込み確認 ─...）を再現する。
+func renderApprovalBox(req approvalRequest) string {
+	var b strings.Builder
+	b.WriteString("\n  ┌─ 書き込み確認 ──────────────────────────────────────\n")
+	b.WriteString(fmt.Sprintf("  │  ツール : %s\n", req.toolName))
+	b.WriteString(fmt.Sprintf("  │  ファイル: %s\n", req.path))
+	b.WriteString("  │\n")
+	lines := strings.Split(req.preview, "\n")
+	if len(lines) > 20 {
+		lines = lines[:20]
+	}
+	for _, line := range lines {
+		b.WriteString("  │  " + line + "\n")
+	}
+	b.WriteString("  └──────────────────────────────────────────────────────\n")
+	b.WriteString(fmt.Sprintf("  実行しますか？ [Y/n] (%d秒で自動承認): ", approvalTimeoutSec))
+	return b.String()
 }
 
 // ── View ──────────────────────────────────────────────────────
@@ -781,7 +900,9 @@ func (m Model) renderInput() string {
 	boxRendered := box.Render(inputView)
 
 	hint := "Enter 送信 · Ctrl+N 改行 · F1-F4 タブ切替 · Ctrl+C 終了"
-	if m.streaming {
+	if m.pendingApproval != nil {
+		hint = fmt.Sprintf("Y/n を入力 · Enter で確定 · %d秒で自動承認", approvalTimeoutSec)
+	} else if m.streaming {
 		hint = "⏳ 実行中... (Ctrl+C で中断)"
 	} else if m.active == tabFiles {
 		hint = "↑/↓ 選択 · Enter プレビュー · F1-F4 タブ切替"
