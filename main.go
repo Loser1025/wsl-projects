@@ -1,7 +1,287 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+// --- Color Palette (Cyberpunk / Modern Neon) ---
+var (
+	cyan      = lipgloss.Color("#00F5FF")
+	purple    = lipgloss.Color("#A855F7")
+	pink      = lipgloss.Color("#EC4899")
+	green     = lipgloss.Color("#10B981")
+	yellow    = lipgloss.Color("#F59E0B")
+	gray      = lipgloss.Color("#4B5563")
+	lightGray = lipgloss.Color("#9CA3AF")
+	darkBg    = lipgloss.Color("#0F172A")
+	cardBg    = lipgloss.Color("#1E293B")
+)
+
+// --- Styles (Lip Gloss) ---
+var (
+	titleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(darkBg).
+			Background(cyan).
+			Padding(0, 1)
+
+	badgeStyle = lipgloss.NewStyle().
+			Foreground(pink).
+			Background(cardBg).
+			Bold(true).
+			Padding(0, 1)
+
+	statusStyle = lipgloss.NewStyle().
+			Foreground(green).
+			Bold(true)
+
+	// Layout Boxes
+	headerBox = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(cyan).
+			Padding(0, 1).
+			Width(98)
+
+	sidebarBox = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(purple).
+			Padding(0, 1).
+			Width(28).
+			Height(16)
+
+	chatBox = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(cyan).
+			Padding(0, 1).
+			Width(68).
+			Height(16)
+
+	inputBox = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(pink).
+			Padding(0, 1).
+			Width(98)
+
+	footerBox = lipgloss.NewStyle().
+			Foreground(lightGray).
+			Width(98).
+			Align(lipgloss.Center)
+
+	// Content Styles
+	userTag = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(pink).
+		Render("👤 [USER]: ")
+
+	agentTag = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(cyan).
+		Render("🤖 [AGENT]: ")
+
+	toolTag = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(yellow).
+		Render("⚡ [TOOL EXECUTION]: ")
+
+	sectionHeader = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(purple).
+			Underline(true)
+)
+
+// Messages
+type tickMsg time.Time
+type streamChunkMsg string
+type agentFinishMsg struct{}
+
+// Model Definition
+type model struct {
+	viewport  viewport.Model
+	textInput textinput.Model
+	spinner   spinner.Model
+
+	// State
+	isStreaming bool
+	fullChat    string
+	cpuUsage    float64
+	memUsage    int
+	tokens      int
+}
+
+func initialModel() model {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(pink)
+
+	ti := textinput.New()
+	ti.Placeholder = "メッセージを入力してください (例: 'Analyze go.mod file')..."
+	ti.Focus()
+	ti.CharLimit = 156
+	ti.Width = 80
+
+	vp := viewport.New(64, 14)
+	initialContent := agentTag + "こんにちは！Cyberpunk CLI Agent v3.5です。指示を入力してください。\n\n"
+	vp.SetContent(initialContent)
+
+	return model{
+		viewport:    vp,
+		textInput:   ti,
+		spinner:     s,
+		isStreaming: false,
+		fullChat:    initialContent,
+		cpuUsage:    12.4,
+		memUsage:    482,
+		tokens:      1250,
+	}
+}
+
+func (m model) Init() tea.Cmd {
+	return tea.Batch(
+		textinput.Blink,
+		m.spinner.Tick,
+		tickCmd(),
+	)
+}
+
+func tickCmd() tea.Cmd {
+	return tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
+// 疑似ストリーミング応答の生成コマンド
+func fakeStreamCmd(step int) tea.Cmd {
+	chunks := []string{
+		"思考中: プロジェクト構成の解析を開始...",
+		"\n" + toolTag + "`go.mod` と依存関係ツリーのチェック完了",
+		"\n" + agentTag + "最適化の提案が見つかりました:",
+		"\n  1. **Charm/Bubbletea** の非同期Msgチャネルの最適化",
+		"\n  2. メモリ割り当ての削減 (Goroutine poolの導入)",
+		"\n  3. Dockerビルド時のマルチステージ化による軽量化",
+		"\n\n完了しました！適用するコマンドを生成しますか？",
+	}
+
+	if step < len(chunks) {
+		return func() tea.Msg {
+			time.Sleep(350 * time.Millisecond)
+			return streamChunkMsg(chunks[step])
+		}
+	}
+	return func() tea.Msg {
+		return agentFinishMsg{}
+	}
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var (
+		tiCmd tea.Cmd
+		vpCmd tea.Cmd
+		spCmd tea.Cmd
+	)
+
+	m.textInput, tiCmd = m.textInput.Update(msg)
+	m.viewport, vpCmd = m.viewport.Update(msg)
+	m.spinner, spCmd = m.spinner.Update(msg)
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEsc:
+			return m, tea.Quit
+
+		case tea.KeyEnter:
+			if m.textInput.Value() != "" && !m.isStreaming {
+				userInput := m.textInput.Value()
+				m.textInput.SetValue("")
+
+				m.fullChat += userTag + userInput + "\n"
+				m.isStreaming = true
+				m.tokens += len(userInput) * 2
+				m.viewport.SetContent(m.fullChat + "\n" + m.spinner.View() + " " + lipgloss.NewStyle().Foreground(lightGray).Render("AI思考中..."))
+				m.viewport.GotoBottom()
+
+				return m, fakeStreamCmd(0)
+			}
+		}
+
+	case streamChunkMsg:
+		chunk := string(msg)
+		m.fullChat += chunk
+		m.tokens += 15
+		m.viewport.SetContent(m.fullChat)
+		m.viewport.GotoBottom()
+
+		step := strings.Count(m.fullChat, "\n")
+		return m, fakeStreamCmd(step % 7)
+
+	case agentFinishMsg:
+		m.isStreaming = false
+		m.fullChat += "\n\n"
+		m.viewport.SetContent(m.fullChat)
+		m.viewport.GotoBottom()
+
+	case tickMsg:
+		m.cpuUsage = 8.0 + (float64(time.Now().UnixNano()%150) / 10.0)
+		m.memUsage = 480 + int(time.Now().UnixNano()%30)
+		return m, tickCmd()
+	}
+
+	return m, tea.Batch(tiCmd, vpCmd, spCmd)
+}
+
+func (m model) View() string {
+	// 1. Header
+	headerLeft := titleStyle.Render("⚡ CYBER-AGENT CLI") + " " + badgeStyle.Render("v3.5.0-PROD")
+	headerRight := fmt.Sprintf("%s ONLINE | %s gpt-4o-2024-05-13", statusStyle.Render("●"), lipgloss.NewStyle().Foreground(yellow).Render("MODEL:"))
+	headerContent := lipgloss.JoinHorizontal(lipgloss.Center, headerLeft, strings.Repeat(" ", 32), headerRight)
+	header := headerBox.Render(headerContent)
+
+	// 2. Sidebar
+	sbTitle := sectionHeader.Render("📊 SYSTEM METRICS")
+	sbSys := fmt.Sprintf("\n\n• CPU : %.1f%%\n• MEM : %d MB\n• NET : 42 Kbps", m.cpuUsage, m.memUsage)
+	
+	sbInfoTitle := "\n\n" + sectionHeader.Render("🤖 SESSION INFO")
+	sbInfo := fmt.Sprintf("\n\n• Mode   : Auto-Agent\n• Tokens : %d / 128k\n• Cost   : $0.0042", m.tokens)
+
+	sbToolsTitle := "\n\n" + sectionHeader.Render("🛠 ACTIVE TOOLS")
+	sbTools := "\n\n• [x] File Search\n• [x] Code Exec\n• [x] Git Control"
+
+	sidebarContent := sbTitle + sbSys + sbInfoTitle + sbInfo + sbToolsTitle + sbTools
+	sidebar := sidebarBox.Render(sidebarContent)
+
+	// 3. Chat Area
+	chatView := chatBox.Render(m.viewport.View())
+
+	// 4. Main Body
+	mainBody := lipgloss.JoinHorizontal(lipgloss.Top, chatView, sidebar)
+
+	// 5. Input Field
+	inputPrompt := "PROMPT > "
+	if m.isStreaming {
+		inputPrompt = m.spinner.View() + " STREAMING... "
+	}
+	m.textInput.Prompt = lipgloss.NewStyle().Foreground(cyan).Bold(true).Render(inputPrompt)
+	input := inputBox.Render(m.textInput.View())
+
+	// 6. Footer
+	footer := footerBox.Render("[Enter] 送信  |  [Ctrl+C / Esc] 終了  |  [↑/↓] ログスクロール")
+
+	return lipgloss.JoinVertical(lipgloss.Left, header, mainBody, input, footer)
+}
 
 func main() {
-	fmt.Println("Hello, World!")
+	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("エラーが発生しました: %v\n", err)
+		os.Exit(1)
+	}
 }
