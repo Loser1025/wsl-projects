@@ -18,6 +18,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"image/color"
 	"os"
 	"path/filepath"
 	"sort"
@@ -542,16 +543,16 @@ var mimicArtLines = []string{
 
 // mimicArtColors はPython版のRazerグリーン→ティール→エレクトリックアクアの
 // グラデーションと同じ配色（1行ずつ対応）。
-var mimicArtColors = []lipgloss.Color{
-	lipgloss.Color("#00FF41"),
-	lipgloss.Color("#00FF78"),
-	lipgloss.Color("#00FFB4"),
-	lipgloss.Color("#00F2DA"),
-	lipgloss.Color("#00E6FF"),
-	lipgloss.Color("#50D7FF"),
+var mimicArtColors = []string{
+	"#00FF41",
+	"#00FF78",
+	"#00FFB4",
+	"#00F2DA",
+	"#00E6FF",
+	"#50D7FF",
 }
 
-var mimicArtDimColor = lipgloss.Color("#005050")
+var mimicArtDimColor = "#005050"
 
 // renderTitleArt はPython版の #title-art（ASCIIアート+区切り線+サブタイトル）を再現する。
 func (m Model) renderTitleArt() string {

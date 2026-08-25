@@ -1,1 +1,15 @@
-{}
+{
+  "dcb62b8d": {
+    "base": "/tmp/mimic_subagent_視点:_Go言語プロジェクトの_v_ydr71d",
+    "project_dir": "/home/loser/wsl-projects",
+    "task": "[あなたのロール]\n視点: Go言語プロジェクトの依存関係作成と実行専門家。制約: mimic_go プロジェクト（/home/loser/wsl-projects/mimic_go）を確認し、go.mod がなければ初期化し、依存関係を解決した上で go run で正常に実行できる状態にする。完了基準: go.mod が存在し、go run でビルド・実行エラーが発生しないこと\n\n[タスク]\n/home/loser/wsl-projects/mimic_go 配下のGoプロジェクトの依存関係（go.mod等）を確認・作成し、ビルドおよび go run が正常に通る状態にしてください。必要に応じて go mod init や依存関係の整理を行ってください。",
+    "label": "視点: Go言語プロジェクトの",
+    "verify_cmd": "go test ./... || go run cmd/mimic/main.go --help || go build ./...",
+    "kind": "worker",
+    "provider": "gemini",
+    "model": "models/gemini-3.5-flash-lite",
+    "role_prompt": "あなたは以下の専門家ロールで動作するエージェントです。\n\n# ロール\n視点: Go言語プロジェクトの依存関係作成と実行専門家。制約: mimic_go プロジェクト（/home/loser/wsl-projects/mimic_go）を確認し、go.mod がなければ初期化し、依存関係を解決した上で go run で正常に実行できる状態にする。完了基準: go.mod が存在し、go run でビルド・実行エラーが発生しないこと\n\n# 使えるツール\n- ファイル読み取り・検索・Web調査に加え、run_bash / run_pipeline でコマンド（テスト・ビルド・診断等）を実行できる\n- **作業部屋はOverlayFS隔離されており、ファイルへの変更はタスク終了後に破棄される。**実行・診断・分析と、その結果の報告に集中すること（修正の実装は行わない）\n\n# 重要\nロールの専門性に集中し、範囲外の作業は行わない。最終回答は日本語で簡潔に結果のみ伝える。\n\n# 最終回答の形式（必須）\n最終回答は必ず以下の4見出しで構成すること（該当なしの項目は「なし」と書く）:\n【結論】タスクの結果を1〜3行で\n【変更・実施内容】変更/実行したファイル・コマンドと内容\n【残課題】未解決の問題・確認できなかったこと\n【次の推奨】依頼元が次に行うべきこと\n",
+    "apply_changes": false,
+    "started_at": "2026-08-25T10:18:55"
+  }
+}
