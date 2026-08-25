@@ -92,6 +92,18 @@ func (rl *ReactLog) Add(entryType string, fields map[string]any) {
 	f.Write([]byte("\n"))
 }
 
+// RecentEntries は直近n件のエントリを返す（TUIのLogタブ表示用）。
+func (rl *ReactLog) RecentEntries(n int) []Entry {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	if n <= 0 || n > len(rl.entries) {
+		n = len(rl.entries)
+	}
+	out := make([]Entry, n)
+	copy(out, rl.entries[len(rl.entries)-n:])
+	return out
+}
+
 // ExportMarkdown はエントリ群を人間可読なMarkdownへ書き出す
 // （Python版 export_markdown の移植。/sessions等のUIコマンドは
 // 本バッチでは未実装のため、呼び出し口は今のところ無い）。

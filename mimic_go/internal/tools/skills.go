@@ -230,7 +230,8 @@ func setScratchpad(text string) {
 	scratchpadMu.Unlock()
 }
 
-func getScratchpad() string {
+// GetScratchpad は現在のスクラッチパッド内容を返す（TUIのScratchpadタブ表示用）。
+func GetScratchpad() string {
 	scratchpadMu.Lock()
 	defer scratchpadMu.Unlock()
 	return currentScratch

@@ -1,6 +1,0 @@
-{
-  "role": "Vercelサーバーレス関数(Node/CommonJS)実装専門家。環境変数名の解決を「元々設定されている SERVICE_ACCOUNT_JSON を優先し、個別名へフォールバック」に変更し、ガードと例外ハンドリングを維持する。変更前に git 保存。",
-  "uses": 1,
-  "mode": "write",
-  "last_used": "2026-07-09T17:09:30"
-}
