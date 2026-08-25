@@ -368,6 +368,17 @@ Director（指示役）から渡された「元の指示」を実現するため
 - 今回の変更スコープに絞った最小限のコマンドにすること（フルスイートは避ける）
 - 実行に数分以上かかるものは不適切
 - 適切なコマンドが特定できない場合はこのセクションを省略してよい
+
+# 構造化サマリ（任意・機械可読）
+上記のMarkdown設計ワークフローに加えて、最終回答の一番最後に、以下のキーを持つ
+JSONブロックを ```json フェンス付きで1つだけ出力すること（省略してもよい。
+省略した場合はハーネス側がMarkdown本文をそのまま使う）:
+{
+  "target_files": ["変更対象の絶対パスの配列"],
+  "steps": ["実装手順を短い文で1ステップ1要素にした配列"],
+  "verify_cmd": "推奨verify_cmd（未特定なら空文字）",
+  "rollback": "検証に失敗した場合の切り戻し方針（1文）"
+}
 """
 
 
@@ -375,8 +386,37 @@ Director（指示役）から渡された「元の指示」を実現するため
 
 
 
+def _extract_structured_plan(research: str) -> dict:
+    """Researcher出力末尾の ```json フェンスから構造化サマリを抽出する（フェーズ2）。
+
+    パース失敗・ブロック欠如時は空dictを返すだけで、呼び出し元は必ず既存の
+    Markdown本文/正規表現抽出へフォールバックする（Researcherモデルが
+    JSON生成に失敗しても機能が完全停止しないための二段構え）。"""
+    import re
+    m = re.search(r"```json\s*(\{.*?\})\s*```", research, re.DOTALL)
+    if not m:
+        _log_team_event({"event": "researcher_json_absent"})
+        return {}
+    try:
+        data = json.loads(m.group(1))
+        if not isinstance(data, dict):
+            raise ValueError("not a dict")
+        _log_team_event({"event": "researcher_json_parsed", "keys": list(data.keys())})
+        return data
+    except Exception as e:
+        _log_team_event({"event": "researcher_json_parse_failed", "error": str(e)})
+        return {}
+
+
 def _extract_suggested_verify_cmd(research: str) -> str:
-    """Researcherのワークフロー出力から [推奨verify_cmd] を抽出する。"""
+    """Researcherのワークフロー出力からverify_cmdを抽出する。
+
+    まず構造化JSON（フェーズ2）を試み、無ければ従来の [推奨verify_cmd] 行を
+    正規表現で抽出する既存経路にフォールバックする。"""
+    structured = _extract_structured_plan(research)
+    cmd = str(structured.get("verify_cmd") or "").strip()
+    if cmd:
+        return cmd
     import re
     m = re.search(r'\[推奨verify_cmd\]\s*[:`]?\s*(.+?)(?:\n|$)', research, re.IGNORECASE)
     if not m:
@@ -384,18 +424,40 @@ def _extract_suggested_verify_cmd(research: str) -> str:
     return m.group(1).strip().strip('`').strip()
 
 
+def _reflexive_retry_enabled() -> bool:
+    import os
+    return (os.environ.get("MIMIC_REFLEXIVE_RETRY") or "1").strip() != "0"
+
+
 def _build_verify_retry_task(original_task: str, verify_cmd: str, verify_exit: int,
-                               verify_output: str, attempt: int) -> str:
-    """verify失敗フィードバックを含む、Workerへの修正指示文を生成する。"""
+                               verify_output: str, attempt: int,
+                               tried_summaries: Optional[list[str]] = None) -> str:
+    """verify失敗フィードバックを含む、Workerへの修正指示文を生成する。
+
+    フェーズ5（Reflexion系）: リトライ回数(MAX_VERIFY_RETRIES)・abort条件
+    （exit 2/126/127）・適用は検証結果に関わらず実行、という既存の安全設計は
+    一切変更しない。ここで変えるのは「同じ試行回数の中で何を指示するか」だけ。
+    2回目以降の失敗では、過去の試行の要約を「既に失敗した方針」として明示し、
+    単純な同一アプローチの繰り返しを避けるよう促す（同一失敗の反復はループ
+    ブレーカーの主要な検出対象でもあるため、プロンプト側でも予防する）。"""
     tail = verify_output[-3000:]
     if len(verify_output) > 3000:
         tail = f"…（出力省略、末尾3000文字のみ表示）\n{tail}"
+    reflexion_block = ""
+    if _reflexive_retry_enabled() and tried_summaries:
+        prior = "\n".join(f"  試行{i}: {s}" for i, s in enumerate(tried_summaries, 1))
+        reflexion_block = (
+            f"\n[既に失敗した方針（Reflexion — 繰り返さないこと）]\n{prior}\n"
+            f"上記と同じ変更内容を繰り返しても検証は通りません。"
+            f"エラーメッセージから原因を再分析し、これまでと異なるアプローチを取ってください。\n"
+        )
     return (
         f"{original_task}\n\n"
         f"[検証失敗 — 修正してください（試行 {attempt}/{MAX_VERIFY_RETRIES}）]\n"
         f"検証コマンド: {verify_cmd}\n"
         f"終了コード: {verify_exit}\n"
-        f"出力:\n{tail}\n\n"
+        f"出力:\n{tail}\n"
+        f"{reflexion_block}\n"
         f"前回の変更内容はOverlay上に残っています。エラーを修正し、検証が通るようにしてください。"
     )
 
@@ -597,6 +659,18 @@ def _build_dynamic_system_prompt(role: str, can_write: bool,
 _ROLE_MIN_CHARS = 20
 
 
+# フェーズ3: 「禁止事項」契約フィールド。既存の「完了基準」必須化と同じ機械的
+# 文字列検査の延長線上にある。過去のロールが未対応でも既存委任を壊さないよう
+# 導入初期はブロックせず警告のみ（2段階導入）とし、環境変数
+# MIMIC_ROLE_REQUIRE_FORBIDDEN=1 で拒否化できるようにする（既定は警告のみ）。
+_ROLE_FORBIDDEN_KEYWORDS = ("禁止事項", "禁止:", "してはいけない")
+
+
+def _role_require_forbidden() -> bool:
+    import os
+    return (os.environ.get("MIMIC_ROLE_REQUIRE_FORBIDDEN") or "0").strip() == "1"
+
+
 def validate_specialist_role(role: str) -> str:
     """delegate_to_specialist の role を検証する。問題があればエラー文字列を返す。"""
     role = (role or "").strip()
@@ -605,13 +679,20 @@ def validate_specialist_role(role: str) -> str:
         problems.append(f"role が短すぎます（{len(role)}文字 < {_ROLE_MIN_CHARS}文字）")
     if "完了基準" not in role:
         problems.append("role に「完了基準」の明記がありません")
+    has_forbidden = any(kw in role for kw in _ROLE_FORBIDDEN_KEYWORDS)
+    if not has_forbidden and _role_require_forbidden():
+        problems.append("role に「禁止事項」の明記がありません")
     if not problems:
+        if not has_forbidden:
+            # 必須化前の移行期間: 拒否はしないが警告だけログに残す（案E, 06章の思想を踏襲）
+            log.info({"event": "role_forbidden_field_missing", "role": role[:200]})
         return ""
     return (
         "[委任拒否: role不備] " + " / ".join(problems) + "\n"
         "role は以下のテンプレートを埋めて再送してください（このチェックは機械的な文字列検査です）:\n"
         "  視点: <どの専門性・観点で作業するか>\n"
         "  制約: <やってはいけないこと・守るべき既存の流儀>\n"
+        "  禁止事項: <境界外ファイルへの書き込み・破壊的コマンド等、明示的に除外すること>\n"
         "  完了基準: <何が確認できたらタスク完了とみなすか（検証可能な形で）>"
     )
 
@@ -676,6 +757,49 @@ def _forget_learned_verify_cmd(project_dir: str, cmd: str) -> None:
                     json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception:
         pass
+
+
+# ── 言語別verify_cmdテンプレート（フェーズ1: 低コスト・非破壊） ─────
+# プロジェクトルートのマニフェストファイルからテンプレートコマンドを推定し、
+# _suggest_verify_cmd の自動調達（読み取り専用プローブ最大6ラウンド）より先に
+# コストゼロで候補を用意する。特定できない場合は従来どおり自動調達にフォールバック
+# するだけで、既存の学習/忘却フロー（_save/_forget_learned_verify_cmd）や
+# abort条件（exit 2/126/127）には一切手を入れない。
+# 環境変数 MIMIC_VERIFY_TEMPLATES=0 で無効化できる。
+
+_VERIFY_CMD_TEMPLATES: list[tuple[str, str]] = [
+    ("pyproject.toml", "python -m pytest -q"),
+    ("pytest.ini", "python -m pytest -q"),
+    ("setup.py", "python -m pytest -q"),
+    ("package.json", "npm test --silent"),
+    ("Cargo.toml", "cargo test"),
+    ("go.mod", "go test ./..."),
+    ("Gemfile", "bundle exec rspec"),
+    ("composer.json", "composer test"),
+]
+
+
+def _verify_templates_enabled() -> bool:
+    import os
+    return (os.environ.get("MIMIC_VERIFY_TEMPLATES") or "1").strip() != "0"
+
+
+def _template_verify_cmd(project_dir: str) -> str:
+    """プロジェクトルートのマニフェストファイル検出からverify_cmd候補を1つ返す（読み取りのみ）。
+
+    検出できなければ空文字を返し、呼び出し元は既存の自動調達（_suggest_verify_cmd）へ
+    フォールバックする。テンプレート自体が誤りだった場合も、既存の学習/忘却の仕組みが
+    そのまま働くため（_forget_learned_verify_cmd）自己修復する。"""
+    if not _verify_templates_enabled():
+        return ""
+    root = Path(project_dir)
+    for manifest, cmd in _VERIFY_CMD_TEMPLATES:
+        try:
+            if (root / manifest).is_file():
+                return cmd
+        except OSError:
+            continue
+    return ""
 
 
 _VERIFY_SUGGEST_MAX_ROUNDS = 6
@@ -816,11 +940,17 @@ def run_specialist_task(role: str, task: str, project_dir: str, config,
                     f"  [{effective_label}] 🧪 学習済みverify_cmdを再利用: {verify_cmd}"
                 ), flush=True)
             else:
-                verify_cmd = _suggest_verify_cmd(task, project_dir, config, label=effective_label)
+                verify_cmd = _template_verify_cmd(project_dir)
                 if verify_cmd:
                     safe_print(C.gray(
-                        f"  [{effective_label}] 🧪 自動調達したverify_cmd: {verify_cmd}"
+                        f"  [{effective_label}] 🧪 言語別テンプレートverify_cmd: {verify_cmd}"
                     ), flush=True)
+                else:
+                    verify_cmd = _suggest_verify_cmd(task, project_dir, config, label=effective_label)
+                    if verify_cmd:
+                        safe_print(C.gray(
+                            f"  [{effective_label}] 🧪 自動調達したverify_cmd: {verify_cmd}"
+                        ), flush=True)
 
         enriched = f"[あなたのロール]\n{role}\n\n[タスク]\n{task}"
         result = run_worker_once(enriched, project_dir, config, label=effective_label,
@@ -927,6 +1057,8 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
     )
 
     # verify失敗ループ: 同じOverlay上でWorkerが修正再試行する
+    # フェーズ5: 各試行の要約を蓄積し、次の指示文で「既に失敗した方針」として提示する
+    tried_summaries: list[str] = []
     for verify_attempt in range(1, MAX_VERIFY_RETRIES + 1):
         if result.verify_exit is None or result.verify_exit == 0:
             break  # 検証通過 or verify_cmd未指定
@@ -952,8 +1084,10 @@ def _run_delegation_core_inner(task: str, project_dir: str, config, base: Path, 
             "task": task, "resumed": True, "trace_id": trace_id,
             "reason": "verify_failed", "verify_exit": result.verify_exit,
         })
+        tried_summaries.append(" ".join((result.summary or "").split())[:200])
         retry_task = _build_verify_retry_task(
-            task, verify_cmd, result.verify_exit, result.verify_output, verify_attempt
+            task, verify_cmd, result.verify_exit, result.verify_output, verify_attempt,
+            tried_summaries=tried_summaries,
         )
         new_result, new_upper, new_base = run_subagent_reviewable(
             retry_task, project_dir, label=label or "single",

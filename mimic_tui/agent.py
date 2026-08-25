@@ -3,6 +3,7 @@ from __future__ import annotations
 import collections
 import http.client
 import json
+import os
 import queue
 import random
 import re
@@ -286,6 +287,62 @@ def _build_compaction_digest(removed_msgs: list[dict],
         lines = [f"…（先頭{len(lines) - max_lines}行省略）"] + lines[-max_lines:]
     text = "\n".join(f"- {ln}" for ln in lines)
     return text[:_DIGEST_MAX_CHARS]
+
+
+# ── 永続ダイジェスト（フェーズ4・シャドーモード） ───────────────────
+# _compact_if_needed が生成する使い捨てダイジェストを .mimic/digests/ に
+# セッション単位でマージ保存する（anchored iterative summarization）。
+# 既存の圧縮動作（モデルへ送るnote_text）は一切変更しない。あくまで比較用の
+# 記録を並行して残すだけの「シャドーモード」導入であり、切替は行わない。
+# 環境変数 MIMIC_PERSISTENT_DIGEST=0 で無効化できる。
+
+_PERSISTENT_DIGEST_MAX_CHARS = 8000  # 肥大化防止: 超過分は古いエントリから削る
+_PERSISTENT_DIGEST_KEEP = 50         # ディスク上に保持するセッションダイジェスト数
+
+
+def _persistent_digest_enabled() -> bool:
+    return (os.environ.get("MIMIC_PERSISTENT_DIGEST") or "1").strip() != "0"
+
+
+def _digests_dir() -> Path:
+    p = Path(__file__).parent / ".mimic" / "digests"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _persist_digest_shadow(session_key: str, digest: str) -> None:
+    """既存の使い捨て圧縮とは独立に、セッション単位でダイジェストをマージ保存する。
+
+    失敗しても圧縮処理本体には一切影響させない（try/exceptで完全に隔離）。"""
+    if not digest or not _persistent_digest_enabled():
+        return
+    try:
+        path = _digests_dir() / f"{session_key}.json"
+        if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            data = {"entries": []}
+        data.setdefault("entries", []).append(digest)
+        merged = "\n".join(data["entries"])
+        if len(merged) > _PERSISTENT_DIGEST_MAX_CHARS:
+            # 肥大化防止: 古いエントリから機械的に削る
+            while data["entries"] and len("\n".join(data["entries"])) > _PERSISTENT_DIGEST_MAX_CHARS:
+                data["entries"].pop(0)
+        data["updated_at"] = time.time()
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        _prune_old_digests()
+    except Exception:
+        pass
+
+
+def _prune_old_digests() -> None:
+    """保持上限を超えた古いダイジェストファイルを削除する（utils.prune_old_sessions相当）。"""
+    try:
+        files = sorted(_digests_dir().glob("*.json"), key=lambda f: f.stat().st_mtime)
+        for f in files[:-_PERSISTENT_DIGEST_KEEP]:
+            f.unlink(missing_ok=True)
+    except Exception:
+        pass
 
 
 def _repair_message_sequence(messages: list[dict]) -> list[dict]:
@@ -783,6 +840,9 @@ class OpenRouterAgent:
         note_text = f"[{removed}件の古い会話を削除しました（コンテキスト節約）]"
         if digest:
             note_text += f"\n[削除された会話の機械ダイジェスト（ハーネス自動抽出）]\n{digest}"
+            # フェーズ4（シャドーモード）: モデルへ送る内容は変更せず、比較用に
+            # セッション単位でマージ永続化するだけ。失敗しても圧縮処理に影響しない。
+            _persist_digest_shadow(self._session_cache_key, digest)
         note = {"role": "user", "content": note_text}
         ack = {"role": "assistant", "content": "了解しました。"}
         self.conversation = first_pair + [note, ack] + recent_part

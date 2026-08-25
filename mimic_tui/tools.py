@@ -108,6 +108,59 @@ def _check_read_warning(path: str) -> str:
     return ""
 
 
+# ── 書込後の軽量構文チェック（非ブロッキング） ────────────────────
+# write_file/edit_file/patch_file の成功後に、対応言語の構文チェッカーが
+# あれば実行しラベルを付与するだけの機能。承認・書き込み自体は既に完了して
+# いるため、構文エラーでも書き込みは絶対に中断・ロールバックしない
+# （検証必須化は誤検知コストで過去にrevertされた前例があるため。team.py参照）。
+# 環境変数 MIMIC_SYNTAX_CHECK=0 で無効化できる。
+
+_SYNTAX_CHECK_TIMEOUT = 10
+
+
+def _syntax_check_enabled() -> bool:
+    return (os.environ.get("MIMIC_SYNTAX_CHECK") or "1").strip() != "0"
+
+
+def _syntax_check_note(path: str) -> str:
+    """書込直後のファイルへ軽量構文チェックを行い、結果ラベルを1行返す（失敗しても空文字）。
+
+    ブロッキングではなく情報提供のみ。誤検知（tsconfig未検出等の環境要因）を
+    許容し、既存の ※未検証 ラベルと同じ「非ブロッキング・正直な表示」思想に従う。"""
+    if not _syntax_check_enabled():
+        return ""
+    p = Path(path)
+    ext = p.suffix.lower()
+    try:
+        if ext == ".py":
+            src = p.read_text(encoding="utf-8", errors="replace")
+            ast.parse(src, filename=str(p))
+            return "✓構文チェックOK"
+        if ext == ".json":
+            json.loads(p.read_text(encoding="utf-8", errors="replace"))
+            return "✓構文チェックOK"
+        if ext in (".ts", ".tsx") and _which("tsc"):
+            proc = subprocess.run(
+                ["tsc", "--noEmit", str(p)], capture_output=True, text=True,
+                timeout=_SYNTAX_CHECK_TIMEOUT, cwd=str(p.parent),
+            )
+            return "✓構文チェックOK" if proc.returncode == 0 else (
+                f"✗構文チェックNG: {proc.stdout.strip().splitlines()[0] if proc.stdout.strip() else proc.stderr.strip()[:200]}"
+            )
+    except SyntaxError as e:
+        return f"✗構文チェックNG: {e.msg} (line {e.lineno})"
+    except json.JSONDecodeError as e:
+        return f"✗構文チェックNG: {e.msg} (line {e.lineno})"
+    except Exception:
+        return ""  # チェッカー自体の失敗（未インストール等）は無視、書き込み結果に影響させない
+    return ""
+
+
+def _which(cmd: str) -> bool:
+    import shutil
+    return shutil.which(cmd) is not None
+
+
 def _generate_diff(old_text: str, new_text: str) -> str:
     """変更前後の差分を生成し、最大30行まで返す"""
     old_lines = old_text.splitlines(keepends=True)
@@ -490,8 +543,9 @@ def write_file(path: str, content: str) -> str:
     _request_write_approval("write_file", {"path": path}, preview)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8")
-    
-    return f"{warning}書き込み完了: {path} ({len(content)} 文字)"
+    syntax_note = _syntax_check_note(path)
+    syntax_suffix = f" [{syntax_note}]" if syntax_note else ""
+    return f"{warning}書き込み完了: {path} ({len(content)} 文字){syntax_suffix}"
 
 
 @tools.register(
@@ -524,11 +578,12 @@ def edit_file(path: str, old_string: str, new_string: str) -> str:
     if count == 1:
         new_content = content.replace(old_string, new_string, 1)
         p.write_text(new_content, encoding="utf-8")
-        
+
         diff_lines = new_string.count("\n") - old_string.count("\n")
         sign = "+" if diff_lines >= 0 else ""
-        
-        res = f"{warning}編集完了: {path}  ({sign}{diff_lines} 行差分, 計 {new_content.count(chr(10))+1} 行)"
+        syntax_note = _syntax_check_note(path)
+        syntax_suffix = f" [{syntax_note}]" if syntax_note else ""
+        res = f"{warning}編集完了: {path}  ({sign}{diff_lines} 行差分, 計 {new_content.count(chr(10))+1} 行){syntax_suffix}"
         return res + _generate_diff(content, new_content)
     if count > 1:
         return (
@@ -730,8 +785,9 @@ def patch_file(path: str, search: str, replace: str) -> str:
         p.write_text(new_content, encoding="utf-8")
         diff_lines = replace.count("\n") - search.count("\n")
         sign = "+" if diff_lines >= 0 else ""
-        
-        res = f"{warning}編集完了（完全一致）: {path}  ({sign}{diff_lines} 行差分)"
+        syntax_note = _syntax_check_note(path)
+        syntax_suffix = f" [{syntax_note}]" if syntax_note else ""
+        res = f"{warning}編集完了（完全一致）: {path}  ({sign}{diff_lines} 行差分){syntax_suffix}"
         return res + _generate_diff(content, new_content)
 
     # ── 2. インデント正規化後にファジーマッチ ────────────────────
@@ -791,9 +847,11 @@ def patch_file(path: str, search: str, replace: str) -> str:
         re_indented, block = apply_and_write(content_lines, i, n, block, b_indent)
         diff_lines = re_indented.count("\n") - block.count("\n")
         sign = "+" if diff_lines >= 0 else ""
+        syntax_note = _syntax_check_note(path)
+        syntax_suffix = f" [{syntax_note}]" if syntax_note else ""
         return (
             f"編集完了（インデント許容マッチ）: {path}  "
-            f"({sign}{diff_lines} 行差分, indent_delta={b_indent - s_indent:+})"
+            f"({sign}{diff_lines} 行差分, indent_delta={b_indent - s_indent:+}){syntax_suffix}"
         )
     if len(matches) > 1:
         return f"エラー: 検索ブロックが {len(matches)} 箇所にマッチします（一意に特定できません）。"
@@ -1017,7 +1075,10 @@ def delegate_research(question: str, project_dir: str = ".") -> str:
                 "description": (
                     "専門家ロールの説明。「視点」「制約」「完了基準」の3要素を必ず含めること"
                     "（「完了基準」の明記がないと機械チェックで差し戻される）。"
+                    "「禁止事項」（境界外ファイルへの書き込み・破壊的コマンド等の明示的な除外）も"
+                    "含めることが推奨される。"
                     "例: '視点: セキュリティ脆弱性の診断専門家。制約: コードの変更提案はしない。"
+                    "禁止事項: 本番設定ファイル・シークレットの内容は出力しない。"
                     "完了基準: 認証・認可・入力検証の問題点を重大度付きで列挙できている'"
                 ),
             },
