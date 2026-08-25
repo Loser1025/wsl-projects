@@ -551,7 +551,7 @@ var mimicArtColors = []lipgloss.Color{
 	lipgloss.Color("#50D7FF"),
 }
 
-const mimicArtDimColor = lipgloss.Color("#005050")
+var mimicArtDimColor = lipgloss.Color("#005050")
 
 // renderTitleArt はPython版の #title-art（ASCIIアート+区切り線+サブタイトル）を再現する。
 func (m Model) renderTitleArt() string {
@@ -614,18 +614,15 @@ func (m Model) renderHeader() string {
 		Render(art)
 
 	row := lipgloss.JoinHorizontal(lipgloss.Top, artBox, panel)
-	rowW := lipgloss.Width(row)
-	if gap := clamp0(m.width - rowW); gap > 0 {
-		fillLines := strings.Repeat("\n", lipgloss.Height(row)-1)
-		_ = fillLines
-		fill := lipgloss.NewStyle().Background(colBGAlt).Render(strings.Repeat(" ", gap))
-		// 行ごとに右端を埋める必要があるため、行分割して結合し直す。
-		rowLines := strings.Split(row, "\n")
-		for i, rl := range rowLines {
-			rowLines[i] = rl + fill
+	// 各行ごとに実幅を測って右端を埋める（行によって幅が異なるため一括ではなく行単位で処理）。
+	rowLines := strings.Split(row, "\n")
+	for i, rl := range rowLines {
+		gap := clamp0(m.width - lipgloss.Width(rl))
+		if gap > 0 {
+			rowLines[i] = rl + lipgloss.NewStyle().Background(colBGAlt).Render(strings.Repeat(" ", gap))
 		}
-		row = strings.Join(rowLines, "\n")
 	}
+	row = strings.Join(rowLines, "\n")
 
 	return lipgloss.NewStyle().
 		Background(colBGAlt).
