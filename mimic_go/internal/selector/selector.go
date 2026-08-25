@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"mimic/internal/config"
 )
 
@@ -267,23 +269,47 @@ func SelectInteractively(cfg *config.Config) *config.ProviderConfig {
 	// ゴルーチンが次の read() システムコールに入ったまま停止できず、そのまま
 	// Bubble Tea（対話TUI本体）が読むはずのキー入力を横取りし続けてしまう
 	// （Goのブロッキング read() は一度呼ぶとチャネルで外部から中断できないため）。
-	// SetReadDeadlineで短い期限を刻みながら読むことで、関数を抜けるタイミングで
-	// 確実にゴルーチンを終了させ、以降の標準入力をBubble Teaへ明け渡せるようにする。
+	// 当初SetReadDeadlineで期限を刻む方式を試したが、tmux配下のptyでは
+	// デッドラインが効かず無期限にブロックしたままになる事例を実機で確認したため、
+	// unix.Pollと自己パイプ（stopPipeへの書き込みでpoll待ちを即座に起こす）による
+	// 確実な中断方式に変更した。これなら「次の入力が来るまで無反応」という
+	// 事態にならず、関数を抜けるタイミングで確実にゴルーチンを終了させられる。
 	lineCh := make(chan string)
-	stopReader := make(chan struct{})    // 外部からゴルーチンへ停止を指示する
+	stopReader := make(chan struct{}) // ローカルのchannel送信を打ち切るための合図
+	stopPipeR, stopPipeW, pipeErr := os.Pipe()
+	if pipeErr != nil {
+		// pipe作成自体に失敗する状況は現実的にはほぼ無いが、失敗時は
+		// このバッチの新機能（早期終了）を諦めてフォールバックの単純な
+		// ブロッキング読み取りにする（無いよりはまし、という位置づけ）。
+		stopPipeR, stopPipeW = nil, nil
+	}
 	readerStopped := make(chan struct{}) // ゴルーチンが実際に停止したことの確認用
 	go func() {
 		defer close(readerStopped)
-		defer os.Stdin.SetReadDeadline(time.Time{}) // 抜ける際は期限を必ずクリアする
 		var buf []byte
 		tmp := make([]byte, 256)
+		stdinFd := int32(os.Stdin.Fd())
 		for {
-			select {
-			case <-stopReader:
-				return
-			default:
+			if stopPipeR != nil {
+				fds := []unix.PollFd{
+					{Fd: stdinFd, Events: unix.POLLIN},
+					{Fd: int32(stopPipeR.Fd()), Events: unix.POLLIN},
+				}
+				_, perr := unix.Poll(fds, -1)
+				if perr != nil {
+					if perr == unix.EINTR {
+						continue
+					}
+					close(lineCh)
+					return
+				}
+				if fds[1].Revents&unix.POLLIN != 0 {
+					return // 停止シグナル（stopPipeWへの書き込み）を受信
+				}
+				if fds[0].Revents&unix.POLLIN == 0 {
+					continue
+				}
 			}
-			os.Stdin.SetReadDeadline(time.Now().Add(150 * time.Millisecond))
 			n, err := os.Stdin.Read(tmp)
 			if n > 0 {
 				buf = append(buf, tmp[:n]...)
@@ -302,9 +328,6 @@ func SelectInteractively(cfg *config.Config) *config.ProviderConfig {
 				}
 			}
 			if err != nil {
-				if os.IsTimeout(err) {
-					continue // 期限切れは正常、ループして再度チェックするだけ
-				}
 				close(lineCh)
 				return
 			}
@@ -313,9 +336,18 @@ func SelectInteractively(cfg *config.Config) *config.ProviderConfig {
 	// この関数を抜ける直前に必ずゴルーチンを止め、停止を確認してから標準入力を
 	// Bubble Tea側へ明け渡す（確認を待たずに抜けると、まだ読み取り中の可能性がある
 	// 期間とBubble Tea起動が重なり、最初のキー入力を横取りされる恐れがあるため）。
+	// stopPipeWへの書き込みでpoll()待ちを即座に起こし、read()呼び出し自体を
+	// 一度も発生させずに確実にゴルーチンを終了させる。
 	defer func() {
 		close(stopReader)
+		if stopPipeW != nil {
+			stopPipeW.Write([]byte{0})
+		}
 		<-readerStopped
+		if stopPipeR != nil {
+			stopPipeR.Close()
+			stopPipeW.Close()
+		}
 	}()
 
 	results := make(map[string]testResult)
