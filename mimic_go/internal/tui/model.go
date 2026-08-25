@@ -40,9 +40,9 @@ import (
 
 // ── カラーパレット（Razer Neon Greenテーマ、Python版セレクターと統一） ──
 // Python版 app.py の CSS (GitHub Dark系配色) と完全一致させる。
+// 背景色（Screen/#161b22等）はTUI全体を透過表示するため意図的に使わない
+// （端末側の背景・透過設定をそのまま透けさせる方針）。
 var (
-	colBG       = lipgloss.Color("#0D1117") // Screen background
-	colBGAlt    = lipgloss.Color("#161B22") // パネル/タイトルバー/入力欄 background
 	colBorder   = lipgloss.Color("#21262D") // title-bar border-bottom
 	colBorderHi = lipgloss.Color("#00FF41") // 入力欄フォーカス時ボーダー・アクセント緑
 	colBorder2  = lipgloss.Color("#30363D") // status-panel border-left / input-bar 通常ボーダー
@@ -587,9 +587,9 @@ func (m Model) renderStatusPanel() string {
 	status := "  Status: " + lipgloss.NewStyle().Bold(true).Foreground(statusColor).Render(statusText)
 	content := heading + "\n" + status
 
+	// 背景色は明示的に塗らず、端末側の背景（透過設定含む）をそのまま透けさせる。
 	return lipgloss.NewStyle().
 		Width(panelWidth-2).MaxWidth(panelWidth-2).
-		Background(colBGAlt).
 		Foreground(colText).
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(colBorder2).
@@ -610,23 +610,22 @@ func (m Model) renderHeader() string {
 	// そのため箱の内側では自然幅のままPadding/Backgroundのみ適用し、
 	// 右側の余白は手動でスペースを追記して埋める安全な方式を使う。
 	artBox := lipgloss.NewStyle().
-		Background(colBGAlt).
 		Padding(0, 2).
 		Render(art)
 
 	row := lipgloss.JoinHorizontal(lipgloss.Top, artBox, panel)
-	// 各行ごとに実幅を測って右端を埋める（行によって幅が異なるため一括ではなく行単位で処理）。
+	// 各行ごとに実幅を測って右端をスペースで埋める（背景色は塗らず、
+	// 端末側の背景をそのまま透けさせる）。
 	rowLines := strings.Split(row, "\n")
 	for i, rl := range rowLines {
 		gap := clamp0(m.width - lipgloss.Width(rl))
 		if gap > 0 {
-			rowLines[i] = rl + lipgloss.NewStyle().Background(colBGAlt).Render(strings.Repeat(" ", gap))
+			rowLines[i] = rl + strings.Repeat(" ", gap)
 		}
 	}
 	row = strings.Join(rowLines, "\n")
 
 	return lipgloss.NewStyle().
-		Background(colBGAlt).
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(colBorder).
 		BorderBottom(true).BorderTop(false).BorderLeft(false).BorderRight(false).
@@ -643,7 +642,9 @@ func (m Model) renderTabs() string {
 		rendered = append(rendered, style.Render(fmt.Sprintf("%s [F%d]", label, i+1)))
 	}
 	bar := lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
-	return lipgloss.NewStyle().Width(m.width).MaxWidth(m.width).Height(1).MaxHeight(1).Background(colBGAlt).Render(bar)
+	// 非アクティブ部分の背景は塗らず、端末側の背景を透けさせる
+	// （アクティブタブのハイライト背景colAccentのみ残す）。
+	return lipgloss.NewStyle().Height(1).MaxHeight(1).Render(bar)
 }
 
 func (m Model) renderBody(height int) string {
@@ -662,9 +663,8 @@ func (m Model) renderBody(height int) string {
 		content = m.renderLogTab(innerWidth)
 	}
 
-	// Python版 CSS: #chat-log/#scratchpad-log/#log-view/#file-preview はいずれも
-	// background: #0d1117（Screen背景と同色）。
-	style := lipgloss.NewStyle().Width(innerWidth).MaxWidth(innerWidth).Height(height).MaxHeight(height).Background(colBG)
+	// 背景色は明示的に塗らず、端末側の背景（透過設定含む）をそのまま透けさせる。
+	style := lipgloss.NewStyle().Width(innerWidth).MaxWidth(innerWidth).Height(height).MaxHeight(height)
 	if m.active != tabChat {
 		style = style.Padding(0, hPad)
 	}
@@ -762,10 +762,10 @@ func (m Model) renderInput() string {
 	if m.active == tabChat {
 		borderColor = colBorderHi
 	}
+	// 背景色は明示的に塗らず、端末側の背景（透過設定含む）をそのまま透けさせる。
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
-		Background(colBGAlt).
 		Padding(0, 1).
 		Width(innerWidth).MaxWidth(m.width)
 
