@@ -39,17 +39,21 @@ import (
 )
 
 // ── カラーパレット（Razer Neon Greenテーマ、Python版セレクターと統一） ──
+// Python版 app.py の CSS (GitHub Dark系配色) と完全一致させる。
 var (
-	colBGAlt    = lipgloss.Color("#111A11")
-	colBorder   = lipgloss.Color("#1E3A22")
-	colBorderHi = lipgloss.Color("#00FF41")
-	colText     = lipgloss.Color("#D8FFE0")
-	colMuted    = lipgloss.Color("#4E8A5A")
-	colAccent   = lipgloss.Color("#00FF41")
+	colBG       = lipgloss.Color("#0D1117") // Screen background
+	colBGAlt    = lipgloss.Color("#161B22") // パネル/タイトルバー/入力欄 background
+	colBorder   = lipgloss.Color("#21262D") // title-bar border-bottom
+	colBorderHi = lipgloss.Color("#00FF41") // 入力欄フォーカス時ボーダー・アクセント緑
+	colBorder2  = lipgloss.Color("#30363D") // status-panel border-left / input-bar 通常ボーダー
+	colText     = lipgloss.Color("#F0F6FC")
+	colMuted    = lipgloss.Color("#8B949E") // Footer等の淡色
+	colAccent   = lipgloss.Color("#00FF41") // 緑アクセント (■ AGENT見出し・IDLE等)
 	colOnAccent = lipgloss.Color("#0A0F0A")
-	colAmber    = lipgloss.Color("#FBBF24")
-	colCyan     = lipgloss.Color("#00F0C8")
-	colPink     = lipgloss.Color("#7FFFB0")
+	colTitle    = lipgloss.Color("#58A6FF") // タイトル/Modeラベルの青
+	colAmber    = lipgloss.Color("#FFDA6A") // BUSY等ステータス色
+	colCyan     = lipgloss.Color("#58A6FF")
+	colPink     = lipgloss.Color("#FF8C42") // Role表示色
 )
 
 const (
@@ -525,41 +529,110 @@ func (m Model) renderFull() string {
 	return lipgloss.JoinVertical(lipgloss.Left, header, tabs, body, input)
 }
 
-func (m Model) renderHeader() string {
-	const hPad = 1
-	title := lipgloss.NewStyle().Bold(true).Foreground(colAccent).Render("◆ mimic-go")
+// mimicArtLines はPython版 utils.py::get_ascii_art_str のpyfiglet非依存フォールバック
+// ブロック文字と完全一致させたもの（pyfigletはGo版に移植していないため常にこの表現を使う）。
+var mimicArtLines = []string{
+	"███╗   ███╗██╗███╗   ███╗██╗ ██████╗",
+	"████╗ ████║██║████╗ ████║██║██╔════╝",
+	"██╔████╔██║██║██╔████╔██║██║██║     ",
+	"██║╚██╔╝██║██║██║╚██╔╝██║██║██║     ",
+	"██║ ╚═╝ ██║██║██║ ╚═╝ ██║██║╚██████╗",
+	"╚═╝     ╚═╝╚═╝╚═╝     ╚═╝╚═╝ ╚═════╝",
+}
 
-	statusColor := colAccent
+// mimicArtColors はPython版のRazerグリーン→ティール→エレクトリックアクアの
+// グラデーションと同じ配色（1行ずつ対応）。
+var mimicArtColors = []lipgloss.Color{
+	lipgloss.Color("#00FF41"),
+	lipgloss.Color("#00FF78"),
+	lipgloss.Color("#00FFB4"),
+	lipgloss.Color("#00F2DA"),
+	lipgloss.Color("#00E6FF"),
+	lipgloss.Color("#50D7FF"),
+}
+
+const mimicArtDimColor = lipgloss.Color("#005050")
+
+// renderTitleArt はPython版の #title-art（ASCIIアート+区切り線+サブタイトル）を再現する。
+func (m Model) renderTitleArt() string {
+	var lines []string
+	for i, l := range mimicArtLines {
+		c := mimicArtColors[i]
+		if i >= len(mimicArtColors) {
+			c = mimicArtColors[len(mimicArtColors)-1]
+		}
+		lines = append(lines, lipgloss.NewStyle().Bold(true).Foreground(c).Render(l))
+	}
+	sepStyle := lipgloss.NewStyle().Foreground(mimicArtDimColor)
+	sep := sepStyle.Render(" " + strings.Repeat("─", 50))
+	subtitle := m.client.Model() + "  ·  " + m.cwd
+	sub := lipgloss.NewStyle().Bold(true).Foreground(mimicArtColors[len(mimicArtColors)-1]).Render(" " + subtitle)
+	lines = append(lines, sep, sub, sep)
+	return strings.Join(lines, "\n")
+}
+
+// renderStatusPanel はPython版の #status-panel（■ AGENT セクション）を再現する
+// （固定幅36。CPU/MEMの■ SYSTEMセクションはGo版に対応するシステム計測が
+// 未実装のため今回は対象外——Python版のみの機能）。
+func (m Model) renderStatusPanel() string {
+	const panelWidth = 36
 	statusText := "IDLE"
+	statusColor := colAccent
 	if m.streaming {
-		statusColor = colAmber
 		statusText = "BUSY"
+		statusColor = colAmber
 	}
-	statusBadge := lipgloss.NewStyle().Foreground(colOnAccent).Background(statusColor).Bold(true).Render(" " + statusText + " ")
-	modelBadge := lipgloss.NewStyle().Foreground(colMuted).Render(m.client.ProviderName() + "/" + m.client.Model())
-	right := lipgloss.JoinHorizontal(lipgloss.Center, statusBadge, "  ", modelBadge)
+	heading := lipgloss.NewStyle().Bold(true).Foreground(colAccent).Render("■ AGENT")
+	status := "  Status: " + lipgloss.NewStyle().Bold(true).Foreground(statusColor).Render(statusText)
+	content := heading + "\n" + status
 
-	innerWidth := clamp0(m.width - hPad*2)
-	titleW := lipgloss.Width(title)
-	rightW := lipgloss.Width(right)
-
-	var line string
-	if titleW+rightW <= innerWidth {
-		gap := clamp0(innerWidth - titleW - rightW)
-		line = title + strings.Repeat(" ", gap) + right
-	} else {
-		line = lipgloss.NewStyle().MaxWidth(innerWidth).Render(title)
-	}
-
-	// 注意: lineは既にinnerWidthちょうどになるよう手動でパディング済み。
-	// ここでさらにWidth()/MaxWidth()による切り詰めを適用すると、lipglossの
-	// ANSI考慮切り詰めロジックが右側のバッジを誤って削り取ってしまう
-	// （実機で発生したバグ: モデル名バッジが消える）ため、Background/Paddingのみ適用する。
 	return lipgloss.NewStyle().
-		Height(1).MaxHeight(1).
+		Width(panelWidth-2).MaxWidth(panelWidth-2).
 		Background(colBGAlt).
-		Padding(0, hPad).
-		Render(line)
+		Foreground(colText).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(colBorder2).
+		BorderLeft(true).BorderTop(false).BorderRight(false).BorderBottom(false).
+		Padding(0, 1).
+		Render(content)
+}
+
+// renderHeader はPython版 #title-bar（左: ASCIIアート、右: ステータスパネル、
+// 下部境界線）を再現する。
+func (m Model) renderHeader() string {
+	art := m.renderTitleArt()
+	panel := m.renderStatusPanel()
+
+	// 注意: 既にANSIスタイル適用済みの複数行ブロックへ更にWidth()/MaxWidth()に
+	// よる切り詰めを重ねると、lipglossのANSI考慮切り詰めロジックが末尾の内容を
+	// 誤って削り取る（renderHeaderの旧バージョンで実際に発生したバグ）。
+	// そのため箱の内側では自然幅のままPadding/Backgroundのみ適用し、
+	// 右側の余白は手動でスペースを追記して埋める安全な方式を使う。
+	artBox := lipgloss.NewStyle().
+		Background(colBGAlt).
+		Padding(0, 2).
+		Render(art)
+
+	row := lipgloss.JoinHorizontal(lipgloss.Top, artBox, panel)
+	rowW := lipgloss.Width(row)
+	if gap := clamp0(m.width - rowW); gap > 0 {
+		fillLines := strings.Repeat("\n", lipgloss.Height(row)-1)
+		_ = fillLines
+		fill := lipgloss.NewStyle().Background(colBGAlt).Render(strings.Repeat(" ", gap))
+		// 行ごとに右端を埋める必要があるため、行分割して結合し直す。
+		rowLines := strings.Split(row, "\n")
+		for i, rl := range rowLines {
+			rowLines[i] = rl + fill
+		}
+		row = strings.Join(rowLines, "\n")
+	}
+
+	return lipgloss.NewStyle().
+		Background(colBGAlt).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(colBorder).
+		BorderBottom(true).BorderTop(false).BorderLeft(false).BorderRight(false).
+		Render(row)
 }
 
 func (m Model) renderTabs() string {
