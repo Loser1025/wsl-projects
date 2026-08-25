@@ -551,8 +551,11 @@ func (m Model) renderHeader() string {
 		line = lipgloss.NewStyle().MaxWidth(innerWidth).Render(title)
 	}
 
+	// 注意: lineは既にinnerWidthちょうどになるよう手動でパディング済み。
+	// ここでさらにWidth()/MaxWidth()による切り詰めを適用すると、lipglossの
+	// ANSI考慮切り詰めロジックが右側のバッジを誤って削り取ってしまう
+	// （実機で発生したバグ: モデル名バッジが消える）ため、Background/Paddingのみ適用する。
 	return lipgloss.NewStyle().
-		Width(innerWidth).MaxWidth(innerWidth).
 		Height(1).MaxHeight(1).
 		Background(colBGAlt).
 		Padding(0, hPad).
