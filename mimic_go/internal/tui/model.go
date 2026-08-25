@@ -143,6 +143,14 @@ func NewModel(client *llm.Client, systemPrompt string) Model {
 	ta.CharLimit = 0
 	ta.ShowLineNumbers = false
 	ta.SetHeight(1)
+	// textareaのデフォルトStylesはCursorLineに背景色を塗るため、入力欄全体の
+	// 背景透過方針に合わせて背景なしのスタイルへ上書きする。
+	styles := ta.Styles()
+	styles.Focused.CursorLine = styles.Focused.CursorLine.UnsetBackground()
+	styles.Focused.Base = styles.Focused.Base.UnsetBackground()
+	styles.Blurred.CursorLine = styles.Blurred.CursorLine.UnsetBackground()
+	styles.Blurred.Base = styles.Blurred.Base.UnsetBackground()
+	ta.SetStyles(styles)
 
 	log := []string{"作業Dir: " + mustCwd()}
 	history, err := react.LoadCheckpoint(checkpointPath)
