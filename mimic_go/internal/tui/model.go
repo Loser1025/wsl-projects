@@ -18,7 +18,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"image/color"
 	"os"
 	"path/filepath"
 	"sort"
@@ -85,7 +84,8 @@ const (
 	tabLog
 )
 
-var tabLabels = []string{"Chat", "Files", "Scratchpad", "Log"}
+// Python版 app.py::compose() の TabPane タイトル（絵文字付き）と一致させる。
+var tabLabels = []string{"💬 Chat", "📁 Files", "📝 Scratchpad", "📜 Log"}
 
 type fileEntry struct {
 	path  string
@@ -243,7 +243,7 @@ func (m *Model) recalcLayout() {
 	if m.width <= 0 || m.height <= 0 {
 		return
 	}
-	const headerLines = 1
+	headerLines := lipgloss.Height(m.renderHeader())
 	const tabsLines = 1
 	inputHeight := lipgloss.Height(m.renderInput())
 	bodyHeight := clampMin(m.height-headerLines-tabsLines-inputHeight, 1)
@@ -562,12 +562,12 @@ func (m Model) renderTitleArt() string {
 		if i >= len(mimicArtColors) {
 			c = mimicArtColors[len(mimicArtColors)-1]
 		}
-		lines = append(lines, lipgloss.NewStyle().Bold(true).Foreground(c).Render(l))
+		lines = append(lines, lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(c)).Render(l))
 	}
-	sepStyle := lipgloss.NewStyle().Foreground(mimicArtDimColor)
+	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(mimicArtDimColor))
 	sep := sepStyle.Render(" " + strings.Repeat("─", 50))
 	subtitle := m.client.Model() + "  ·  " + m.cwd
-	sub := lipgloss.NewStyle().Bold(true).Foreground(mimicArtColors[len(mimicArtColors)-1]).Render(" " + subtitle)
+	sub := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(mimicArtColors[len(mimicArtColors)-1])).Render(" " + subtitle)
 	lines = append(lines, sep, sub, sep)
 	return strings.Join(lines, "\n")
 }
@@ -662,7 +662,9 @@ func (m Model) renderBody(height int) string {
 		content = m.renderLogTab(innerWidth)
 	}
 
-	style := lipgloss.NewStyle().Width(innerWidth).MaxWidth(innerWidth).Height(height).MaxHeight(height)
+	// Python版 CSS: #chat-log/#scratchpad-log/#log-view/#file-preview はいずれも
+	// background: #0d1117（Screen背景と同色）。
+	style := lipgloss.NewStyle().Width(innerWidth).MaxWidth(innerWidth).Height(height).MaxHeight(height).Background(colBG)
 	if m.active != tabChat {
 		style = style.Padding(0, hPad)
 	}
@@ -755,13 +757,15 @@ func (m Model) renderInput() string {
 	const paddingCols = 2
 	innerWidth := clampMin(m.width-borderCols-paddingCols, 1)
 
-	borderColor := colBorderHi
-	if m.active != tabChat {
-		borderColor = colBorder
+	// Python版 CSS: #input-bar { border: round #30363d; } / :focus-within { border: round #00ff41; }
+	borderColor := colBorder2
+	if m.active == tabChat {
+		borderColor = colBorderHi
 	}
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
+		Background(colBGAlt).
 		Padding(0, 1).
 		Width(innerWidth).MaxWidth(m.width)
 
