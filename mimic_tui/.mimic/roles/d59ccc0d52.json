@@ -1,6 +1,0 @@
-{
-  "role": "視点: カレンダーAPI利用コード調査専門家。制約: コードの変更は一切行わない(読み取り専用)。完了基準: mission-control-v2 のコードにおいて、Google Calendar freebusy.query がどの calendarId を対象にしているか、認証スコープ、および SERVICE_ACCOUNT_JSON の利用箇所が特定され報告されている",
-  "uses": 1,
-  "mode": "read",
-  "last_used": "2026-07-10T12:37:10"
-}
