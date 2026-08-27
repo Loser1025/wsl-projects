@@ -3,6 +3,7 @@ package vcs
 import (
 	"bufio"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,8 +20,16 @@ var jiffyHz float64 = 100 // Linuxの一般的なデフォルト
 
 func getJiffy() float64 {
 	jiffyOnce.Do(func() {
-		// getconf CLK_TCK相当。/proc上に直接の値は無いため固定100Hzを既定とする
-		// （x86 Linuxではほぼ常に100Hz。誤差はCPU%表示の目安程度への影響に留まる）。
+		// getconf CLK_TCKを実測する（Python版 os.sysconf("SC_CLK_TCK") の移植。
+		// Goの標準ライブラリにはsysconf相当が無いため`getconf`コマンドを使う。
+		// 失敗した場合はLinuxの一般的なデフォルト100Hzにフォールバックする。
+		out, err := exec.Command("getconf", "CLK_TCK").Output()
+		if err == nil {
+			if v, perr := strconv.ParseFloat(strings.TrimSpace(string(out)), 64); perr == nil && v > 0 {
+				jiffyHz = v
+				return
+			}
+		}
 		jiffyHz = 100
 	})
 	return jiffyHz

@@ -118,8 +118,9 @@ type Model struct {
 
 	// <think>/<thought>ブロック検出（Python版 utils.py::ThinkAwareBuffer の移植）。
 	// ターン開始時にリセットし、ストリームチャンクをこれ経由でログへ流す。
-	thinkBuf    ThinkAwareBuffer
-	inThinkLine bool
+	thinkBuf     ThinkAwareBuffer
+	inThinkLine  bool
+	thinkLineBuf string // 未改行のthink断片バッファ（複数行ボックス表示用）
 
 	// /viewerコマンドでオンデマンド起動する観測ビューアのURL（起動前は空文字）。
 	viewerURL string
@@ -139,10 +140,57 @@ type Model struct {
 	filePreview  string
 	filePath     string
 
+	// ツリーの展開状態（Python版 Textual Tree の「ルートのみ自動展開、他は
+	// ノードを開くまで子要素が非表示」の移植。キーはディレクトリの絶対パス）。
+	filesExpanded map[string]bool
+	// ツリー/プレビューのスクロール位置（Python版 Tree/RichLog の自動スクロールの移植。
+	// Go版は手描画のため、カーソル追従・PageUp/PageDown等で明示的に管理する）。
+	filesScrollTop    int
+	filePreviewScroll int
+
 	// 書き込み承認フロー（Python版 app.py の承認モーダルの移植）
 	approvalCh      chan approvalRequest
 	pendingApproval *approvalRequest
 	approvalSeq     int
+
+	// 委任apply承認フロー（Python版 app.py::_make_apply_approval_handler の移植。
+	// APPLY_APPROVAL=ask/threshold時のみ実際に発動する。デフォルト(auto)では
+	// ハンドラは登録されるが呼ばれない＝常に自動適用のまま）。
+	applyApprovalCh      chan applyApprovalRequest
+	pendingApplyApproval *applyApprovalRequest
+	applyApprovalSeq     int
+
+	// ホスト直接実行承認フロー（Python版 app.py::_make_host_exec_approval_handler の移植）。
+	hostExecApprovalCh      chan hostExecApprovalRequest
+	pendingHostExecApproval *hostExecApprovalRequest
+	hostExecApprovalSeq     int
+
+	// ■ SYSTEM パネル用のシステムCPU/MEM使用率（Python版 app.py::_refresh_system_panel
+	// の移植。2秒間隔でsystemTickMsg経由で更新する）。
+	systemCPUPercent float64
+	systemMemUsedMB  float64
+	systemMemTotalMB float64
+}
+
+// hostExecApprovalRequest はtools.HostExecApprovalHandler経由でツール実行
+// goroutineからUpdateループへ渡される承認依頼。
+type hostExecApprovalRequest struct {
+	id      int
+	command string
+	reason  string
+	respCh  chan bool
+}
+
+type hostExecApprovalTimeoutMsg struct{ id int }
+
+// systemTickMsg はシステムCPU/MEM使用率を再計測させる2秒間隔のティック
+// （Python版 app.py の set_interval(2, _refresh_system_panel) の移植）。
+type systemTickMsg struct{}
+
+const systemTickInterval = 2 * time.Second
+
+func systemTickCmd() tea.Cmd {
+	return tea.Tick(systemTickInterval, func(time.Time) tea.Msg { return systemTickMsg{} })
 }
 
 // approvalRequest はtools.ApprovalHandler経由でツール実行goroutineから
@@ -158,6 +206,18 @@ type approvalRequest struct {
 const approvalTimeoutSec = 30 // Python版 app.py::_APPROVAL_TIMEOUT
 
 type approvalTimeoutMsg struct{ id int }
+
+// applyApprovalRequest はdelegate.ApplyApprovalHandler経由で委任実行goroutineから
+// Updateループへ渡される適用承認依頼。
+type applyApprovalRequest struct {
+	id           int
+	label        string
+	changedFiles []string
+	summary      string
+	respCh       chan bool
+}
+
+type applyApprovalTimeoutMsg struct{ id int }
 
 // turnEvent はReActループを回すゴルーチンからUpdateループへ渡すイベント。
 type turnEvent struct {
@@ -226,26 +286,58 @@ func NewModel(client *llm.Client, systemPrompt string) Model {
 		return <-respCh
 	})
 
+	applyApprovalCh := make(chan applyApprovalRequest)
+	// APPLY_APPROVAL=ask/threshold時のみ実際に発動する（既定では
+	// delegate.needsApplyApprovalが常にfalseを返すためこのハンドラは呼ばれない）。
+	delegate.SetApplyApprovalHandler(func(label string, changedFiles []string, summary string) bool {
+		respCh := make(chan bool, 1)
+		applyApprovalCh <- applyApprovalRequest{label: label, changedFiles: changedFiles, summary: summary, respCh: respCh}
+		return <-respCh
+	})
+
+	hostExecApprovalCh := make(chan hostExecApprovalRequest)
+	tools.SetHostExecApprovalHandler(func(command, reason string) bool {
+		respCh := make(chan bool, 1)
+		hostExecApprovalCh <- hostExecApprovalRequest{command: command, reason: reason, respCh: respCh}
+		return <-respCh
+	})
+
 	autoGit := vcs.New()
 	// delegate_to_team/delegate_to_worker等の適用後コミットを、通常ターンと
 	// 同じAutoGitインスタンスに積ませてsquash対象に含める
 	// （Python版 team.py::set_team_autogit の移植）。
 	delegate.SetTeamAutoGit(autoGit)
-	// get_delegation_traceツールがtrace_idを逆引きできるよう、TUI(常にDirector)の
-	// sessionsディレクトリを共有する。
+	// get_delegation_trace/search_historyツールがセッションログを参照できるよう、
+	// TUI(常にDirector)のsessionsディレクトリを共有する。
 	delegate.SetSessionsDir(sessionsDir)
+	tools.SetSessionsDirForTool(sessionsDir)
 
 	specialistRegistry := registry.Exclude(specialistExcludedTools, []string{"mcp__"})
+
+	// 起動時デフォルトモード: specialist（委任特化）。MIMIC_DEFAULT_MODE=interactive
+	// で従来のReActを既定にできる（Python版 app.py:297-302 の移植）。
+	agentMode := "interactive"
+	activeRegistry := registry
+	activeSystemPrompt := systemPrompt
+	defaultMode := strings.ToLower(strings.TrimSpace(os.Getenv("MIMIC_DEFAULT_MODE")))
+	if defaultMode == "" {
+		defaultMode = "specialist"
+	}
+	if defaultMode != "interactive" {
+		agentMode = "specialist"
+		activeRegistry = specialistRegistry
+		activeSystemPrompt = systemPrompt + specialistSystemPrompt + delegate.LoadSavedRolesSection(10)
+	}
 
 	return Model{
 		input:              ta,
 		client:             client,
-		systemPrompt:       systemPrompt,
+		systemPrompt:       activeSystemPrompt,
 		baseSystemPrompt:   systemPrompt,
-		registry:           registry,
+		registry:           activeRegistry,
 		fullRegistry:       registry,
 		specialistRegistry: specialistRegistry,
-		agentMode:          "interactive",
+		agentMode:          agentMode,
 		history:            history,
 		log:                log,
 		reactLog:           reactLog,
@@ -253,6 +345,8 @@ func NewModel(client *llm.Client, systemPrompt string) Model {
 		autoGit:            autoGit,
 		cwd:                cwd,
 		approvalCh:         approvalCh,
+		applyApprovalCh:    applyApprovalCh,
+		hostExecApprovalCh: hostExecApprovalCh,
 	}
 }
 
@@ -265,7 +359,32 @@ func mustCwd() string {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, waitForApproval(m.approvalCh))
+	return tea.Batch(textarea.Blink, waitForApproval(m.approvalCh), waitForApplyApproval(m.applyApprovalCh),
+		waitForHostExecApproval(m.hostExecApprovalCh), systemTickCmd())
+}
+
+func waitForHostExecApproval(ch chan hostExecApprovalRequest) tea.Cmd {
+	return func() tea.Msg {
+		return <-ch
+	}
+}
+
+func hostExecApprovalTimeoutCmd(id int) tea.Cmd {
+	return tea.Tick(approvalTimeoutSec*time.Second, func(time.Time) tea.Msg {
+		return hostExecApprovalTimeoutMsg{id: id}
+	})
+}
+
+func waitForApplyApproval(ch chan applyApprovalRequest) tea.Cmd {
+	return func() tea.Msg {
+		return <-ch
+	}
+}
+
+func applyApprovalTimeoutCmd(id int) tea.Cmd {
+	return tea.Tick(approvalTimeoutSec*time.Second, func(time.Time) tea.Msg {
+		return applyApprovalTimeoutMsg{id: id}
+	})
 }
 
 // waitForApproval は承認依頼チャンネルを1件読み、tea.Msgとして返す
@@ -329,20 +448,36 @@ func (m *Model) feedThinkAwareText(chunk string) {
 	}
 }
 
+// appendThinkSegment はthinkセグメントを灰色ボーダーの複数行ボックスとして
+// 描画する（Python版 utils.py::PipelineTypewriter._enter_think/_flush_think_raw/
+// _exit_think の移植。単一行への折りたたみではなく、思考内容を改行込みで
+// そのまま「│ 」プレフィックス付きの複数行として表示する）。
 func (m *Model) appendThinkSegment(seg thinkSegment) {
 	if seg.IsThink {
 		if !m.inThinkLine {
 			m.closeOpenLine()
-			m.log = append(m.log, "  💭 "+strings.ReplaceAll(seg.Text, "\n", " "))
+			m.log = append(m.log, "╭─ 💭 思考中 "+strings.Repeat("─", 50))
 			m.inThinkLine = true
-			m.openLine = true
-			return
+			m.thinkLineBuf = ""
 		}
-		m.log[len(m.log)-1] += strings.ReplaceAll(seg.Text, "\n", " ")
+		m.thinkLineBuf += seg.Text
+		for {
+			idx := strings.Index(m.thinkLineBuf, "\n")
+			if idx < 0 {
+				break
+			}
+			line := m.thinkLineBuf[:idx]
+			m.thinkLineBuf = m.thinkLineBuf[idx+1:]
+			m.log = append(m.log, "│ "+line)
+		}
 		return
 	}
 	if m.inThinkLine {
-		m.closeOpenLine()
+		if m.thinkLineBuf != "" {
+			m.log = append(m.log, "│ "+m.thinkLineBuf)
+			m.thinkLineBuf = ""
+		}
+		m.log = append(m.log, "╰"+strings.Repeat("─", 62))
 		m.inThinkLine = false
 	}
 	m.appendToOpenLine(seg.Text)
@@ -352,6 +487,13 @@ func (m *Model) appendThinkSegment(seg thinkSegment) {
 func (m *Model) flushThinkBuffer() {
 	for _, seg := range m.thinkBuf.Flush() {
 		m.appendThinkSegment(seg)
+	}
+	if m.inThinkLine {
+		if m.thinkLineBuf != "" {
+			m.log = append(m.log, "│ "+m.thinkLineBuf)
+			m.thinkLineBuf = ""
+		}
+		m.log = append(m.log, "╰"+strings.Repeat("─", 62))
 	}
 	m.thinkBuf = ThinkAwareBuffer{}
 	m.inThinkLine = false
@@ -397,9 +539,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.recalcLayout()
 
 	case tea.KeyPressMsg:
-		if msg.String() == "ctrl+c" {
+		if msg.String() == "ctrl+c" || msg.String() == "ctrl+q" {
 			if m.cancelFunc != nil {
 				m.cancelFunc()
+			}
+			// セッション終了時に.mdサマリーを自動保存する
+			// （Python版 app.py::action_quit_app / autogit.py::ReactLog.save_session の移植）。
+			if m.reactLog != nil && m.reactLog.EntryCount() > 0 {
+				sessionsDir := filepath.Join(m.cwd, ".mimic", "sessions")
+				m.reactLog.SaveSession(sessionsDir)
 			}
 			return m, tea.Quit
 		}
@@ -412,6 +560,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				val := strings.ToLower(strings.TrimSpace(m.input.Value()))
 				approved := val == "" || val == "y"
 				m.input.Reset()
+				m.adjustInputHeight()
 				req := m.pendingApproval
 				req.respCh <- approved
 				respText := "  ✗ 拒否しました（処理を中断します）"
@@ -429,6 +578,54 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, taCmd
 		}
 
+		// 委任apply承認待ち中も同様にY/n入力のみ受け付ける。
+		if m.pendingApplyApproval != nil {
+			if msg.String() == "enter" {
+				val := strings.ToLower(strings.TrimSpace(m.input.Value()))
+				approved := val == "" || val == "y"
+				m.input.Reset()
+				m.adjustInputHeight()
+				req := m.pendingApplyApproval
+				req.respCh <- approved
+				respText := "  ✗ 適用を拒否しました（変更は破棄されます）"
+				if approved {
+					respText = "  ✓ 適用を承認しました"
+				}
+				m.log = append(m.log, respText)
+				m.pendingApplyApproval = nil
+				m.openLine = false
+				m.viewport.SetContent(m.renderLog())
+				m.viewport.GotoBottom()
+				return m, waitForApplyApproval(m.applyApprovalCh)
+			}
+			m.input, taCmd = m.input.Update(msg)
+			return m, taCmd
+		}
+
+		// ホスト実行承認待ち中も同様にY/n入力のみ受け付ける。
+		if m.pendingHostExecApproval != nil {
+			if msg.String() == "enter" {
+				val := strings.ToLower(strings.TrimSpace(m.input.Value()))
+				approved := val == "" || val == "y"
+				m.input.Reset()
+				m.adjustInputHeight()
+				req := m.pendingHostExecApproval
+				req.respCh <- approved
+				respText := "  ✗ ホスト実行を拒否しました"
+				if approved {
+					respText = "  ✓ ホスト実行を承認しました"
+				}
+				m.log = append(m.log, respText)
+				m.pendingHostExecApproval = nil
+				m.openLine = false
+				m.viewport.SetContent(m.renderLog())
+				m.viewport.GotoBottom()
+				return m, waitForHostExecApproval(m.hostExecApprovalCh)
+			}
+			m.input, taCmd = m.input.Update(msg)
+			return m, taCmd
+		}
+
 		switch msg.String() {
 		case "f1":
 			m.active = tabChat
@@ -436,7 +633,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "f2":
 			m.active = tabFiles
 			if !m.filesScanned {
-				m.files = scanFiles(m.cwd)
+				m.resetFilesTree()
 				m.filesScanned = true
 			}
 			return m, nil
@@ -446,27 +643,109 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "f4":
 			m.active = tabLog
 			return m, nil
+		case "ctrl+l":
+			// 画面クリア（Python版 app.py::action_clear_log の移植）。
+			m.log = nil
+			m.viewport.SetContent(m.renderLog())
+			m.viewport.GotoTop()
+			return m, nil
+		case "pgup", "pgdown", "ctrl+home", "ctrl+end":
+			// Python版 app.py::_active_scroll_target / action_scroll_* の移植。
+			// Filesタブがアクティブな間はプレビューペインをスクロールし、
+			// それ以外（Chat等）は従来通りメインログをスクロールする。
+			if m.active == tabFiles {
+				rows := clampMin(m.viewport.Height(), 1)
+				switch msg.String() {
+				case "pgup":
+					m.filePreviewScroll -= rows
+				case "pgdown":
+					m.filePreviewScroll += rows
+				case "ctrl+home":
+					m.filePreviewScroll = 0
+				case "ctrl+end":
+					m.filePreviewScroll = previewMaxScroll(m.filePreview, rows)
+				}
+				if m.filePreviewScroll < 0 {
+					m.filePreviewScroll = 0
+				}
+				return m, nil
+			}
+			switch msg.String() {
+			case "pgup":
+				m.viewport.PageUp()
+			case "pgdown":
+				m.viewport.PageDown()
+			case "ctrl+home":
+				m.viewport.GotoTop()
+			case "ctrl+end":
+				m.viewport.GotoBottom()
+			}
+			return m, nil
 		}
 
 		if m.active == tabFiles {
+			visible := visibleFileEntries(m.files, m.cwd, m.filesExpanded)
+			rows := clampMin(m.viewport.Height()-1, 1) // -1: ルート行ぶん
 			switch msg.String() {
 			case "up", "k":
 				if m.filesCursor > 0 {
 					m.filesCursor--
 				}
+				m.ensureFilesCursorVisible(rows)
 				return m, nil
 			case "down", "j":
-				if m.filesCursor < len(m.files)-1 {
+				if m.filesCursor < len(visible)-1 {
 					m.filesCursor++
+				}
+				m.ensureFilesCursorVisible(rows)
+				return m, nil
+			case "right", "l":
+				// ディレクトリを展開し、子要素を表示する（cwdは変更しない。
+				// Python版 Tree ウィジェットの矢印キー展開の移植）。
+				if m.filesCursor >= 0 && m.filesCursor < len(visible) {
+					e := visible[m.filesCursor]
+					if e.isDir {
+						m.filesExpanded[e.path] = true
+					}
+				}
+				return m, nil
+			case "left", "h":
+				// ディレクトリを折りたたむ。
+				if m.filesCursor >= 0 && m.filesCursor < len(visible) {
+					e := visible[m.filesCursor]
+					if e.isDir && m.filesExpanded[e.path] {
+						delete(m.filesExpanded, e.path)
+						m.ensureFilesCursorVisible(rows)
+					}
 				}
 				return m, nil
 			case "enter":
-				if m.filesCursor >= 0 && m.filesCursor < len(m.files) {
-					e := m.files[m.filesCursor]
-					if !e.isDir {
+				if m.filesCursor >= 0 && m.filesCursor < len(visible) {
+					e := visible[m.filesCursor]
+					if e.isDir {
+						// ディレクトリを選択したらそこへcwdを移動してツリーを
+						// 作り直す（Python版 app.py::on_tree_node_selected の移植）。
+						m.cwd = e.path
+						m.resetFilesTree()
+						m.log = append(m.log, fmt.Sprintf("  📁 作業Dir → %s", m.cwd))
+						m.viewport.SetContent(m.renderLog())
+					} else {
 						m.filePath = e.path
 						m.filePreview = readPreview(e.path)
+						m.filePreviewScroll = 0
 					}
+				}
+				return m, nil
+			case "backspace":
+				// 親ディレクトリへ移動する（Python版 app.py::on_key の
+				// file-tree focus時のBackspace処理の移植。ファイルシステム
+				// ルートで親==自身になった場合は何もしない）。
+				parent := filepath.Dir(m.cwd)
+				if parent != m.cwd {
+					m.cwd = parent
+					m.resetFilesTree()
+					m.log = append(m.log, fmt.Sprintf("  📁 作業Dir → %s", m.cwd))
+					m.viewport.SetContent(m.renderLog())
 				}
 				return m, nil
 			}
@@ -486,6 +765,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.input.Reset()
+			m.adjustInputHeight()
 			if strings.HasPrefix(text, "/") {
 				if updated, handled := m.runSlashCommand(text); handled {
 					return updated, nil
@@ -509,6 +789,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 		return m, approvalTimeoutCmd(msg.id)
 
+	case hostExecApprovalRequest:
+		m.hostExecApprovalSeq++
+		msg.id = m.hostExecApprovalSeq
+		m.pendingHostExecApproval = &msg
+		m.closeOpenLine()
+		m.log = append(m.log, renderHostExecApprovalBox(msg))
+		m.viewport.SetContent(m.renderLog())
+		m.viewport.GotoBottom()
+		return m, hostExecApprovalTimeoutCmd(msg.id)
+
+	case hostExecApprovalTimeoutMsg:
+		if m.pendingHostExecApproval != nil && m.pendingHostExecApproval.id == msg.id {
+			req := m.pendingHostExecApproval
+			// Python版 app.py::_make_host_exec_approval_handler と同じく、
+			// タイムアウト時は自動承認する（書き込み/適用承認と同じ既定動作。
+			// 隔離なしでホストへ影響する操作のため、運用上はタイムアウトを
+			// 十分長く取るか常時監視することが前提）。
+			req.respCh <- true
+			m.log = append(m.log, fmt.Sprintf("  ⏱ %d秒経過 → 自動承認", approvalTimeoutSec))
+			m.pendingHostExecApproval = nil
+			m.viewport.SetContent(m.renderLog())
+			m.viewport.GotoBottom()
+			return m, waitForHostExecApproval(m.hostExecApprovalCh)
+		}
+		return m, nil
+
+	case systemTickMsg:
+		m.systemCPUPercent = vcs.GetSystemCPUPercent()
+		m.systemMemUsedMB, m.systemMemTotalMB = vcs.GetSystemMemInfo()
+		return m, systemTickCmd()
+
 	case approvalTimeoutMsg:
 		if m.pendingApproval != nil && m.pendingApproval.id == msg.id {
 			req := m.pendingApproval
@@ -518,6 +829,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.SetContent(m.renderLog())
 			m.viewport.GotoBottom()
 			return m, waitForApproval(m.approvalCh)
+		}
+		return m, nil
+
+	case applyApprovalRequest:
+		m.applyApprovalSeq++
+		msg.id = m.applyApprovalSeq
+		m.pendingApplyApproval = &msg
+		m.closeOpenLine()
+		m.log = append(m.log, renderApplyApprovalBox(msg))
+		m.viewport.SetContent(m.renderLog())
+		m.viewport.GotoBottom()
+		return m, applyApprovalTimeoutCmd(msg.id)
+
+	case applyApprovalTimeoutMsg:
+		if m.pendingApplyApproval != nil && m.pendingApplyApproval.id == msg.id {
+			req := m.pendingApplyApproval
+			req.respCh <- true
+			m.log = append(m.log, fmt.Sprintf("  ⏱ %d秒経過 → 自動承認", approvalTimeoutSec))
+			m.pendingApplyApproval = nil
+			m.viewport.SetContent(m.renderLog())
+			m.viewport.GotoBottom()
+			return m, waitForApplyApproval(m.applyApprovalCh)
 		}
 		return m, nil
 
@@ -550,16 +883,38 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if m.active == tabChat {
 		m.input, taCmd = m.input.Update(msg)
+		m.adjustInputHeight()
 		vp, cmd := m.viewport.Update(msg)
 		m.viewport, vpCmd = vp, cmd
 	}
 	return m, tea.Batch(taCmd, vpCmd)
 }
 
+const (
+	inputMinLines = 1 // Python版 app.py::_INPUT_MIN_LINES
+	inputMaxLines = 5 // Python版 app.py::_INPUT_MAX_LINES
+)
+
+// adjustInputHeight は入力欄の行数に応じて高さを1〜5行の範囲で自動調整する
+// （Python版 app.py::_on_input_changed の移植）。
+func (m *Model) adjustInputHeight() {
+	n := strings.Count(m.input.Value(), "\n") + 1
+	if n < inputMinLines {
+		n = inputMinLines
+	}
+	if n > inputMaxLines {
+		n = inputMaxLines
+	}
+	if m.input.Height() != n {
+		m.input.SetHeight(n)
+	}
+}
+
 func (m Model) startTurn() (tea.Model, tea.Cmd) {
 	m.streaming = true
 	m.thinkBuf = ThinkAwareBuffer{}
 	m.inThinkLine = false
+	m.thinkLineBuf = ""
 	ch := make(chan turnEvent)
 	ctx, cancel := context.WithCancel(context.Background())
 	m.turnCh = ch
@@ -593,21 +948,27 @@ func (m Model) startTurn() (tea.Model, tea.Cmd) {
 
 // ── ファイルツリー ────────────────────────────────────────────
 
+// fileScanIgnore はPython版 app.py::_populate_tree の ignore セットをそのまま踏襲する。
+// これに加えて、名前が"."で始まるすべてのファイル/ディレクトリも除外する
+// （Python版の `item.name.startswith(".")` 判定の移植。.git/.venv等は結果的に
+// この規則にも合致するが、Python版の明示セットとの対応関係を保つため両方残す）。
 var fileScanIgnore = map[string]bool{
 	".git": true, "node_modules": true, ".venv": true, "venv": true,
-	"__pycache__": true, ".idea": true, ".vscode": true, ".mimic": true,
+	"__pycache__": true, ".mypy_cache": true,
 }
 
-const maxFileScanEntries = 500
-const maxFileScanDepth = 6
+// maxFileScanDepth はPython版 app.py::_populate_tree の `if depth > 2: return` と
+// 同じ深さ制限（ルートを0として、0/1/2の3階層まで）。
+const maxFileScanDepth = 2
 
-// scanFiles はcwd配下を再帰的に走査し、フラットな一覧にする（安全のため件数・
-// 深さの上限つき）。巨大リポジトリでも固まらないよう上限で早期打ち切りする。
+// scanFiles はcwd配下を再帰的に走査し、フラットな一覧にする
+// （Python版 app.py::_build_file_tree / _populate_tree の移植。実際のTreeウィジェットの
+// 代わりに、深さに応じたインデント付きフラットリストとして表現する）。
 func scanFiles(root string) []fileEntry {
 	var out []fileEntry
 	var walk func(dir string, depth int)
 	walk = func(dir string, depth int) {
-		if len(out) >= maxFileScanEntries || depth > maxFileScanDepth {
+		if depth > maxFileScanDepth {
 			return
 		}
 		entries, err := os.ReadDir(dir)
@@ -621,11 +982,8 @@ func scanFiles(root string) []fileEntry {
 			return entries[i].Name() < entries[j].Name()
 		})
 		for _, e := range entries {
-			if fileScanIgnore[e.Name()] {
+			if fileScanIgnore[e.Name()] || strings.HasPrefix(e.Name(), ".") {
 				continue
-			}
-			if len(out) >= maxFileScanEntries {
-				return
 			}
 			full := filepath.Join(dir, e.Name())
 			out = append(out, fileEntry{path: full, name: e.Name(), isDir: e.IsDir(), depth: depth})
@@ -636,6 +994,76 @@ func scanFiles(root string) []fileEntry {
 	}
 	walk(root, 0)
 	return out
+}
+
+// visibleFileEntries はscanFilesが返した全件（depth 0〜maxFileScanDepth）のうち、
+// 祖先ディレクトリがすべて展開済みのものだけを返す（Python版のTree標準挙動:
+// ルートのみ自動展開、それ以外のノードは明示的に開くまで子要素が隠れている、
+// の移植）。
+func visibleFileEntries(files []fileEntry, root string, expanded map[string]bool) []fileEntry {
+	var out []fileEntry
+	for _, e := range files {
+		dir := filepath.Dir(e.path)
+		visible := true
+		for dir != root {
+			if !expanded[dir] {
+				visible = false
+				break
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+		if visible {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// ensureFilesCursorVisible はファイルツリーのカーソルが表示領域内に収まるよう
+// スクロール位置を調整する（Python版 Tree ウィジェットの自動スクロールの移植）。
+func (m *Model) ensureFilesCursorVisible(rows int) {
+	if rows <= 0 {
+		return
+	}
+	if m.filesCursor < m.filesScrollTop {
+		m.filesScrollTop = m.filesCursor
+	}
+	if m.filesCursor >= m.filesScrollTop+rows {
+		m.filesScrollTop = m.filesCursor - rows + 1
+	}
+	if m.filesScrollTop < 0 {
+		m.filesScrollTop = 0
+	}
+}
+
+// resetFilesTree はcwd変更時にツリー状態を初期化する（Python版
+// _build_file_tree が毎回ルートのみ展開した新規Treeを組み立てるのと同じ挙動）。
+func (m *Model) resetFilesTree() {
+	m.files = scanFiles(m.cwd)
+	m.filesExpanded = map[string]bool{}
+	m.filesCursor = 0
+	m.filesScrollTop = 0
+	m.filePath = ""
+	m.filePreview = ""
+	m.filePreviewScroll = 0
+}
+
+// previewMaxScroll はプレビューペインの最終ページに対応するスクロール行数を返す
+// （Ctrl+End用）。
+func previewMaxScroll(preview string, rows int) int {
+	if preview == "" {
+		return 0
+	}
+	n := strings.Count(preview, "\n") + 1
+	max := n - rows
+	if max < 0 {
+		max = 0
+	}
+	return max
 }
 
 const maxPreviewChars = 4000
@@ -670,6 +1098,60 @@ func renderApprovalBox(req approvalRequest) string {
 	b.WriteString("  └──────────────────────────────────────────────────────\n")
 	b.WriteString(fmt.Sprintf("  実行しますか？ [Y/n] (%d秒で自動承認): ", approvalTimeoutSec))
 	return b.String()
+}
+
+// renderApplyApprovalBox はPython版 app.py::_make_apply_approval_handler の
+// ASCII枠の移植（委任結果の適用可否をユーザーに問う）。
+func renderApplyApprovalBox(req applyApprovalRequest) string {
+	var b strings.Builder
+	b.WriteString("\n  ┌─ 委任結果の適用確認 ──────────────────────────────────\n")
+	b.WriteString(fmt.Sprintf("  │  委任  : %s\n", firstLine(req.label, 60)))
+	b.WriteString(fmt.Sprintf("  │  変更ファイル数: %d\n", len(req.changedFiles)))
+	shown := req.changedFiles
+	if len(shown) > 10 {
+		shown = shown[:10]
+	}
+	for _, f := range shown {
+		b.WriteString("  │    - " + f + "\n")
+	}
+	if len(req.changedFiles) > len(shown) {
+		b.WriteString(fmt.Sprintf("  │    …他%d件\n", len(req.changedFiles)-len(shown)))
+	}
+	b.WriteString("  │\n")
+	summaryLines := strings.Split(req.summary, "\n")
+	if len(summaryLines) > 10 {
+		summaryLines = summaryLines[:10]
+	}
+	for _, line := range summaryLines {
+		b.WriteString("  │  " + line + "\n")
+	}
+	b.WriteString("  └──────────────────────────────────────────────────────\n")
+	b.WriteString(fmt.Sprintf("  適用しますか？ [Y/n] (%d秒で自動承認): ", approvalTimeoutSec))
+	return b.String()
+}
+
+// renderHostExecApprovalBox はPython版 app.py::_make_host_exec_approval_handler の
+// ASCII枠の移植（ホスト直接実行の承認をユーザーに問う。隔離なしで実システムに
+// 影響することを明示する）。
+func renderHostExecApprovalBox(req hostExecApprovalRequest) string {
+	var b strings.Builder
+	b.WriteString("\n  ┌─ ⚠ ホスト直接実行の承認 ─────────────────────────────\n")
+	b.WriteString(fmt.Sprintf("  │  コマンド: %s\n", firstLine(req.command, 200)))
+	b.WriteString(fmt.Sprintf("  │  理由    : %s\n", firstLine(req.reason, 200)))
+	b.WriteString("  │  ※ 隔離なしで実システムに影響します（デプロイ・インストール等）\n")
+	b.WriteString("  └──────────────────────────────────────────────────────\n")
+	b.WriteString(fmt.Sprintf("  実行しますか？ [Y/n] (%d秒で自動承認): ", approvalTimeoutSec))
+	return b.String()
+}
+
+func firstLine(s string, max int) string {
+	if idx := strings.IndexByte(s, '\n'); idx >= 0 {
+		s = s[:idx]
+	}
+	if len(s) > max {
+		s = s[:max]
+	}
+	return s
 }
 
 // ── View ──────────────────────────────────────────────────────
@@ -750,9 +1232,8 @@ func (m Model) renderTitleArt() string {
 	return strings.Join(lines, "\n")
 }
 
-// renderStatusPanel はPython版の #status-panel（■ AGENT セクション）を再現する
-// （固定幅36。CPU/MEMの■ SYSTEMセクションはGo版に対応するシステム計測が
-// 未実装のため今回は対象外——Python版のみの機能）。
+// renderStatusPanel はPython版の #status-panel（■ AGENT / ■ SYSTEM セクション）を
+// 再現する（固定幅36）。
 func (m Model) renderStatusPanel() string {
 	const panelWidth = 36
 	statusText := "IDLE"
@@ -763,7 +1244,18 @@ func (m Model) renderStatusPanel() string {
 	}
 	heading := lipgloss.NewStyle().Bold(true).Foreground(colAccent).Render("■ AGENT")
 	status := "  Status: " + lipgloss.NewStyle().Bold(true).Foreground(statusColor).Render(statusText)
-	content := heading + "\n" + status
+
+	memPct := 0.0
+	if m.systemMemTotalMB > 0 {
+		memPct = m.systemMemUsedMB / m.systemMemTotalMB * 100.0
+	}
+	sysHeading := lipgloss.NewStyle().Bold(true).Foreground(colAccent).Render("■ SYSTEM")
+	valStyle := lipgloss.NewStyle().Foreground(colTitle)
+	sysCPU := fmt.Sprintf("  CPU: %s", valStyle.Render(fmt.Sprintf("%5.1f%%", m.systemCPUPercent)))
+	sysMem := fmt.Sprintf("  MEM: %s / %.0fMB (%.0f%%)",
+		valStyle.Render(fmt.Sprintf("%6.0fMB", m.systemMemUsedMB)), m.systemMemTotalMB, memPct)
+
+	content := heading + "\n" + status + "\n" + sysHeading + "\n" + sysCPU + "\n" + sysMem
 
 	// 背景色は明示的に塗らず、端末側の背景（透過設定含む）をそのまま透けさせる。
 	return lipgloss.NewStyle().
@@ -856,30 +1348,62 @@ func (m Model) renderFiles(width, height int) string {
 	}
 	previewWidth := clampMin(width-treeWidth-3, 1)
 
-	var treeLines []string
-	for i, e := range m.files {
-		indent := strings.Repeat("  ", e.depth)
-		name := e.name
+	// ツリー本体（Python版 Tree ウィジェット: ルートのみ自動展開、他ノードは
+	// 展開するまで子要素が非表示。折りたたみディレクトリには▸、展開済みには▾を付す）。
+	visible := visibleFileEntries(m.files, m.cwd, m.filesExpanded)
+	rootLabel := "📁 " + m.cwd
+	rootLine := lipgloss.NewStyle().Foreground(colCyan).Bold(true).MaxWidth(treeWidth).Render(rootLabel)
+
+	var itemLines []string
+	for i, e := range visible {
+		indent := strings.Repeat("  ", e.depth+1)
+		icon := "📄 "
 		if e.isDir {
-			name += "/"
+			icon = "▾ 📁 "
+			if !m.filesExpanded[e.path] {
+				icon = "▸ 📁 "
+			}
 		}
-		line := indent + name
+		line := indent + icon + e.name
 		st := lipgloss.NewStyle().Foreground(colText)
 		if i == m.filesCursor {
 			st = lipgloss.NewStyle().Foreground(colOnAccent).Background(colAccent).Bold(true)
 		} else if e.isDir {
 			st = lipgloss.NewStyle().Foreground(colCyan)
 		}
-		treeLines = append(treeLines, st.MaxWidth(treeWidth).Render(line))
+		itemLines = append(itemLines, st.MaxWidth(treeWidth).Render(line))
 	}
-	if len(treeLines) == 0 {
-		treeLines = []string{lipgloss.NewStyle().Foreground(colMuted).Render("(空、またはスキャン待ち)")}
+	if len(visible) == 0 {
+		itemLines = append(itemLines, lipgloss.NewStyle().Foreground(colMuted).Render("  (空、またはスキャン待ち)"))
 	}
+
+	// ツリーの表示可能行数（ルート行を除く）に応じてスクロールウィンドウを切り出す
+	// （Python版 Tree ウィジェットの自動スクロールの移植）。
+	treeRows := clampMin(height-1, 1)
+	start := clampMin(m.filesScrollTop, 0)
+	if start > clamp0(len(itemLines)-1) {
+		start = clamp0(len(itemLines) - 1)
+	}
+	end := start + treeRows
+	if end > len(itemLines) {
+		end = len(itemLines)
+	}
+	treeLines := append([]string{rootLine}, itemLines[start:end]...)
 	tree := strings.Join(treeLines, "\n")
 
-	preview := m.filePreview
-	if preview == "" {
-		preview = "↑/↓ でファイル選択、Enterでプレビュー"
+	previewLines := strings.Split(m.filePreview, "\n")
+	previewRows := clampMin(height, 1)
+	pStart := clampMin(m.filePreviewScroll, 0)
+	if pStart > clamp0(len(previewLines)-1) {
+		pStart = clamp0(len(previewLines) - 1)
+	}
+	pEnd := pStart + previewRows
+	if pEnd > len(previewLines) {
+		pEnd = len(previewLines)
+	}
+	preview := strings.Join(previewLines[pStart:pEnd], "\n")
+	if m.filePreview == "" {
+		preview = "↑/↓ でファイル選択、Enterでプレビュー  (←/→でディレクトリ展開/折りたたみ)"
 	}
 	previewHeader := ""
 	if m.filePath != "" {
@@ -951,12 +1475,12 @@ func (m Model) renderInput() string {
 	boxRendered := box.Render(inputView)
 
 	hint := "Enter 送信 · Ctrl+N 改行 · F1-F4 タブ切替 · Ctrl+C 終了"
-	if m.pendingApproval != nil {
+	if m.pendingApproval != nil || m.pendingApplyApproval != nil || m.pendingHostExecApproval != nil {
 		hint = fmt.Sprintf("Y/n を入力 · Enter で確定 · %d秒で自動承認", approvalTimeoutSec)
 	} else if m.streaming {
 		hint = "⏳ 実行中... (Ctrl+C で中断)"
 	} else if m.active == tabFiles {
-		hint = "↑/↓ 選択 · Enter プレビュー · F1-F4 タブ切替"
+		hint = "↑/↓ 選択 · ←/→ 展開/折りたたみ · Enter 開く · PgUp/PgDn プレビュー捲り · Backspace 上へ"
 	} else if m.active != tabChat {
 		hint = "F1-F4 タブ切替 · Ctrl+C 終了"
 	}

@@ -58,6 +58,29 @@ func GetDelegationHistoryBrief(limit int) []string {
 	return out
 }
 
+// RenderDelegationHistory は直近の委任履歴を、委任タスク冒頭へ注入するテキストとして
+// 整形する（Python版 team.py::render_delegation_history の移植）。履歴が無ければ空文字。
+func RenderDelegationHistory() string {
+	historyMu.Lock()
+	entries := append([]delegationHistoryEntry(nil), history...)
+	historyMu.Unlock()
+	if len(entries) == 0 {
+		return ""
+	}
+	lines := []string{"[直近の委任履歴（ハーネス自動記録・あなた以前に行われた作業）]"}
+	for _, e := range entries {
+		cf := ""
+		if len(e.ChangedFiles) > 0 {
+			cf = " 変更: " + strings.Join(e.ChangedFiles, ", ")
+		}
+		lines = append(lines, fmt.Sprintf("- [%s] %s%s", e.Label, e.Status, cf))
+		lines = append(lines, "  依頼: "+e.Task)
+	}
+	lines = append(lines, "※ 上記と矛盾する変更（直前の委任が行った変更を打ち消す等）を行う場合は、"+
+		"その理由を最終回答に明記すること。")
+	return strings.Join(lines, "\n") + "\n\n"
+}
+
 // ClearDelegationHistory は委任履歴・書き込みストリークをリセットする
 // （/clear コマンド用。Python版 clear_delegation_history の移植）。
 func ClearDelegationHistory() {

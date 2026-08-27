@@ -2,10 +2,12 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	tea "charm.land/bubbletea/v2"
@@ -42,6 +44,14 @@ func main() {
 	setupSignalHandling()
 
 	cfg, err := config.Load(*envPath)
+	if errors.Is(err, config.ErrEnvTemplateGenerated) {
+		fmt.Println(strings.Repeat("=", 55))
+		fmt.Println("  設定ファイルを生成しました。")
+		fmt.Printf("  場所: %s\n", *envPath)
+		fmt.Println("  APIキーを設定してから再実行してください。")
+		fmt.Println(strings.Repeat("=", 55))
+		os.Exit(0)
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "設定読み込みエラー: %v\n", err)
 		os.Exit(1)

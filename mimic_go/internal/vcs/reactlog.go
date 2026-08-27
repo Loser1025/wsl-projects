@@ -33,6 +33,13 @@ func NewReactLog() *ReactLog {
 	return &ReactLog{sessionStart: time.Now()}
 }
 
+// EntryCount は蓄積済みエントリ数を返す（quit時の保存要否判定用）。
+func (rl *ReactLog) EntryCount() int {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	return len(rl.entries)
+}
+
 // SetJSONLPath はJSONL逐次書き込み先を設定する（Python版と異なり、
 // 既存ファイルからの復元は行わない簡略版 — チェックポイント再開は
 // internal/react.LoadCheckpoint が別途担っているため）。

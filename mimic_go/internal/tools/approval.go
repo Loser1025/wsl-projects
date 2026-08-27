@@ -50,6 +50,37 @@ func IsWriteRejected(output string) bool {
 	return len(output) >= len(writeRejectedPrefix) && output[:len(writeRejectedPrefix)] == writeRejectedPrefix
 }
 
+// HostExecApprovalHandler は run_host_command 実行前の承認判断を行うコールバック
+// （Python版 tools.py::_host_exec_approval_handler の移植）。command・reasonを
+// 受け取り、実行してよければtrueを返す。
+type HostExecApprovalHandler func(command, reason string) bool
+
+var (
+	hostExecApprovalMu sync.Mutex
+	hostExecApproval   HostExecApprovalHandler
+)
+
+// SetHostExecApprovalHandler はrun_host_command実行前の承認ハンドラを登録する。
+// nilを渡すと未登録扱いになり、run_host_commandは常に拒否される
+// （Python版が非対話実行時に常に拒否するのと同じ安全側の既定動作）。
+func SetHostExecApprovalHandler(h HostExecApprovalHandler) {
+	hostExecApprovalMu.Lock()
+	hostExecApproval = h
+	hostExecApprovalMu.Unlock()
+}
+
+// requestHostExecApproval はrun_host_commandから呼ぶ。ハンドラが無ければ
+// (false, false)を返し、呼び出し元は「未登録のため拒否」を報告すること。
+func requestHostExecApproval(command, reason string) (approved, handlerRegistered bool) {
+	hostExecApprovalMu.Lock()
+	h := hostExecApproval
+	hostExecApprovalMu.Unlock()
+	if h == nil {
+		return false, false
+	}
+	return h(command, reason), true
+}
+
 // RequestMCPApproval はMCPツール呼び出し前に承認を要求する（Python版
 // mcp_client.py::_make_tool_fn が _request_write_approval を呼ぶのと同じ経路を、
 // internal/mcp から internal/tools を経由して使うためのエクスポート版）。

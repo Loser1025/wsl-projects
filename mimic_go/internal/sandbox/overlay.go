@@ -88,12 +88,32 @@ type Workroom struct {
 	Upper  string // 書き込み層（変更差分がここに残る）
 	Work   string // overlayfsの内部work dir
 	Merged string // 合成ビュー（サンドボックス内の作業ディレクトリ）
+
+	Mode Mode // overlay/copyのいずれで動作するか（NewWorkroom時に一度だけ実地診断）
+
+	copyInitialized bool // copy-mode時、Merged初期化（Lowerの全コピー）を済ませたか
+}
+
+// detectedMode はDetectMode()の実地診断結果をプロセス内でキャッシュする
+// （診断自体が最大15秒かかるため、委任のたびに毎回実行しない）。
+var (
+	detectModeOnce sync.Once
+	detectedMode   Mode
+)
+
+func cachedDetectMode() Mode {
+	detectModeOnce.Do(func() { detectedMode = DetectMode() })
+	return detectedMode
 }
 
 // NewWorkroom はprojectDirをlowerdirとして参照するworkroomを作成する。
 // lowerdirはprojectDirを直接使う（Python版と同じくコピーしない。書き込みは
 // upperdirにしか反映されないため、lowerdir=projectDir自体は unshare 内の
 // mount操作でのみ変更されうるが、ホスト側namespaceには影響しない）。
+// unshare/user namespaceが使えない環境では、実地診断（cachedDetectMode）に
+// 基づき自動的にcopy-modeへフォールバックする
+// （Python版 subagent.py::_detect_sandbox_mode の移植。以前はGo版で
+// DetectModeが定義されているのに一度も呼ばれないデッドコードだった）。
 func NewWorkroom(projectDir string) (*Workroom, error) {
 	absProject, err := filepath.Abs(projectDir)
 	if err != nil {
@@ -109,6 +129,7 @@ func NewWorkroom(projectDir string) (*Workroom, error) {
 		Upper:  filepath.Join(base, "upper"),
 		Work:   filepath.Join(base, "work"),
 		Merged: filepath.Join(base, "merged"),
+		Mode:   cachedDetectMode(),
 	}
 	for _, d := range []string{w.Upper, w.Work, w.Merged} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
@@ -144,6 +165,9 @@ type RunResult struct {
 // 同時にマウントは自動解除される（後始末不要）。戻り値のChangedFilesは
 // upperdir走査で得た変更/新規ファイルの相対パス一覧。
 func (w *Workroom) Run(ctx context.Context, command string, timeout time.Duration) (RunResult, error) {
+	if w.Mode == ModeCopy {
+		return w.runCopy(ctx, command, timeout)
+	}
 	marker := "MIMIC_SANDBOX_EXIT:"
 	script := fmt.Sprintf(
 		"set -o pipefail\n"+
@@ -203,11 +227,147 @@ func (w *Workroom) Run(ctx context.Context, command string, timeout time.Duratio
 	return RunResult{Output: output, ExitCode: exitCode, ChangedFiles: changed}, nil
 }
 
-// ChangedFiles はupperdirを走査し、その時点までの累積の変更/新規ファイル
-// 一覧を返す。Runを複数回呼んだ後でも、upperdirは各回の変更が実ディスク上に
-// 積み重なっているため、都度これを呼べば最新の累積差分が取れる
+// runCopy はunshare/overlayが使えない環境向けのフォールバック実行方式
+// （Python版 subagent.py の copy-mode の移植）。隔離度は落ちる
+// （名前空間分離が無く、コマンドはホストのプロセス空間で直接動く）が、
+// 委任機能自体を完全に無効化するよりはマシという判断。初回呼び出し時に
+// LowerをMergedへ丸ごとコピーし、以降はMerged上で直接コマンドを実行する。
+func (w *Workroom) runCopy(ctx context.Context, command string, timeout time.Duration) (RunResult, error) {
+	if !w.copyInitialized {
+		if err := copyTree(w.Lower, w.Merged); err != nil {
+			return RunResult{}, fmt.Errorf("copy-modeの初期コピーに失敗しました: %w", err)
+		}
+		w.copyInitialized = true
+	}
+
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	cmd := exec.Command("bash", "-c", command)
+	cmd.Dir = w.Merged
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	var outBuf strings.Builder
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &outBuf
+	if err := cmd.Start(); err != nil {
+		return RunResult{}, err
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+
+	var err error
+	select {
+	case err = <-done:
+	case <-runCtx.Done():
+		if cmd.Process != nil {
+			if pgid, pgErr := syscall.Getpgid(cmd.Process.Pid); pgErr == nil {
+				syscall.Kill(-pgid, syscall.SIGKILL)
+			}
+		}
+		<-done
+		return RunResult{Output: outBuf.String(), TimedOut: true}, nil
+	}
+
+	exitCode := 0
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = -1
+		}
+	}
+
+	changed, walkErr := changedFilesCopy(w.Lower, w.Merged)
+	if walkErr != nil {
+		return RunResult{Output: outBuf.String(), ExitCode: exitCode}, walkErr
+	}
+	return RunResult{Output: outBuf.String(), ExitCode: exitCode, ChangedFiles: changed}, nil
+}
+
+// copyTree はsrc配下をdstへ再帰コピーする（copy-modeの初期化用）。
+func copyTree(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		target := filepath.Join(dst, rel)
+		if info.IsDir() {
+			return os.MkdirAll(target, info.Mode().Perm()|0o700)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil // シンボリックリンクは対象外（overlayモードとの挙動差だが実害は小さい）
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, info.Mode().Perm())
+	})
+}
+
+// changedFilesCopy はMerged側を走査し、Lower側と内容が異なる/新規のファイルを
+// 変更ファイルとして返す（copy-mode版のchangedFiles相当）。
+func changedFilesCopy(lower, merged string) ([]string, error) {
+	var changed []string
+	err := filepath.Walk(merged, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(merged, path)
+		if err != nil {
+			return nil
+		}
+		mergedData, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		lowerData, lowerErr := os.ReadFile(filepath.Join(lower, rel))
+		if lowerErr != nil || string(lowerData) != string(mergedData) {
+			changed = append(changed, rel)
+		}
+		return nil
+	})
+	return changed, err
+}
+
+// deletedFilesCopy はLower側を走査し、Merged側に存在しなくなったファイルを
+// 削除分として返す（copy-mode版のdeletedFiles相当）。
+func deletedFilesCopy(lower, merged string) ([]string, error) {
+	var deleted []string
+	err := filepath.Walk(lower, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(lower, path)
+		if err != nil {
+			return nil
+		}
+		if _, statErr := os.Stat(filepath.Join(merged, rel)); os.IsNotExist(statErr) {
+			deleted = append(deleted, rel)
+		}
+		return nil
+	})
+	return deleted, err
+}
+
+// ChangedFiles はその時点までの累積の変更/新規ファイル一覧を返す。
+// Runを複数回呼んだ後でも、Upper（またはcopy-modeのMerged）は各回の変更が
+// 実ディスク上に積み重なっているため、都度これを呼べば最新の累積差分が取れる
 // （verify失敗リトライで同じWorkroomに対しRunを繰り返す委任フローで使う）。
 func (w *Workroom) ChangedFiles() ([]string, error) {
+	if w.Mode == ModeCopy {
+		return changedFilesCopy(w.Lower, w.Merged)
+	}
 	return changedFiles(w.Upper)
 }
 
@@ -264,11 +424,19 @@ func ApplyChanges(w *Workroom, changedFiles []string) error {
 	applyMu.Lock()
 	defer applyMu.Unlock()
 
+	// copy-modeではUpperが存在しないため、変更の出所はMergedになる
+	// （overlay-modeはUpperのみに差分が残るのに対し、copy-modeはMerged全体が
+	// Lowerのコピー+変更後の状態そのもの）。
+	sourceDir := w.Upper
+	if w.Mode == ModeCopy {
+		sourceDir = w.Merged
+	}
+
 	for _, rel := range changedFiles {
 		if applyExcludedPaths[rel] {
 			continue
 		}
-		src := filepath.Join(w.Upper, rel)
+		src := filepath.Join(sourceDir, rel)
 		dst := filepath.Join(w.Lower, rel)
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return err
@@ -282,7 +450,13 @@ func ApplyChanges(w *Workroom, changedFiles []string) error {
 		}
 	}
 
-	deleted, err := deletedFiles(w.Upper)
+	var deleted []string
+	var err error
+	if w.Mode == ModeCopy {
+		deleted, err = deletedFilesCopy(w.Lower, w.Merged)
+	} else {
+		deleted, err = deletedFiles(w.Upper)
+	}
 	if err != nil {
 		return err
 	}

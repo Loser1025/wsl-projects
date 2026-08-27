@@ -11,8 +11,23 @@ import (
 	"mimic/internal/tools"
 )
 
-// isolatedMaxRounds はResearcherの最大ラウンド数（Python版 _ISOLATED_MAX_ROUNDS）。
-const isolatedMaxRounds = 8
+// researcherMaxRounds はResearcher役の最大ラウンド数（Python版 _RESEARCHER_MAX_ROUNDS）。
+const researcherMaxRounds = 12
+
+// roundsForSpecialist はrole/taskの記述量から読み取り専用Specialistのラウンド
+// 上限を段階的に決める（Python版 team.py::_rounds_for_specialist の移植。
+// 「コードベース全体のレビュー」のような広いタスクほど記述が長くなる傾向を
+// 利用した粗いヒューリスティック）。
+func roundsForSpecialist(role, task string) int {
+	size := len(role) + len(task)
+	if size > 1200 {
+		return 24
+	}
+	if size > 500 {
+		return 18
+	}
+	return researcherMaxRounds
+}
 
 // researcherTools はResearcherに与える読み取り専用+Web系ツールの一覧
 // （Python版 _RESEARCHER_TOOLS を踏襲。read_tool_cache/load_skill/list_skillsは
@@ -64,12 +79,12 @@ var jsonFenceRe = regexp.MustCompile(`(?s)` + "```json\\s*(\\{.*?\\})\\s*```")
 // （internal/react は internal/tools に依存しており、internal/delegate も
 // internal/tools に依存するため、internal/react を経由すると
 // tools→delegate→react→tools の依存循環になってしまうことを避ける構成上の理由もある）。
-func runIsolated(ctx context.Context, client *llm.Client, systemPrompt, userMessage string, registry *tools.Registry) (string, error) {
+func runIsolated(ctx context.Context, client *llm.Client, systemPrompt, userMessage string, registry *tools.Registry, maxRounds int) (string, error) {
 	specs := registry.Specs()
 	history := []llm.Message{{Role: "user", Content: userMessage}}
 	lastText := ""
 
-	for round := 0; round < isolatedMaxRounds; round++ {
+	for round := 0; round < maxRounds; round++ {
 		result, err := client.StreamChat(ctx, systemPrompt, history, specs, func(string) {})
 		if err != nil {
 			return "", err
@@ -112,7 +127,7 @@ func extractSuggestedVerifyCmd(research string) string {
 // 委任履歴リングバッファ・中断委任マニフェストは未移植）。
 func RunTeamTask(ctx context.Context, client *llm.Client, baseRegistry *tools.Registry, task, projectDir, verifyCmd string) (string, error) {
 	researcherRegistry := baseRegistry.Subset(researcherTools)
-	research, err := runIsolated(ctx, client, researcherSystemPrompt, task, researcherRegistry)
+	research, err := runIsolated(ctx, client, researcherSystemPrompt, task, researcherRegistry, researcherMaxRounds)
 	if err != nil {
 		return "", fmt.Errorf("Researcher調査に失敗しました: %w", err)
 	}
@@ -160,5 +175,5 @@ Director（指示役）から渡された「調べてほしいこと」につい
 func RunResearchQA(ctx context.Context, client *llm.Client, baseRegistry *tools.Registry, question, projectDir string) (string, error) {
 	registry := baseRegistry.Subset(researcherTools)
 	prompt := fmt.Sprintf("[作業フォルダ] %s\n\n[調べてほしいこと]\n%s\n", projectDir, question)
-	return runIsolated(ctx, client, researchQASystemPrompt, prompt, registry)
+	return runIsolated(ctx, client, researchQASystemPrompt, prompt, registry, researcherMaxRounds)
 }

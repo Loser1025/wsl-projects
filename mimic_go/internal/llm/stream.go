@@ -30,6 +30,7 @@ type streamRequest struct {
 	Stream     bool       `json:"stream"`
 	Tools      []ToolSpec `json:"tools,omitempty"`
 	ToolChoice string     `json:"tool_choice,omitempty"`
+	MaxTokens  int        `json:"max_tokens,omitempty"`
 }
 
 type streamChunk struct {
@@ -43,6 +44,7 @@ type streamChunk struct {
 					Name      string `json:"name"`
 					Arguments string `json:"arguments"`
 				} `json:"function"`
+				ExtraContent *ExtraContent `json:"extra_content,omitempty"`
 			} `json:"tool_calls"`
 		} `json:"delta"`
 		FinishReason string `json:"finish_reason"`
@@ -147,6 +149,9 @@ func (c *Client) attemptStreamChat(ctx context.Context, apiKey, systemPrompt str
 		req.Tools = tools
 		req.ToolChoice = "auto"
 	}
+	if c.provider.MaxTokens > 0 {
+		req.MaxTokens = c.provider.MaxTokens
+	}
 
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -175,7 +180,7 @@ func (c *Client) attemptStreamChat(ctx context.Context, apiKey, systemPrompt str
 	}
 
 	type accCall struct {
-		id, name, args string
+		id, name, args, thoughtSig string
 	}
 	acc := make(map[int]*accCall)
 	var textBuf strings.Builder
@@ -219,6 +224,9 @@ func (c *Client) attemptStreamChat(ctx context.Context, apiKey, systemPrompt str
 				cur.name = tc.Function.Name
 			}
 			cur.args += tc.Function.Arguments
+			if tc.ExtraContent != nil && tc.ExtraContent.Google != nil && tc.ExtraContent.Google.ThoughtSignature != "" {
+				cur.thoughtSig = tc.ExtraContent.Google.ThoughtSignature
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -234,14 +242,18 @@ func (c *Client) attemptStreamChat(ctx context.Context, apiKey, systemPrompt str
 		sort.Ints(indices)
 		for _, i := range indices {
 			c := acc[i]
-			result.ToolCalls = append(result.ToolCalls, ToolCall{
+			tc := ToolCall{
 				ID:   c.id,
 				Type: "function",
 				Function: ToolCallFunction{
 					Name:      c.name,
 					Arguments: c.args,
 				},
-			})
+			}
+			if c.thoughtSig != "" {
+				tc.ExtraContent = &ExtraContent{Google: &GoogleExtra{ThoughtSignature: c.thoughtSig}}
+			}
+			result.ToolCalls = append(result.ToolCalls, tc)
 		}
 	}
 	return result, 0, nil

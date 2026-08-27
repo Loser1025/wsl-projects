@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/text/encoding/htmlindex"
 )
 
 const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -73,6 +75,34 @@ func httpGet(rawURL string, timeout time.Duration) ([]byte, string, error) {
 	return body, resp.Header.Get("Content-Type"), nil
 }
 
+// decodeByCharset はContent-Typeヘッダのcharsetを検出しHTMLをUTF-8文字列に
+// デコードする（Python版 fetch_webpage の charset 検出処理の移植。charset未指定
+// またはutf-8ならそのまま、他エンコーディングはhtmlindexで対応するデコーダを
+// 探しベストエフォートで変換、失敗時はutf-8のまま返す＝Python版の
+// `except (LookupError, UnicodeDecodeError): html = raw.decode("utf-8", errors="replace")`
+// と同等のフォールバック）。
+func decodeByCharset(body []byte, contentType string) string {
+	charset := "utf-8"
+	if idx := strings.Index(contentType, "charset="); idx != -1 {
+		charset = strings.TrimSpace(contentType[idx+len("charset="):])
+		if semi := strings.Index(charset, ";"); semi != -1 {
+			charset = strings.TrimSpace(charset[:semi])
+		}
+	}
+	if strings.EqualFold(charset, "utf-8") || strings.EqualFold(charset, "utf8") {
+		return string(body)
+	}
+	enc, err := htmlindex.Get(charset)
+	if err != nil {
+		return string(body)
+	}
+	decoded, err := enc.NewDecoder().Bytes(body)
+	if err != nil {
+		return string(body)
+	}
+	return string(decoded)
+}
+
 func stripHTML(s string) string {
 	s = tagStripPat.ReplaceAllString(s, "")
 	s = strings.ReplaceAll(s, "&amp;", "&")
@@ -124,11 +154,11 @@ func toolFetchWebpage(args map[string]any) (string, error) {
 	rawURL := argString(args, "url")
 	maxChars := argInt(args, "max_chars", 10000)
 
-	body, _, err := httpGet(rawURL, 20*time.Second)
+	body, contentType, err := httpGet(rawURL, 20*time.Second)
 	if err != nil {
 		return fmt.Sprintf("ページ取得エラー: %v", err), nil
 	}
-	html := string(body)
+	html := decodeByCharset(body, contentType)
 
 	html = scriptStylePat.ReplaceAllString(html, " ")
 	html = commentPat.ReplaceAllString(html, " ")

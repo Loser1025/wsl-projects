@@ -3,6 +3,7 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"sync"
 
 	"mimic/internal/tools"
@@ -22,6 +23,7 @@ var (
 	serversMu   sync.Mutex
 	servers     = make(map[string]server)
 	serverTools = make(map[string][]string) // serverName -> 登録済みツールのフルネーム一覧（reconnect用）
+	lastResults = make(map[string]ConnectResult)
 )
 
 // ConnectResult は1サーバーへの接続試行結果。
@@ -54,7 +56,7 @@ func ConnectAll(r *tools.Registry, projectDir string, readonlyOnly bool) []Conne
 		var s server
 		var toolMap map[string]ToolInfo
 		if spec.URL != "" {
-			proc := NewHTTPServerProcess(name, spec.URL, spec.Env)
+			proc := NewHTTPServerProcess(name, spec.URL, spec.Headers)
 			if !proc.Start() {
 				results = append(results, ConnectResult{name, false, proc.FailedReason()})
 				continue
@@ -75,6 +77,12 @@ func ConnectAll(r *tools.Registry, projectDir string, readonlyOnly bool) []Conne
 		n := registerToolsFor(r, name, toolMap, projectDir)
 		results = append(results, ConnectResult{name, true, fmt.Sprintf("%d件のツールを登録", n)})
 	}
+
+	serversMu.Lock()
+	for _, res := range results {
+		lastResults[res.Name] = res
+	}
+	serversMu.Unlock()
 	return results
 }
 
@@ -142,21 +150,33 @@ func Reconnect(r *tools.Registry, projectDir, name string) ConnectResult {
 	configs := LoadServerConfigs(projectDir)
 	spec, ok := configs[name]
 	if !ok {
-		return ConnectResult{name, false, fmt.Sprintf("設定に見つかりません（.mcp.jsonに'%s'が定義されていません）", name)}
+		res := ConnectResult{name, false, fmt.Sprintf("設定に見つかりません（.mcp.jsonに'%s'が定義されていません）", name)}
+		serversMu.Lock()
+		lastResults[name] = res
+		serversMu.Unlock()
+		return res
 	}
 
 	var s server
 	var toolMap map[string]ToolInfo
 	if spec.URL != "" {
-		proc := NewHTTPServerProcess(name, spec.URL, spec.Env)
+		proc := NewHTTPServerProcess(name, spec.URL, spec.Headers)
 		if !proc.Start() {
-			return ConnectResult{name, false, proc.FailedReason()}
+			res := ConnectResult{name, false, proc.FailedReason()}
+			serversMu.Lock()
+			lastResults[name] = res
+			serversMu.Unlock()
+			return res
 		}
 		s, toolMap = proc, proc.Tools
 	} else {
 		proc := NewServerProcess(name, spec.Command, spec.Args, spec.Env)
 		if !proc.Start() {
-			return ConnectResult{name, false, proc.FailedReason()}
+			res := ConnectResult{name, false, proc.FailedReason()}
+			serversMu.Lock()
+			lastResults[name] = res
+			serversMu.Unlock()
+			return res
 		}
 		s, toolMap = proc, proc.Tools
 	}
@@ -165,7 +185,11 @@ func Reconnect(r *tools.Registry, projectDir, name string) ConnectResult {
 	servers[name] = s
 	serversMu.Unlock()
 	n := registerToolsFor(r, name, toolMap, projectDir)
-	return ConnectResult{name, true, fmt.Sprintf("%d件のツールを再登録", n)}
+	res := ConnectResult{name, true, fmt.Sprintf("%d件のツールを再登録", n)}
+	serversMu.Lock()
+	lastResults[name] = res
+	serversMu.Unlock()
+	return res
 }
 
 func truncateForPreview(s string, max int) string {
@@ -185,13 +209,36 @@ func ShutdownAll() {
 	servers = make(map[string]server)
 }
 
-// ListStatus は接続中サーバーの状態一覧を返す（/mcp コマンド等での利用を想定）。
+// ListStatus は設定済み全サーバーの状態一覧を返す（接続中・未接続いずれも含む。
+// Python版 mcp_client.list_status / commands.py::cmd_mcp の移植 — 未接続サーバーも
+// エラー理由付きで表示し、起動時に失敗したサーバーが黙って消えないようにする）。
 func ListStatus() []string {
 	serversMu.Lock()
 	defer serversMu.Unlock()
+	names := make(map[string]bool)
+	for name := range servers {
+		names[name] = true
+	}
+	for name := range lastResults {
+		names[name] = true
+	}
+	sorted := make([]string, 0, len(names))
+	for name := range names {
+		sorted = append(sorted, name)
+	}
+	sort.Strings(sorted)
+
 	var out []string
-	for name, s := range servers {
-		out = append(out, fmt.Sprintf("%s: %d件のツール", name, s.ToolCount()))
+	for _, name := range sorted {
+		if s, ok := servers[name]; ok {
+			out = append(out, fmt.Sprintf("✓ %s: 接続中 (%d件のツール)", name, s.ToolCount()))
+			continue
+		}
+		if res, ok := lastResults[name]; ok {
+			out = append(out, fmt.Sprintf("✗ %s: 未接続 (%s)", name, res.Message))
+			continue
+		}
+		out = append(out, fmt.Sprintf("? %s: 状態不明", name))
 	}
 	return out
 }

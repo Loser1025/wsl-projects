@@ -7,6 +7,7 @@ package config
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -55,9 +56,54 @@ type Config struct {
 	SystemPrompt string
 }
 
+// ErrEnvTemplateGenerated はLoadが.envの不在を検出し、テンプレートを新規生成して
+// 案内した際に返す番兵エラー。呼び出し元（cmd/mimic）はこれを通常のエラーと区別し、
+// 「設定してから再実行してください」という案内で正常終了(exit 0)すべきことを示す
+// （Python版 config.py::load_config の_generate_env_template呼び出し箇所の移植）。
+var ErrEnvTemplateGenerated = errors.New("env template generated")
+
+// envTemplate は.envが存在しない場合に生成する雛形（Python版 config.py::
+// _generate_env_template の移植）。
+const envTemplate = `# =====================================================
+# Mimic Go 設定ファイル
+# =====================================================
+
+# ── Actor: OpenRouter (https://openrouter.ai/keys)
+# OPENROUTER_KEY_1=YOUR_OPENROUTER_KEY_1
+# OPENROUTER_KEY_2=YOUR_OPENROUTER_KEY_2
+# OPENROUTER_KEY_3=YOUR_OPENROUTER_KEY_3
+# OPENROUTER_MODEL=openrouter/auto
+
+# ── Actor: Google AI Studio (https://aistudio.google.com/apikey)
+# GEMINI_KEY_1=YOUR_GEMINI_KEY_1
+# GEMINI_KEY_2=YOUR_GEMINI_KEY_2
+# GEMINI_KEY_3=YOUR_GEMINI_KEY_3
+# GEMINI_MODEL=gemini-2.0-flash
+# RPM_LIMIT_GEMINI=15
+
+# ── 共通設定 ──
+# どちらか一方（または両方）のキーを設定してください
+RPM_LIMIT=20
+
+# システムプロンプト
+SYSTEM_PROMPT=あなたは有能なAIアシスタントです。日本語で丁寧に回答してください。
+`
+
 // Load は指定パスの .env ファイルを読み、Config を返す。
 // Python版と同じキー名規則（<PROVIDER>_KEY_1..9 / <PROVIDER>_MODEL / RPM_LIMIT_*）を使う。
+// .envが存在しない場合はテンプレートを新規生成し、ErrEnvTemplateGeneratedを返す
+// （Python版 load_config の_generate_env_template呼び出しの移植）。
 func Load(envPath string) (*Config, error) {
+	if _, statErr := os.Stat(envPath); statErr != nil {
+		if os.IsNotExist(statErr) {
+			if err := os.WriteFile(envPath, []byte(envTemplate), 0o644); err != nil {
+				return nil, fmt.Errorf(".env テンプレートの生成に失敗しました: %w", err)
+			}
+			return nil, ErrEnvTemplateGenerated
+		}
+		return nil, statErr
+	}
+
 	raw, err := parseEnvFile(envPath)
 	if err != nil {
 		return nil, err

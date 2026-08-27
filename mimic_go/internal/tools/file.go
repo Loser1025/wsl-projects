@@ -9,7 +9,7 @@ import (
 )
 
 const largeFileThreshold = 5000 // Python版 _LARGE_FILE_THRESHOLD を踏襲
-const readFileChunk = 20000     // maxReadChars と同じ値でチャンク読みの単位とする
+const readFileChunk = 10000     // Python版 _TOOL_CHUNK_SIZE を踏襲（read_tool_cacheと同じ値）
 
 // checkWorkerWriteBoundary はWorker（OverlayFS隔離サブプロセス）実行時、
 // 作業ディレクトリの外への書き込みを拒否する（Python版 tools.py::_check_worker_write_boundary
@@ -141,6 +141,7 @@ func toolReadFile(args map[string]any) (string, error) {
 	}
 	content := string(data)
 	total := len(content)
+	MarkReadThisTurn(path)
 
 	if total > largeFileThreshold && offset == 0 {
 		preview := content
@@ -201,6 +202,13 @@ func toolWriteFile(args map[string]any) (string, error) {
 		return rejectErr, nil
 	}
 
+	warning := checkReadWarning(path)
+	oldContent, hadOld := "", false
+	if data, err := os.ReadFile(path); err == nil {
+		oldContent = string(data)
+		hadOld = true
+	}
+
 	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return "", err
@@ -209,7 +217,14 @@ func toolWriteFile(args map[string]any) (string, error) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("書き込み完了: %s (%d 文字)", path, len(content)), nil
+	result := fmt.Sprintf("書き込み完了: %s (%d 文字)", path, len(content))
+	if hadOld {
+		result += "\n" + generateDiff(oldContent, content)
+	}
+	if note := syntaxCheckNote(path); note != "" {
+		result += "\n" + note
+	}
+	return warning + result, nil
 }
 
 func toolEditFile(args map[string]any) (string, error) {
@@ -225,6 +240,7 @@ func toolEditFile(args map[string]any) (string, error) {
 		return rejectErr, nil
 	}
 
+	warning := checkReadWarning(path)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -242,7 +258,12 @@ func toolEditFile(args map[string]any) (string, error) {
 		if diffLines >= 0 {
 			sign = "+"
 		}
-		return fmt.Sprintf("編集完了: %s  (%s%d 行差分, 計 %d 行)", path, sign, diffLines, strings.Count(newContent, "\n")+1), nil
+		result := fmt.Sprintf("編集完了: %s  (%s%d 行差分, 計 %d 行)", path, sign, diffLines, strings.Count(newContent, "\n")+1)
+		result += "\n" + generateDiff(content, newContent)
+		if note := syntaxCheckNote(path); note != "" {
+			result += "\n" + note
+		}
+		return warning + result, nil
 	}
 	if count > 1 {
 		return "", fmt.Errorf("指定した文字列が %d 箇所に存在します（一意に特定できません）。前後の文脈をより多く含めた文字列を指定してください。", count)
@@ -272,6 +293,7 @@ func toolPatchFile(args map[string]any) (string, error) {
 		return rejectErr, nil
 	}
 
+	warning := checkReadWarning(path)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -292,7 +314,12 @@ func toolPatchFile(args map[string]any) (string, error) {
 		if diffLines >= 0 {
 			sign = "+"
 		}
-		return fmt.Sprintf("編集完了（完全一致）: %s  (%s%d 行差分)", path, sign, diffLines), nil
+		result := fmt.Sprintf("編集完了（完全一致）: %s  (%s%d 行差分)", path, sign, diffLines)
+		result += "\n" + generateDiff(content, newContent)
+		if note := syntaxCheckNote(path); note != "" {
+			result += "\n" + note
+		}
+		return warning + result, nil
 	}
 
 	// 2. インデント正規化後のファジーマッチ（stripしたコンテンツが完全一致する箇所を探す）
@@ -325,7 +352,8 @@ func toolPatchFile(args map[string]any) (string, error) {
 		if strings.HasSuffix(content, "\n") {
 			trailing = "\n"
 		}
-		if err := os.WriteFile(path, []byte(strings.Join(newLines, "\n")+trailing), 0o644); err != nil {
+		newContent := strings.Join(newLines, "\n") + trailing
+		if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
 			return "", err
 		}
 		diffLines := strings.Count(reIndented, "\n") - n + 1
@@ -333,7 +361,12 @@ func toolPatchFile(args map[string]any) (string, error) {
 		if diffLines >= 0 {
 			sign = "+"
 		}
-		return fmt.Sprintf("編集完了（インデント許容マッチ）: %s  (%s%d 行差分, indent_delta=%+d)", path, sign, diffLines, indentDelta), nil
+		result := fmt.Sprintf("編集完了（インデント許容マッチ）: %s  (%s%d 行差分, indent_delta=%+d)", path, sign, diffLines, indentDelta)
+		result += "\n" + generateDiff(content, newContent)
+		if note := syntaxCheckNote(path); note != "" {
+			result += "\n" + note
+		}
+		return warning + result, nil
 	}
 	if len(matches) > 1 {
 		return "", fmt.Errorf("検索ブロックが %d 箇所にマッチします（一意に特定できません）。", len(matches))

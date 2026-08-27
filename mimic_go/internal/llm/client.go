@@ -18,10 +18,25 @@ type ToolCallFunction struct {
 }
 
 // ToolCall は1回のツール呼び出し（アシスタントメッセージに乗せて送り返す形式）。
+// ExtraContentはGemini固有の thought_signature を往復させるためのフィールド
+// （Python版 agent.py::_build_tool_call_entry の移植。Geminiのfunction calling
+// プロトコルはマルチターンでこの署名の保持を要求するため、往復させないと
+// 2ターン目以降のtool_callsでプロトコル違反になりうる）。
 type ToolCall struct {
-	ID       string           `json:"id"`
-	Type     string           `json:"type"`
-	Function ToolCallFunction `json:"function"`
+	ID           string           `json:"id"`
+	Type         string           `json:"type"`
+	Function     ToolCallFunction `json:"function"`
+	ExtraContent *ExtraContent    `json:"extra_content,omitempty"`
+}
+
+// ExtraContent はGemini拡張フィールド（OpenAI互換エンドポイント経由でも
+// extra_content.google.thought_signature として往復する）。
+type ExtraContent struct {
+	Google *GoogleExtra `json:"google,omitempty"`
+}
+
+type GoogleExtra struct {
+	ThoughtSignature string `json:"thought_signature,omitempty"`
 }
 
 // Message はOpenAI chat-completions形式の1メッセージ。
@@ -31,6 +46,13 @@ type Message struct {
 	Content    string     `json:"content,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
+
+	// SkipSave はこのメッセージがターン内の一時的な誘導（空応答リトライ・
+	// XML救済リトライ・最終回答ゲートA/Bの差し戻し等）であり、ターン確定後は
+	// 次ターン以降の永続会話履歴から取り除くべきことを示す（Python版
+	// orchestrator.py の "_skip_save": True マーカーの移植）。APIへは送らない
+	// 内部状態のためJSONへは含めない。
+	SkipSave bool `json:"-"`
 }
 
 // ToolSpec はモデルへ渡すツール定義（OpenAI function calling形式）。
@@ -66,6 +88,16 @@ func NewClient(provider *config.ProviderConfig) *Client {
 
 func (c *Client) ProviderName() string { return c.provider.Name }
 func (c *Client) Model() string        { return c.model }
+
+// KeyStatus は現在のプロバイダのAPIキー状態一覧を返す（/status コマンド等での
+// 表示用。KeyManager.Statusのラッパー）。
+func (c *Client) KeyStatus() []KeyStatus { return c.keyManager.Status() }
+
+// NReadyKeys は現在すぐ使えるキー数を返す。
+func (c *Client) NReadyKeys() int { return c.keyManager.NReadyKeys() }
+
+// TotalTokensAvailable は全キーのトークン残量合計を返す。
+func (c *Client) TotalTokensAvailable() float64 { return c.keyManager.TotalTokensAvailable() }
 
 // ContextLength はモデルのコンテキストウィンドウ（トークン数）を返す。
 // 不明な場合は0（selector.SelectInteractivelyで疎通確認できなかった場合等）。

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,7 +79,7 @@ func registerBrowserTools(r *Registry) {
 		map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"selector": map[string]any{"type": "string", "description": "CSSセレクタ（例: button#submit）"},
+				"selector": map[string]any{"type": "string", "description": "CSSセレクタ...またはテキスト（例: text=ログイン）"},
 				"wait_ms":  map[string]any{"type": "integer", "description": "クリック後の待機ミリ秒（デフォルト500）", "default": 500},
 			},
 			"required": []string{"selector"},
@@ -148,8 +149,23 @@ func toolBrowserNavigate(args map[string]any) (string, error) {
 	return fmt.Sprintf("遷移完了: %s\nタイトル: %s", curURL, title), nil
 }
 
+// resolveSelector はPlaywright流の `text=...` 擬似セレクタをXPathのテキスト
+// マッチ式へ変換する（Python版はPlaywright自体が `text=` エンジンをネイティブ
+// サポートするため特別な変換コードは無いが、chromedpにはその機構が無いため
+// Go版ではXPathへの変換で同等の挙動を再現する）。それ以外はCSSセレクタとして
+// 扱う（chromedp.ByQuery）。
+func resolveSelector(selector string) (string, chromedp.QueryOption) {
+	if text, ok := strings.CutPrefix(selector, "text="); ok {
+		text = strings.Trim(text, `"'`)
+		escaped := strings.ReplaceAll(text, `"`, `\"`)
+		xpath := fmt.Sprintf(`//*[contains(normalize-space(string(.)), "%s")]`, escaped)
+		return xpath, chromedp.BySearch
+	}
+	return selector, chromedp.ByQuery
+}
+
 func toolBrowserClick(args map[string]any) (string, error) {
-	selector := argString(args, "selector")
+	rawSelector := argString(args, "selector")
 	waitMs := argInt(args, "wait_ms", 500)
 	ctx, err := getBrowserContext()
 	if err != nil {
@@ -158,16 +174,17 @@ func toolBrowserClick(args map[string]any) (string, error) {
 	actx, cancel := context.WithTimeout(ctx, browserActionTimeout)
 	defer cancel()
 
+	selector, queryOpt := resolveSelector(rawSelector)
 	var curURL string
 	err = chromedp.Run(actx,
-		chromedp.Click(selector, chromedp.ByQuery),
+		chromedp.Click(selector, queryOpt),
 		chromedp.Sleep(time.Duration(waitMs)*time.Millisecond),
 		chromedp.Location(&curURL),
 	)
 	if err != nil {
 		return fmt.Sprintf("browser_click エラー: %v", err), nil
 	}
-	return fmt.Sprintf("クリック完了: %s\n現在のURL: %s", selector, curURL), nil
+	return fmt.Sprintf("クリック完了: %s\n現在のURL: %s", rawSelector, curURL), nil
 }
 
 func toolBrowserType(args map[string]any) (string, error) {

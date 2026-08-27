@@ -78,9 +78,10 @@ func runNonInteractive(client *llm.Client, systemPrompt, prompt string, auto boo
 	}
 	reactLog.Add("session_start", sessionStart)
 	if !isWorker {
-		// get_delegation_traceツールがtrace_idを逆引きできるよう、Director自身の
-		// sessionsディレクトリを共有する。
+		// get_delegation_trace/search_historyツールがセッションログを参照できるよう、
+		// Director自身のsessionsディレクトリを共有する。
 		delegate.SetSessionsDir(sessionsDir)
+		tools.SetSessionsDirForTool(sessionsDir)
 	}
 
 	// delegate_to_specialist経由で起動されたWorkerには、Directorが指定した

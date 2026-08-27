@@ -122,6 +122,45 @@ func registerShellTools(r *Registry) {
 			"required": []string{"command"},
 		},
 		toolRunPipeline)
+
+	r.Register("run_host_command",
+		"【要ユーザー承認】ホスト環境で直接コマンドを実行する。実行前に必ずユーザーの承認確認が入り、"+
+			"拒否されると実行されない（非対話実行では常に拒否）。Workerの隔離環境では原理的に不可能な操作"+
+			"**のみ**に使うこと: システムパッケージのインストール（apt等）、認証・ログイン状態が必要な操作"+
+			"（vercel/gh/gcloud等のデプロイ・push）、ユーザー環境の設定変更。通常のファイル操作・テスト・"+
+			"ビルドはdelegate_to_specialist(can_execute/can_write)を使う（承認不要で速い）。",
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"command":           map[string]any{"type": "string", "description": "実行するコマンド"},
+				"reason":            map[string]any{"type": "string", "description": "なぜWorkerへの委任ではなくホスト実行が必要かの説明（承認画面でユーザーに表示される）"},
+				"working_directory": map[string]any{"type": "string", "description": "作業ディレクトリ（デフォルト: カレント）", "default": ""},
+				"timeout":           map[string]any{"type": "integer", "description": "タイムアウト秒数（デフォルト120）", "default": 120},
+			},
+			"required": []string{"command", "reason"},
+		},
+		toolRunHostCommand)
+}
+
+// toolRunHostCommand はrun_bashと同じ実行系だが、Worker環境では常に拒否し、
+// 承認ハンドラ経由でユーザー承認を得てから実行する（Python版 tools.py::
+// run_host_command の移植）。
+func toolRunHostCommand(args map[string]any) (string, error) {
+	if os.Getenv("MIMIC_NO_AUTOGIT") != "" {
+		return "エラー: run_host_command はWorker環境では使用できません。必要な場合は最終回答でDirectorに依頼してください。", nil
+	}
+	command := argString(args, "command")
+	reason := argString(args, "reason")
+
+	approved, registered := requestHostExecApproval(command, reason)
+	if !registered {
+		return "エラー: 承認ハンドラが未登録のため実行できません（非対話モードではホスト実行は常に拒否されます）。", nil
+	}
+	if !approved {
+		return "[実行拒否] ユーザーがホスト実行を承認しませんでした。\nコマンドの内容・理由を見直して再提案するか、別の手段を検討してください。", nil
+	}
+
+	return toolRunBash(args)
 }
 
 // toolRunBash はptyを確保してコマンドを実行する（npm/git等の対話的コマンドに

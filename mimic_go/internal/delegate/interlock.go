@@ -32,16 +32,18 @@ func noteWriteDelegation(changedFiles []string) {
 	}
 }
 
+// noteReadonlyDelegation は読み取り専用委任（delegate_to_specialist の
+// デフォルト権限分岐）が1回完了するたびに呼ぶ。書き込みストリークをリセットし、
+// 次の書き込み委任のブロックを解除する（Python版 team.py::_note_readonly_delegation
+// の移植）。
+func noteReadonlyDelegation() {
+	interlockMu.Lock()
+	writeStreak = nil
+	interlockMu.Unlock()
+}
+
 // checkWriteInterlock は書き込み委任を許可してよいか判定する。
 // 拒否する場合は理由を説明する文字列を、許可する場合は空文字を返す。
-//
-// Python版はここでの「読み取り専用委任」実行によりストリークをリセットするが、
-// Go版はdelegate_to_specialist（読み取り専用ロール）が未実装のため、
-// Director自身が直接read_file/grep_codebase等で調査すれば十分という前提に
-// 適応させている（そもそもDirectorはこれらのツールを委任なしで持っている）。
-// そのため本実装ではストリークのリセット手段を明示メッセージ内の案内のみとし、
-// 実際のリセットは次にnoteWriteDelegationで重複のない変更が記録された時点で
-// 自然に起こる（重複判定は直近3件のスライディングウィンドウのため）。
 func checkWriteInterlock() string {
 	interlockMu.Lock()
 	defer interlockMu.Unlock()

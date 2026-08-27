@@ -3,6 +3,7 @@ package delegate
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
@@ -15,9 +16,17 @@ import (
 const roleMinChars = 20
 
 // roleForbiddenKeywords はroleに「禁止事項」が明記されているとみなすキーワード
-// （Python版 _ROLE_FORBIDDEN_KEYWORDS）。未記載でも拒否はせず警告のみとする
-// （Python版のMIMIC_ROLE_REQUIRE_FORBIDDEN=1相当の強制モードは未移植）。
+// （Python版 _ROLE_FORBIDDEN_KEYWORDS）。既定では未記載でも拒否しないが、
+// 環境変数MIMIC_ROLE_REQUIRE_FORBIDDEN=1を立てると必須項目として拒否化できる
+// （Python版と同じ2段階導入方針。以前はこの変数自体が一度も参照されず、
+// チェック自体が呼ばれないデッドコードになっていたため修正）。
 var roleForbiddenKeywords = []string{"禁止事項", "禁止:", "してはいけない"}
+
+// roleRequireForbidden はMIMIC_ROLE_REQUIRE_FORBIDDEN=1が設定されているかを返す
+// （Python版 _role_require_forbidden の移植）。
+func roleRequireForbidden() bool {
+	return strings.TrimSpace(os.Getenv("MIMIC_ROLE_REQUIRE_FORBIDDEN")) == "1"
+}
 
 // validateSpecialistRole はdelegate_to_specialistのroleを検証する。
 // 問題があればエラー文字列を、問題なければ空文字を返す
@@ -30,6 +39,16 @@ func validateSpecialistRole(role string) string {
 	}
 	if !strings.Contains(role, "完了基準") {
 		problems = append(problems, "roleに「完了基準」の明記がありません")
+	}
+	hasForbidden := false
+	for _, kw := range roleForbiddenKeywords {
+		if strings.Contains(role, kw) {
+			hasForbidden = true
+			break
+		}
+	}
+	if !hasForbidden && roleRequireForbidden() {
+		problems = append(problems, "roleに「禁止事項」の明記がありません")
 	}
 	if len(problems) == 0 {
 		return ""
@@ -86,14 +105,29 @@ func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *to
 	dynamicPrompt := buildDynamicSystemPrompt(role, canWrite, canExecute)
 
 	if !canWrite && !canExecute {
+		// 直前の別実行分の取りこぼしをこの委任の集計に混ぜないため破棄
+		// （Python版 team.py:966-967 の移植）。
+		tools.PopUsedSkills()
 		registry := baseRegistry.Subset(researcherTools)
-		answer, err := runIsolated(ctx, client, dynamicPrompt, task, registry)
+		// 委任履歴を作業フォルダ通知に続けてタスク冒頭へ注入する（Python版 team.py:969-973 の移植）。
+		prompt := fmt.Sprintf("[作業フォルダ] %s\n\n%s[タスク]\n%s\n", projectDir, RenderDelegationHistory(), task)
+		answer, err := runIsolated(ctx, client, dynamicPrompt, prompt, registry, roundsForSpecialist(role, task))
 		if err != nil {
 			return "", fmt.Errorf("Specialist実行に失敗しました: %w", err)
 		}
+		// インプロセスSkill使用のverify結果をtrustスコアに反映する
+		// （Python版 team.py:980-983 の移植。read-onlyには機械verify_cmdが無いため、
+		// 「ラウンド上限未到達で完了」をverifyPassed相当として扱う）。
+		completed := strings.TrimSpace(answer) != "" && !strings.HasPrefix(answer, "[ラウンド上限到達")
+		for _, skillName := range tools.PopUsedSkills() {
+			tools.RecordSkillOutcome(projectDir, skillName, completed)
+		}
 		// ロール保存は完了した委任のみ（Python版 run_specialist_task の読み取り専用分岐の移植）。
-		if strings.TrimSpace(answer) != "" {
+		if completed {
 			SaveSpecialistRole(role, "read")
+			// 読み取り専用委任の完了で書き込みストリークをリセットする
+			// （Python版 team.py:987 `_note_readonly_delegation()` の移植）。
+			noteReadonlyDelegation()
 		}
 		return "[Specialist:読取専用] " + answer, nil
 	}
@@ -162,9 +196,8 @@ func getSessionWorker() *sessionWorkerState {
 	return session
 }
 
-// DiscardSessionWorker は保持中のセッションWorkerを破棄する（/clear相当の操作用。
-// 現状呼び出し口となるスラッシュコマンドは未実装だが、将来の/clear実装に備えて
-// 関数として先行公開しておく）。
+// DiscardSessionWorker は保持中のセッションWorkerを破棄する（/clearコマンドから
+// 呼ばれる。Python版 team.py::discard_session_worker の移植）。
 func DiscardSessionWorker() {
 	sessionMu.Lock()
 	old := session

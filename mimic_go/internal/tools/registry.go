@@ -178,5 +178,6 @@ func NewDefaultRegistry() *Registry {
 	registerSkillTools(r)
 	registerOutputCacheTools(r)
 	registerBrowserTools(r)
+	registerSearchHistoryTools(r)
 	return r
 }

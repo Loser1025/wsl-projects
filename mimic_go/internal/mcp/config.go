@@ -6,13 +6,17 @@ import (
 	"path/filepath"
 )
 
-// ServerSpec は.mcp.jsonの1サーバー分の設定（stdioトランスポートのみ対応、
-// url指定のリモートサーバーはこのバッチでは未対応）。
+// ServerSpec は.mcp.jsonの1サーバー分の設定。commandを指定するとstdio
+// トランスポート、urlを指定するとStreamable HTTP（リモート）トランスポートで
+// 接続する。headersはHTTPトランスポート専用（Bearer認証等）、envはstdio
+// トランスポート専用（子プロセスの環境変数）— 両者を混同しないこと
+// （Python版 mcp_client.py::McpHttpServerProcess.__init__ の headers=spec.get("headers", {}) 相当）。
 type ServerSpec struct {
 	Command string            `json:"command"`
 	Args    []string          `json:"args"`
 	Env     map[string]string `json:"env"`
-	URL     string            `json:"url"` // 検出のみ（未対応の旨を返すために保持）
+	URL     string            `json:"url"`
+	Headers map[string]string `json:"headers"`
 }
 
 // LoadServerConfigs はClaude Codeと同じ .mcp.json / mcpServers キーを読む。

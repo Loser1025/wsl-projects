@@ -55,6 +55,9 @@ func (m Model) runSlashCommand(text string) (Model, bool) {
 	case "/sessions":
 		return m.appendCommandLog(text, listSessionsText(m.cwd)), true
 	case "/skills":
+		if len(args) > 0 && args[0] == "reload" {
+			return m.appendCommandLog(text, tools.ReloadSkills()), true
+		}
 		return m.appendCommandLog(text, m.registry.Call("list_skills", "{}")), true
 	case "/delegations":
 		return m.appendCommandLog(text, delegationsText()), true
@@ -98,6 +101,7 @@ func helpText() string {
 		"  /sessions                 過去セッション一覧",
 		"  /search <キーワード>       過去セッションをキーワード検索",
 		"  /skills                   利用可能なSkill一覧",
+		"  /skills reload            Skillディレクトリを再スキャン",
 		"  /delegations              孤立委任（中断された委任）の一覧",
 		"  /mcp                      接続中MCPサーバー一覧",
 		"  /mcp trust <server> [read-only|off]  MCPサーバーの信頼設定を変更",
@@ -135,9 +139,11 @@ func (m Model) cmdViewer(text string) Model {
 }
 
 func (m Model) statusText() string {
-	return fmt.Sprintf(
+	base := fmt.Sprintf(
 		"プロバイダ: %s\nモデル: %s\nモード: %s\n作業ディレクトリ: %s\nツール数: %d\n履歴メッセージ数: %d",
 		m.client.ProviderName(), m.client.Model(), m.agentMode, m.cwd, len(m.registry.Specs()), len(m.history))
+	return base + fmt.Sprintf("\nAPIキー: 即使用可 %d本 / 残トークン合計 %.1f",
+		m.client.NReadyKeys(), m.client.TotalTokensAvailable())
 }
 
 func (m Model) cmdCD(text string, args []string) Model {
@@ -159,6 +165,12 @@ func (m Model) cmdCD(text string, args []string) Model {
 	m.cwd = abs
 	m.filesScanned = false
 	m.files = nil
+	m.filesExpanded = nil
+	m.filesCursor = 0
+	m.filesScrollTop = 0
+	m.filePath = ""
+	m.filePreview = ""
+	m.filePreviewScroll = 0
 	return m.appendCommandLog(text, fmt.Sprintf("作業ディレクトリを変更しました: %s", abs))
 }
 
@@ -259,9 +271,9 @@ func (m Model) cmdMCP(text string, args []string) Model {
 	if len(args) == 0 {
 		status := mcp.ListStatus()
 		if len(status) == 0 {
-			return m.appendCommandLog(text, "接続中のMCPサーバーはありません。")
+			return m.appendCommandLog(text, "接続対象のMCPサーバーはありません（~/.mcp.json, ./.mcp.json にmcpServersが見つかりません）。")
 		}
-		return m.appendCommandLog(text, "接続中MCPサーバー:\n  "+strings.Join(status, "\n  "))
+		return m.appendCommandLog(text, "MCPサーバー:\n  "+strings.Join(status, "\n  "))
 	}
 	if args[0] == "trust" && len(args) >= 2 {
 		server := args[1]

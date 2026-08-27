@@ -1,11 +1,10 @@
-// Package delegate はResearcherを介さない最小構成のWorker委任を実装する
-// （Python版 team.py::run_worker_once / _run_delegation_core_inner の縮小移植）。
+// Package delegate はWorker委任（delegate_to_worker/delegate_to_team/
+// delegate_to_specialist）を実装する（Python版 team.py::run_worker_once /
+// _run_delegation_core_inner の移植）。role検証・禁止事項フィールド・書き込み
+// インターロック（interlock.go）、中断委任マニフェスト・クラッシュ再開・
+// タイムアウトウォッチドッグ（registerInflight等）は実装済み。
 //
-// 対象外（v2ロードマップ フェーズ3の次ステップ以降）:
-//   - Researcher段階（計画のJSON構造化）
-//   - role検証・禁止事項フィールド・書き込みインターロック
-//   - 中断委任マニフェスト・クラッシュ再開・タイムアウトウォッチドッグ
-//   - trace_idによるセッション相互リンク（ビューアでの親子表示）
+// 対象外: trace_idによるセッション相互リンク（ビューアでの親子委任ツリー表示）。
 //
 // verify_cmd失敗時は同じOverlay上でWorkerが最大MaxVerifyRetries回まで修正再試行する
 // （Python版のReflexionブロックも簡略版として移植: 直前の失敗要約のみ次の指示に含める）。
@@ -98,6 +97,10 @@ func RunWorkerOnce(ctx context.Context, task, projectDir, verifyCmd, rolePrompt 
 // expectedFilesが空でなければ、実際の変更ファイルと食い違う場合に警告を付す
 // （Python版 team.py::expected_files の移植。delegate_to_specialist専用）。
 func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyCmd, rolePrompt string, applyChanges, keepSession bool, expectedFiles []string) (string, error) {
+	// 競合検出用: この時刻以降に本体側(project dir)で変更されたファイルを
+	// 適用時に警告する（Python版 team.py:1044 `_t_start = time.time()` の移植）。
+	tStart := time.Now()
+
 	select {
 	case delegationSem <- struct{}{}:
 	default:
@@ -136,7 +139,10 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 		}
 	}
 
-	currentTask := task
+	// 委任履歴（直近の委任の要約）をハーネス側でタスク冒頭に自動注入する。
+	// task変数自体は汚さない（履歴記録・結果サマリには元のtaskを使う。
+	// Python版 team.py:1046-1048 の移植）。
+	currentTask := RenderDelegationHistory() + task
 	var summary string
 	var verifyExit *int
 	var verifyOutput string
@@ -198,8 +204,28 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 	}
 	changed = dedupe(changed)
 	discardedNote := ""
+
+	// 適用承認ゲート（APPLY_APPROVAL=ask/threshold時のみ発動。既定(auto)や
+	// ハンドラ未登録時は常に自動適用＝従来挙動）。Python版 team.py:1121-1130 の移植。
+	if len(changed) > 0 && applyChanges && needsApplyApproval(changed) {
+		if !requestApplyApproval(task, changed, truncateSummary(summary, 2000)) {
+			applyChanges = false
+			discardedNote = "（ユーザーが適用を拒否したため変更は破棄されました）"
+		}
+	}
+
+	var conflictFiles []string
 	if applyChanges {
 		if len(changed) > 0 {
+			// 委任実行中に本体側でも変更されたファイルを検出する（applyは
+			// last-writer-winsで上書きするため、警告として差分サマリに載せる。
+			// Python版 team.py:1132-1141 の移植）。
+			for _, f := range changed {
+				dst := filepath.Join(w.Lower, f)
+				if info, statErr := os.Stat(dst); statErr == nil && info.ModTime().After(tStart) {
+					conflictFiles = append(conflictFiles, f)
+				}
+			}
 			if err := sandbox.ApplyChanges(w, changed); err != nil {
 				return "", fmt.Errorf("変更の適用に失敗しました: %w", err)
 			}
@@ -207,9 +233,19 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 				teamAutoGit.Checkpoint(w.Lower, "delegate", strings.Join(changed, ", "))
 			}
 		}
-		noteWriteDelegation(changed)
-	} else if len(changed) > 0 {
-		discardedNote = "（実行専用のため変更は適用されず破棄されました）"
+		// 書き込みストリークの記録（Python版 team.py:1222-1229 の移植）。
+		// 機械検証を通過した変更は「進展」とみなしストリークをリセットする。
+		if verifyCmd != "" && verifyExit != nil && *verifyExit == 0 {
+			noteReadonlyDelegation()
+		} else {
+			noteWriteDelegation(changed)
+		}
+	} else {
+		if len(changed) > 0 && discardedNote == "" {
+			discardedNote = "（実行専用のため変更は適用されず破棄されました）"
+		}
+		// 実行専用（変更破棄）の委任完了は読み取り専用委任と同様に扱いストリークをリセットする。
+		noteReadonlyDelegation()
 	}
 
 	// Workerがload_skillを使っていれば、machine verify結果を信頼スコアに反映する
@@ -222,6 +258,13 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 	}
 
 	verifySection := ""
+	if verifyCmd == "" && applyChanges {
+		// verify_cmd未指定のまま書き込み委任が完了した場合、Workerの自己申告のみを
+		// 根拠に「完了」と断言されるのを防ぐため明示的にラベルを付ける
+		// （Python版 team.py:1179 " ※未検証（verify_cmd未指定・Workerの自己申告のみ）"の移植。
+		// 最終回答ゲートB(detectUnverifiedClaim)がこの文字列を検出条件に使う）。
+		verifySection = "\n\n[検証] ※未検証（verify_cmd未指定・Workerの自己申告のみ）"
+	}
 	if verifyCmd != "" {
 		switch {
 		case verifyExit == nil:
@@ -269,6 +312,11 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 			harnessNote += fmt.Sprintf("\n\n⚠ ハーネス判定: 変更予定（expected_files）に含まれないファイルが変更されました: %s\n"+
 				"意図した変更範囲からの逸脱がないか差分サマリを確認してください。", strings.Join(shown, ", "))
 		}
+	}
+
+	if len(conflictFiles) > 0 {
+		harnessNote += fmt.Sprintf("\n\n⚠ 競合の可能性: 委任実行中にプロジェクト側でも変更されていたファイルを上書きしました: %s",
+			strings.Join(conflictFiles, ", "))
 	}
 
 	crashNote := ""

@@ -27,6 +27,10 @@ const (
 	digestMaxChars           = 1600
 )
 
+// compactionMinEffectiveChars はオーバーヘッド差し引き後の実効しきい値の下限
+// （Python版 _effective_threshold の `max(1000, ...)` を踏襲）。
+const compactionMinEffectiveChars = 1000
+
 // compactionThreshold はcontextLength(トークン数)からしきい値(文字数)を計算する
 // （Python版 _update_compaction_threshold の移植）。
 func compactionThreshold(contextLength int) int {
@@ -34,6 +38,18 @@ func compactionThreshold(contextLength int) int {
 		return int(float64(contextLength) * charsPerToken * compactionRatio)
 	}
 	return compactionThresholdChars
+}
+
+// effectiveCompactionThreshold はsystem_prompt/context_headerのオーバーヘッドを
+// 差し引いた実効しきい値を返す（Python版 _effective_threshold の移植。Go版は
+// 呼び出し時点のsystemPrompt長を直接渡す方式のため、Python版の1秒TTLキャッシュは
+// 不要——毎ターン1回しか呼ばれないため）。
+func effectiveCompactionThreshold(contextLength, systemPromptLen int) int {
+	threshold := compactionThreshold(contextLength) - systemPromptLen
+	if threshold < compactionMinEffectiveChars {
+		return compactionMinEffectiveChars
+	}
+	return threshold
 }
 
 // compactionKeepRecent はしきい値に応じて圧縮後に残す直近メッセージ数を計算する
@@ -61,9 +77,9 @@ func msgCharCount(m llm.Message) int {
 // compactIfNeeded は会話履歴の合計文字数がしきい値を超えていれば、
 // 先頭2件（システムプロンプト相当のペア想定）と直近keepRecent件を
 // 残し、間の会話を機械ダイジェストに置換する。
-func compactIfNeeded(history *[]llm.Message, contextLength int) {
+func compactIfNeeded(history *[]llm.Message, contextLength, systemPromptLen int) {
 	h := *history
-	threshold := compactionThreshold(contextLength)
+	threshold := effectiveCompactionThreshold(contextLength, systemPromptLen)
 	total := 0
 	for _, m := range h {
 		total += msgCharCount(m)

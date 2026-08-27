@@ -1,9 +1,5 @@
 // Package react はThought→Action→ObservationのReActループ本体を実装する
-// （Python版 orchestrator.py::InteractiveOrchestrator.run_react の縮小版）。
-//
-// フェーズ1時点で移植済み: 基本ループ、tool_calls実行、履歴への追記、
-// 観測の切り詰め、ループブレーカー、チェックポイント保存・再開。
-// 未移植（後続フェーズ）: XMLツール呼び出し救済、最終回答ゲートA/B。
+// （Python版 orchestrator.py::InteractiveOrchestrator.run_react の移植）。
 package react
 
 import (
@@ -21,6 +17,10 @@ import (
 
 // MaxSteps はPython版の MAX_REACT_STEPS = 120 をそのまま踏襲する。
 const MaxSteps = 120
+
+// maxParallelToolWorkers は読み取り専用ツールの並列実行時の最大同時実行数
+// （Python版 orchestrator.py::ThreadPoolExecutor(max_workers=min(len(tool_calls),4)) を踏襲）。
+const maxParallelToolWorkers = 4
 
 // MaxObservationChars はツール出力(observation)1件あたりの文字数上限
 // （Python版 orchestrator.py::_OBS_MAX_CHARS = 2000 を踏襲）。
@@ -88,11 +88,11 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 	autoGit *vcs.AutoGit, cwd string, reactLog *vcs.ReactLog, callLog *vcs.ToolCallLog,
 	keepCheckpoint bool) (string, error) {
 
-	// 会話圧縮: しきい値超過時、古い会話を機械ダイジェストに置換する
-	// （Python版 agent.py::_compact_if_needed の移植。ターン開始時に1回のみ実行）。
-	compactIfNeeded(history, client.ContextLength())
-
 	specs := registry.Specs()
+
+	// このターンのread_file既読集合をクリアする
+	// （Python版 orchestrator.py::clear_read_files_registry() 呼び出しの移植）。
+	tools.ClearReadThisTurnRegistry()
 
 	// Skillの存在をモデルが能動的にlist_skillsを呼ばずとも認識できるよう、
 	// name+descriptionの要約を毎ターンsystemPromptへ常時掲載する
@@ -103,6 +103,12 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 	// （Python版 agent.py::_build_machine_notes の移植。scratchpadの自己更新が
 	// 当てにならない弱いモデル対策として、ハーネス側が確実な事実を提示する）。
 	systemPrompt += buildMachineNotes()
+
+	// 会話圧縮: しきい値超過時、古い会話を機械ダイジェストに置換する
+	// （Python版 agent.py::_compact_if_needed の移植。ターン開始時に1回のみ実行。
+	// system_prompt/context_headerのオーバーヘッド分を差し引いた実効しきい値を使う
+	// —— Python版 _effective_threshold の移植）。
+	compactIfNeeded(history, client.ContextLength(), len(systemPrompt))
 
 	if autoGit != nil {
 		autoGit.Backup(cwd)
@@ -126,6 +132,8 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 	repeatFailCounts := make(map[string]int)
 	refusals := 0
 	offloadRetryDone := false
+	unverifiedRetryDone := false
+	turnHadUnverified := false
 	hadToolCall := false
 	emptyRetryCount := 0
 	xmlToolRetryCount := 0
@@ -159,8 +167,8 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 			if result.Text == "" && hadToolCall && emptyRetryCount < MaxEmptyRetries {
 				emptyRetryCount++
 				*history = append(*history,
-					llm.Message{Role: "assistant", Content: "（思考中...）"},
-					llm.Message{Role: "user", Content: "ツール実行結果を踏まえて、作業内容と結果を日本語で報告してください。"},
+					llm.Message{Role: "assistant", Content: "（思考中...）", SkipSave: true},
+					llm.Message{Role: "user", Content: "ツール実行結果を踏まえて、作業内容と結果を日本語で報告してください。", SkipSave: true},
 				)
 				continue
 			}
@@ -170,31 +178,47 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 			if result.Text != "" && hasXMLToolCall(result.Text) && xmlToolRetryCount < MaxXMLToolRetries {
 				xmlToolRetryCount++
 				*history = append(*history,
-					llm.Message{Role: "assistant", Content: result.Text},
+					llm.Message{Role: "assistant", Content: result.Text, SkipSave: true},
 					llm.Message{Role: "user", Content: "[システム] ツール呼び出しがXML形式でテキストに含まれていましたが、" +
 						"パースできませんでした。\n" +
 						"ツールを呼び出す場合は、テキスト内に書かず、APIのtool_calls機能（JSON形式）を使ってください。\n" +
-						"直前のツール呼び出し意図をtool_calls形式で再送してください。"},
+						"直前のツール呼び出し意図をtool_calls形式で再送してください。", SkipSave: true},
 				)
 				continue
 			}
 
 			// 最終回答ゲートA: 実行手段を持つのにユーザーへ丸投げしていないか検査する
-			// （1ターンにつき1回だけ差し戻す。委任結果の未検証断言を見るゲートBは
-			// 委任(delegate_*)が未実装のため現状発火しない — gates.go参照）。
+			// （1ターンにつき1回だけ差し戻す）。
 			if !offloadRetryDone && detectCommandOffload(result.Text, toolNames) {
 				offloadRetryDone = true
 				*history = append(*history,
-					llm.Message{Role: "assistant", Content: result.Text},
+					llm.Message{Role: "assistant", Content: result.Text, SkipSave: true},
 					llm.Message{Role: "user", Content: "[システム] 回答内でユーザーにコマンド実行や手動修正を依頼していますが、" +
 						"実行はあなたの仕事です。あなたが持っている実行ツールを使って自分で実行してから結果を報告してください。\n" +
-						"この環境で本当に実行できない場合（認証・対話操作が必要等）のみ、その理由を明記した上でユーザーへの依頼を残してください。"},
+						"この環境で本当に実行できない場合（認証・対話操作が必要等）のみ、その理由を明記した上でユーザーへの依頼を残してください。", SkipSave: true},
+				)
+				continue
+			}
+
+			// 最終回答ゲートB: このターン内に「※未検証」の委任結果があったのに
+			// 「完了/解決」と断言していないか検査する（1ターンにつき1回だけ差し戻す）。
+			if !unverifiedRetryDone && detectUnverifiedClaim(result.Text, turnHadUnverified) {
+				unverifiedRetryDone = true
+				*history = append(*history,
+					llm.Message{Role: "assistant", Content: result.Text, SkipSave: true},
+					llm.Message{Role: "user", Content: "[システム] このターンには「※未検証」の委任結果が含まれていますが、" +
+						"回答は完了/解決したと断言しています。未検証のまま完了と報告せず、" +
+						"検証状況を正直に明記するか、可能であれば検証コマンドを実行して確認してから報告してください。", SkipSave: true},
 				)
 				continue
 			}
 
 			// ツール呼び出しなし = 最終回答。履歴に記録して終了。
 			*history = append(*history, llm.Message{Role: "assistant", Content: result.Text})
+			// ターン確定時点で、このターン中に挿入した一時的な誘導メッセージ
+			// （空応答/XML救済リトライ、ゲートA/Bの差し戻し）を永続履歴から
+			// 取り除く（Python版 orchestrator.py の _save_msgs フィルタの移植）。
+			*history = filterSkipSave(*history)
 			if !keepCheckpoint {
 				ClearCheckpoint(checkpointPath)
 			} else {
@@ -256,10 +280,16 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 			mon := vcs.NewProcessMonitor()
 			mon.Start()
 			var wg sync.WaitGroup
+			// Python版 ThreadPoolExecutor(max_workers=min(len(tool_calls),4)) と
+			// 同じく、並列度を最大4に制限する（無制限だとバッチが巨大な場合に
+			// システムリソースを圧迫しうるため）。
+			sem := make(chan struct{}, maxParallelToolWorkers)
 			for i, tc := range result.ToolCalls {
 				wg.Add(1)
+				sem <- struct{}{}
 				go func(i int, tc llm.ToolCall) {
 					defer wg.Done()
+					defer func() { <-sem }()
 					start := time.Now()
 					callOutputs[i] = tools.CachedCall(registry, tc.Function.Name, tc.Function.Arguments)
 					callElapsed[i] = time.Since(start)
@@ -338,6 +368,9 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 				}
 				reactLog.Add("observation", map[string]any{"tool": tc.Function.Name, "result": resultPreview, "step": step})
 			}
+			if strings.Contains(output, "※未検証") {
+				turnHadUnverified = true
+			}
 			isFail := isFailForLog
 			outputForHistory := output
 			if isFail {
@@ -399,6 +432,28 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 	}
 
 	return "", fmt.Errorf("最大ステップ数(%d)に到達しました", MaxSteps)
+}
+
+// filterSkipSave はSkipSave==trueのメッセージを取り除いた新しいスライスを返す
+// （Python版 orchestrator.py::_save_msgs フィルタの移植）。
+func filterSkipSave(history []llm.Message) []llm.Message {
+	hasSkip := false
+	for _, m := range history {
+		if m.SkipSave {
+			hasSkip = true
+			break
+		}
+	}
+	if !hasSkip {
+		return history
+	}
+	out := make([]llm.Message, 0, len(history))
+	for _, m := range history {
+		if !m.SkipSave {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // isFailure はツール実行結果が Registry.Call のエラー整形文字列かどうかを判定する

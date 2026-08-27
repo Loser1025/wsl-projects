@@ -1,13 +1,14 @@
 // Package mcp はMCP(Model Context Protocol)サーバーとの通信を実装する
-// （Python版 mcp_client.py の縮小移植）。
+// （Python版 mcp_client.py の移植）。
 //
-// このバッチではstdioトランスポート（subprocess + JSON-RPC, newline-delimited
-// JSON）のみを対象とし、Streamable HTTP（url指定のリモートサーバー）は
-// 対象外とする（次のステップ候補）。
+// stdioトランスポート（subprocess + JSON-RPC, newline-delimited JSON、
+// client.go）とStreamable HTTP（url指定のリモートサーバー、http_client.go）の
+// 両方に対応する。
 //
 // 書き込み承認フック（Python版は全MCPツール呼び出しをデフォルトで
-// _request_write_approval経由にする）もGo版には承認UI自体が無いため未実装
-// （write_file等の既存の書き込みツールと同じギャップ）。
+// _request_write_approval経由にする）も register.go::registerToolsFor で
+// 実装済み（.mimic/mcp_policy.json でtrust=read-onlyと明示されたサーバーのみ
+// 承認を省略する）。
 package mcp
 
 import (

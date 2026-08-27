@@ -17,14 +17,93 @@ const (
 	scratchpadMaxChars   = 800
 )
 
+// skillToolAliases はClaude Code固有のツール名→Mimic側の対応ツール名
+// （Python版 skills.py::_TOOL_ALIASES の移植）。
+var skillToolAliases = map[string]string{
+	"Read":      "read_file",
+	"Write":     "write_file",
+	"Edit":      "edit_file",
+	"MultiEdit": "edit_file",
+	"Bash":      "run_bash",
+	"Grep":      "grep_codebase",
+	"Glob":      "grep_codebase",
+	"WebFetch":  "fetch_webpage",
+	"WebSearch": "web_search",
+	"TodoWrite": "update_scratchpad",
+	"Task":      "delegate_to_specialist",
+}
+
+var skillAliasRe = func() *regexp.Regexp {
+	names := make([]string, 0, len(skillToolAliases))
+	for k := range skillToolAliases {
+		names = append(names, regexp.QuoteMeta(k))
+	}
+	sort.Strings(names)
+	return regexp.MustCompile(`\b(` + strings.Join(names, "|") + `)\b`)
+}()
+
+// buildAliasHint は本文中に出現するClaude Code固有ツール名を検出し、Mimic側の
+// 対応ツールへの読み替えヒントを返す（Python版 _build_alias_hint の移植）。
+// 該当なしなら空文字列。
+func buildAliasHint(body string) string {
+	matches := skillAliasRe.FindAllString(body, -1)
+	if len(matches) == 0 {
+		return ""
+	}
+	seen := make(map[string]bool)
+	var found []string
+	for _, m := range matches {
+		if !seen[m] {
+			seen[m] = true
+			found = append(found, m)
+		}
+	}
+	sort.Strings(found)
+	var lines []string
+	for _, name := range found {
+		lines = append(lines, fmt.Sprintf("  %s → %s", name, skillToolAliases[name]))
+	}
+	return "\n\n[ハーネス注記: ツール名の読み替え]\n" +
+		"このSkillはClaude Code向けに書かれており、本文中のツール名はMimicのツール体系と異なります。" +
+		"実行時は以下のように読み替えてください:\n" + strings.Join(lines, "\n")
+}
+
+// ── Skill使用トラッキング（P1: 信頼スコアリング統合の下地。Python版 mark_loaded/
+// pop_used の移植）。Python版はthreading.localでスレッド単位に隔離するが、
+// Go版はin-process実行（Director直接呼び出し／読み取り専用Specialistの単一
+// goroutine内完結呼び出し）でのみ使う前提のため、単純なミューテックス保護の
+// パッケージレベル集合で代替する。
+var (
+	skillUsageMu sync.Mutex
+	skillUsage   = map[string]bool{}
+)
+
+// MarkSkillLoaded はload_skillツール実行時に呼ぶ。
+func MarkSkillLoaded(name string) {
+	skillUsageMu.Lock()
+	skillUsage[name] = true
+	skillUsageMu.Unlock()
+}
+
+// PopUsedSkills は使用済みskill名集合を取り出してクリアする。
+func PopUsedSkills() []string {
+	skillUsageMu.Lock()
+	defer skillUsageMu.Unlock()
+	out := make([]string, 0, len(skillUsage))
+	for k := range skillUsage {
+		out = append(out, k)
+	}
+	skillUsage = map[string]bool{}
+	return out
+}
+
 type skill struct {
 	name        string
 	description string
 	path        string
 }
 
-// skillRegistry はPython版 SkillRegistry の縮小移植。トラストスコアリング・
-// ツール名エイリアスヒント・使用トラッキング(P1/P2)は本バッチでは未移植。
+// skillRegistry はPython版 SkillRegistry の移植。
 type skillRegistry struct {
 	mu     sync.Mutex
 	skills map[string]skill
@@ -146,12 +225,13 @@ func (sr *skillRegistry) loadBody(name string) string {
 		return fmt.Sprintf("エラー: %s を読めませんでした (%v)", sk.path, err)
 	}
 	_, body := parseFrontmatter(string(data))
+	aliasHint := buildAliasHint(body)
 	if len(body) <= skillBodyMaxChars {
-		return fmt.Sprintf("[Skill: %s]\n%s\n%s", name, strings.Repeat("─", 60), body)
+		return fmt.Sprintf("[Skill: %s]\n%s\n%s%s", name, strings.Repeat("─", 60), body, aliasHint)
 	}
 	// 本文超過時はread_tool_cacheでページング継続できるようキャッシュする
 	// （Python版 skills.py: 6000字超過分をcache_tool_output/read_tool_cache経由で提供する仕様の移植）。
-	return fmt.Sprintf("[Skill: %s]\n%s\n%s", name, strings.Repeat("─", 60), CacheObs("load_skill:"+name, body, skillBodyMaxChars))
+	return fmt.Sprintf("[Skill: %s]\n%s\n%s%s", name, strings.Repeat("─", 60), CacheObs("load_skill:"+name, body, skillBodyMaxChars), aliasHint)
 }
 
 func registerSkillTools(r *Registry) {
@@ -165,7 +245,9 @@ func registerSkillTools(r *Registry) {
 			"required": []string{"name"},
 		},
 		func(args map[string]any) (string, error) {
-			return globalSkillRegistry.loadBody(argString(args, "name")), nil
+			name := argString(args, "name")
+			MarkSkillLoaded(name)
+			return globalSkillRegistry.loadBody(name), nil
 		})
 
 	r.Register("list_skills",
@@ -215,6 +297,18 @@ func registerSkillTools(r *Registry) {
 			setScratchpad(content)
 			return fmt.Sprintf("スクラッチパッドを更新しました（%d文字）", len(content)), nil
 		})
+}
+
+// ReloadSkills はSkillディレクトリを明示的に再スキャンする（Python版
+// `/skills reload`サブコマンド ↔ SkillRegistry.rescan の移植）。
+func ReloadSkills() string {
+	var n int
+	if len(globalSkillRegistry.listSummaries()) == 0 {
+		n = globalSkillRegistry.scan(defaultSkillDirs())
+	} else {
+		n = globalSkillRegistry.rescan()
+	}
+	return fmt.Sprintf("Skillを再スキャンしました（%d件）", n)
 }
 
 // SkillContextHeaderSection は「利用可能なSkill」一覧を毎ターンのsystemPromptに

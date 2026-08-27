@@ -56,8 +56,9 @@ func detectCommandOffload(text string, availableTools []string) bool {
 
 // detectUnverifiedClaim は未検証の変更を「完了/解決」と断言している最終回答を検知する。
 // turnHadUnverified はこのターン内に「※未検証」の委任結果が存在したかを示す
-// （Go版フェーズ2時点では委任(delegate_*)が未実装のため常にfalseとなり、
-// 本ゲートは実質発火しない。委任実装後に有効化される想定で先行移植しておく）。
+// （internal/delegate/worker.goがverify_cmd未指定の書き込み委任結果に
+// "※未検証（verify_cmd未指定・Workerの自己申告のみ）"を付与し、loop.goがそれを
+// 検出してこのフラグを立てる。以前は委任未実装のため常にfalseだったが現在は有効）。
 func detectUnverifiedClaim(text string, turnHadUnverified bool) bool {
 	if !turnHadUnverified || text == "" {
 		return false
