@@ -1,1 +1,4 @@
 {"model":"nvidia/nemotron-3.5-lightning:free","provider":"openrouter","ts":"2026-08-27T12:15:18","type":"session_start"}
+{"content":"描画テストです","ts":"2026-08-27T12:15:27","type":"user_input"}
+{"args":{"content":"# 簡易描画テスト\n\n**太字**と*斜体*のテスト。\n\n- リスト1\n- リスト2\n\n1. 番号付き1\n2. 番号付き2\n\n```javascript\nconsole.log(\"Hello\");\n```\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n\u003e 引用テスト\n\n[リンクテスト](https://example.com)","path":"./simple_test.md"},"step":0,"tool":"write_file","ts":"2026-08-27T12:15:39","type":"action"}
+{"result":"書き込み完了: ./simple_test.md (257 文字)","step":0,"tool":"write_file","ts":"2026-08-27T12:15:44","type":"observation"}
