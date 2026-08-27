@@ -538,6 +538,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.recalcLayout()
 
+	case tea.MouseWheelMsg:
+		if m.active == tabFiles {
+			m.handleFilesMouseWheel(msg.Mouse())
+		}
+
+	case tea.MouseClickMsg:
+		if m.active == tabFiles && msg.Mouse().Button == tea.MouseLeft {
+			m.handleFilesMouseClick(msg.Mouse())
+		}
+
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" || msg.String() == "ctrl+q" {
 			if m.cancelFunc != nil {
@@ -1052,6 +1062,86 @@ func (m *Model) resetFilesTree() {
 	m.filePreviewScroll = 0
 }
 
+// filesPaneBoundary はFilesタブでツリー領域とプレビュー領域の境界となる
+// 画面X座標を返す（マウスがどちらのペイン上にあるかの判定用。renderBody/
+// renderFilesのレイアウト計算[hPad=1 + fileTreeWidth]を複製する）。
+func (m Model) filesPaneBoundary() int {
+	innerWidth := clamp0(m.width - 2)
+	return 1 + fileTreeWidth(innerWidth)
+}
+
+const filesMouseWheelStep = 3
+
+// handleFilesMouseWheel はFilesタブでのマウスホイールをツリー/プレビューの
+// スクロールに割り当てる（ホイール位置のX座標でどちらのペインを操作するか
+// 判定する。Python版はTree/RichLogがネイティブにホイール対応済みのため
+// 明示的なコードは無いが、同等のUXをGo版で再現する）。
+func (m *Model) handleFilesMouseWheel(ev tea.Mouse) {
+	inTree := ev.X < m.filesPaneBoundary()
+	rows := clampMin(m.viewport.Height()-1, 1)
+	switch ev.Button {
+	case tea.MouseWheelUp:
+		if inTree {
+			m.filesCursor -= filesMouseWheelStep
+			if m.filesCursor < 0 {
+				m.filesCursor = 0
+			}
+			m.ensureFilesCursorVisible(rows)
+		} else {
+			m.filePreviewScroll -= filesMouseWheelStep
+			if m.filePreviewScroll < 0 {
+				m.filePreviewScroll = 0
+			}
+		}
+	case tea.MouseWheelDown:
+		if inTree {
+			visible := visibleFileEntries(m.files, m.cwd, m.filesExpanded)
+			m.filesCursor += filesMouseWheelStep
+			if max := clamp0(len(visible) - 1); m.filesCursor > max {
+				m.filesCursor = max
+			}
+			m.ensureFilesCursorVisible(rows)
+		} else {
+			previewRows := clampMin(m.viewport.Height(), 1)
+			m.filePreviewScroll += filesMouseWheelStep
+			if max := previewMaxScroll(m.filePreview, previewRows); m.filePreviewScroll > max {
+				m.filePreviewScroll = max
+			}
+		}
+	}
+}
+
+// handleFilesMouseClick はツリー領域の行クリックをカーソル移動＋選択
+// （ディレクトリならcd、ファイルならプレビュー表示）として扱う
+// （Enterキー押下と同じ処理。Python版 Tree ウィジェットのクリック選択に相当）。
+// プレビュー領域のクリックは何もしない。
+func (m *Model) handleFilesMouseClick(ev tea.Mouse) {
+	if ev.X >= m.filesPaneBoundary() {
+		return
+	}
+	row := ev.Y - m.filesBodyTop()
+	if row <= 0 {
+		return // ルート行（0行目）のクリックは無視
+	}
+	visible := visibleFileEntries(m.files, m.cwd, m.filesExpanded)
+	idx := m.filesScrollTop + (row - 1)
+	if idx < 0 || idx >= len(visible) {
+		return
+	}
+	m.filesCursor = idx
+	e := visible[idx]
+	if e.isDir {
+		m.cwd = e.path
+		m.resetFilesTree()
+		m.log = append(m.log, fmt.Sprintf("  📁 作業Dir → %s", m.cwd))
+		m.viewport.SetContent(m.renderLog())
+	} else {
+		m.filePath = e.path
+		m.filePreview = readPreview(e.path)
+		m.filePreviewScroll = 0
+	}
+}
+
 // previewMaxScroll はプレビューペインの最終ページに対応するスクロール行数を返す
 // （Ctrl+End用）。
 func previewMaxScroll(preview string, rows int) int {
@@ -1341,11 +1431,27 @@ func (m Model) renderBody(height int) string {
 	return style.Render(content)
 }
 
-func (m Model) renderFiles(width, height int) string {
+// fileTreeWidth はFilesタブのツリー幅を計算する（renderFilesとマウスの
+// 当たり判定[handleFilesMouse]の両方から同じ式を使うための共通ヘルパー。
+// 計算がずれると「見た目と実際にクリックできる位置がずれる」バグになるため
+// 必ずこの関数を経由すること）。
+func fileTreeWidth(width int) int {
 	treeWidth := clampMin(width/3, 20)
 	if treeWidth > width-4 {
 		treeWidth = clampMin(width-4, 1)
 	}
+	return treeWidth
+}
+
+// filesBodyTop はFilesタブ本文（renderBody）が画面上で開始するY座標
+// （0始まり）を返す。renderFullのheader+tabsの積み上げと同じ計算をマウス
+// 当たり判定用に複製する。
+func (m Model) filesBodyTop() int {
+	return lipgloss.Height(m.renderHeader()) + 1 // +1 はタブ行
+}
+
+func (m Model) renderFiles(width, height int) string {
+	treeWidth := fileTreeWidth(width)
 	previewWidth := clampMin(width-treeWidth-3, 1)
 
 	// ツリー本体（Python版 Tree ウィジェット: ルートのみ自動展開、他ノードは
