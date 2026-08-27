@@ -293,15 +293,20 @@ func waitForTurnEvent(ch chan turnEvent) tea.Cmd {
 }
 
 // renderLog はviewportの幅に合わせて m.log の各行を折り返した上で結合する。
+// 幅が未確定（レイアウト計算前）でもMarkdown装飾自体は常に適用する。
 func (m Model) renderLog() string {
 	w := m.viewport.Width()
+	rendered := make([]string, len(m.log))
+	for i, line := range m.log {
+		rendered[i] = renderMarkdown(line)
+	}
 	if w <= 0 {
-		return strings.Join(m.log, "\n")
+		return strings.Join(rendered, "\n")
 	}
 	style := lipgloss.NewStyle().Width(w)
-	wrapped := make([]string, len(m.log))
-	for i, line := range m.log {
-		wrapped[i] = style.Render(renderMarkdown(line))
+	wrapped := make([]string, len(rendered))
+	for i, line := range rendered {
+		wrapped[i] = style.Render(line)
 	}
 	return strings.Join(wrapped, "\n")
 }
