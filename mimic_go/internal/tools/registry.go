@@ -1,12 +1,13 @@
-// Package tools はエージェントが呼び出せるツールのレジストリを実装する
-// （フェーズ2: ファイル書き込み・検索系の主要ツールに対応。委任系
-// (delegate_*) とブラウザ系 (browser_*) は、それぞれサンドボックス・
-// chromedp移植を伴うフェーズ3/4の範囲として本フェーズでは対象外）。
+// Package tools はエージェントが呼び出せるツールのレジストリを実装する。
+// 委任系 (delegate_*) はinternal/delegateから循環参照を避けるため呼び出し側
+// （cmd/mimic, internal/tui）が個別に登録する。ブラウザ系 (browser_*) は
+// internal/tools/browser.go でchromedpベースに実装済み。
 package tools
 
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"mimic/internal/llm"
 )
@@ -30,6 +31,7 @@ func NewRegistry() *Registry {
 }
 
 func (r *Registry) Register(name, description string, parameters map[string]any, handler Handler) {
+	_, exists := r.tools[name]
 	r.tools[name] = entry{
 		spec: llm.ToolSpec{
 			Type: "function",
@@ -41,7 +43,24 @@ func (r *Registry) Register(name, description string, parameters map[string]any,
 		},
 		handler: handler,
 	}
-	r.order = append(r.order, name)
+	if !exists {
+		r.order = append(r.order, name)
+	}
+}
+
+// Unregister はnameで指定したツールをレジストリから取り除く
+// （MCPサーバー切断・再接続時に、旧ツール一覧を確実にクリアするために使う）。
+func (r *Registry) Unregister(name string) {
+	if _, ok := r.tools[name]; !ok {
+		return
+	}
+	delete(r.tools, name)
+	for i, n := range r.order {
+		if n == name {
+			r.order = append(r.order[:i], r.order[i+1:]...)
+			break
+		}
+	}
 }
 
 // Subset は指定した名前のツールだけを持つ新しいRegistryを返す
@@ -54,6 +73,36 @@ func (r *Registry) Subset(names []string) *Registry {
 			sub.tools[name] = e
 			sub.order = append(sub.order, name)
 		}
+	}
+	return sub
+}
+
+// Exclude は指定した名前・接頭辞に一致しないツールだけを持つ新しいRegistryを
+// 返す（Python版 __main__.py の_SPECIALIST_EXCLUDED_TOOLSベースのSpecialist
+// レジストリ構築の移植。excludeNamesは完全一致、excludePrefixesは前方一致で除外）。
+func (r *Registry) Exclude(excludeNames []string, excludePrefixes []string) *Registry {
+	excluded := make(map[string]bool, len(excludeNames))
+	for _, n := range excludeNames {
+		excluded[n] = true
+	}
+	sub := NewRegistry()
+	for _, name := range r.order {
+		if excluded[name] {
+			continue
+		}
+		skip := false
+		for _, p := range excludePrefixes {
+			if strings.HasPrefix(name, p) {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+		e := r.tools[name]
+		sub.tools[name] = e
+		sub.order = append(sub.order, name)
 	}
 	return sub
 }
@@ -127,5 +176,7 @@ func NewDefaultRegistry() *Registry {
 	registerShellTools(r)
 	registerWebTools(r)
 	registerSkillTools(r)
+	registerOutputCacheTools(r)
+	registerBrowserTools(r)
 	return r
 }

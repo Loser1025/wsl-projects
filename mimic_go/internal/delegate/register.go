@@ -7,6 +7,7 @@ import (
 
 	"mimic/internal/llm"
 	"mimic/internal/tools"
+	"mimic/internal/viewer"
 )
 
 // RegisterTools はdelegate_to_worker/delegate_to_teamを既存のRegistryへ追加する。
@@ -110,6 +111,10 @@ func RegisterTools(r *tools.Registry, client *llm.Client) {
 				"can_execute": map[string]any{"type": "boolean", "description": "Trueで実行専用（コマンド実行可だが変更は破棄）。can_write=Trueが優先される", "default": false},
 				"project_dir": map[string]any{"type": "string", "description": "作業ディレクトリ（デフォルト: カレント）", "default": "."},
 				"verify_cmd":  map[string]any{"type": "string", "description": "can_write/can_execute時、実行後に評価する検証コマンド（省略可）", "default": ""},
+				"expected_files": map[string]any{
+					"type": "array", "items": map[string]any{"type": "string"},
+					"description": "変更を想定しているファイルパス一覧（省略可）。can_write=True時、これ以外のファイルが変更されると警告が付く",
+				},
 			},
 			"required": []string{"role", "task"},
 		},
@@ -118,9 +123,10 @@ func RegisterTools(r *tools.Registry, client *llm.Client) {
 			if roleErr := validateSpecialistRole(role); roleErr != "" {
 				return roleErr, nil
 			}
+			expectedFiles, _ := argStrArray(args, "expected_files")
 			return RunSpecialistTask(context.Background(), client, r,
 				role, argStr(args, "task"), defaultDir(argStr(args, "project_dir")), argStr(args, "verify_cmd"),
-				argBool(args, "can_write"), argBool(args, "can_execute"))
+				argBool(args, "can_write"), argBool(args, "can_execute"), expectedFiles)
 		})
 
 	r.Register("continue_specialist",
@@ -137,6 +143,34 @@ func RegisterTools(r *tools.Registry, client *llm.Client) {
 		func(args map[string]any) (string, error) {
 			return RunSpecialistContinue(context.Background(), argStr(args, "task"), argStr(args, "verify_cmd"))
 		})
+
+	r.Register("get_delegation_trace",
+		"delegate_to_team/delegate_to_worker/delegate_to_specialistの結果文字列に含まれるtrace_idから、"+
+			"そのWorkerが実際に実行したThought/Action/Observation/最終回答のトレースを取得する。"+
+			"diffサマリだけでは不十分で、指示通りの手順を踏んだか検証したい場合に使う。",
+		map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"trace_id":  map[string]any{"type": "string", "description": "委任結果文字列に含まれるtrace_id"},
+				"max_steps": map[string]any{"type": "integer", "description": "表示する最大ステップ数（デフォルト20）", "default": 20},
+			},
+			"required": []string{"trace_id"},
+		},
+		func(args map[string]any) (string, error) {
+			if teamSessionsDir == "" {
+				return "セッションログがまだありません。", nil
+			}
+			return viewer.GetSessionTraceText(teamSessionsDir, argStr(args, "trace_id"), argInt(args, "max_steps", 20)), nil
+		})
+}
+
+func argInt(args map[string]any, key string, def int) int {
+	if v, ok := args[key]; ok {
+		if f, ok := v.(float64); ok {
+			return int(f)
+		}
+	}
+	return def
 }
 
 func argBool(args map[string]any, key string) bool {

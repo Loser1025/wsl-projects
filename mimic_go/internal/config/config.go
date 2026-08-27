@@ -16,12 +16,13 @@ import (
 // ProviderConfig は1プロバイダ分の設定（Python版 OpenRouterConfig/
 // GoogleAIConfig/MistralConfig を統一表現にしたもの）。
 type ProviderConfig struct {
-	Name      string // "openrouter" / "gemini" / "mistral"
-	APIBase   string
-	APIKeys   []string
-	Model     string
-	RPMLimit  int
-	MaxTokens int
+	Name          string // "openrouter" / "gemini" / "mistral"
+	APIBase       string
+	APIKeys       []string
+	Model         string
+	RPMLimit      int
+	MaxTokens     int
+	ContextLength int // モデルのコンテキストウィンドウ（トークン数）、0=不明。selector.SelectInteractivelyが設定する
 }
 
 // BuildAuthHeaders はプロバイダごとの認証ヘッダーを返す。
@@ -170,8 +171,15 @@ func parseEnvFile(path string) (map[string]string, error) {
 
 	out := make(map[string]string)
 	scanner := bufio.NewScanner(f)
+	first := true
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+		line := scanner.Text()
+		if first {
+			// UTF-8 BOM付きファイルだと先頭キーの前にBOMが混入してパースが壊れるため除去する。
+			line = strings.TrimPrefix(line, "\uFEFF")
+			first = false
+		}
+		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}

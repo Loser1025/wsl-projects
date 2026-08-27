@@ -19,8 +19,9 @@ func (s *ServerProcess) ToolCount() int     { return len(s.Tools) }
 func (s *HTTPServerProcess) ToolCount() int { return len(s.Tools) }
 
 var (
-	serversMu sync.Mutex
-	servers   = make(map[string]server)
+	serversMu   sync.Mutex
+	servers     = make(map[string]server)
+	serverTools = make(map[string][]string) // serverName -> 登録済みツールのフルネーム一覧（reconnect用）
 )
 
 // ConnectResult は1サーバーへの接続試行結果。
@@ -79,6 +80,7 @@ func ConnectAll(r *tools.Registry, projectDir string, readonlyOnly bool) []Conne
 
 func registerToolsFor(r *tools.Registry, serverName string, toolMap map[string]ToolInfo, projectDir string) int {
 	n := 0
+	var registered []string
 	for toolName, spec := range toolMap {
 		fullName := fmt.Sprintf("mcp__%s__%s", serverName, toolName)
 		params := spec.InputSchema
@@ -112,9 +114,58 @@ func registerToolsFor(r *tools.Registry, serverName string, toolMap map[string]T
 			}
 			return s.CallTool(toolNameCapture, args), nil
 		})
+		registered = append(registered, fullName)
 		n++
 	}
+	serversMu.Lock()
+	serverTools[serverName] = registered
+	serversMu.Unlock()
 	return n
+}
+
+// Reconnect は指定サーバーを一度切断してから再接続し直す（Python版
+// commands.py::cmd_mcp の "/mcp reconnect <server>" の移植）。projectDirの
+// .mcp.json設定を再読み込みするため、設定変更後の再接続にも使える。
+func Reconnect(r *tools.Registry, projectDir, name string) ConnectResult {
+	serversMu.Lock()
+	if s, ok := servers[name]; ok {
+		s.Stop()
+		delete(servers, name)
+	}
+	oldTools := serverTools[name]
+	delete(serverTools, name)
+	serversMu.Unlock()
+	for _, toolName := range oldTools {
+		r.Unregister(toolName)
+	}
+
+	configs := LoadServerConfigs(projectDir)
+	spec, ok := configs[name]
+	if !ok {
+		return ConnectResult{name, false, fmt.Sprintf("設定に見つかりません（.mcp.jsonに'%s'が定義されていません）", name)}
+	}
+
+	var s server
+	var toolMap map[string]ToolInfo
+	if spec.URL != "" {
+		proc := NewHTTPServerProcess(name, spec.URL, spec.Env)
+		if !proc.Start() {
+			return ConnectResult{name, false, proc.FailedReason()}
+		}
+		s, toolMap = proc, proc.Tools
+	} else {
+		proc := NewServerProcess(name, spec.Command, spec.Args, spec.Env)
+		if !proc.Start() {
+			return ConnectResult{name, false, proc.FailedReason()}
+		}
+		s, toolMap = proc, proc.Tools
+	}
+
+	serversMu.Lock()
+	servers[name] = s
+	serversMu.Unlock()
+	n := registerToolsFor(r, name, toolMap, projectDir)
+	return ConnectResult{name, true, fmt.Sprintf("%d件のツールを再登録", n)}
 }
 
 func truncateForPreview(s string, max int) string {

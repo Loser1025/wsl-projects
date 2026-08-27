@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -451,7 +452,8 @@ func toolSmartRead(args map[string]any) (string, error) {
 	text := string(data)
 
 	if focus != "" {
-		out, found := grepInFile(text, focus, contextLines, false)
+		// focusは自由入力なので正規表現メタ文字はエスケープし、リテラル部分一致として扱う。
+		out, found, _ := grepInFile(text, regexp.QuoteMeta(focus), contextLines, false)
 		if found {
 			return fmt.Sprintf("[smart_read] %s / focus=%q\n%s", path, focus, out), nil
 		}

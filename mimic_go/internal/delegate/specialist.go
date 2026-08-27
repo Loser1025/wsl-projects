@@ -78,9 +78,10 @@ func buildDynamicSystemPrompt(role string, canWrite, canExecute bool) string {
 // RunSpecialistTask はrole検証済みの自由記述ロールでタスクを実行する
 // （Python版 team.py::run_specialist_task の移植。3段階権限:
 // 読み取り専用（デフォルト）/ can_execute=True（実行専用、変更は破棄）/
-// can_write=True（実装・適用）。expected_filesによる想定外ファイル警告は未移植）。
+// can_write=True（実装・適用）。expectedFilesが空でなければ、実際の変更
+// ファイルが想定外の場合に警告を付す）。
 func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *tools.Registry,
-	role, task, projectDir, verifyCmd string, canWrite, canExecute bool) (string, error) {
+	role, task, projectDir, verifyCmd string, canWrite, canExecute bool, expectedFiles []string) (string, error) {
 
 	dynamicPrompt := buildDynamicSystemPrompt(role, canWrite, canExecute)
 
@@ -89,6 +90,10 @@ func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *to
 		answer, err := runIsolated(ctx, client, dynamicPrompt, task, registry)
 		if err != nil {
 			return "", fmt.Errorf("Specialist実行に失敗しました: %w", err)
+		}
+		// ロール保存は完了した委任のみ（Python版 run_specialist_task の読み取り専用分岐の移植）。
+		if strings.TrimSpace(answer) != "" {
+			SaveSpecialistRole(role, "read")
 		}
 		return "[Specialist:読取専用] " + answer, nil
 	}
@@ -100,6 +105,10 @@ func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *to
 		if err != nil {
 			return "", err
 		}
+		// ロール保存は機械検証を通過した委任のみ（自己申告の「完了」では保存しない）。
+		if strings.Contains(result, "✓ 通過しました") {
+			SaveSpecialistRole(role, "execute")
+		}
 		return "[Specialist:実行専用] " + result, nil
 	}
 
@@ -107,12 +116,15 @@ func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *to
 	if err != nil {
 		return "", fmt.Errorf("workroom作成に失敗しました: %w", err)
 	}
-	result, err := runWorkerInWorkroom(ctx, w, task, verifyCmd, dynamicPrompt, true, true)
+	result, err := runWorkerInWorkroom(ctx, w, task, verifyCmd, dynamicPrompt, true, true, expectedFiles)
 	if err != nil {
 		w.Cleanup()
 		return "", err
 	}
 	setSessionWorker(w, dynamicPrompt, projectDir, verifyCmd)
+	if strings.Contains(result, "✓ 通過しました") {
+		SaveSpecialistRole(role, "write")
+	}
 	return "[Specialist:実装] " + result + "\n\n(continue_specialistで同じセッションに追加指示を出せます)", nil
 }
 
@@ -178,7 +190,7 @@ func RunSpecialistContinue(ctx context.Context, task, verifyCmd string) (string,
 	if verifyCmd == "" {
 		verifyCmd = s.verifyCmd
 	}
-	result, err := runWorkerInWorkroom(ctx, s.workroom, task, verifyCmd, s.rolePrompt, true, true)
+	result, err := runWorkerInWorkroom(ctx, s.workroom, task, verifyCmd, s.rolePrompt, true, true, nil)
 	if err != nil {
 		return "", err
 	}

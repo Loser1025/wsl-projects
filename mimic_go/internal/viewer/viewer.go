@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -97,6 +98,27 @@ func listSessions(sessionsDir string) []sessionMeta {
 }
 
 // StartServer は127.0.0.1のランダムポートでビューアサーバーを起動し、URLを返す。
+// OpenBrowser はurlを既定のブラウザで開こうとする（Python版
+// viewer.py::start_viewer_server の webbrowser.open(url) の移植）。
+// 開けなくても致命的エラーにはしない（ベストエフォート）。
+func OpenBrowser(url string) {
+	candidates := [][]string{
+		{"wslview", url},                // WSL専用（wslu）
+		{"xdg-open", url},               // 一般的なLinuxデスクトップ
+		{"cmd.exe", "/c", "start", url}, // WSLからWindows既定ブラウザを開く
+		{"open", url},                   // macOS
+	}
+	for _, argv := range candidates {
+		if _, err := exec.LookPath(argv[0]); err != nil {
+			continue
+		}
+		cmd := exec.Command(argv[0], argv[1:]...)
+		if cmd.Start() == nil {
+			return
+		}
+	}
+}
+
 func StartServer(sessionsDir string) (string, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

@@ -51,14 +51,37 @@ func runNonInteractive(client *llm.Client, systemPrompt, prompt string, auto boo
 		// Directorとして委任を行う場合のみ、適用後コミットを同じAutoGit
 		// インスタンスへ積ませる（Python版 team.py::set_team_autogit の移植）。
 		delegate.SetTeamAutoGit(autoGit)
+		delegate.WarnOrphanedDelegations()
 	}
 	reactLog := vcs.NewReactLog()
 	sessionsDir := filepath.Join(cwd, ".mimic", "sessions")
-	jsonlPath := filepath.Join(sessionsDir, "auto-"+fmt.Sprint(os.Getpid())+".jsonl")
+	// MIMIC_SESSIONS_DIRが設定されている場合（delegate_to_worker等が起動した
+	// Workerで、trace_id相互リンクのため）は、Overlay隔離された自分のcwdではなく
+	// 実プロジェクトのsessionsディレクトリへ直接書き込む（Python版が
+	// Path(__file__).parentという固定パスを使うのと同じ意図。Go版はバイナリに
+	// 固定インストール先が無いためDirectorから明示的に渡す方式にした）。
+	if override := os.Getenv("MIMIC_SESSIONS_DIR"); override != "" {
+		sessionsDir = override
+	}
+	traceID := os.Getenv("MIMIC_TRACE_ID")
+	jsonlName := "auto-" + fmt.Sprint(os.Getpid()) + ".jsonl"
+	if traceID != "" {
+		jsonlName = "trace-" + traceID + ".jsonl"
+	}
+	jsonlPath := filepath.Join(sessionsDir, jsonlName)
 	if err := reactLog.SetJSONLPath(jsonlPath); err == nil {
 		vcs.PruneOldSessions(sessionsDir, 200)
 	}
-	reactLog.Add("session_start", map[string]any{"model": client.Model(), "provider": client.ProviderName()})
+	sessionStart := map[string]any{"model": client.Model(), "provider": client.ProviderName()}
+	if traceID != "" {
+		sessionStart["trace_id"] = traceID
+	}
+	reactLog.Add("session_start", sessionStart)
+	if !isWorker {
+		// get_delegation_traceツールがtrace_idを逆引きできるよう、Director自身の
+		// sessionsディレクトリを共有する。
+		delegate.SetSessionsDir(sessionsDir)
+	}
 
 	// delegate_to_specialist経由で起動されたWorkerには、Directorが指定した
 	// ロール説明がMIMIC_ROLE_PROMPT環境変数で渡される（Python版と同じ仕組み）。

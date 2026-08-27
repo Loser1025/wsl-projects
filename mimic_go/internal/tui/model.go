@@ -29,7 +29,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"mimic/internal/bench"
 	"mimic/internal/delegate"
 	"mimic/internal/llm"
 	"mimic/internal/mcp"
@@ -116,6 +115,22 @@ type Model struct {
 	turnCh     chan turnEvent
 	cancelFunc context.CancelFunc
 	openLine   bool
+
+	// <think>/<thought>ブロック検出（Python版 utils.py::ThinkAwareBuffer の移植）。
+	// ターン開始時にリセットし、ストリームチャンクをこれ経由でログへ流す。
+	thinkBuf    ThinkAwareBuffer
+	inThinkLine bool
+
+	// /viewerコマンドでオンデマンド起動する観測ビューアのURL（起動前は空文字）。
+	viewerURL string
+
+	// エージェントモード（Python版 app.py::_cmd_mode の移植。interactive=通常の
+	// フルツールReAct（既定・退避用）、specialist=delegate_to_specialistのみで
+	// 動く軽量Director）。切替時はregistry/systemPromptを丸ごと差し替える。
+	agentMode          string
+	fullRegistry       *tools.Registry
+	specialistRegistry *tools.Registry
+	baseSystemPrompt   string // モード接尾辞を含まない素のsystemPrompt
 
 	// Filesタブ状態
 	files        []fileEntry
@@ -216,19 +231,28 @@ func NewModel(client *llm.Client, systemPrompt string) Model {
 	// 同じAutoGitインスタンスに積ませてsquash対象に含める
 	// （Python版 team.py::set_team_autogit の移植）。
 	delegate.SetTeamAutoGit(autoGit)
+	// get_delegation_traceツールがtrace_idを逆引きできるよう、TUI(常にDirector)の
+	// sessionsディレクトリを共有する。
+	delegate.SetSessionsDir(sessionsDir)
+
+	specialistRegistry := registry.Exclude(specialistExcludedTools, []string{"mcp__"})
 
 	return Model{
-		input:        ta,
-		client:       client,
-		systemPrompt: systemPrompt,
-		registry:     registry,
-		history:      history,
-		log:          log,
-		reactLog:     reactLog,
-		callLog:      vcs.NewToolCallLog(),
-		autoGit:      autoGit,
-		cwd:          cwd,
-		approvalCh:   approvalCh,
+		input:              ta,
+		client:             client,
+		systemPrompt:       systemPrompt,
+		baseSystemPrompt:   systemPrompt,
+		registry:           registry,
+		fullRegistry:       registry,
+		specialistRegistry: specialistRegistry,
+		agentMode:          "interactive",
+		history:            history,
+		log:                log,
+		reactLog:           reactLog,
+		callLog:            vcs.NewToolCallLog(),
+		autoGit:            autoGit,
+		cwd:                cwd,
+		approvalCh:         approvalCh,
 	}
 }
 
@@ -277,7 +301,7 @@ func (m Model) renderLog() string {
 	style := lipgloss.NewStyle().Width(w)
 	wrapped := make([]string, len(m.log))
 	for i, line := range m.log {
-		wrapped[i] = style.Render(line)
+		wrapped[i] = style.Render(renderMarkdown(line))
 	}
 	return strings.Join(wrapped, "\n")
 }
@@ -288,6 +312,44 @@ func (m *Model) appendToOpenLine(suffix string) {
 		m.openLine = true
 	}
 	m.log[len(m.log)-1] += suffix
+}
+
+// feedThinkAwareText はストリームチャンクをThinkAwareBuffer経由で処理し、
+// <think>/<thought>ブロックを灰色の折りたたみ表示、それ以外を通常の
+// アシスタント発言としてログへ流す（Python版 PipelineTypewriter::feed の
+// _enter_think/_flush_think_raw/_exit_think の簡略移植）。
+func (m *Model) feedThinkAwareText(chunk string) {
+	for _, seg := range m.thinkBuf.Push(chunk) {
+		m.appendThinkSegment(seg)
+	}
+}
+
+func (m *Model) appendThinkSegment(seg thinkSegment) {
+	if seg.IsThink {
+		if !m.inThinkLine {
+			m.closeOpenLine()
+			m.log = append(m.log, "  💭 "+strings.ReplaceAll(seg.Text, "\n", " "))
+			m.inThinkLine = true
+			m.openLine = true
+			return
+		}
+		m.log[len(m.log)-1] += strings.ReplaceAll(seg.Text, "\n", " ")
+		return
+	}
+	if m.inThinkLine {
+		m.closeOpenLine()
+		m.inThinkLine = false
+	}
+	m.appendToOpenLine(seg.Text)
+}
+
+// flushThinkBuffer はターン終了時に残バッファを強制フラッシュする。
+func (m *Model) flushThinkBuffer() {
+	for _, seg := range m.thinkBuf.Flush() {
+		m.appendThinkSegment(seg)
+	}
+	m.thinkBuf = ThinkAwareBuffer{}
+	m.inThinkLine = false
 }
 
 func (m *Model) closeOpenLine() {
@@ -419,31 +481,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.input.Reset()
-			if text == "/undo" {
-				result := m.autoGit.Rollback(m.cwd)
-				m.log = append(m.log, fmt.Sprintf("> %s", text), fmt.Sprintf("[AutoGit] %s", result))
-				m.openLine = false
-				m.viewport.SetContent(m.renderLog())
-				m.viewport.GotoBottom()
-				return m, nil
-			}
-			if text == "/stats" {
-				m.log = append(m.log, fmt.Sprintf("> %s", text), m.callLog.StatsText())
-				m.openLine = false
-				m.viewport.SetContent(m.renderLog())
-				m.viewport.GotoBottom()
-				return m, nil
-			}
-			if text == "/bench" {
-				report, err := bench.Run(m.cwd)
-				if err != nil {
-					report = fmt.Sprintf("ベンチマーク集計エラー: %v", err)
+			if strings.HasPrefix(text, "/") {
+				if updated, handled := m.runSlashCommand(text); handled {
+					return updated, nil
 				}
-				m.log = append(m.log, fmt.Sprintf("> %s", text), report)
-				m.openLine = false
-				m.viewport.SetContent(m.renderLog())
-				m.viewport.GotoBottom()
-				return m, nil
 			}
 			m.history = append(m.history, llm.Message{Role: "user", Content: text})
 			m.log = append(m.log, fmt.Sprintf("> %s", text))
@@ -478,18 +519,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case turnEvent:
 		switch {
 		case msg.finalErr != nil:
+			m.flushThinkBuffer()
 			m.closeOpenLine()
 			m.log = append(m.log, fmt.Sprintf("[エラー] %v", msg.finalErr))
 			m.streaming = false
 		case msg.tool != nil:
+			m.flushThinkBuffer()
 			m.closeOpenLine()
 			m.log = append(m.log, fmt.Sprintf("  → %s(%s)", msg.tool.Name, msg.tool.ArgsPreview))
 		case msg.done:
+			m.flushThinkBuffer()
 			m.closeOpenLine()
 			m.streaming = false
 			m.history = msg.history
 		default:
-			m.appendToOpenLine(msg.text)
+			m.feedThinkAwareText(msg.text)
 		}
 		m.viewport.SetContent(m.renderLog())
 		m.viewport.GotoBottom()
@@ -509,6 +553,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) startTurn() (tea.Model, tea.Cmd) {
 	m.streaming = true
+	m.thinkBuf = ThinkAwareBuffer{}
+	m.inThinkLine = false
 	ch := make(chan turnEvent)
 	ctx, cancel := context.WithCancel(context.Background())
 	m.turnCh = ch

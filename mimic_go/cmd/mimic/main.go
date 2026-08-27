@@ -5,16 +5,32 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
+	"os/signal"
+	"syscall"
 
 	tea "charm.land/bubbletea/v2"
 
 	"mimic/internal/config"
+	"mimic/internal/delegate"
 	"mimic/internal/llm"
 	"mimic/internal/selector"
 	"mimic/internal/tui"
-	"mimic/internal/viewer"
 )
+
+// setupSignalHandling はSIGTERMを受けた際にメッセージを出して正常終了し、
+// SIGHUPは無視する（Python版 __main__.py::_on_sigterm / SIGHUP=SIG_IGN の移植。
+// 端末が閉じられてもnohup相当で動作を継続させる意図）。
+func setupSignalHandling() {
+	signal.Ignore(syscall.SIGHUP)
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		fmt.Fprintln(os.Stderr, "\n  [SIGTERM] シャットダウンします...")
+		os.Exit(0)
+	}()
+}
 
 func main() {
 	envPath := flag.String("env", "./.env", ".envファイルのパス")
@@ -22,6 +38,8 @@ func main() {
 	autoPromptFlag := flag.String("auto-prompt", "", "自動実行モード: --promptと同様だが完了マーカー付きで出力する（Worker連携用、フェーズ3で本格活用予定）")
 	statusFlag := flag.Bool("status", false, "現在の設定（プロバイダ/モデル/キー数）を表示して終了する")
 	flag.Parse()
+
+	setupSignalHandling()
 
 	cfg, err := config.Load(*envPath)
 	if err != nil {
@@ -42,6 +60,11 @@ func main() {
 		return
 	}
 
+	// Directorとしての起動時、24時間以上前から進行中のままの孤立委任
+	// （前回セッションがクラッシュ等で中断した委任）があれば警告する
+	// （Python版 __main__.py の起動時警告の移植）。
+	delegate.WarnOrphanedDelegations()
+
 	// 対話モード起動前に、プロバイダ横断のモデルセレクター（一覧取得+疎通確認）を
 	// 必ず経由する（Python版 __main__.py の対話モード起動フローを踏襲）。
 	active := selector.SelectInteractively(cfg)
@@ -49,12 +72,8 @@ func main() {
 
 	fmt.Fprintf(os.Stderr, "[mimic-go] provider=%s model=%s\n", client.ProviderName(), client.Model())
 
-	if cwd, err := os.Getwd(); err == nil {
-		sessionsDir := filepath.Join(cwd, ".mimic", "sessions")
-		if url, err := viewer.StartServer(sessionsDir); err == nil {
-			fmt.Fprintf(os.Stderr, "[mimic-go] session viewer: %s\n", url)
-		}
-	}
+	// Viewerサーバーは常時起動せず、/viewerコマンドでオンデマンド起動する
+	// （Python版 commands.py::cmd_viewer と同じ挙動。意図しない常時待受ポートを避ける）。
 
 	// alt-screen・マウスモードはv2ではView()が返すtea.Viewのフィールドとして
 	// tui.Model.View()側で指定する（NewProgramのオプションではない）。

@@ -146,14 +146,12 @@ func (sr *skillRegistry) loadBody(name string) string {
 		return fmt.Sprintf("エラー: %s を読めませんでした (%v)", sk.path, err)
 	}
 	_, body := parseFrontmatter(string(data))
-	total := len(body)
-	if total <= skillBodyMaxChars {
+	if len(body) <= skillBodyMaxChars {
 		return fmt.Sprintf("[Skill: %s]\n%s\n%s", name, strings.Repeat("─", 60), body)
 	}
-	head := body[:skillBodyMaxChars]
-	return fmt.Sprintf(
-		"[Skill: %s  本文 %d文字中 先頭 %d文字]\n%s\n%s\n%s\n⚠ 本文が長いため切り詰めました（フェーズ2では続きの再取得手段は未移植）。",
-		name, total, skillBodyMaxChars, strings.Repeat("─", 60), head, strings.Repeat("─", 60))
+	// 本文超過時はread_tool_cacheでページング継続できるようキャッシュする
+	// （Python版 skills.py: 6000字超過分をcache_tool_output/read_tool_cache経由で提供する仕様の移植）。
+	return fmt.Sprintf("[Skill: %s]\n%s\n%s", name, strings.Repeat("─", 60), CacheObs("load_skill:"+name, body, skillBodyMaxChars))
 }
 
 func registerSkillTools(r *Registry) {
@@ -217,6 +215,47 @@ func registerSkillTools(r *Registry) {
 			setScratchpad(content)
 			return fmt.Sprintf("スクラッチパッドを更新しました（%d文字）", len(content)), nil
 		})
+}
+
+// SkillContextHeaderSection は「利用可能なSkill」一覧を毎ターンのsystemPromptに
+// 常時掲載するためのセクション文字列を返す（Python版 skills.py::
+// SkillRegistry.context_header_section の移植。name+descriptionのみで
+// 本文はload_skill(name)を呼ぶまで見せないProgressive Disclosureを実現する）。
+// Skillが1件も無ければ空文字を返す。
+func SkillContextHeaderSection() string {
+	if len(globalSkillRegistry.listSummaries()) == 0 {
+		globalSkillRegistry.scan(defaultSkillDirs())
+	} else {
+		globalSkillRegistry.rescan()
+	}
+	skills := globalSkillRegistry.listSummaries()
+	if len(skills) == 0 {
+		return ""
+	}
+	cwd, _ := os.Getwd()
+	trust := loadSkillTrust(cwd)
+
+	var lines []string
+	total := 0
+	for i, s := range skills {
+		desc := s.description
+		if len(desc) > skillSummaryDescMax {
+			desc = desc[:skillSummaryDescMax]
+		}
+		badge := "（※未検証）"
+		if t, ok := trust[s.name]; ok && t.PassCount > 0 {
+			badge = fmt.Sprintf("（検証通過%d回）", t.PassCount)
+		}
+		line := fmt.Sprintf("- %s%s: %s", s.name, badge, desc)
+		if total+len(line) > skillSummaryTotalMax {
+			lines = append(lines, fmt.Sprintf("…他 %d 件（省略）", len(skills)-i))
+			break
+		}
+		lines = append(lines, line)
+		total += len(line)
+	}
+	return "\n\n## 利用可能なSkill（name+descriptionのみ。本文は load_skill(name) で取得）\n" +
+		strings.Join(lines, "\n") + "\n"
 }
 
 var (

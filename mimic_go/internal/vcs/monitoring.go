@@ -9,15 +9,16 @@ import (
 )
 
 // ToolCallRecord は1回のツール呼び出しの計測結果
-// （Python版 monitoring.py::ToolCallRecord の縮小移植。
-// CPU%/RSS計測(proc_observer.py)はバックグラウンドサンプリングスレッドを
-// 要し診断上の価値の割にコストが高いため、本バッチでは未移植とし
-// 実行時間・成否のみを記録する）。
+// （Python版 monitoring.py::ToolCallRecord の移植。CPUMaxPct/RSSDeltaMBは
+// internal/vcs/procobserver.go の ProcessMonitor によるバックグラウンド
+// ポーリング計測値。呼び出し元が計測しない場合は0のままでよい）。
 type ToolCallRecord struct {
-	Tool     string
-	Elapsed  time.Duration
-	Status   string // "ok" | "error"
-	Occurred time.Time
+	Tool       string
+	Elapsed    time.Duration
+	Status     string // "ok" | "error"
+	Occurred   time.Time
+	CPUMaxPct  float64
+	RSSDeltaMB float64
 }
 
 func (r ToolCallRecord) oneLine() string {
@@ -25,7 +26,7 @@ func (r ToolCallRecord) oneLine() string {
 	if r.Status != "ok" {
 		icon = "✗"
 	}
-	return fmt.Sprintf("%s %s %.2fs", icon, r.Tool, r.Elapsed.Seconds())
+	return fmt.Sprintf("%s %s %.2fs | CPU:max%.0f%% | MEM:%+.0fMB", icon, r.Tool, r.Elapsed.Seconds(), r.CPUMaxPct, r.RSSDeltaMB)
 }
 
 // ToolCallLog はセッション中の全ツール呼び出しを記録する。
@@ -62,6 +63,8 @@ func (l *ToolCallLog) StatsText() string {
 	var totalElapsed time.Duration
 	slowest := recs[0]
 	counts := make(map[string]int)
+	cpuMax := 0.0
+	rssDeltaSum := 0.0
 	for _, r := range recs {
 		if r.Status == "error" {
 			errors++
@@ -71,6 +74,10 @@ func (l *ToolCallLog) StatsText() string {
 			slowest = r
 		}
 		counts[r.Tool]++
+		if r.CPUMaxPct > cpuMax {
+			cpuMax = r.CPUMaxPct
+		}
+		rssDeltaSum += r.RSSDeltaMB
 	}
 	ok := total - errors
 
@@ -97,6 +104,8 @@ func (l *ToolCallLog) StatsText() string {
 		fmt.Sprintf("  合計時間   : %.1fs", totalElapsed.Seconds()),
 		fmt.Sprintf("  平均時間   : %.2fs", avg),
 		fmt.Sprintf("  最遅       : %s %.2fs", slowest.Tool, slowest.Elapsed.Seconds()),
+		fmt.Sprintf("  CPU最大    : %.0f%%", cpuMax),
+		fmt.Sprintf("  MEM増分合計: %+.0fMB", rssDeltaSum),
 		"  使用頻度   : " + strings.Join(topParts, "  "),
 	}, "\n")
 }

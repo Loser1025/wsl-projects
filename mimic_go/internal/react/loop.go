@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"mimic/internal/llm"
@@ -21,16 +22,45 @@ import (
 // MaxSteps はPython版の MAX_REACT_STEPS = 120 をそのまま踏襲する。
 const MaxSteps = 120
 
-// MaxObservationChars はツール出力(observation)1件あたりの文字数上限。
+// MaxObservationChars はツール出力(observation)1件あたりの文字数上限
+// （Python版 orchestrator.py::_OBS_MAX_CHARS = 2000 を踏襲）。
 // 上限なしで履歴に積み続けると、巨大なgrep結果等を含む長いターンで
 // 履歴全体を毎ステップ再送信するReActの構造上、メモリ・帯域が
 // 際限なく膨張する（実運用でOOM Killerに殺される事例を確認済み）。
-const MaxObservationChars = 4000
+const MaxObservationChars = 2000
 
-// MaxRepeatedFailures は同一のツール呼び出し（名前+引数が同一）が
-// 連続して失敗し続けた場合に強制終了するまでの回数
-// （Python版ループブレーカーの「同一失敗3回」を踏襲）。
+// DelegationObservationChars は委任系ツールの観測上限（Python版
+// _DELEGATION_OBS_MAX_CHARS = 6000 を踏襲）。委任結果はDirectorの唯一の
+// 情報源になりうるため、通常ツールより大きい切り詰め上限を使う。
+const DelegationObservationChars = 6000
+
+// delegationTools は internal/delegate/register.go が登録する委任系ツール名の集合。
+var delegationTools = map[string]bool{
+	"delegate_to_specialist":    true,
+	"delegate_to_team":          true,
+	"delegate_to_worker":        true,
+	"delegate_to_team_parallel": true,
+	"delegate_research":         true,
+	"continue_specialist":       true,
+}
+
+// MaxRepeatedFailures は同一のツール呼び出し（名前+引数が同一）の失敗が
+// この回数に達すると、以降は実行せず拒否メッセージのみ返すようになる
+// （Python版 _MAX_IDENTICAL_TOOL_FAILURES = 3 を踏襲）。
 const MaxRepeatedFailures = 3
+
+// MaxLoopRefusals はターン内で実行拒否が発生した累計回数の上限。
+// これを超えるとターン自体を中断する（Python版 _MAX_LOOP_REFUSALS = 5 を踏襲）。
+const MaxLoopRefusals = 5
+
+// MaxEmptyRetries はツール実行後に空テキストが返ってきた場合に報告を促して
+// 再試行させる上限回数（Python版 MAX_EMPTY_RETRIES = 2 を踏襲）。
+const MaxEmptyRetries = 2
+
+// MaxXMLToolRetries はXML形式のツール呼び出しがテキストに含まれるがパースに
+// 失敗した場合、tool_calls形式での再送を促す上限回数
+// （Python版 _MAX_XML_TOOL_RETRIES = 3 を踏襲）。
+const MaxXMLToolRetries = 3
 
 // ToolActivity はツール呼び出し発生時にUI側へ通知するためのイベント。
 type ToolActivity struct {
@@ -58,7 +88,21 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 	autoGit *vcs.AutoGit, cwd string, reactLog *vcs.ReactLog, callLog *vcs.ToolCallLog,
 	keepCheckpoint bool) (string, error) {
 
+	// 会話圧縮: しきい値超過時、古い会話を機械ダイジェストに置換する
+	// （Python版 agent.py::_compact_if_needed の移植。ターン開始時に1回のみ実行）。
+	compactIfNeeded(history, client.ContextLength())
+
 	specs := registry.Specs()
+
+	// Skillの存在をモデルが能動的にlist_skillsを呼ばずとも認識できるよう、
+	// name+descriptionの要約を毎ターンsystemPromptへ常時掲載する
+	// （Python版 skills.py::context_header_section の移植。Progressive
+	// Disclosure: 本文はload_skill(name)を呼ぶまで見せない）。
+	systemPrompt += tools.SkillContextHeaderSection()
+	// ハーネス自動記録: 書き込み済みファイル・直近の委任結果を毎ターン自動併記する
+	// （Python版 agent.py::_build_machine_notes の移植。scratchpadの自己更新が
+	// 当てにならない弱いモデル対策として、ハーネス側が確実な事実を提示する）。
+	systemPrompt += buildMachineNotes()
 
 	if autoGit != nil {
 		autoGit.Backup(cwd)
@@ -79,11 +123,23 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 		toolNames[i] = s.Function.Name
 	}
 
-	var lastFailKey string
-	failStreak := 0
+	repeatFailCounts := make(map[string]int)
+	refusals := 0
 	offloadRetryDone := false
+	hadToolCall := false
+	emptyRetryCount := 0
+	xmlToolRetryCount := 0
+	// readCallIDs はpath→(このターンでread_fileしたtool_call ID一覧)。
+	// 同じpathへの書き込みが起きた時点でその観測を無効化する
+	// （Python版 _read_call_ids の移植。stale observation invalidation）。
+	readCallIDs := make(map[string][]string)
 
 	for step := 0; step < MaxSteps; step++ {
+		// 送信直前トリム: compactionをすり抜けるペースでもコンテキスト窓の90%を
+		// 超えないよう、その場で中間メッセージを間引く最終防衛ライン
+		// （Python版 agent.py::_trim_to_fit の移植）。
+		*history = trimToFit(*history, systemPrompt, client.ContextLength())
+
 		result, err := client.StreamChat(ctx, systemPrompt, *history, specs, onText)
 		if err != nil {
 			return "", err
@@ -98,6 +154,31 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 		}
 
 		if len(result.ToolCalls) == 0 {
+			// 空レスポンス検知: 直前にツールを実行したのにテキストが空のまま
+			// 返ってきた場合、報告を促して再試行させる（Python版 MAX_EMPTY_RETRIES=2）。
+			if result.Text == "" && hadToolCall && emptyRetryCount < MaxEmptyRetries {
+				emptyRetryCount++
+				*history = append(*history,
+					llm.Message{Role: "assistant", Content: "（思考中...）"},
+					llm.Message{Role: "user", Content: "ツール実行結果を踏まえて、作業内容と結果を日本語で報告してください。"},
+				)
+				continue
+			}
+
+			// XML検知したがパース失敗 → tool_calls形式での再送を促す
+			// （Python版 _MAX_XML_TOOL_RETRIES=3）。
+			if result.Text != "" && hasXMLToolCall(result.Text) && xmlToolRetryCount < MaxXMLToolRetries {
+				xmlToolRetryCount++
+				*history = append(*history,
+					llm.Message{Role: "assistant", Content: result.Text},
+					llm.Message{Role: "user", Content: "[システム] ツール呼び出しがXML形式でテキストに含まれていましたが、" +
+						"パースできませんでした。\n" +
+						"ツールを呼び出す場合は、テキスト内に書かず、APIのtool_calls機能（JSON形式）を使ってください。\n" +
+						"直前のツール呼び出し意図をtool_calls形式で再送してください。"},
+				)
+				continue
+			}
+
 			// 最終回答ゲートA: 実行手段を持つのにユーザーへ丸投げしていないか検査する
 			// （1ターンにつき1回だけ差し戻す。委任結果の未検証断言を見るゲートBは
 			// 委任(delegate_*)が未実装のため現状発火しない — gates.go参照）。
@@ -130,6 +211,8 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 			return result.Text, nil
 		}
 
+		hadToolCall = true
+
 		// assistant メッセージ（tool_calls付き）を履歴に追記
 		*history = append(*history, llm.Message{
 			Role:      "assistant",
@@ -137,8 +220,6 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 			ToolCalls: result.ToolCalls,
 		})
 
-		// 各ツールを実行し、tool ロールの応答メッセージを追記する。
-		// フェーズ1は逐次実行のみ（Python版の並列実行は後続フェーズで移植）。
 		for _, tc := range result.ToolCalls {
 			if onTool != nil {
 				onTool(ToolActivity{Name: tc.Function.Name, ArgsPreview: preview(tc.Function.Arguments)})
@@ -146,9 +227,90 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 			if reactLog != nil {
 				reactLog.Add("action", map[string]any{"tool": tc.Function.Name, "args": rawJSONArgs(tc.Function.Arguments), "step": step})
 			}
-			callStart := time.Now()
-			output := registry.Call(tc.Function.Name, tc.Function.Arguments)
-			elapsed := time.Since(callStart)
+		}
+
+		// 書き込み系ツールが1件でも含まれる場合、またはいずれかが既に
+		// ループブレーカーで拒否対象になっている場合は逐次実行する
+		// （書き込みはチェックポイント/介入が必要、拒否判定は逐次側の既存ロジックに任せる）。
+		// それ以外（読み取り系のみ・全件実行対象）は並列実行する
+		// （Python版 orchestrator.py の ThreadPoolExecutor 分岐の移植）。
+		hasWriteCall := false
+		hasRefusalCandidate := false
+		for _, tc := range result.ToolCalls {
+			if vcs.WriteTools[tc.Function.Name] {
+				hasWriteCall = true
+			}
+			if repeatFailCounts[tc.Function.Name+"|"+tc.Function.Arguments] >= MaxRepeatedFailures {
+				hasRefusalCandidate = true
+			}
+		}
+
+		callOutputs := make([]string, len(result.ToolCalls))
+		callElapsed := make([]time.Duration, len(result.ToolCalls))
+		callCPUMax := make([]float64, len(result.ToolCalls))
+		callRSSDelta := make([]float64, len(result.ToolCalls))
+		if len(result.ToolCalls) > 1 && !hasWriteCall && !hasRefusalCandidate {
+			// 並列バッチはCPU/RSSを呼び出し単位では分離計測できないため
+			// （/procは自プロセス全体の値）、バッチ全体で1回だけ計測し、
+			// 同じ値を全呼び出しの記録に付与する近似とする。
+			mon := vcs.NewProcessMonitor()
+			mon.Start()
+			var wg sync.WaitGroup
+			for i, tc := range result.ToolCalls {
+				wg.Add(1)
+				go func(i int, tc llm.ToolCall) {
+					defer wg.Done()
+					start := time.Now()
+					callOutputs[i] = tools.CachedCall(registry, tc.Function.Name, tc.Function.Arguments)
+					callElapsed[i] = time.Since(start)
+				}(i, tc)
+			}
+			wg.Wait()
+			summary := mon.Stop()
+			for i := range result.ToolCalls {
+				callCPUMax[i] = summary.CPUMaxPct
+				callRSSDelta[i] = summary.RSSDeltaMB
+			}
+		} else {
+			for i, tc := range result.ToolCalls {
+				mon := vcs.NewProcessMonitor()
+				mon.Start()
+				start := time.Now()
+				callOutputs[i] = tools.CachedCall(registry, tc.Function.Name, tc.Function.Arguments)
+				callElapsed[i] = time.Since(start)
+				summary := mon.Stop()
+				callCPUMax[i] = summary.CPUMaxPct
+				callRSSDelta[i] = summary.RSSDeltaMB
+			}
+		}
+
+		// 各ツールの結果を順序通りに履歴へ反映する（ループブレーカー拒否判定・
+		// stale observation無効化・チェックポイント発火は逐次で行う）。
+		for i, tc := range result.ToolCalls {
+			key := tc.Function.Name + "|" + tc.Function.Arguments
+
+			// ループブレーカー: 同一引数の呼び出しが規定回数失敗済みなら実行せず拒否する
+			// （Python版 _execute_with_intervention の同ロジックを移植）。
+			if repeatFailCounts[key] >= MaxRepeatedFailures {
+				refusals++
+				if refusals > MaxLoopRefusals {
+					return "", fmt.Errorf("ループブレーカー: 実行拒否が%d回を超えたため中断しました（最後の呼び出し: %s）", MaxLoopRefusals, tc.Function.Name)
+				}
+				refusalMsg := fmt.Sprintf(
+					"[ループ防止] この呼び出し（%s）は同一の引数で%d回失敗しているため、これ以上実行されません。\n"+
+						"引数を変える・別のツールを使う・アプローチを変える、のいずれかを行ってください。\n"+
+						"打つ手がない場合は、現状と失敗の内容を最終回答として報告してください。",
+					tc.Function.Name, MaxRepeatedFailures)
+				*history = append(*history, llm.Message{Role: "tool", ToolCallID: tc.ID, Content: refusalMsg})
+				if reactLog != nil {
+					reactLog.Add("observation", map[string]any{"tool": tc.Function.Name, "result": refusalMsg, "step": step})
+				}
+				continue
+			}
+
+			output := callOutputs[i]
+			elapsed := callElapsed[i]
+			callStart := time.Now().Add(-elapsed)
 
 			// 書き込み承認が拒否された場合はPython版 UserRejectedWriteError と同様に
 			// ターンを即中断する（リトライやループブレーカーへは進ませない）。
@@ -164,7 +326,10 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 				if isFailForLog {
 					status = "error"
 				}
-				callLog.Add(vcs.ToolCallRecord{Tool: tc.Function.Name, Elapsed: elapsed, Status: status, Occurred: callStart})
+				callLog.Add(vcs.ToolCallRecord{
+					Tool: tc.Function.Name, Elapsed: elapsed, Status: status, Occurred: callStart,
+					CPUMaxPct: callCPUMax[i], RSSDeltaMB: callRSSDelta[i],
+				})
 			}
 			if reactLog != nil {
 				resultPreview := output
@@ -174,29 +339,51 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 				reactLog.Add("observation", map[string]any{"tool": tc.Function.Name, "result": resultPreview, "step": step})
 			}
 			isFail := isFailForLog
-			key := tc.Function.Name + "|" + tc.Function.Arguments
-			if isFail && key == lastFailKey {
-				failStreak++
-			} else if isFail {
-				lastFailKey = key
-				failStreak = 1
-			} else {
-				lastFailKey = ""
-				failStreak = 0
+			outputForHistory := output
+			if isFail {
+				repeatFailCounts[key]++
+				if repeatFailCounts[key] == MaxRepeatedFailures-1 {
+					outputForHistory += fmt.Sprintf(
+						"\n⚠ 同一の呼び出しが%d回連続で失敗しています。"+
+							"次も同じ引数で呼ぶと実行が拒否されます。引数または手段を変えてください。",
+						repeatFailCounts[key])
+				}
 			}
 
+			obsLimit := MaxObservationChars
+			if delegationTools[tc.Function.Name] {
+				obsLimit = DelegationObservationChars
+			}
 			*history = append(*history, llm.Message{
 				Role:       "tool",
 				ToolCallID: tc.ID,
-				Content:    truncateObservation(output),
+				Content:    tools.CacheObs(tc.Function.Name, outputForHistory, obsLimit),
 			})
 
-			if autoGit != nil && !isFail && vcs.WriteTools[tc.Function.Name] {
-				autoGit.Checkpoint(cwd, tc.Function.Name, extractPathArg(tc.Function.Arguments))
+			path := extractPathArg(tc.Function.Arguments)
+			if vcs.WriteTools[tc.Function.Name] && path != "" && !isFail {
+				tools.InvalidateCacheForPath(path)
+			}
+			if vcs.WriteTools[tc.Function.Name] && path != "" {
+				// 書き込み系: 同一パスの古いread_file観測を無効化する。
+				for _, staleID := range readCallIDs[path] {
+					for i := range *history {
+						if (*history)[i].Role == "tool" && (*history)[i].ToolCallID == staleID {
+							(*history)[i].Content = "[このread結果は後で上書きされました—省略]"
+							break
+						}
+					}
+				}
+				delete(readCallIDs, path)
+			} else if tc.Function.Name == "read_file" && path != "" {
+				readCallIDs[path] = append(readCallIDs[path], tc.ID)
 			}
 
-			if isFail && failStreak >= MaxRepeatedFailures {
-				return "", fmt.Errorf("ループブレーカー: ツール呼び出し %s が同一引数で%d回連続失敗したため中断しました", tc.Function.Name, failStreak)
+			if !isFail && vcs.WriteTools[tc.Function.Name] && path != "" {
+				recordWrite(path)
+			}
+			if autoGit != nil && !isFail && vcs.WriteTools[tc.Function.Name] {
+				autoGit.Checkpoint(cwd, tc.Function.Name, path)
 			}
 		}
 
@@ -218,14 +405,6 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 // （tools.Registry.Call は "エラー: ..." / "ツール実行エラー: ..." 形式で返す方針）。
 func isFailure(output string) bool {
 	return strings.HasPrefix(output, "エラー:") || strings.HasPrefix(output, "ツール実行エラー:")
-}
-
-// truncateObservation はツール出力(observation)を上限文字数で切り詰める。
-func truncateObservation(s string) string {
-	if len(s) <= MaxObservationChars {
-		return s
-	}
-	return s[:MaxObservationChars] + fmt.Sprintf("\n...(以下省略、観測切り詰め: 全%d文字中%d文字を表示)", len(s), MaxObservationChars)
 }
 
 // truncateForCommitMsg はコミットメッセージ用に改行を空白へ置換し文字数を切り詰める。

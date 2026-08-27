@@ -66,3 +66,15 @@ func NewClient(provider *config.ProviderConfig) *Client {
 
 func (c *Client) ProviderName() string { return c.provider.Name }
 func (c *Client) Model() string        { return c.model }
+
+// ContextLength はモデルのコンテキストウィンドウ（トークン数）を返す。
+// 不明な場合は0（selector.SelectInteractivelyで疎通確認できなかった場合等）。
+func (c *Client) ContextLength() int { return c.provider.ContextLength }
+
+// SetModel はモデル名を直接切り替える（Python版 /model <名前> 直接指定の移植。
+// TUI実行中にライブセレクターを再起動する仕組みは無いため、名前直指定のみ対応）。
+// context_lengthは不明（0）に戻る点に注意——動的圧縮しきい値はフォールバック値を使う。
+func (c *Client) SetModel(name string) {
+	c.model = name
+	c.provider.ContextLength = 0
+}

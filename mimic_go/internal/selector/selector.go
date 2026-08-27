@@ -601,14 +601,17 @@ loop:
 			switch sel.provider {
 			case "or":
 				orCfg.Model = sel.model.ID
+				orCfg.ContextLength = sel.model.ContextLength
 				fmt.Printf("\n  %s  %s  %s %s\n\n", bg("✓"), w("選択:"), g("[OR]"), g(sel.model.ID))
 				return orCfg
 			case "gemini":
 				geminiCfg.Model = sel.model.ID
+				geminiCfg.ContextLength = sel.model.ContextLength
 				fmt.Printf("\n  %s  %s  GM %s\n\n", bg("✓"), w("選択:"), sel.model.ID)
 				return geminiCfg
 			case "mistral":
 				mistralCfg.Model = sel.model.ID
+				mistralCfg.ContextLength = sel.model.ContextLength
 				fmt.Printf("\n  %s  %s  %s %s\n\n", cy("✓"), w("選択:"), cy("[MI]"), cy(sel.model.ID))
 				return mistralCfg
 			}

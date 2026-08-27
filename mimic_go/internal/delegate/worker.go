@@ -6,7 +6,6 @@
 //   - role検証・禁止事項フィールド・書き込みインターロック
 //   - 中断委任マニフェスト・クラッシュ再開・タイムアウトウォッチドッグ
 //   - trace_idによるセッション相互リンク（ビューアでの親子表示）
-//   - 委任同時実行数セマフォ（並列委任は現状delegate_to_worker単発呼び出しのみのため不要）
 //
 // verify_cmd失敗時は同じOverlay上でWorkerが最大MaxVerifyRetries回まで修正再試行する
 // （Python版のReflexionブロックも簡略版として移植: 直前の失敗要約のみ次の指示に含める）。
@@ -26,12 +25,29 @@ import (
 	"mimic/internal/vcs"
 )
 
+// MaxDelegationConcurrency はWorkerサブプロセスの総同時実行数の上限
+// （Python版 team.py::_MAX_DELEGATION_CONCURRENCY = 3 を踏襲）。
+// delegate_to_team_parallel等はorchestratorの並列ツール実行経路で呼び出し数ぶん
+// 同時に走り得るため、Workerの総数をここで絞る。
+const MaxDelegationConcurrency = 3
+
+var delegationSem = make(chan struct{}, MaxDelegationConcurrency)
+
 // teamAutoGit はDirector側のAutoGitインスタンスを共有するための参照
 // （Python版 team.py::set_team_autogit の移植）。これを設定しておくことで、
 // delegate_to_team/delegate_to_worker等の適用後チェックポイントコミットが
 // Directorの通常ターンと同じAutoGitインスタンスに積まれ、ターン終了時の
 // squash対象に含まれるようになる。
 var teamAutoGit *vcs.AutoGit
+
+// teamSessionsDir はDirector自身の.mimic/sessionsディレクトリへの参照
+// （get_delegation_traceツールがtrace_idを逆引きする際に使う）。
+var teamSessionsDir string
+
+// SetSessionsDir はDirector（TUI/非対話モード）起動時に一度だけ呼び出す。
+func SetSessionsDir(dir string) {
+	teamSessionsDir = dir
+}
 
 // SetTeamAutoGit はDirector（TUI/非対話モード）起動時に一度だけ呼び出す。
 func SetTeamAutoGit(a *vcs.AutoGit) {
@@ -45,6 +61,13 @@ const (
 
 	// MaxVerifyRetries はverify失敗時の修正再試行上限（Python版 MAX_VERIFY_RETRIES）。
 	MaxVerifyRetries = 3
+
+	// MaxResumeAttempts はWorkerが完了マーカーなしで予期せず終了した場合に、
+	// 同じOverlay上で（チェックポイントが残っていれば）再起動を試みる上限
+	// （Python版 subagent.py::_MAX_RESUME_ATTEMPTS = 3 を踏襲）。
+	MaxResumeAttempts = 3
+
+	workerCheckpointRelPath = ".mimic/checkpoint.json"
 )
 
 // abortExitCodes はWorkerが修正不可能な失敗として即座にリトライを打ち切る終了コード
@@ -65,23 +88,52 @@ func RunWorkerOnce(ctx context.Context, task, projectDir, verifyCmd, rolePrompt 
 		return "", fmt.Errorf("workroom作成に失敗しました: %w", err)
 	}
 	defer w.Cleanup()
-	return runWorkerInWorkroom(ctx, w, task, verifyCmd, rolePrompt, applyChanges, false)
+	return runWorkerInWorkroom(ctx, w, task, verifyCmd, rolePrompt, applyChanges, false, nil)
 }
 
 // runWorkerInWorkroom は既存のWorkroom内でWorkerを実行する共通処理。
 // keepSessionがtrueの場合、Worker起動時にMIMIC_KEEP_CHECKPOINT環境変数を立て、
 // Worker自身の会話履歴（サンドボックス内チェックポイント）を正常完了後も
 // 消さずに残す（continue_specialistでの追加指示継続用）。
-func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyCmd, rolePrompt string, applyChanges, keepSession bool) (string, error) {
+// expectedFilesが空でなければ、実際の変更ファイルと食い違う場合に警告を付す
+// （Python版 team.py::expected_files の移植。delegate_to_specialist専用）。
+func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyCmd, rolePrompt string, applyChanges, keepSession bool, expectedFiles []string) (string, error) {
+	select {
+	case delegationSem <- struct{}{}:
+	default:
+		fmt.Fprintf(os.Stderr, "  [delegate] ⏳ 委任スロット待機中（同時実行上限 %d）...\n", MaxDelegationConcurrency)
+		select {
+		case delegationSem <- struct{}{}:
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+	}
+	defer func() { <-delegationSem }()
+
 	if applyChanges {
 		if blocked := checkWriteInterlock(); blocked != "" {
 			return blocked, nil
 		}
 	}
 
+	traceID := newTraceID()
+	registerInflight(traceID, w.Base, w.Lower, task, rolePrompt, verifyCmd, "worker", rolePrompt, applyChanges)
+	defer unregisterInflight(traceID)
+
 	mimicBin, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("自身の実行ファイルパスを取得できませんでした: %w", err)
+	}
+
+	// verify_cmd未指定の書き込み委任には、このプロジェクトで過去に検証通過した
+	// コマンド、無ければ言語別テンプレートを自動採用する（Python版
+	// team.py::get_learned_verify_cmd / _template_verify_cmd の移植）。
+	if verifyCmd == "" && applyChanges {
+		if learned := GetLearnedVerifyCmd(w.Lower); learned != "" {
+			verifyCmd = learned
+		} else if tmpl := TemplateVerifyCmd(w.Lower); tmpl != "" {
+			verifyCmd = tmpl
+		}
 	}
 
 	currentTask := task
@@ -90,9 +142,11 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 	var verifyOutput string
 	var timedOut bool
 	var triedSummaries []string
+	var crashed bool
+	var crashResumeAttempts int
 
 	for attempt := 1; attempt <= 1+MaxVerifyRetries; attempt++ {
-		launchRes, runErr := w.Run(ctx, launchCommand(mimicBin, currentTask, rolePrompt, keepSession), defaultWorkerTimeout)
+		launchRes, resumeAttempts, runErr := runWithResume(ctx, w, launchCommand(mimicBin, currentTask, rolePrompt, traceID, w.Lower, keepSession), defaultWorkerTimeout)
 		if runErr != nil {
 			return "", fmt.Errorf("Worker実行に失敗しました: %w", runErr)
 		}
@@ -100,6 +154,8 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 			timedOut = true
 			break
 		}
+		crashed = !strings.Contains(launchRes.Output, finalMarker)
+		crashResumeAttempts = resumeAttempts
 		summary = extractFinalAnswer(launchRes.Output)
 
 		if verifyCmd == "" {
@@ -118,9 +174,11 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 		verifyOutput = verifyRes.Output
 
 		if exitCode == 0 {
+			SaveLearnedVerifyCmd(w.Lower, verifyCmd)
 			break // 検証通過
 		}
 		if abortExitCodes[exitCode] {
+			ForgetLearnedVerifyCmd(w.Lower, verifyCmd)
 			break // Workerが修正できない種類の失敗 → リトライ中止
 		}
 		if attempt > MaxVerifyRetries {
@@ -184,12 +242,82 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 		}
 	}
 
-	result := fmt.Sprintf("[Worker] 変更ファイル数: %d %s\n%s\n\n[Workerの報告]\n%s%s",
-		len(changed), discardedNote, strings.Join(changed, ", "), summary, verifySection)
+	// ── ハーネスによる機械判定（Workerの自己申告に依存しない注記） ──
+	// Python版 team.py::_run_delegation_core_inner の該当ロジックの移植。
+	harnessNote := ""
+	if applyChanges && len(changed) == 0 {
+		harnessNote += "\n\n⚠ ハーネス判定: 書き込み権限（can_write）の委任ですが、変更ファイルは0件でした。" +
+			"Workerの完了報告と矛盾する場合、タスクは実施されていない可能性があります。" +
+			"結果を鵜呑みにせず、読み取り専用の委任で実ファイルの状態を確認してください。"
+	}
+	if len(expectedFiles) > 0 && len(changed) > 0 {
+		expectedSet := make(map[string]bool, len(expectedFiles))
+		for _, f := range expectedFiles {
+			expectedSet[strings.TrimPrefix(f, "./")] = true
+		}
+		var unexpected []string
+		for _, f := range changed {
+			if !expectedSet[f] {
+				unexpected = append(unexpected, f)
+			}
+		}
+		if len(unexpected) > 0 {
+			shown := unexpected
+			if len(shown) > 10 {
+				shown = shown[:10]
+			}
+			harnessNote += fmt.Sprintf("\n\n⚠ ハーネス判定: 変更予定（expected_files）に含まれないファイルが変更されました: %s\n"+
+				"意図した変更範囲からの逸脱がないか差分サマリを確認してください。", strings.Join(shown, ", "))
+		}
+	}
+
+	crashNote := ""
+	if crashed {
+		crashNote = fmt.Sprintf("⚠ Workerが完了シグナルなしで終了しました（再開試行: %d/%d回）。\n", crashResumeAttempts, MaxResumeAttempts)
+	}
+	result := fmt.Sprintf("%s[Worker] (trace_id=%s) 変更ファイル数: %d %s\n%s\n\n[Workerの報告]\n%s%s%s",
+		crashNote, traceID, len(changed), discardedNote, strings.Join(changed, ", "), summary, verifySection, harnessNote)
+
+	// 委任履歴リングバッファへ記録（Python版 team.py::_record_delegation の移植）。
+	// 次のsystemPrompt構築時にcontext headerへ自動注入される。
+	statusLabel := "✓完了"
+	switch {
+	case crashed:
+		statusLabel = "⚠完了シグナルなし"
+	case verifyExit != nil && *verifyExit == 0:
+		statusLabel = "✓検証通過"
+	case verifyExit != nil:
+		statusLabel = "✗検証失敗"
+	}
+	RecordDelegation("Worker", task, statusLabel, changed)
+
 	return result, nil
 }
 
-func launchCommand(mimicBin, task, rolePrompt string, keepSession bool) string {
+// runWithResume はWorkerを起動し、完了マーカーなしで予期せず終了した場合、
+// タイムアウトしておらずチェックポイントが残っている限り、同じOverlay上で
+// 最大MaxResumeAttempts回まで再起動する（Python版 subagent.py の
+// resume_attemptループの移植）。戻り値の第2引数は実際に再開した回数。
+func runWithResume(ctx context.Context, w *sandbox.Workroom, command string, timeout time.Duration) (sandbox.RunResult, int, error) {
+	var last sandbox.RunResult
+	for resumeAttempt := 0; resumeAttempt <= MaxResumeAttempts; resumeAttempt++ {
+		res, err := w.Run(ctx, command, timeout)
+		if err != nil {
+			return res, resumeAttempt, err
+		}
+		last = res
+		if res.TimedOut || strings.Contains(res.Output, finalMarker) {
+			return last, resumeAttempt, nil
+		}
+		// チェックポイントが無ければ再開しても意味がないため打ち切る。
+		if _, statErr := os.Stat(filepath.Join(w.Upper, workerCheckpointRelPath)); statErr != nil {
+			return last, resumeAttempt, nil
+		}
+	}
+	return last, MaxResumeAttempts, nil
+}
+
+func launchCommand(mimicBin, task, rolePrompt, traceID, lowerDir string, keepSession bool) string {
 	// Worker自身にはAutoGitのbackup/checkpoint/squashを行わせない
 	// （upperdirに.gitの変更が混入し差分サマリが汚染されるのを防ぐ。
 	// Python版 NullAutoGit と同じ意図をMIMIC_NO_AUTOGIT環境変数で伝える）。
@@ -201,7 +329,19 @@ func launchCommand(mimicBin, task, rolePrompt string, keepSession bool) string {
 	if keepSession {
 		keepExport = "export MIMIC_KEEP_CHECKPOINT=1\n"
 	}
-	return fmt.Sprintf("export MIMIC_NO_AUTOGIT=1\n%s%s%s -auto-prompt %s", roleExport, keepExport, shellQuote(mimicBin), shellQuote(task))
+	// MIMIC_TRACE_ID/MIMIC_SESSIONS_DIRはWorker自身のsession_startイベントに
+	// trace_idを記録させ、実プロジェクトのsessionsディレクトリへ直接書き込ませる
+	// （unshare -m は既存パスへのアクセスを妨げないため、lowerDir=実プロジェクトへの
+	// 絶対パスはOverlay越しでなくそのまま書き込める）。Director側の
+	// get_delegation_traceツールがこのtrace_idでセッションjsonlを逆引きできるようにする
+	// （Python版 __main__.py::MIMIC_TRACE_ID / viewer.py::get_session_trace_text の移植）。
+	traceExport := ""
+	if traceID != "" {
+		sessionsDir := lowerDir + "/.mimic/sessions"
+		traceExport = fmt.Sprintf("export MIMIC_TRACE_ID=%s\nexport MIMIC_SESSIONS_DIR=%s\n",
+			shellQuote(traceID), shellQuote(sessionsDir))
+	}
+	return fmt.Sprintf("export MIMIC_NO_AUTOGIT=1\n%s%s%s%s -auto-prompt %s", roleExport, keepExport, traceExport, shellQuote(mimicBin), shellQuote(task))
 }
 
 // buildVerifyRetryTask はverify失敗フィードバックを含む修正指示文を生成する

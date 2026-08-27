@@ -12,6 +12,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/creack/pty"
 )
 
 const (
@@ -23,6 +25,18 @@ const (
 // outsideWriteTargetRe はWorker実行時、リダイレクト・tee・cp/mv等で作業ディレクトリ外の
 // 絶対パスへ書き込むコマンドを検出するパターン（Python版 tools_linux.py::_OUTSIDE_WRITE_TARGET_RE の移植）。
 var outsideWriteTargetRe = regexp.MustCompile(`(?:>>?\s*|\btee\s+(?:-a\s+)?|\b(?:cp|mv)\s+(?:-\S+\s+)*\S+\s+)(/[^\s;|&'"<>]+)`)
+
+// terminalCtrlRe はDECプライベートモード（代替画面・マウストラッキング・
+// カーソルキーモード等の端末状態変更シーケンス）を検出するパターン
+// （Python版 tools_linux.py::_TERMINAL_CTRL_RE の移植）。これらがそのまま
+// 親ターミナルへ出力されると端末状態が壊れるため、ツール出力から除去する。
+var terminalCtrlRe = regexp.MustCompile("\x1b\\[\\?[0-9;]*[hl]")
+
+// stripTerminalControlSequences はrun_bash/run_pipelineの出力から
+// 端末状態変更シーケンスを除去する。
+func stripTerminalControlSequences(s string) string {
+	return terminalCtrlRe.ReplaceAllString(s, "")
+}
 
 // workerOutsideWriteWarning はWorker実行時、作業ディレクトリ外への書き込みらしきコマンドを
 // 検出して警告を返す（Python版 tools_linux.py::_worker_outside_write_warning の移植）。
@@ -65,10 +79,21 @@ func workerOutsideWriteWarning(command string) string {
 		root, strings.Join(shown, ", "))
 }
 
+// sudoPromptRe はsudoパスワードプロンプト検出パターン（デコード後の文字列で照合。
+// Python版 tools_linux.py::_SUDO_PROMPT_RE の移植）。
+var sudoPromptRe = regexp.MustCompile(`\[sudo\] password for [^:]+|[Pp]assword:|パスワードを入力してください`)
+
+// sudoPassword は環境変数SUDO_PASSWORDからパスワードを取得する
+// （Python版 tools_linux.py::_sudo_password の移植。デフォルト値も同一）。
+func sudoPassword() []byte {
+	pw := os.Getenv("SUDO_PASSWORD")
+	if pw == "" {
+		pw = "1025"
+	}
+	return []byte(pw + "\n")
+}
+
 // registerShellTools は run_bash / run_pipeline を登録する。
-// Python版はrun_bashをptyで実行し対話コマンド(npm/git等)に対応しているが、
-// Go版フェーズ2ではptyを使わず素直にexec.Commandで実行する簡略版とする
-// （github.com/creack/pty導入は本バッチのスコープ外、既知の簡略化点）。
 func registerShellTools(r *Registry) {
 	r.Register("run_bash",
 		"bashコマンドを実行して結果を返す。結果の先頭が[SUCCESS]なら成功、[FAILURE(ExitCode=N)]なら失敗。パイプ・リダイレクト・複数行コマンドに対応。",
@@ -78,6 +103,7 @@ func registerShellTools(r *Registry) {
 				"command":           map[string]any{"type": "string", "description": "実行するbashコマンド。パイプ・&&・複数行可。"},
 				"timeout":           map[string]any{"type": "integer", "description": "タイムアウト秒数（デフォルト60）", "default": 60},
 				"working_directory": map[string]any{"type": "string", "description": "コマンドを実行する作業フォルダのフルパス（必ず指定）"},
+				"shell":             map[string]any{"type": "string", "description": "使用するシェル: bash / sh / zsh（デフォルト: bash）", "default": "bash"},
 			},
 			"required": []string{"command"},
 		},
@@ -98,31 +124,105 @@ func registerShellTools(r *Registry) {
 		toolRunPipeline)
 }
 
+// toolRunBash はptyを確保してコマンドを実行する（npm/git等の対話的コマンドに
+// 対応。Python版 tools_linux.py::run_bash の移植）。sudoパスワードプロンプトを
+// 検知した場合、SUDO_PASSWORD環境変数の値を最大3回まで自動入力する。
 func toolRunBash(args map[string]any) (string, error) {
 	command := argString(args, "command")
 	timeoutSec := argInt(args, "timeout", defaultBashTimeout)
 	cwd := argString(args, "working_directory")
+	shellName := argString(args, "shell")
+	if shellName == "" {
+		shellName = "bash"
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec)*time.Second)
-	defer cancel()
-
+	// PAGER=cat / GIT_PAGER=cat: lessなどのページャーが起動すると、代替画面
+	// 等の端末制御シーケンスがpty経由で漏洩し端末状態を破壊するため無効化する。
 	wrapped := "export LC_ALL=C.UTF-8\nexport LANG=C.UTF-8\nexport PAGER=cat\nexport GIT_PAGER=cat\nexport GIT_TERMINAL_PROMPT=0\n" + command
 
-	cmd := exec.CommandContext(ctx, "bash", "-c", wrapped)
+	cmd := exec.Command(shellName, "-c", wrapped)
 	if cwd != "" {
 		cmd.Dir = cwd
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
+	ptmx, err := pty.Start(cmd)
+	if err != nil {
+		return "", fmt.Errorf("pty起動エラー: %w", err)
+	}
+	defer ptmx.Close()
 
-	err := cmd.Run()
-	output := strings.TrimSpace(buf.String())
+	deadline := time.Now().Add(time.Duration(timeoutSec) * time.Second)
+	var outBuf bytes.Buffer
+	sudoSent := 0
+	timedOut := false
+	readErrCh := make(chan error, 1)
+	chunkCh := make(chan []byte, 16)
 
-	if ctx.Err() == context.DeadlineExceeded {
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, rerr := ptmx.Read(buf)
+			if n > 0 {
+				chunk := make([]byte, n)
+				copy(chunk, buf[:n])
+				chunkCh <- chunk
+			}
+			if rerr != nil {
+				readErrCh <- rerr
+				return
+			}
+		}
+	}()
+
+readLoop:
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			timedOut = true
+			break
+		}
+		select {
+		case chunk := <-chunkCh:
+			outBuf.Write(chunk)
+			if sudoSent < 3 && sudoPromptRe.Match(chunk) {
+				ptmx.Write(sudoPassword())
+				sudoSent++
+			}
+		case <-readErrCh:
+			break readLoop
+		case <-time.After(remaining):
+			timedOut = true
+			break readLoop
+		}
+	}
+
+	if timedOut || cmd.ProcessState == nil {
 		killProcessGroup(cmd)
+	}
+	waitErr := cmd.Wait()
+
+	// タイムアウト後、EOFまでの残り出力を短時間だけ拾う（プロセスは既にkill済み）。
+	if !timedOut {
+	drain:
+		for {
+			select {
+			case chunk := <-chunkCh:
+				outBuf.Write(chunk)
+			case <-time.After(50 * time.Millisecond):
+				break drain
+			case <-readErrCh:
+				break drain
+			}
+		}
+	}
+
+	raw := outBuf.String()
+	raw = strings.ReplaceAll(raw, "\r\n", "\n")
+	raw = strings.ReplaceAll(raw, "\r", "\n")
+	output := strings.TrimSpace(stripTerminalControlSequences(raw))
+
+	if timedOut {
 		partial := "\n(出力なし)"
 		if output != "" {
 			partial = "\n途中出力:\n" + output
@@ -134,8 +234,8 @@ func toolRunBash(args map[string]any) (string, error) {
 	}
 
 	rc := 0
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+	if waitErr != nil {
+		if exitErr, ok := waitErr.(*exec.ExitError); ok {
 			rc = exitErr.ExitCode()
 		} else {
 			rc = -1
@@ -188,7 +288,7 @@ func toolRunPipeline(args map[string]any) (string, error) {
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
+		lines = append(lines, stripTerminalControlSequences(scanner.Text()))
 		if len(lines) >= maxLines {
 			truncated = true
 			killProcessGroup(cmd)
@@ -227,7 +327,7 @@ func toolRunPipeline(args map[string]any) (string, error) {
 	if len(lines) > 0 {
 		parts = append(parts, strings.Join(lines, "\n")+note)
 	}
-	if stderrOut := strings.TrimSpace(stderrBuf.String()); stderrOut != "" {
+	if stderrOut := strings.TrimSpace(stripTerminalControlSequences(stderrBuf.String())); stderrOut != "" {
 		parts = append(parts, "STDERR:\n"+stderrOut)
 	}
 	result := strings.Join(parts, "\n")
