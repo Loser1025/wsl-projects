@@ -30,9 +30,14 @@ import (
 var applyMu sync.Mutex
 
 // applyExcludedPaths はapply対象から除外する内部管理ファイル
-// （Python版 subagent.py::_APPLY_EXCLUDED_PATHS の移植）。
+// （Python版 subagent.py::_APPLY_EXCLUDED_PATHS の移植。Python版はフラットな
+// `.mimic_checkpoint.json`だが、Go版は`.mimic/checkpoint.json`という実際の
+// チェックポイントパス（internal/delegate/worker.go::workerCheckpointRelPath、
+// internal/tui/model.go::checkpointPath）を使うため、両方を除外対象にする —
+// 旧名を残しているのは将来的な互換のため実害はない）。
 var applyExcludedPaths = map[string]bool{
 	".mimic_checkpoint.json": true,
+	".mimic/checkpoint.json": true,
 }
 
 // Mode はサンドボックスの実行方式。
@@ -138,6 +143,24 @@ func NewWorkroom(projectDir string) (*Workroom, error) {
 		}
 	}
 	return w, nil
+}
+
+// AttachWorkroom は既存のbaseディレクトリからWorkroomを再構築する
+// （Python版 team.py::resume_delegation が既存baseを再利用してrun_subagent_reviewable
+// に渡すのと同じ発想。孤立委任の再開[/delegations resume]用。NewWorkroomと同じ
+// ディレクトリ命名規則（base/upper, base/work, base/merged）を前提とする）。
+func AttachWorkroom(base, lower string) (*Workroom, error) {
+	if _, err := os.Stat(base); err != nil {
+		return nil, fmt.Errorf("作業ディレクトリが見つかりません: %w", err)
+	}
+	return &Workroom{
+		Base:   base,
+		Lower:  lower,
+		Upper:  filepath.Join(base, "upper"),
+		Work:   filepath.Join(base, "work"),
+		Merged: filepath.Join(base, "merged"),
+		Mode:   cachedDetectMode(),
+	}, nil
 }
 
 // Cleanup はworkroom一式を破棄する（overlay内部のworkディレクトリはmode 0000で

@@ -17,6 +17,7 @@ type delegationHistoryEntry struct {
 	Task         string
 	Status       string
 	ChangedFiles []string
+	TraceID      string
 }
 
 var (
@@ -26,6 +27,15 @@ var (
 
 // RecordDelegation は完了した委任の要約を履歴バッファへ記録する。
 func RecordDelegation(label, task, status string, changedFiles []string) {
+	RecordDelegationWithTrace(label, task, status, changedFiles, "")
+}
+
+// RecordDelegationWithTrace はtrace_id付きで委任履歴を記録する
+// （Scratchpadタブのサブエージェント表示[GetRecentWorkerTraceIDs]用。
+// Python版 app.py::_refresh_scratchpad_tab はReactLogのsystem_event
+// `team_worker_start`からtrace_idを拾うが、Go版はreactLogがinternal/delegateから
+// 見えないため、既存の委任履歴リングバッファにtrace_idも保持する形で代替する）。
+func RecordDelegationWithTrace(label, task, status string, changedFiles []string, traceID string) {
 	historyMu.Lock()
 	defer historyMu.Unlock()
 	taskShort := strings.Join(strings.Fields(task), " ")
@@ -36,10 +46,26 @@ func RecordDelegation(label, task, status string, changedFiles []string) {
 	if len(shown) > 8 {
 		shown = shown[:8]
 	}
-	history = append(history, delegationHistoryEntry{Label: label, Task: taskShort, Status: status, ChangedFiles: shown})
+	history = append(history, delegationHistoryEntry{Label: label, Task: taskShort, Status: status, ChangedFiles: shown, TraceID: traceID})
 	if len(history) > delegationHistoryKeep {
 		history = history[len(history)-delegationHistoryKeep:]
 	}
+}
+
+// GetRecentWorkerTraceIDs は直近の委任履歴からtrace_idを重複除去して返す
+// （Scratchpadタブでサブエージェント分を表示する際の対象一覧用）。
+func GetRecentWorkerTraceIDs() []string {
+	historyMu.Lock()
+	defer historyMu.Unlock()
+	seen := make(map[string]bool)
+	var out []string
+	for _, e := range history {
+		if e.TraceID != "" && !seen[e.TraceID] {
+			seen[e.TraceID] = true
+			out = append(out, e.TraceID)
+		}
+	}
+	return out
 }
 
 // GetDelegationHistoryBrief は直近の委任の1行要約を返す

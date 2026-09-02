@@ -210,9 +210,11 @@ func ShutdownAll() {
 }
 
 // ListStatus は設定済み全サーバーの状態一覧を返す（接続中・未接続いずれも含む。
-// Python版 mcp_client.list_status / commands.py::cmd_mcp の移植 — 未接続サーバーも
-// エラー理由付きで表示し、起動時に失敗したサーバーが黙って消えないようにする）。
-func ListStatus() []string {
+// Python版 mcp_client.list_status / commands.py::cmd_mcp の移植）。projectDirを
+// 渡すと`.mcp.json`を都度再読込し、一度も接続を試みていないサーバー（設定に
+// あるが起動時にConnectAllの対象にならなかった等）も一覧に含める。
+// projectDirが空文字の場合は接続試行済みのサーバーのみを対象にする（従来挙動）。
+func ListStatus(projectDir string) []string {
 	serversMu.Lock()
 	defer serversMu.Unlock()
 	names := make(map[string]bool)
@@ -221,6 +223,11 @@ func ListStatus() []string {
 	}
 	for name := range lastResults {
 		names[name] = true
+	}
+	if projectDir != "" {
+		for name := range LoadServerConfigs(projectDir) {
+			names[name] = true
+		}
 	}
 	sorted := make([]string, 0, len(names))
 	for name := range names {
@@ -238,7 +245,7 @@ func ListStatus() []string {
 			out = append(out, fmt.Sprintf("✗ %s: 未接続 (%s)", name, res.Message))
 			continue
 		}
-		out = append(out, fmt.Sprintf("? %s: 状態不明", name))
+		out = append(out, fmt.Sprintf("✗ %s: 未接続（未試行）", name))
 	}
 	return out
 }

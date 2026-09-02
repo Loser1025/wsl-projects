@@ -53,7 +53,10 @@ func toolReadToolCache(args map[string]any) (string, error) {
 		return fmt.Sprintf("エラー: cache_key '%s' が見つかりません。利用可能なキー: %v", cacheKey, keys), nil
 	}
 
-	total := len(result)
+	// Python版はcontent[offset:offset+chunk]を文字単位でスライスするため、
+	// Go版もrune単位に変換する（read_fileと同じ理由）。
+	runes := []rune(result)
+	total := len(runes)
 	if offset < 0 {
 		offset = 0
 	}
@@ -64,7 +67,7 @@ func toolReadToolCache(args map[string]any) (string, error) {
 	if end > total {
 		end = total
 	}
-	sliced := result[offset:end]
+	sliced := string(runes[offset:end])
 	remaining := total - end
 
 	sep := strings.Repeat("─", toolOutputCacheStrip)
@@ -99,12 +102,13 @@ func storeOutputCache(toolName, result string) string {
 // 超える結果をキャッシュへ登録し、先頭threshold文字+read_tool_cache案内を返す。
 // threshold以下ならそのまま返す。
 func CacheObs(toolName, result string, threshold int) string {
-	if len(result) <= threshold {
+	runes := []rune(result)
+	total := len(runes)
+	if total <= threshold {
 		return result
 	}
 	cacheKey := storeOutputCache(toolName, result)
-	total := len(result)
-	sliced := result[:threshold]
+	sliced := string(runes[:threshold])
 	remaining := total - threshold
 	header := fmt.Sprintf("[%s 全%d文字  cache_key=\"%s\"]\n", toolName, total, cacheKey)
 	footer := fmt.Sprintf("\n…残り%d文字: read_tool_cache(cache_key=\"%s\", offset=%d)", remaining, cacheKey, threshold)

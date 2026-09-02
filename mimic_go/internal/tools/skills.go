@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -352,14 +353,30 @@ func SkillContextHeaderSection() string {
 		strings.Join(lines, "\n") + "\n"
 }
 
+// ScratchpadHistoryEntry は1回のupdate_scratchpad呼び出し（Director自身の分）。
+type ScratchpadHistoryEntry struct {
+	TS      string
+	Content string
+}
+
+const scratchpadHistoryKeep = 50
+
 var (
-	scratchpadMu   sync.Mutex
-	currentScratch = "【現在の進捗】タスクを開始しました。"
+	scratchpadMu      sync.Mutex
+	currentScratch    = "【現在の進捗】タスクを開始しました。"
+	scratchpadHistory []ScratchpadHistoryEntry
 )
 
 func setScratchpad(text string) {
 	scratchpadMu.Lock()
 	currentScratch = text
+	scratchpadHistory = append(scratchpadHistory, ScratchpadHistoryEntry{
+		TS:      time.Now().Format("2006-01-02T15:04:05"),
+		Content: text,
+	})
+	if len(scratchpadHistory) > scratchpadHistoryKeep {
+		scratchpadHistory = scratchpadHistory[len(scratchpadHistory)-scratchpadHistoryKeep:]
+	}
 	scratchpadMu.Unlock()
 }
 
@@ -368,4 +385,14 @@ func GetScratchpad() string {
 	scratchpadMu.Lock()
 	defer scratchpadMu.Unlock()
 	return currentScratch
+}
+
+// GetScratchpadHistory はDirector自身のupdate_scratchpad呼び出し履歴を時系列で
+// 返す（Python版 app.py::_refresh_scratchpad_tab の履歴表示部分の移植）。
+func GetScratchpadHistory() []ScratchpadHistoryEntry {
+	scratchpadMu.Lock()
+	defer scratchpadMu.Unlock()
+	out := make([]ScratchpadHistoryEntry, len(scratchpadHistory))
+	copy(out, scratchpadHistory)
+	return out
 }

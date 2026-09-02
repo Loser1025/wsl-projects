@@ -16,16 +16,17 @@ import (
 const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
 var (
-	resultTitlePat   = regexp.MustCompile(`(?s)class="result__a"[^>]+href="([^"]*)"[^>]*>(.*?)</a>`)
-	resultSnippetPat = regexp.MustCompile(`(?s)class="result__snippet"[^>]*>(.*?)</a>`)
-	uddgPat          = regexp.MustCompile(`uddg=([^&"]+)`)
-	tagStripPat      = regexp.MustCompile(`<[^>]+>`)
-	scriptStylePat   = regexp.MustCompile(`(?is)<(script|style|nav|footer|header|aside)[^>]*>.*?</(script|style|nav|footer|header|aside)>`)
-	commentPat       = regexp.MustCompile(`(?s)<!--.*?-->`)
-	titlePat         = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
-	numEntityPat     = regexp.MustCompile(`&#(\d+);`)
-	spacePat         = regexp.MustCompile(`[ \t]+`)
-	blankLinesPat    = regexp.MustCompile(`\n{3,}`)
+	resultTitlePat    = regexp.MustCompile(`(?s)class="result__a"[^>]+href="([^"]*)"[^>]*>(.*?)</a>`)
+	fallbackResultPat = regexp.MustCompile(`(?s)href="(/l/\?uddg=[^"]+)"[^>]*>(.*?)</a>`)
+	resultSnippetPat  = regexp.MustCompile(`(?s)class="result__snippet"[^>]*>(.*?)</a>`)
+	uddgPat           = regexp.MustCompile(`uddg=([^&"]+)`)
+	tagStripPat       = regexp.MustCompile(`<[^>]+>`)
+	scriptStylePat    = regexp.MustCompile(`(?is)<(script|style|nav|footer|header|aside)[^>]*>.*?</(script|style|nav|footer|header|aside)>`)
+	commentPat        = regexp.MustCompile(`(?s)<!--.*?-->`)
+	titlePat          = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	numEntityPat      = regexp.MustCompile(`&#(\d+);`)
+	spacePat          = regexp.MustCompile(`[ \t]+`)
+	blankLinesPat     = regexp.MustCompile(`\n{3,}`)
 )
 
 func registerWebTools(r *Registry) {
@@ -123,6 +124,13 @@ func toolWebSearch(args map[string]any) (string, error) {
 
 	titleMatches := resultTitlePat.FindAllStringSubmatch(html, -1)
 	snippetMatches := resultSnippetPat.FindAllStringSubmatch(html, -1)
+
+	if len(titleMatches) == 0 {
+		// フォールバック: hrefにuddg=を含む<a>要素を拾う二次抽出
+		// （Python版 web_search の`fallback`ロジックの移植。DuckDuckGoの
+		// HTML構造が変わりresult__aクラスにマッチしない場合の保険）。
+		titleMatches = fallbackResultPat.FindAllStringSubmatch(html, -1)
+	}
 
 	var results []string
 	for i, m := range titleMatches {

@@ -4,27 +4,29 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
-	"time"
+
+	tea "charm.land/bubbletea/v2"
 
 	"mimic/internal/bench"
+	"mimic/internal/config"
 	"mimic/internal/delegate"
 	"mimic/internal/mcp"
+	"mimic/internal/selector"
 	"mimic/internal/tools"
 	"mimic/internal/viewer"
 )
 
 // スラッシュコマンド群（Python版 commands.py の縮小移植）。
 // runSlashCommand はコマンド名（先頭の"/"含む）に応じて処理し、
-// 対応するコマンドであれば(更新後のModel, true)を返す。未知のコマンドや
-// 通常のチャット入力の場合はhandled=falseを返し、呼び出し元が通常の
+// 対応するコマンドであれば(更新後のModel, 追加コマンド, true)を返す。未知の
+// コマンドや通常のチャット入力の場合はhandled=falseを返し、呼び出し元が通常の
 // チャット送信処理へフォールバックする。
-func (m Model) runSlashCommand(text string) (Model, bool) {
+func (m Model) runSlashCommand(text string) (Model, tea.Cmd, bool) {
 	fields := strings.Fields(text)
 	if len(fields) == 0 || !strings.HasPrefix(fields[0], "/") {
-		return m, false
+		return m, nil, false
 	}
 	cmd := fields[0]
 	args := fields[1:]
@@ -32,53 +34,58 @@ func (m Model) runSlashCommand(text string) (Model, bool) {
 	switch cmd {
 	case "/undo":
 		result := m.autoGit.Rollback(m.cwd)
-		return m.appendCommandLog(text, fmt.Sprintf("[AutoGit] %s", result)), true
+		return m.appendCommandLog(text, fmt.Sprintf("[AutoGit] %s", result)), nil, true
 	case "/stats":
-		return m.appendCommandLog(text, m.callLog.StatsText()), true
+		return m.appendCommandLog(text, m.callLog.StatsText()), nil, true
 	case "/bench":
 		report, err := bench.Run(m.cwd)
 		if err != nil {
 			report = fmt.Sprintf("ベンチマーク集計エラー: %v", err)
 		}
-		return m.appendCommandLog(text, report), true
+		return m.appendCommandLog(text, report), nil, true
 	case "/help":
-		return m.appendCommandLog(text, helpText()), true
+		return m.appendCommandLog(text, helpText()), nil, true
 	case "/status":
-		return m.appendCommandLog(text, m.statusText()), true
+		return m.appendCommandLog(text, m.statusText()), nil, true
 	case "/clear":
 		m.history = nil
 		delegate.DiscardSessionWorker()
 		delegate.ClearDelegationHistory()
-		return m.appendCommandLog(text, "会話履歴をクリアしました。"), true
+		if m.reactLog != nil {
+			m.reactLog.Clear()
+		}
+		return m.appendCommandLog(text, "会話履歴をクリアしました。"), nil, true
 	case "/cd":
-		return m.cmdCD(text, args), true
+		return m.cmdCD(text, args), nil, true
 	case "/sessions":
-		return m.appendCommandLog(text, listSessionsText(m.cwd)), true
+		return m.cmdSessions(text, strings.Join(args, " ")), nil, true
 	case "/skills":
 		if len(args) > 0 && args[0] == "reload" {
-			return m.appendCommandLog(text, tools.ReloadSkills()), true
+			return m.appendCommandLog(text, tools.ReloadSkills()), nil, true
 		}
-		return m.appendCommandLog(text, m.registry.Call("list_skills", "{}")), true
+		return m.appendCommandLog(text, m.registry.Call("list_skills", "{}")), nil, true
 	case "/delegations":
-		return m.appendCommandLog(text, delegationsText()), true
+		updated, cmd := m.cmdDelegations(text, args)
+		return updated, cmd, true
 	case "/mcp":
-		return m.cmdMCP(text, args), true
+		return m.cmdMCP(text, args), nil, true
 	case "/search":
-		return m.appendCommandLog(text, searchSessionsText(m.cwd, strings.Join(args, " "))), true
+		return m.cmdSearch(text, strings.Join(args, " ")), nil, true
 	case "/viewer":
-		return m.cmdViewer(text), true
+		return m.cmdViewer(text), nil, true
 	case "/model":
-		return m.cmdModel(text, args), true
+		updated, cmd := m.cmdModel(text, args)
+		return updated, cmd, true
 	case "/mode":
-		return m.cmdMode(text, args), true
+		return m.cmdMode(text, args), nil, true
 	case "/scratchpad":
 		content := tools.GetScratchpad()
 		if strings.TrimSpace(content) == "" {
 			content = "（スクラッチパッドは空です）"
 		}
-		return m.appendCommandLog(text, content), true
+		return m.appendCommandLog(text, content), nil, true
 	}
-	return m, false
+	return m, nil, false
 }
 
 // appendCommandLog はコマンドとその結果をログに積み、viewportを更新する
@@ -98,8 +105,8 @@ func helpText() string {
 		"  /status                   プロバイダ・モデル・作業ディレクトリを表示",
 		"  /clear                    会話履歴をクリア（保持中の委任セッションも破棄）",
 		"  /cd <dir>                 作業ディレクトリを変更",
-		"  /sessions                 過去セッション一覧",
-		"  /search <キーワード>       過去セッションをキーワード検索",
+		"  /sessions [番号|ファイル名] 過去セッション一覧・詳細表示・コンテキスト注入",
+		"  /search <キーワード>       過去セッションをキーワード検索・コンテキスト注入",
 		"  /skills                   利用可能なSkill一覧",
 		"  /skills reload            Skillディレクトリを再スキャン",
 		"  /delegations              孤立委任（中断された委任）の一覧",
@@ -174,80 +181,6 @@ func (m Model) cmdCD(text string, args []string) Model {
 	return m.appendCommandLog(text, fmt.Sprintf("作業ディレクトリを変更しました: %s", abs))
 }
 
-func listSessionsText(cwd string) string {
-	dir := filepath.Join(cwd, ".mimic", "sessions")
-	entries, err := os.ReadDir(dir)
-	if err != nil || len(entries) == 0 {
-		return "セッション履歴はありません。"
-	}
-	type sessionFile struct {
-		name  string
-		mtime time.Time
-	}
-	var files []sessionFile
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
-			continue
-		}
-		info, err := e.Info()
-		if err != nil {
-			continue
-		}
-		files = append(files, sessionFile{e.Name(), info.ModTime()})
-	}
-	sort.Slice(files, func(i, j int) bool { return files[i].mtime.After(files[j].mtime) })
-	if len(files) > 20 {
-		files = files[:20]
-	}
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("過去セッション（直近%d件）:\n", len(files)))
-	for _, f := range files {
-		fmt.Fprintf(&b, "  %s  %s\n", f.mtime.Format("2006-01-02 15:04"), f.name)
-	}
-	return b.String()
-}
-
-func searchSessionsText(cwd, query string) string {
-	if strings.TrimSpace(query) == "" {
-		return "エラー: 検索キーワードを指定してください。例: /search TODO"
-	}
-	dir := filepath.Join(cwd, ".mimic", "sessions")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return "セッション履歴はありません。"
-	}
-	var hits []string
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
-		if err != nil {
-			continue
-		}
-		lines := strings.Split(string(data), "\n")
-		for i, line := range lines {
-			if strings.Contains(line, query) {
-				snippet := line
-				if len(snippet) > 200 {
-					snippet = snippet[:200]
-				}
-				hits = append(hits, fmt.Sprintf("%s:%d: %s", e.Name(), i+1, snippet))
-				if len(hits) >= 30 {
-					break
-				}
-			}
-		}
-		if len(hits) >= 30 {
-			break
-		}
-	}
-	if len(hits) == 0 {
-		return fmt.Sprintf("「%s」は見つかりませんでした。", query)
-	}
-	return fmt.Sprintf("%d件ヒット:\n%s", len(hits), strings.Join(hits, "\n"))
-}
-
 func delegationsText() string {
 	entries := delegate.ListOrphanedDelegations()
 	if len(entries) == 0 {
@@ -255,21 +188,57 @@ func delegationsText() string {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "孤立委任 %d件:\n", len(entries))
-	for _, e := range entries {
+	for i, e := range entries {
 		age := "不明"
 		if e.CheckpointAge != nil {
 			age = strconv.Itoa(int(*e.CheckpointAge)) + "秒前"
 		}
-		fmt.Fprintf(&b, "  [%s] %s\n    開始: %s / 最終チェックポイント: %s\n    task: %.80s\n",
-			e.TraceID, e.Label, e.StartedAt, age, e.Task)
+		fmt.Fprintf(&b, "  [%d] trace_id=%s  %s\n    開始: %s / 最終チェックポイント: %s\n    task: %.80s\n",
+			i+1, e.TraceID, e.Label, e.StartedAt, age, e.Task)
 	}
-	b.WriteString("（Go版では自動再開は未対応。baseディレクトリを直接確認・削除してください: 各エントリのbase欄）")
+	b.WriteString("再開: /delegations resume <番号>   破棄: /delegations discard <番号>")
 	return b.String()
+}
+
+// cmdDelegations は`/delegations`, `/delegations resume <番号>`,
+// `/delegations discard <番号>`を処理する（Python版 commands.py::register_delegations_command
+// / team.py::resume_delegation・discard_delegation の移植）。
+func (m Model) cmdDelegations(text string, args []string) (Model, tea.Cmd) {
+	if len(args) == 0 {
+		return m.appendCommandLog(text, delegationsText()), nil
+	}
+	action := args[0]
+	if action != "resume" && action != "discard" {
+		return m.appendCommandLog(text, "使い方: /delegations | /delegations resume <番号> | /delegations discard <番号>"), nil
+	}
+	if len(args) < 2 {
+		return m.appendCommandLog(text, "番号を指定してください（一覧は /delegations で確認）。"), nil
+	}
+	n, err := strconv.Atoi(args[1])
+	if err != nil {
+		return m.appendCommandLog(text, fmt.Sprintf("エラー: 番号ではありません: %s", args[1])), nil
+	}
+	entries := delegate.ListOrphanedDelegations()
+	idx := n - 1
+	if idx < 0 || idx >= len(entries) {
+		return m.appendCommandLog(text, fmt.Sprintf("エラー: 番号 %d のタスクが見つかりません（1〜%d）。", n, len(entries))), nil
+	}
+	traceID := entries[idx].TraceID
+
+	if action == "discard" {
+		result := delegate.DiscardDelegation(traceID)
+		return m.appendCommandLog(text, result), nil
+	}
+
+	// resumeはWorkerの再実行を伴い時間がかかるため、バックグラウンドで実行し
+	// 完了時にdelegationResumeResultMsgで結果を受け取る（TUIをブロックしない）。
+	m = m.appendCommandLog(text, fmt.Sprintf("  [Resume] trace_id=%s のタスクを再開します...", traceID))
+	return m, resumeDelegationCmd(traceID)
 }
 
 func (m Model) cmdMCP(text string, args []string) Model {
 	if len(args) == 0 {
-		status := mcp.ListStatus()
+		status := mcp.ListStatus(m.cwd)
 		if len(status) == 0 {
 			return m.appendCommandLog(text, "接続対象のMCPサーバーはありません（~/.mcp.json, ./.mcp.json にmcpServersが見つかりません）。")
 		}
@@ -297,19 +266,45 @@ func (m Model) cmdMCP(text string, args []string) Model {
 	return m.appendCommandLog(text, "使い方: /mcp  または  /mcp trust <server> [read-only|off]  または  /mcp reconnect <server>")
 }
 
-// cmdModel はモデルの確認・直接変更を行う（Python版 commands.py::cmd_model /
-// app.py::_cmd_model の移植。TUI実行中にライブセレクターを再起動する仕組みは
-// 無いため、引数なし時はライブ選択の代わりに現在値のみ表示する）。
-func (m Model) cmdModel(text string, args []string) Model {
+// cmdModel はモデルの確認・直接変更・ライブ選択を行う（Python版 commands.py::
+// cmd_model / app.py::_cmd_model の移植）。引数なし時は、cfgが設定済みなら
+// ライブモデルセレクタ（internal/selector.SelectInteractively）をバックグラウンドで
+// 起動する。cfg未設定（起動経路の都合等）の場合は現在値表示のみにフォールバックする。
+func (m Model) cmdModel(text string, args []string) (Model, tea.Cmd) {
 	if len(args) == 0 {
-		return m.appendCommandLog(text, fmt.Sprintf(
-			"現在のモデル: %s/%s\n変更: /model <モデル名>（Go版はライブ選択未対応のため名前を直接指定）",
-			m.client.ProviderName(), m.client.Model()))
+		if m.cfg == nil {
+			return m.appendCommandLog(text, fmt.Sprintf(
+				"現在のモデル: %s/%s\n変更: /model <モデル名>",
+				m.client.ProviderName(), m.client.Model())), nil
+		}
+		m = m.appendCommandLog(text, "モデルセレクタを起動します（画面が一時的に切り替わります）...")
+		return m, liveModelSelectCmd(m.cfg)
 	}
 	name := args[0]
 	m.client.SetModel(name)
 	m.history = nil
-	return m.appendCommandLog(text, fmt.Sprintf("✓ モデルを変更しました: %s\n会話履歴をリセットしました。", name))
+	return m.appendCommandLog(text, fmt.Sprintf("✓ モデルを変更しました: %s\n会話履歴をリセットしました。", name)), nil
+}
+
+// modelSelectResultMsg はliveModelSelectCmdの完了をUpdateループへ通知する。
+type modelSelectResultMsg struct {
+	provider *config.ProviderConfig
+}
+
+// liveModelSelectCmd はBubble Teaの描画・入力読み取りを一時停止して端末を明け渡し
+// （ReleaseTerminal）、internal/selector.SelectInteractivelyを同期実行してから
+// 端末をBubble Teaへ返す（RestoreTerminal）。selector自体はプロバイダ横断の
+// モデル一覧取得・疎通確認を行う既存の起動時ロジックをそのまま再利用する。
+func liveModelSelectCmd(cfg *config.Config) tea.Cmd {
+	return func() tea.Msg {
+		if programRef == nil {
+			return modelSelectResultMsg{}
+		}
+		programRef.ReleaseTerminal()
+		active := selector.SelectInteractively(cfg)
+		programRef.RestoreTerminal()
+		return modelSelectResultMsg{provider: active}
+	}
 }
 
 // specialistExcludedTools はSpecialistモードで除外するツール名

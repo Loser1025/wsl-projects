@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -29,12 +30,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"mimic/internal/config"
 	"mimic/internal/delegate"
 	"mimic/internal/llm"
 	"mimic/internal/mcp"
 	"mimic/internal/react"
 	"mimic/internal/tools"
 	"mimic/internal/vcs"
+	"mimic/internal/viewer"
 )
 
 // ── カラーパレット（Razer Neon Greenテーマ、Python版セレクターと統一） ──
@@ -103,6 +106,7 @@ type Model struct {
 	active   tabID
 
 	client       *llm.Client
+	cfg          *config.Config // /model引数なし時のライブモデルセレクタで使う
 	systemPrompt string
 	registry     *tools.Registry
 	history      []llm.Message
@@ -121,6 +125,10 @@ type Model struct {
 	thinkBuf     ThinkAwareBuffer
 	inThinkLine  bool
 	thinkLineBuf string // 未改行のthink断片バッファ（複数行ボックス表示用）
+
+	// 通常テキストのバッファリング（Python版 PipelineTypewriter::_raw_buf相当）。
+	// appendThinkSegment/feedRawTextが使う。
+	rawTextBuf string
 
 	// /viewerコマンドでオンデマンド起動する観測ビューアのURL（起動前は空文字）。
 	viewerURL string
@@ -148,6 +156,15 @@ type Model struct {
 	filesScrollTop    int
 	filePreviewScroll int
 
+	// ファイルプレビュー内`/`検索（Python版 app.py::_open_file_search/_run_file_search
+	// /_render_preview の移植）。filePreviewAllLinesは検索対象となる全行
+	// （表示用filePreviewは4000字で打ち切られるため別に保持する）。
+	filePreviewAllLines  []string
+	fileSearchActive     bool // 検索クエリ入力中かどうか（Enterで確定しfalseに戻る）
+	fileSearchQuery      string
+	filePreviewSearching bool         // 検索確定後、結果（マッチ行±2）のみ表示中かどうか
+	filePreviewMatches   map[int]bool // マッチした行番号（0-indexed）の集合
+
 	// 書き込み承認フロー（Python版 app.py の承認モーダルの移植）
 	approvalCh      chan approvalRequest
 	pendingApproval *approvalRequest
@@ -164,6 +181,11 @@ type Model struct {
 	hostExecApprovalCh      chan hostExecApprovalRequest
 	pendingHostExecApproval *hostExecApprovalRequest
 	hostExecApprovalSeq     int
+
+	// /search・/sessionsのヒット後コンテキスト注入フロー（Python版 app.py::_cmd_search/
+	// _cmd_sessions の`_enter_approval_mode`による対話確認の移植）。
+	pendingSearchSelection *searchSelectionState
+	pendingSessionInject   *sessionInjectState
 
 	// ■ SYSTEM パネル用のシステムCPU/MEM使用率（Python版 app.py::_refresh_system_panel
 	// の移植。2秒間隔でsystemTickMsg経由で更新する）。
@@ -191,6 +213,24 @@ const systemTickInterval = 2 * time.Second
 
 func systemTickCmd() tea.Cmd {
 	return tea.Tick(systemTickInterval, func(time.Time) tea.Msg { return systemTickMsg{} })
+}
+
+// delegationResumeResultMsg は`/delegations resume`のバックグラウンド実行完了を
+// Updateループへ通知する（Worker再実行は時間がかかるためgoroutineで行い、
+// TUIをブロックしない）。
+type delegationResumeResultMsg struct {
+	text string
+}
+
+// resumeDelegationCmd はdelegate.ResumeDelegationをバックグラウンドで実行する。
+func resumeDelegationCmd(traceID string) tea.Cmd {
+	return func() tea.Msg {
+		result, err := delegate.ResumeDelegation(context.Background(), traceID)
+		if err != nil {
+			return delegationResumeResultMsg{text: fmt.Sprintf("  [Resume] エラー: %v", err)}
+		}
+		return delegationResumeResultMsg{text: "  " + result}
+	}
 }
 
 // approvalRequest はtools.ApprovalHandler経由でツール実行goroutineから
@@ -230,7 +270,20 @@ type turnEvent struct {
 
 const checkpointPath = ".mimic/checkpoint.json"
 
-func NewModel(client *llm.Client, systemPrompt string) Model {
+// programRef はmain.goでtea.NewProgram生成直後にSetProgramRefで登録される
+// *tea.Program参照。`/model`引数なし時のライブモデルセレクタが、Bubble Teaの
+// レンダリング/入力読み取りを一時停止して端末を明け渡す（ReleaseTerminal）ために
+// 使う。Modelはtea.NewProgram呼び出し時点ではまだ*tea.Programを持てない
+// （鶏と卵の関係）ため、パッケージレベルの変数で後から差し込む
+// （既存のSetWriteApprovalHandler等と同じ橋渡しパターン）。
+var programRef *tea.Program
+
+// SetProgramRef はmain.goが起動時に一度だけ呼び出す。
+func SetProgramRef(p *tea.Program) {
+	programRef = p
+}
+
+func NewModel(client *llm.Client, systemPrompt string, cfg *config.Config) Model {
 	ta := textarea.New()
 	ta.Placeholder = "メッセージを入力... (Enterで送信、Ctrl+Nで改行、Ctrl+Cで終了)"
 	ta.Focus()
@@ -307,6 +360,10 @@ func NewModel(client *llm.Client, systemPrompt string) Model {
 	// 同じAutoGitインスタンスに積ませてsquash対象に含める
 	// （Python版 team.py::set_team_autogit の移植）。
 	delegate.SetTeamAutoGit(autoGit)
+	// ビューアの委任親子ツリー表示のため、DirectorのReactLogをinternal/delegateへ
+	// 共有する（Python版 team.py::_log_team_event がReactLogへ直接書き込むのと
+	// 同じ役割。Go版はinternal/delegateがreactLogを保持していないため注入する）。
+	delegate.SetTeamReactLog(reactLog)
 	// get_delegation_trace/search_historyツールがセッションログを参照できるよう、
 	// TUI(常にDirector)のsessionsディレクトリを共有する。
 	delegate.SetSessionsDir(sessionsDir)
@@ -332,6 +389,7 @@ func NewModel(client *llm.Client, systemPrompt string) Model {
 	return Model{
 		input:              ta,
 		client:             client,
+		cfg:                cfg,
 		systemPrompt:       activeSystemPrompt,
 		baseSystemPrompt:   systemPrompt,
 		registry:           activeRegistry,
@@ -413,10 +471,28 @@ func waitForTurnEvent(ch chan turnEvent) tea.Cmd {
 
 // renderLog はviewportの幅に合わせて m.log の各行を折り返した上で結合する。
 // 幅が未確定（レイアウト計算前）でもMarkdown装飾自体は常に適用する。
+// colThink はthinkブロック専用のカラーテーマ（Python版 utils.py::
+// render_markdown_thinker が通常のMarkdown描画と別の淡いテーマを使うのに
+// 相当。灰色寄りのミント系にして「思考中」であることを視覚的に区別する）。
+var colThink = lipgloss.Color("#6B8F82")
+
+// isThinkBoxLine はthinkブロックのボーダーボックス行（境界線/内容行）かどうかを
+// 判定する（appendThinkSegmentが生成する行のプレフィックスで判定）。
+func isThinkBoxLine(line string) bool {
+	return strings.HasPrefix(line, "╭─ 💭") || strings.HasPrefix(line, "│ ") || strings.HasPrefix(line, "╰")
+}
+
 func (m Model) renderLog() string {
 	w := m.viewport.Width()
 	rendered := make([]string, len(m.log))
 	for i, line := range m.log {
+		if isThinkBoxLine(line) {
+			// thinkブロックは通常のMarkdown装飾を適用せず専用カラーのみ適用する
+			// （Python版 render_markdown_thinker が通常のrender_markdownとは
+			// 別の軽量レンダラーである設計の移植）。
+			rendered[i] = lipgloss.NewStyle().Foreground(colThink).Render(line)
+			continue
+		}
 		rendered[i] = renderMarkdown(line)
 	}
 	if w <= 0 {
@@ -455,6 +531,7 @@ func (m *Model) feedThinkAwareText(chunk string) {
 func (m *Model) appendThinkSegment(seg thinkSegment) {
 	if seg.IsThink {
 		if !m.inThinkLine {
+			m.flushRawBuffer(true) // think遷移前に生テキストバッファを強制flush
 			m.closeOpenLine()
 			m.log = append(m.log, "╭─ 💭 思考中 "+strings.Repeat("─", 50))
 			m.inThinkLine = true
@@ -480,7 +557,7 @@ func (m *Model) appendThinkSegment(seg thinkSegment) {
 		m.log = append(m.log, "╰"+strings.Repeat("─", 62))
 		m.inThinkLine = false
 	}
-	m.appendToOpenLine(seg.Text)
+	m.feedRawText(seg.Text)
 }
 
 // flushThinkBuffer はターン終了時に残バッファを強制フラッシュする。
@@ -497,6 +574,57 @@ func (m *Model) flushThinkBuffer() {
 	}
 	m.thinkBuf = ThinkAwareBuffer{}
 	m.inThinkLine = false
+	m.flushRawBuffer(true)
+}
+
+// ── 生テキストのバッファリング（Python版 utils.py::PipelineTypewriter の
+// Stage1相当。_should_flush/_flush_raw の移植）。改行 or 200文字に達するか、
+// コードブロック(```)が閉じている場合にのみflushする。未閉じの```を含む
+// チャンクを保持し続けることで、コードブロックの途中でログ行が分断される
+// のを防ぐ。thinkブロックへの遷移時（appendThinkSegment）や
+// ターン終了時（flushThinkBuffer）はforce=trueで強制flushする。
+
+const rawFlushBufferSize = 200
+
+// shouldFlushRawBuffer はバッファをflushしてよいかを判定する。
+func shouldFlushRawBuffer(buf string) bool {
+	if !strings.Contains(buf, "\n") && len(buf) < rawFlushBufferSize {
+		return false
+	}
+	if strings.Count(buf, "```")%2 != 0 {
+		return false // 未閉じのコードブロック中は保持し続ける
+	}
+	return true
+}
+
+// feedRawText はテキストをバッファへ追加し、flush条件を満たせば
+// appendToOpenLineへ出力する。
+func (m *Model) feedRawText(text string) {
+	m.rawTextBuf += text
+	if shouldFlushRawBuffer(m.rawTextBuf) {
+		m.flushRawBuffer(false)
+	}
+}
+
+// flushRawBuffer はバッファ内容をappendToOpenLineへ出力する。force=falseの
+// 場合、最後の改行までのみ出力し残りはバッファに保持する（改行が無ければ
+// 全量出力する＝Python版の`last_nl == -1`分岐と同じ）。
+func (m *Model) flushRawBuffer(force bool) {
+	if m.rawTextBuf == "" {
+		return
+	}
+	lastNL := strings.LastIndex(m.rawTextBuf, "\n")
+	var toFlush string
+	if force || lastNL == -1 {
+		toFlush = m.rawTextBuf
+		m.rawTextBuf = ""
+	} else {
+		toFlush = m.rawTextBuf[:lastNL+1]
+		m.rawTextBuf = m.rawTextBuf[lastNL+1:]
+	}
+	if toFlush != "" {
+		m.appendToOpenLine(toFlush)
+	}
 }
 
 func (m *Model) closeOpenLine() {
@@ -547,6 +675,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.active == tabFiles && msg.Mouse().Button == tea.MouseLeft {
 			m.handleFilesMouseClick(msg.Mouse())
 		}
+
+	case delegationResumeResultMsg:
+		m.log = append(m.log, msg.text)
+		m.openLine = false
+		m.viewport.SetContent(m.renderLog())
+		m.viewport.GotoBottom()
+		return m, nil
+
+	case modelSelectResultMsg:
+		if msg.provider == nil {
+			m.log = append(m.log, "  ✗ モデルセレクタの起動に失敗しました（変更なし）。")
+		} else {
+			m.client = llm.NewClient(msg.provider)
+			m.history = nil
+			m.log = append(m.log, fmt.Sprintf("  ✓ モデルを切り替えました: %s/%s\n  会話履歴をリセットしました。",
+				m.client.ProviderName(), m.client.Model()))
+		}
+		m.openLine = false
+		m.viewport.SetContent(m.renderLog())
+		m.viewport.GotoBottom()
+		return m, nil
 
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" || msg.String() == "ctrl+q" {
@@ -634,6 +783,71 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.input, taCmd = m.input.Update(msg)
 			return m, taCmd
+		}
+
+		// /searchのヒット選択待ち（番号カンマ区切り/all/n）
+		// （Python版 app.py::_cmd_search の on_response の移植）。
+		if m.pendingSearchSelection != nil {
+			if msg.String() == "enter" {
+				resp := strings.ToLower(strings.TrimSpace(m.input.Value()))
+				m.input.Reset()
+				m.adjustInputHeight()
+				sel := m.pendingSearchSelection
+				m.pendingSearchSelection = nil
+				m.applySearchSelection(sel, resp)
+				return m, nil
+			}
+			m.input, taCmd = m.input.Update(msg)
+			return m, taCmd
+		}
+
+		// /sessionsの詳細表示後の注入確認（y/n）
+		// （Python版 app.py::_cmd_sessions の on_response の移植）。
+		if m.pendingSessionInject != nil {
+			if msg.String() == "enter" {
+				resp := strings.ToLower(strings.TrimSpace(m.input.Value()))
+				m.input.Reset()
+				m.adjustInputHeight()
+				inj := m.pendingSessionInject
+				m.pendingSessionInject = nil
+				m.applySessionInject(inj, resp)
+				return m, nil
+			}
+			m.input, taCmd = m.input.Update(msg)
+			return m, taCmd
+		}
+
+		// ファイルプレビュー内検索クエリ入力中は、Enter/Escape/Backspace以外の
+		// キー入力をすべてクエリ文字として扱う（Python版 app.py::_open_file_search
+		// 〜on_chat_input_submitのfile-search-input専用分岐の移植）。
+		if m.fileSearchActive {
+			switch msg.String() {
+			case "enter":
+				m.runFileSearch(m.fileSearchQuery)
+				m.fileSearchActive = false
+				return m, nil
+			case "escape":
+				m.closeFileSearch()
+				return m, nil
+			case "backspace":
+				if m.fileSearchQuery == "" {
+					// 空の状態でのBackspaceは検索バーを閉じる
+					// （Python版 app.py::on_key の該当分岐の移植）。
+					m.closeFileSearch()
+					return m, nil
+				}
+				r := []rune(m.fileSearchQuery)
+				m.fileSearchQuery = string(r[:len(r)-1])
+				return m, nil
+			case "space":
+				m.fileSearchQuery += " "
+				return m, nil
+			default:
+				if s := msg.String(); len([]rune(s)) == 1 {
+					m.fileSearchQuery += s
+				}
+				return m, nil
+			}
 		}
 
 		switch msg.String() {
@@ -740,9 +954,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.log = append(m.log, fmt.Sprintf("  📁 作業Dir → %s", m.cwd))
 						m.viewport.SetContent(m.renderLog())
 					} else {
-						m.filePath = e.path
-						m.filePreview = readPreview(e.path)
-						m.filePreviewScroll = 0
+						m.openFilePreview(e.path)
 					}
 				}
 				return m, nil
@@ -756,6 +968,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.resetFilesTree()
 					m.log = append(m.log, fmt.Sprintf("  📁 作業Dir → %s", m.cwd))
 					m.viewport.SetContent(m.renderLog())
+				}
+				return m, nil
+			case "/":
+				// プレビュー内検索を開く（Python版 app.py::_open_file_search の移植。
+				// プレビューが開かれている場合のみ）。
+				if m.filePath != "" {
+					m.fileSearchActive = true
+					m.fileSearchQuery = ""
 				}
 				return m, nil
 			}
@@ -777,8 +997,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.input.Reset()
 			m.adjustInputHeight()
 			if strings.HasPrefix(text, "/") {
-				if updated, handled := m.runSlashCommand(text); handled {
-					return updated, nil
+				if updated, cmd, handled := m.runSlashCommand(text); handled {
+					return updated, cmd
 				}
 			}
 			m.history = append(m.history, llm.Message{Role: "user", Content: text})
@@ -925,6 +1145,7 @@ func (m Model) startTurn() (tea.Model, tea.Cmd) {
 	m.thinkBuf = ThinkAwareBuffer{}
 	m.inThinkLine = false
 	m.thinkLineBuf = ""
+	m.rawTextBuf = ""
 	ch := make(chan turnEvent)
 	ctx, cancel := context.WithCancel(context.Background())
 	m.turnCh = ch
@@ -1136,9 +1357,54 @@ func (m *Model) handleFilesMouseClick(ev tea.Mouse) {
 		m.log = append(m.log, fmt.Sprintf("  📁 作業Dir → %s", m.cwd))
 		m.viewport.SetContent(m.renderLog())
 	} else {
-		m.filePath = e.path
-		m.filePreview = readPreview(e.path)
-		m.filePreviewScroll = 0
+		m.openFilePreview(e.path)
+	}
+}
+
+// runFileSearch はプレビュー内検索を実行する（Python版 app.py::_run_file_search
+// の移植。正規表現として不正なパターンはリテラル一致にフォールバックする）。
+func (m *Model) runFileSearch(pattern string) {
+	if pattern == "" || len(m.filePreviewAllLines) == 0 {
+		m.closeFileSearch()
+		return
+	}
+	re, err := regexp.Compile("(?i)" + pattern)
+	if err != nil {
+		re = regexp.MustCompile("(?i)" + regexp.QuoteMeta(pattern))
+	}
+	matches := make(map[int]bool)
+	for i, line := range m.filePreviewAllLines {
+		if re.MatchString(line) {
+			matches[i] = true
+		}
+	}
+	m.filePreviewMatches = matches
+	m.filePreviewSearching = true
+	m.filePreviewScroll = 0
+}
+
+// closeFileSearch は検索モードを終了し、通常のプレビュー表示に戻す。
+func (m *Model) closeFileSearch() {
+	m.fileSearchActive = false
+	m.fileSearchQuery = ""
+	m.filePreviewSearching = false
+	m.filePreviewMatches = nil
+}
+
+// openFilePreview はファイルプレビューを開き、検索状態をリセットする
+// （Python版 app.py::_show_file_preview の移植）。
+func (m *Model) openFilePreview(path string) {
+	m.filePath = path
+	m.filePreview = readPreview(path)
+	m.filePreviewScroll = 0
+	m.fileSearchActive = false
+	m.fileSearchQuery = ""
+	m.filePreviewSearching = false
+	m.filePreviewMatches = nil
+	if data, err := os.ReadFile(path); err == nil {
+		m.filePreviewAllLines = strings.Split(string(data), "\n")
+	} else {
+		m.filePreviewAllLines = nil
 	}
 }
 
@@ -1418,7 +1684,7 @@ func (m Model) renderBody(height int) string {
 	case tabFiles:
 		content = m.renderFiles(innerWidth, height)
 	case tabScratchpad:
-		content = lipgloss.NewStyle().Foreground(colText).MaxWidth(innerWidth).Render(tools.GetScratchpad())
+		content = m.renderScratchpad(innerWidth)
 	case tabLog:
 		content = m.renderLogTab(innerWidth)
 	}
@@ -1497,24 +1763,65 @@ func (m Model) renderFiles(width, height int) string {
 	treeLines := append([]string{rootLine}, itemLines[start:end]...)
 	tree := strings.Join(treeLines, "\n")
 
-	previewLines := strings.Split(m.filePreview, "\n")
-	previewRows := clampMin(height, 1)
-	pStart := clampMin(m.filePreviewScroll, 0)
-	if pStart > clamp0(len(previewLines)-1) {
-		pStart = clamp0(len(previewLines) - 1)
+	var preview string
+	if m.filePreviewSearching {
+		// 検索結果表示: マッチ行±2行のコンテキストのみをハイライト付きで表示
+		// （Python版 app.py::_run_file_search / _render_preview の移植）。
+		var contextIdx []int
+		seen := make(map[int]bool)
+		for i := range m.filePreviewMatches {
+			for d := -2; d <= 2; d++ {
+				idx := i + d
+				if idx >= 0 && idx < len(m.filePreviewAllLines) && !seen[idx] {
+					seen[idx] = true
+					contextIdx = append(contextIdx, idx)
+				}
+			}
+		}
+		sort.Ints(contextIdx)
+		var lines []string
+		for _, idx := range contextIdx {
+			lineText := fmt.Sprintf("%4d %s", idx+1, m.filePreviewAllLines[idx])
+			if m.filePreviewMatches[idx] {
+				lineText = lipgloss.NewStyle().Bold(true).Foreground(colAmber).Render(lineText)
+			}
+			lines = append(lines, lineText)
+		}
+		preview = strings.Join(lines, "\n")
+		if len(lines) == 0 {
+			preview = "（マッチする行がありません）"
+		}
+	} else {
+		previewLines := strings.Split(m.filePreview, "\n")
+		previewRows := clampMin(height, 1)
+		pStart := clampMin(m.filePreviewScroll, 0)
+		if pStart > clamp0(len(previewLines)-1) {
+			pStart = clamp0(len(previewLines) - 1)
+		}
+		pEnd := pStart + previewRows
+		if pEnd > len(previewLines) {
+			pEnd = len(previewLines)
+		}
+		preview = strings.Join(previewLines[pStart:pEnd], "\n")
+		if m.filePreview == "" {
+			preview = "↑/↓ でファイル選択、Enterでプレビュー  (←/→でディレクトリ展開/折りたたみ)"
+		}
 	}
-	pEnd := pStart + previewRows
-	if pEnd > len(previewLines) {
-		pEnd = len(previewLines)
-	}
-	preview := strings.Join(previewLines[pStart:pEnd], "\n")
-	if m.filePreview == "" {
-		preview = "↑/↓ でファイル選択、Enterでプレビュー  (←/→でディレクトリ展開/折りたたみ)"
-	}
+
 	previewHeader := ""
 	if m.filePath != "" {
 		rel, _ := filepath.Rel(m.cwd, m.filePath)
-		previewHeader = lipgloss.NewStyle().Foreground(colAccent).Bold(true).Render(rel) + "\n"
+		headerLine := rel
+		if m.filePreviewSearching {
+			headerLine += fmt.Sprintf("  [%d マッチ行]", len(m.filePreviewMatches))
+		}
+		previewHeader = lipgloss.NewStyle().Foreground(colAccent).Bold(true).Render(headerLine) + "\n"
+	}
+	if m.fileSearchActive {
+		// 検索クエリ入力中のプロンプト行（Python版の#file-search-barに相当）。
+		searchLine := lipgloss.NewStyle().Foreground(colOnAccent).Background(colAmber).Render(
+			"/ " + m.fileSearchQuery + "█  Enter=確定 Escape=閉じる")
+		previewHeader += searchLine + "\n"
 	}
 
 	left := lipgloss.NewStyle().
@@ -1530,8 +1837,62 @@ func (m Model) renderFiles(width, height int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 }
 
+// renderScratchpad はDirector自身のスクラッチパッド＋更新履歴＋
+// delegate_to_team/delegate_to_worker で起動したサブエージェント（Worker）の
+// スクラッチパッドを表示する（Python版 app.py::_refresh_scratchpad_tab の移植）。
+func (m Model) renderScratchpad(width int) string {
+	var b strings.Builder
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(colAccent)
+	subTitleStyle := lipgloss.NewStyle().Bold(true).Foreground(colTitle)
+	dimStyle := lipgloss.NewStyle().Foreground(colMuted)
+	bodyStyle := lipgloss.NewStyle().Foreground(colText).MaxWidth(width)
+
+	b.WriteString(titleStyle.Render("■ このエージェント（Director）") + "\n")
+	content := tools.GetScratchpad()
+	if content != "" {
+		b.WriteString(bodyStyle.Render(content) + "\n")
+	} else {
+		b.WriteString(dimStyle.Render("スクラッチパッドはまだ空です。") + "\n")
+	}
+
+	history := tools.GetScratchpadHistory()
+	if len(history) > 1 {
+		b.WriteString("\n" + dimStyle.Render(fmt.Sprintf("── 更新履歴（%d件、新しい順） ──", len(history))) + "\n")
+		for i := len(history) - 2; i >= 0; i-- { // 最新(末尾)は上で表示済みなので除く
+			e := history[i]
+			b.WriteString(dimStyle.Render(e.TS) + "\n")
+			b.WriteString(lipgloss.NewStyle().Foreground(colMuted).MaxWidth(width).Render(e.Content) + "\n")
+		}
+	}
+
+	traceIDs := delegate.GetRecentWorkerTraceIDs()
+	if len(traceIDs) > 0 {
+		sessionsDir := filepath.Join(m.cwd, ".mimic", "sessions")
+		for _, tid := range traceIDs {
+			b.WriteString("\n")
+			fileName, subHistory, found := viewer.GetSessionScratchpadHistory(sessionsDir, tid)
+			title := fmt.Sprintf("■ サブエージェント（Worker, trace_id=%s）", tid)
+			if fileName != "" {
+				title += "  " + fileName
+			}
+			b.WriteString(subTitleStyle.Render(title) + "\n")
+			if !found {
+				b.WriteString(dimStyle.Render("(セッションログがまだありません)") + "\n")
+				continue
+			}
+			if len(subHistory) > 0 {
+				b.WriteString(bodyStyle.Render(subHistory[len(subHistory)-1].Content) + "\n")
+			} else {
+				b.WriteString(dimStyle.Render("スクラッチパッドはまだ空です。") + "\n")
+			}
+		}
+	}
+
+	return strings.TrimRight(b.String(), "\n")
+}
+
 func (m Model) renderLogTab(width int) string {
-	entries := m.reactLog.RecentEntries(200)
+	entries := m.reactLog.RecentEntries(100) // Python版 app.py::_refresh_log_tab と同じ直近100件
 	if len(entries) == 0 {
 		return lipgloss.NewStyle().Foreground(colMuted).Render("(まだイベントがありません)")
 	}
@@ -1583,10 +1944,14 @@ func (m Model) renderInput() string {
 	hint := "Enter 送信 · Ctrl+N 改行 · F1-F4 タブ切替 · Ctrl+C 終了"
 	if m.pendingApproval != nil || m.pendingApplyApproval != nil || m.pendingHostExecApproval != nil {
 		hint = fmt.Sprintf("Y/n を入力 · Enter で確定 · %d秒で自動承認", approvalTimeoutSec)
+	} else if m.pendingSearchSelection != nil {
+		hint = "番号をカンマ区切り / all / n を入力 · Enter で確定"
+	} else if m.pendingSessionInject != nil {
+		hint = "y/n を入力 · Enter で確定"
 	} else if m.streaming {
 		hint = "⏳ 実行中... (Ctrl+C で中断)"
 	} else if m.active == tabFiles {
-		hint = "↑/↓ 選択 · ←/→ 展開/折りたたみ · Enter 開く · PgUp/PgDn プレビュー捲り · Backspace 上へ"
+		hint = "↑/↓ 選択 · ←/→ 展開/折りたたみ · Enter 開く · / 検索 · PgUp/PgDn プレビュー捲り · Backspace 上へ"
 	} else if m.active != tabChat {
 		hint = "F1-F4 タブ切替 · Ctrl+C 終了"
 	}

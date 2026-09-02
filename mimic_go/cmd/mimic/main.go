@@ -91,7 +91,10 @@ func main() {
 	// Alacritty/kitty等）がShift+ドラッグでアプリのマウス捕捉を無視した
 	// 選択を標準サポートしているため、マウスホイールでのviewportスクロールと
 	// 両立できる。
-	p := tea.NewProgram(tui.NewModel(client, cfg.SystemPrompt))
+	p := tea.NewProgram(tui.NewModel(client, cfg.SystemPrompt, cfg))
+	// `/model`引数なし時のライブモデルセレクタが、ReleaseTerminal/RestoreTerminalで
+	// 端末を一時的に明け渡すために使う（internal/tui/commands.go::liveModelSelectCmd）。
+	tui.SetProgramRef(p)
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "エラー: %v\n", err)
 		os.Exit(1)

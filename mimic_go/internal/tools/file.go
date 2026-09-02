@@ -139,15 +139,20 @@ func toolReadFile(args map[string]any) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	content := string(data)
-	total := len(content)
+	// Python版はcontent[offset:offset+chunk]を文字(Unicode codepoint)単位で
+	// スライスするため、Go版もバイト単位ではなくrune単位に変換して扱う
+	// （日本語等マルチバイト文字混じりファイルでオフセット・チャンク境界・
+	// 文字数表示がPython版とズレるのを防ぐ）。
+	runes := []rune(string(data))
+	total := len(runes)
 	MarkReadThisTurn(path)
 
 	if total > largeFileThreshold && offset == 0 {
-		preview := content
-		if len(preview) > 1500 {
-			preview = preview[:1500]
+		previewLen := 1500
+		if previewLen > total {
+			previewLen = total
 		}
+		preview := string(runes[:previewLen])
 		return fmt.Sprintf(
 			"[read_file: %s]\n"+
 				"⚠ このファイルは %d 文字あります（推奨上限 %d 文字）。\n"+
@@ -161,6 +166,9 @@ func toolReadFile(args map[string]any) (string, error) {
 		), nil
 	}
 
+	if offset < 0 {
+		offset = 0
+	}
 	if offset > total {
 		offset = total
 	}
@@ -168,7 +176,7 @@ func toolReadFile(args map[string]any) (string, error) {
 	if end > total {
 		end = total
 	}
-	sliced := content[offset:end]
+	sliced := string(runes[offset:end])
 	remaining := total - end
 
 	header := fmt.Sprintf("[%s  文字 %d–%d / 全%d文字]\n%s\n", path, offset, end, total, strings.Repeat("─", 60))
@@ -372,12 +380,103 @@ func toolPatchFile(args map[string]any) (string, error) {
 		return "", fmt.Errorf("検索ブロックが %d 箇所にマッチします（一意に特定できません）。", len(matches))
 	}
 
+	// 3. 類似ブロック探索（Python版 difflib.SequenceMatcher の移植）。
+	// 一致度が高い箇所を見つけても自動修正はしない（誤書き込み防止）。
+	// あくまでエラーメッセージに近似箇所のヒントを添えるだけ。
+	sKey := nonEmptyTrimmedLines(sLines)
+	bestRatio := 0.0
+	bestI := -1
+	bestN := n
+	const fuzzyThreshold = 0.85
+	minWin := n - 2
+	if minWin < 1 {
+		minWin = 1
+	}
+	for win := minWin; win <= n+2; win++ {
+		for i := 0; i+win <= len(contentLines); i++ {
+			bKey := nonEmptyTrimmedLines(contentLines[i : i+win])
+			ratio := sequenceRatio(sKey, bKey)
+			if ratio > bestRatio {
+				bestRatio = ratio
+				bestI = i
+				bestN = win
+			}
+		}
+	}
+
+	if bestRatio >= fuzzyThreshold && bestI >= 0 {
+		previewLines := bestN
+		if previewLines > 10 {
+			previewLines = 10
+		}
+		blockPreview := strings.Join(contentLines[bestI:bestI+previewLines], "\n")
+		return "", fmt.Errorf(
+			"完全一致が見つかりません（類似度 %.2f、行 %d–%d）。\n"+
+				"誤書き込みを防ぐため自動修正しません。\n"+
+				"read_file で内容を確認し、正確な文字列を指定してください。\n"+
+				"近似箇所（先頭10行）:\n%s",
+			bestRatio, bestI+1, bestI+bestN, blockPreview)
+	}
+
 	notFoundPreview := search
 	if len(notFoundPreview) > 120 {
 		notFoundPreview = notFoundPreview[:120]
 	}
 	notFoundPreview = strings.ReplaceAll(notFoundPreview, "\n", "↵")
-	return "", fmt.Errorf("指定された検索文字列がファイル内に見つかりません: %s\n検索対象: %s...\nread_file で現在の内容を確認し、正確な（特にインデントや改行を含む）文字列を指定してください。", path, notFoundPreview)
+	hint := ""
+	if bestRatio > 0 {
+		hint = fmt.Sprintf("\n最近似ブロック類似度: %.2f（行 %d–%d）", bestRatio, bestI+1, bestI+bestN)
+	}
+	return "", fmt.Errorf("指定された検索文字列がファイル内に見つかりません: %s\n検索対象: %s...%s\nread_file で現在の内容を確認し、正確な（特にインデントや改行を含む）文字列を指定してください。", path, notFoundPreview, hint)
+}
+
+// nonEmptyTrimmedLines は各行をtrimし、空行を除いたスライスを返す
+// （Python版 `[l.strip() for l in lines if l.strip()]` の移植）。
+func nonEmptyTrimmedLines(lines []string) []string {
+	out := make([]string, 0, len(lines))
+	for _, l := range lines {
+		t := strings.TrimSpace(l)
+		if t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// sequenceRatio はdifflib.SequenceMatcher.ratio()の簡易近似を返す
+// （2*M/T、M=LCSによる一致要素数、T=両者の要素数合計）。difflibの実際の
+// アルゴリズム（junk検出込みの再帰的最長一致ブロック探索）とは厳密には
+// 異なるが、あいまい検索の「近さの目安」としては十分機能する。
+func sequenceRatio(a, b []string) float64 {
+	t := len(a) + len(b)
+	if t == 0 {
+		return 1.0
+	}
+	m := lcsLength(a, b)
+	return 2.0 * float64(m) / float64(t)
+}
+
+// lcsLength は2つの文字列スライスの最長共通部分列(LCS)の長さを返す。
+func lcsLength(a, b []string) int {
+	n, m := len(a), len(b)
+	if n == 0 || m == 0 {
+		return 0
+	}
+	prev := make([]int, m+1)
+	cur := make([]int, m+1)
+	for i := 1; i <= n; i++ {
+		for j := 1; j <= m; j++ {
+			if a[i-1] == b[j-1] {
+				cur[j] = prev[j-1] + 1
+			} else if prev[j] >= cur[j-1] {
+				cur[j] = prev[j]
+			} else {
+				cur[j] = cur[j-1]
+			}
+		}
+		prev, cur = cur, prev
+	}
+	return prev[m]
 }
 
 func stripCommonIndent(text string) (string, int) {

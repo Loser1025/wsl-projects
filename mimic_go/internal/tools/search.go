@@ -34,6 +34,21 @@ func grepFileExcluded(name string) bool {
 	return false
 }
 
+// looksBinary はgrepコマンドのバイナリ判定と同様、NULバイトが含まれるかで
+// バイナリファイルかどうかを簡易判定する（先頭8000バイトのみ検査）。
+func looksBinary(data []byte) bool {
+	n := len(data)
+	if n > 8000 {
+		n = 8000
+	}
+	for i := 0; i < n; i++ {
+		if data[i] == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // compileGrepPattern はPythonのgrep(BRE/ERE寄り)相当としてGoのregexpでコンパイルする。
 // ignoreCaseがtrueなら大文字小文字を無視するフラグを前置する。
 func compileGrepPattern(pattern string, ignoreCase bool) (*regexp.Regexp, error) {
@@ -165,7 +180,7 @@ func toolGrepCodebase(args map[string]any) (string, error) {
 			return nil
 		}
 		if len(results) >= maxResults {
-			return nil
+			return filepath.SkipAll
 		}
 		if grepFileExcluded(d.Name()) {
 			return nil
@@ -175,6 +190,12 @@ func toolGrepCodebase(args map[string]any) (string, error) {
 		}
 		data, err := os.ReadFile(p)
 		if err != nil {
+			return nil
+		}
+		// バイナリファイルは除外する（Python版はgrepコマンドがデフォルトで
+		// バイナリを自動スキップするのに対し、Go版は自前walkのため明示的に
+		// 判定する必要がある）。
+		if looksBinary(data) {
 			return nil
 		}
 		for i, line := range strings.Split(string(data), "\n") {
@@ -257,28 +278,70 @@ func toolGetRepoMap(args map[string]any) (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
+// receiverTypeName はメソッドのレシーバ型名を返す（ポインタレシーバの`*`は除去）。
+func receiverTypeName(fn *ast.FuncDecl) string {
+	if fn.Recv == nil || len(fn.Recv.List) == 0 {
+		return ""
+	}
+	expr := fn.Recv.List[0].Type
+	if star, ok := expr.(*ast.StarExpr); ok {
+		expr = star.X
+	}
+	if ident, ok := expr.(*ast.Ident); ok {
+		return ident.Name
+	}
+	return ""
+}
+
+// goFileSymbols はファイル内のトップレベル型/関数/メソッドを列挙する
+// （Python版 get_repo_map::_get_py_info の移植。Python版は`class X(method1, method2)`
+// 形式でクラスとメソッドを関連付けるため、Go版も`type X(Method1, Method2)`形式で
+// レシーバ型とメソッドを関連付ける）。
 func goFileSymbols(path string) string {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
 	if err != nil {
 		return ""
 	}
+
+	typeMethods := make(map[string][]string)
+	var typeOrder []string
 	var defs []string
+	seenType := make(map[string]int) // 型名 → defs内のインデックス（メソッド挿入用）
+
 	for _, decl := range f.Decls {
 		switch d := decl.(type) {
 		case *ast.FuncDecl:
+			if recv := receiverTypeName(d); recv != "" {
+				if _, ok := typeMethods[recv]; !ok {
+					typeOrder = append(typeOrder, recv)
+				}
+				typeMethods[recv] = append(typeMethods[recv], d.Name.Name)
+				continue
+			}
 			defs = append(defs, fmt.Sprintf("func %s(...)", d.Name.Name))
 		case *ast.GenDecl:
 			for _, spec := range d.Specs {
 				if ts, ok := spec.(*ast.TypeSpec); ok {
+					seenType[ts.Name.Name] = len(defs)
 					defs = append(defs, fmt.Sprintf("type %s", ts.Name.Name))
 				}
 			}
 		}
-		if len(defs) >= 10 {
-			break
+	}
+
+	// レシーバ型のメソッドを対応するtype宣言の表示へ関連付ける
+	// （型宣言が同ファイル内に無い場合は独立した"type X(...)"行として追加）。
+	for _, typeName := range typeOrder {
+		methods := typeMethods[typeName]
+		methodStr := "(" + strings.Join(methods, ", ") + ")"
+		if idx, ok := seenType[typeName]; ok {
+			defs[idx] = fmt.Sprintf("type %s%s", typeName, methodStr)
+		} else {
+			defs = append(defs, fmt.Sprintf("type %s%s", typeName, methodStr))
 		}
 	}
+
 	if len(defs) == 0 {
 		return ""
 	}

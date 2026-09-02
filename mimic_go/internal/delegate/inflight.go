@@ -1,13 +1,17 @@
 package delegate
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
+
+	"mimic/internal/sandbox"
 )
 
 // 中断委任マニフェスト（Python版 team.py::_register_inflight 系の移植）。
@@ -125,7 +129,62 @@ func ListOrphanedDelegations() []InflightEntry {
 		}
 		out = append(out, e)
 	}
+	// マップ由来のため反復順が不定 — `/delegations resume <番号>` の番号が
+	// 呼び出しごとに変わらないよう、開始時刻の昇順で安定させる。
+	sort.Slice(out, func(i, j int) bool { return out[i].StartedAt < out[j].StartedAt })
 	return out
+}
+
+// ResumeDelegation は中断された委任タスクを、保存済みOverlay(base)の続きから
+// 再開する（Python版 team.py::resume_delegation の移植）。既存baseをWorkroomへ
+// 再構築し、runWorkerInWorkroomへ渡すことで、内部の既存チェックポイント検知
+// ロジック（.mimic/checkpoint.jsonがあれば再開メッセージ付きで継続、
+// runWithResume）がそのまま機能する。
+func ResumeDelegation(ctx context.Context, traceID string) (string, error) {
+	inflightMu.Lock()
+	m := loadInflightManifest()
+	entry, ok := m[traceID]
+	inflightMu.Unlock()
+	if !ok {
+		return fmt.Sprintf("trace_id=%s の中断タスクは見つかりませんでした。", traceID), nil
+	}
+	if _, err := os.Stat(entry.Base); err != nil {
+		unregisterInflight(traceID)
+		return fmt.Sprintf("trace_id=%s の作業ディレクトリが既に存在しないため再開できません（マニフェストから削除しました）。", traceID), nil
+	}
+
+	w, err := sandbox.AttachWorkroom(entry.Base, entry.ProjectDir)
+	if err != nil {
+		return "", err
+	}
+	// runWorkerInWorkroomは新しいtrace_idで自分自身を再登録するため、
+	// 古いエントリは先に取り除いておく（重複防止）。
+	unregisterInflight(traceID)
+	// keepSession=false固定: 再開対象はクラッシュ等で中断された孤立委任であり、
+	// continue_specialist用のセッション保持対象として扱うのは安全側でない
+	// （Kindは常に"worker"で記録されるため元の委任種別を区別できない）。
+	result, err := runWorkerInWorkroom(ctx, w, entry.Task, entry.VerifyCmd, entry.RolePrompt, entry.ApplyChanges, false, nil)
+	if err != nil {
+		return "", err
+	}
+	return "[Resume] " + result, nil
+}
+
+// DiscardDelegation は中断された委任タスクを、変更を適用せずに破棄する
+// （Python版 team.py::discard_delegation の移植）。
+func DiscardDelegation(traceID string) string {
+	inflightMu.Lock()
+	m := loadInflightManifest()
+	entry, ok := m[traceID]
+	inflightMu.Unlock()
+	if !ok {
+		return fmt.Sprintf("trace_id=%s の中断タスクは見つかりませんでした。", traceID)
+	}
+	if w, err := sandbox.AttachWorkroom(entry.Base, entry.ProjectDir); err == nil {
+		w.Cleanup()
+	}
+	unregisterInflight(traceID)
+	return fmt.Sprintf("trace_id=%s の中断タスクを破棄しました（変更は適用されていません）。", traceID)
 }
 
 // WarnOrphanedDelegations は24時間を超える孤立委任があれば標準エラーに警告を出す

@@ -108,7 +108,7 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 	// （Python版 agent.py::_compact_if_needed の移植。ターン開始時に1回のみ実行。
 	// system_prompt/context_headerのオーバーヘッド分を差し引いた実効しきい値を使う
 	// —— Python版 _effective_threshold の移植）。
-	compactIfNeeded(history, client.ContextLength(), len(systemPrompt))
+	compactIfNeeded(history, client.ContextLength(), len(systemPrompt), client.SessionCacheKey())
 
 	if autoGit != nil {
 		autoGit.Backup(cwd)
@@ -146,7 +146,10 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 		// 送信直前トリム: compactionをすり抜けるペースでもコンテキスト窓の90%を
 		// 超えないよう、その場で中間メッセージを間引く最終防衛ライン
 		// （Python版 agent.py::_trim_to_fit の移植）。
-		*history = trimToFit(*history, systemPrompt, client.ContextLength())
+		*history = llm.TrimToFit(*history, systemPrompt, client.ContextLength())
+		// 孤立tool_calls/tool応答ペアの修復（Python版 _repair_message_sequence の移植）。
+		// trim/compactionでペアが分断された場合の防御。
+		*history = llm.RepairMessageSequence(*history)
 
 		result, err := client.StreamChat(ctx, systemPrompt, *history, specs, onText)
 		if err != nil {

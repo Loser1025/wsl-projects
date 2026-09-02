@@ -15,7 +15,12 @@ import (
 )
 
 var (
-	xmlToolCallPattern = regexp.MustCompile(`(?i)<tool_call\b|<function=`)
+	// Python版 orchestrator.py::_XML_TOOL_PATTERN の移植。検知対象は
+	// <invoke>/<function_calls>/[TOOL_CALL]も含むが、実際のパース対応
+	// フォーマット（parseXMLToolCalls）はtool_call/function=のみ —
+	// これはPython版も同じ非対称（検知はしてもパースできなければXML救済の
+	// リトライ要求に倒れる、という設計を踏襲）。
+	xmlToolCallPattern = regexp.MustCompile(`(?i)<tool_call\b|<function=|<invoke\b|<function_calls\b|\[TOOL_CALL\]`)
 	toolCallBlockRe    = regexp.MustCompile(`(?is)<tool_call\b[^>]*>(.*?)</tool_call>`)
 	functionBlockRe    = regexp.MustCompile(`(?is)<function=([^>]+)>(.*?)(?:</function>|$)`)
 	parameterRe        = regexp.MustCompile(`(?is)<parameter=([^>]+)>(.*?)</parameter>`)

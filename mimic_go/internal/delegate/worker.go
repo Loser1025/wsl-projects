@@ -53,6 +53,33 @@ func SetTeamAutoGit(a *vcs.AutoGit) {
 	teamAutoGit = a
 }
 
+// teamReactLog はDirector自身のReactLogへの参照（Python版 team.py::_log_team_event
+// の移植先）。ビューアの委任親子ツリー表示（internal/viewer）が、Directorの
+// セッションJSONLに記録されたsystem_eventからtrace_id紐付け・実行状況バッジを
+// 導出できるようにする。
+var teamReactLog *vcs.ReactLog
+
+// SetTeamReactLog はDirector（TUI/非対話モード）起動時に一度だけ呼び出す。
+func SetTeamReactLog(rl *vcs.ReactLog) {
+	teamReactLog = rl
+}
+
+// logTeamEvent はDirectorのセッションJSONLへsystem_eventとして委任イベントを
+// 記録する（Python版 team.py::_log_team_event の移植。Python版はevent dictを
+// そのままcontentへ格納しビューア側でast.literal_evalするが、Go版は同じ役割を
+// JSON文字列で担う — Go版のビューアもGo版のログしか読まないため互換性の
+// 制約は無い）。
+func logTeamEvent(event map[string]any) {
+	if teamReactLog == nil {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		return
+	}
+	teamReactLog.Add("system_event", map[string]any{"level": "info", "content": string(data)})
+}
+
 const (
 	defaultWorkerTimeout = 1800 * time.Second // Python版 _TIMEOUT_SEC を踏襲
 	defaultVerifyTimeout = 300 * time.Second  // Python版 _VERIFY_TIMEOUT_SEC を踏襲
@@ -129,13 +156,18 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 	}
 
 	// verify_cmd未指定の書き込み委任には、このプロジェクトで過去に検証通過した
-	// コマンド、無ければ言語別テンプレートを自動採用する（Python版
-	// team.py::get_learned_verify_cmd / _template_verify_cmd の移植）。
+	// コマンド、無ければ言語別テンプレート、それも無ければ軽量LLMプローブによる
+	// 自動調達を試みる（Python版 team.py::get_learned_verify_cmd /
+	// _template_verify_cmd / _suggest_verify_cmd の移植。Python版では
+	// _suggest_verify_cmdはdelegate_to_specialist(can_write=True)専用だが、
+	// Go版はWorker委任の入口を共通化しているため全delegate_to_*経路に広げている）。
 	if verifyCmd == "" && applyChanges {
 		if learned := GetLearnedVerifyCmd(w.Lower); learned != "" {
 			verifyCmd = learned
 		} else if tmpl := TemplateVerifyCmd(w.Lower); tmpl != "" {
 			verifyCmd = tmpl
+		} else if suggested := suggestVerifyCmd(ctx, task, w.Lower); suggested != "" {
+			verifyCmd = suggested
 		}
 	}
 
@@ -150,8 +182,14 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 	var triedSummaries []string
 	var crashed bool
 	var crashResumeAttempts int
+	lastAttempt := 1
 
 	for attempt := 1; attempt <= 1+MaxVerifyRetries; attempt++ {
+		lastAttempt = attempt
+		logTeamEvent(map[string]any{
+			"event": "team_worker_start", "attempt": attempt, "trace_id": traceID,
+			"task": truncateSummary(task, 200), "resumed": attempt > 1,
+		})
 		launchRes, resumeAttempts, runErr := runWithResume(ctx, w, launchCommand(mimicBin, currentTask, rolePrompt, traceID, w.Lower, keepSession), defaultWorkerTimeout)
 		if runErr != nil {
 			return "", fmt.Errorf("Worker実行に失敗しました: %w", runErr)
@@ -337,7 +375,19 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 	case verifyExit != nil:
 		statusLabel = "✗検証失敗"
 	}
-	RecordDelegation("Worker", task, statusLabel, changed)
+	RecordDelegationWithTrace("Worker", task, statusLabel, changed, traceID)
+
+	// ビューアの委任実行状況バッジ用（Python版 team_supervisor_verdict イベントに
+	// 相当。Go版にはResearcher/Supervisor段階が無いため、Worker完了時点の結果を
+	// そのままverdictとして記録する）。
+	verdictStatus := "ok"
+	if crashed || (verifyExit != nil && *verifyExit != 0) {
+		verdictStatus = "fail"
+	}
+	logTeamEvent(map[string]any{
+		"event": "team_supervisor_verdict", "trace_id": traceID,
+		"status": verdictStatus, "attempt": lastAttempt,
+	})
 
 	return result, nil
 }

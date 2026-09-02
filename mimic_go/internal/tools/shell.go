@@ -393,6 +393,7 @@ func killProcessGroup(cmd *exec.Cmd) {
 		return
 	}
 	_ = syscall.Kill(-pgid, syscall.SIGTERM)
-	time.Sleep(200 * time.Millisecond)
+	// Python版 tools_linux.py:206-212 の `proc.wait(timeout=2)` と同じ猶予（2秒）。
+	time.Sleep(2 * time.Second)
 	_ = syscall.Kill(-pgid, syscall.SIGKILL)
 }

@@ -84,11 +84,50 @@ func readSelfRSS() float64 {
 	return 0
 }
 
-// ProcSummary はProcessMonitor.Stopの計測結果。
+// readSelfThreadCount は/proc/self/statusのThreadsフィールドを返す
+// （Python版 proc_observer.py::Sample.thread_count の移植）。
+func readSelfThreadCount() int {
+	f, err := os.Open("/proc/self/status")
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "Threads:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				if n, err := strconv.Atoi(fields[1]); err == nil {
+					return n
+				}
+			}
+		}
+	}
+	return 0
+}
+
+// readSelfFDCount は/proc/self/fd配下のエントリ数（オープンFD数）を返す
+// （Python版 proc_observer.py::_count_fds の移植）。
+func readSelfFDCount() int {
+	entries, err := os.ReadDir("/proc/self/fd")
+	if err != nil {
+		return 0
+	}
+	return len(entries)
+}
+
+// ProcSummary はProcessMonitor.Stopの計測結果（Python版 proc_observer.py::Summary
+// の移植。cpu_avg_pct/samples/duration_sec/fd_max/thread_countも含めて対応する）。
 type ProcSummary struct {
-	CPUMaxPct  float64
-	RSSStartMB float64
-	RSSDeltaMB float64
+	CPUMaxPct   float64
+	CPUAvgPct   float64
+	RSSStartMB  float64
+	RSSDeltaMB  float64
+	FDMax       int
+	ThreadCount int
+	Samples     int
+	DurationSec float64
 }
 
 // ProcessMonitor は自プロセス（os.Getpid相当、Go版はランタイム全体）の
@@ -98,10 +137,15 @@ type ProcessMonitor struct {
 	stopCh   chan struct{}
 	doneCh   chan struct{}
 
-	mu        sync.Mutex
-	cpuMax    float64
-	rssStart  float64
-	rssLatest float64
+	mu          sync.Mutex
+	cpuMax      float64
+	cpuSum      float64
+	rssStart    float64
+	rssLatest   float64
+	fdMax       int
+	threadCount int
+	samples     int
+	startTime   time.Time
 }
 
 // NewProcessMonitor はintervalごとにポーリングするモニタを作る
@@ -116,6 +160,9 @@ func (m *ProcessMonitor) Start() {
 	m.doneCh = make(chan struct{})
 	m.rssStart = readSelfRSS()
 	m.rssLatest = m.rssStart
+	m.fdMax = readSelfFDCount()
+	m.threadCount = readSelfThreadCount()
+	m.startTime = time.Now()
 
 	go func() {
 		defer close(m.doneCh)
@@ -142,12 +189,22 @@ func (m *ProcessMonitor) Start() {
 					if pct > m.cpuMax {
 						m.cpuMax = pct
 					}
+					m.cpuSum += pct
+					m.samples++
 					m.mu.Unlock()
 				}
 				prevUt, prevSt, ok = ut, st, curOk
 				prevTime = now
+				fd := readSelfFDCount()
+				threads := readSelfThreadCount()
 				m.mu.Lock()
 				m.rssLatest = readSelfRSS()
+				if fd > m.fdMax {
+					m.fdMax = fd
+				}
+				if threads > m.threadCount {
+					m.threadCount = threads
+				}
 				m.mu.Unlock()
 			}
 		}
@@ -162,9 +219,39 @@ func (m *ProcessMonitor) Stop() ProcSummary {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	cpuAvg := 0.0
+	if m.samples > 0 {
+		cpuAvg = m.cpuSum / float64(m.samples)
+	}
 	return ProcSummary{
-		CPUMaxPct:  m.cpuMax,
-		RSSStartMB: m.rssStart,
-		RSSDeltaMB: m.rssLatest - m.rssStart,
+		CPUMaxPct:   m.cpuMax,
+		CPUAvgPct:   cpuAvg,
+		RSSStartMB:  m.rssStart,
+		RSSDeltaMB:  m.rssLatest - m.rssStart,
+		FDMax:       m.fdMax,
+		ThreadCount: m.threadCount,
+		Samples:     m.samples,
+		DurationSec: time.Since(m.startTime).Seconds(),
+	}
+}
+
+// Current はポーリングを止めずに現時点のサマリを返す
+// （Python版 ProcessMonitor.current() の移植。/statsのライブ表示等で使う）。
+func (m *ProcessMonitor) Current() ProcSummary {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cpuAvg := 0.0
+	if m.samples > 0 {
+		cpuAvg = m.cpuSum / float64(m.samples)
+	}
+	return ProcSummary{
+		CPUMaxPct:   m.cpuMax,
+		CPUAvgPct:   cpuAvg,
+		RSSStartMB:  m.rssStart,
+		RSSDeltaMB:  m.rssLatest - m.rssStart,
+		FDMax:       m.fdMax,
+		ThreadCount: m.threadCount,
+		Samples:     m.samples,
+		DurationSec: time.Since(m.startTime).Seconds(),
 	}
 }

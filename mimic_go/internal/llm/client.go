@@ -5,11 +5,23 @@
 package llm
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 	"time"
 
 	"mimic/internal/config"
 )
+
+// randomHex はn文字（n/2バイト）のランダム16進文字列を返す
+// （Python版 uuid4().hex[:16] 相当）。
+func randomHex(n int) string {
+	b := make([]byte, (n+1)/2)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(b)[:n]
+}
 
 // ToolCallFunction はOpenAI tool_calls形式の function 部分。
 type ToolCallFunction struct {
@@ -71,10 +83,12 @@ type ToolFuncSpec struct {
 // マルチプロバイダの動的切り替え(Python版のMULTI-PROVIDER MODEL SELECTOR)は
 // 未移植 — 起動時に選ばれたプロバイダに固定される簡略方式とする。
 type Client struct {
-	provider   *config.ProviderConfig
-	keyManager *KeyManager
-	model      string
-	http       *http.Client
+	provider        *config.ProviderConfig
+	keyManager      *KeyManager
+	model           string
+	http            *http.Client
+	sessionCacheKey string
+	geminiCache     *GeminiCacheManager
 }
 
 func NewClient(provider *config.ProviderConfig) *Client {
@@ -83,11 +97,25 @@ func NewClient(provider *config.ProviderConfig) *Client {
 		keyManager: NewKeyManager(provider.APIKeys, provider.RPMLimit),
 		model:      provider.Model,
 		http:       &http.Client{Timeout: 120 * time.Second},
+		// Mistral向けprompt_cache_key（Python版 agent.py:669 `self._session_cache_key
+		// = uuid4().hex[:16]` の移植）。セッション単位で固定のキーをリクエストに
+		// 添えることで、同一会話内でのプロンプトキャッシュヒット率を上げる。
+		sessionCacheKey: randomHex(16),
+		// Gemini向けContext Cache（Python版 agent.py::GeminiContextCacheManager の
+		// 移植）。gemini以外のプロバイダでは未使用のままだが、構造体生成コスト自体は
+		// 無視できるほど小さいため常に生成しておく。
+		geminiCache: newGeminiCacheManager(),
 	}
 }
 
 func (c *Client) ProviderName() string { return c.provider.Name }
 func (c *Client) Model() string        { return c.model }
+
+// SessionCacheKey はセッション単位で固定のランダムキーを返す
+// （Python版 self._session_cache_key 相当。Mistralのprompt_cache_keyに使うほか、
+// 永続ダイジェストのシャドーモード保存[_persist_digest_shadow]でも
+// セッション識別子として流用する）。
+func (c *Client) SessionCacheKey() string { return c.sessionCacheKey }
 
 // KeyStatus は現在のプロバイダのAPIキー状態一覧を返す（/status コマンド等での
 // 表示用。KeyManager.Statusのラッパー）。

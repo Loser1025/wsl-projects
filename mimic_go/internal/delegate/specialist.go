@@ -210,7 +210,8 @@ func DiscardSessionWorker() {
 
 // RunSpecialistContinue は保持中のセッションWorkerに追加指示を出し、
 // 前回の会話+Overlayの続きで実行する（Python版 team.py::run_specialist_continue
-// の移植。中断委任マニフェスト・クラッシュ再開との連携部分は未移植）。
+// の移植。中断委任マニフェスト登録・クラッシュ再開は内部で呼ぶ
+// runWorkerInWorkroom がregisterInflight/unregisterInflightを行うため対応済み）。
 func RunSpecialistContinue(ctx context.Context, task, verifyCmd string) (string, error) {
 	s := getSessionWorker()
 	if s == nil {

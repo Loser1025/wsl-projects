@@ -40,9 +40,8 @@ func (rl *ReactLog) EntryCount() int {
 	return len(rl.entries)
 }
 
-// SetJSONLPath はJSONL逐次書き込み先を設定する（Python版と異なり、
-// 既存ファイルからの復元は行わない簡略版 — チェックポイント再開は
-// internal/react.LoadCheckpoint が別途担っているため）。
+// SetJSONLPath はJSONL逐次書き込み先を設定する。既存ファイルがあれば読み込んで
+// entriesへ復元する（Python版 autogit.py::set_jsonl_path の移植）。
 func (rl *ReactLog) SetJSONLPath(path string) error {
 	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -50,9 +49,32 @@ func (rl *ReactLog) SetJSONLPath(path string) error {
 		}
 	}
 	rl.mu.Lock()
+	defer rl.mu.Unlock()
 	rl.jsonlPath = path
-	rl.mu.Unlock()
+	if data, err := os.ReadFile(path); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			var e Entry
+			if err := json.Unmarshal([]byte(line), &e); err == nil {
+				rl.entries = append(rl.entries, e)
+			}
+		}
+		rl.enforceCap()
+	}
 	return nil
+}
+
+// Clear はentriesを空にしてsession_startを更新する（Python版 autogit.py::clear
+// の移植。/clearコマンド等での呼び出しを想定。jsonlPathは保持し、モード切替後も
+// 同じファイルへ書き続ける）。
+func (rl *ReactLog) Clear() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	rl.entries = nil
+	rl.sessionStart = time.Now()
 }
 
 func (rl *ReactLog) enforceCap() {

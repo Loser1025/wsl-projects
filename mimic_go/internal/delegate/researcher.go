@@ -29,12 +29,15 @@ func roundsForSpecialist(role, task string) int {
 	return researcherMaxRounds
 }
 
-// researcherTools はResearcherに与える読み取り専用+Web系ツールの一覧
-// （Python版 _RESEARCHER_TOOLS を踏襲。read_tool_cache/load_skill/list_skillsは
-// Go版で対応するツールが揃っているためそのまま含める）。
+// researcherTools はResearcherに与える読み取り専用+Web+ブラウザ観測系ツールの
+// 一覧（Python版 _RESEARCHER_TOOLS + _RESEARCHER_BROWSER_TOOLS の移植。
+// デプロイ先の実ページを開いて表示・エラーを観測する委任を可能にするため、
+// ブラウザ操作ツールも読み取り専用Specialist/Researcherに許可する）。
 var researcherTools = []string{
-	"read_file", "get_repo_map", "grep_codebase", "file_info", "smart_read",
+	"read_file", "read_tool_cache", "get_repo_map", "grep_codebase", "file_info", "smart_read",
 	"web_search", "fetch_webpage", "load_skill", "list_skills",
+	"browser_navigate", "browser_click", "browser_type",
+	"browser_get_text", "browser_screenshot", "browser_close",
 }
 
 // researcherSystemPrompt はPython版 team.py::RESEARCHER_SYSTEM_PROMPT の移植。
@@ -101,7 +104,14 @@ func runIsolated(ctx context.Context, client *llm.Client, systemPrompt, userMess
 			history = append(history, llm.Message{Role: "tool", ToolCallID: tc.ID, Content: output})
 		}
 	}
-	return lastText, nil
+	// ラウンド上限到達 — 空文字ではなく「未完了」であることを呼び出し元（Director）に
+	// 明示する（Python版 team.py:566-572 の移植）。空文字を返すと「失敗」と
+	// 「発見なし」を区別できず、呼び出し元が誤った報告をしうる。
+	note := fmt.Sprintf("[ラウンド上限到達・調査未完了] %dラウンド以内に最終回答に到達できませんでした。", maxRounds)
+	if partial := strings.TrimSpace(lastText); partial != "" {
+		return fmt.Sprintf("%s\nここまでの最終出力（不完全な可能性あり）:\n%s", note, partial), nil
+	}
+	return note + " タスクを分割するか、より狭いロールで再委任してください。", nil
 }
 
 // extractSuggestedVerifyCmd はResearcher出力から推奨verify_cmdを抽出する
@@ -120,6 +130,51 @@ func extractSuggestedVerifyCmd(research string) string {
 		return strings.Trim(strings.TrimSpace(m[1]), "`")
 	}
 	return ""
+}
+
+// verifySuggestMaxRounds はverify_cmd自動調達プローブの最大ラウンド数
+// （Python版 team.py::_VERIFY_SUGGEST_MAX_ROUNDS）。
+const verifySuggestMaxRounds = 6
+
+// verifySuggestSystemPrompt はPython版 team.py::_VERIFY_SUGGEST_SYSTEM_PROMPT の移植。
+const verifySuggestSystemPrompt = `あなたは検証コマンドの提案役です。渡されたタスクの変更スコープに対応する
+テスト・ビルド・Lint コマンドを1つだけ特定してください。
+- プロジェクト内を読み取りツールで軽く確認してよい（package.json, pyproject.toml 等）
+- 変更スコープに絞った最小限のコマンドにする（フルスイートは避ける）
+- 実行に数分以上かかるものは不適切
+- 適切なコマンドが特定できない場合は「なし」とだけ答える
+
+最終回答は以下の1行のみ:
+[推奨verify_cmd] <コマンド>
+または
+[推奨verify_cmd] なし`
+
+// suggestVerifyCmd はcan_write委任でverify_cmd未指定のとき、軽量な読み取り専用
+// パスで検証コマンドを自動調達する（Python版 team.py::_suggest_verify_cmd の移植）。
+// 特定できなければ空文字を返す（失敗しても委任は続行する）。
+// LLMクライアント/registryはRegisterTools登録時に保存されたグローバル参照
+// （globalClient/globalRegistry、register.go）を使う — runWorkerInWorkroomは
+// サブプロセスランチャーでありLLMクライアントを直接持たないため。
+func suggestVerifyCmd(ctx context.Context, task, projectDir string) string {
+	if globalClient == nil || globalRegistry == nil {
+		return ""
+	}
+	defer func() { recover() }() // ベストエフォート: 失敗しても委任は続行する
+	registry := globalRegistry.Subset(researcherTools)
+	taskPreview := task
+	if len(taskPreview) > 2000 {
+		taskPreview = taskPreview[:2000]
+	}
+	prompt := fmt.Sprintf("[作業フォルダ] %s\n\n[これから実施される変更タスク]\n%s\n", projectDir, taskPreview)
+	answer, err := runIsolated(ctx, globalClient, verifySuggestSystemPrompt, prompt, registry, verifySuggestMaxRounds)
+	if err != nil {
+		return ""
+	}
+	cmd := extractSuggestedVerifyCmd(answer)
+	if cmd == "" || cmd == "なし" || strings.EqualFold(cmd, "none") {
+		return ""
+	}
+	return cmd
 }
 
 // RunTeamTask はResearcher→Workerの二段委任を実行する

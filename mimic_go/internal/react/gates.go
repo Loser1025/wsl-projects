@@ -21,11 +21,11 @@ var (
 )
 
 // execCapableTools はGate A判定の対象となる「実行手段を持つツール」の集合
-// （Python版 _EXEC_CAPABLE_TOOLS を踏襲。delegate_to_specialistはまだ
-// Go側に存在しないため未追加）。
+// （Python版 _EXEC_CAPABLE_TOOLS の移植）。
 var execCapableTools = map[string]bool{
 	"run_bash":                  true,
 	"run_pipeline":              true,
+	"run_host_command":          true,
 	"delegate_to_worker":        true,
 	"delegate_to_team":          true,
 	"delegate_to_team_parallel": true,

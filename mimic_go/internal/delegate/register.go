@@ -10,11 +10,24 @@ import (
 	"mimic/internal/viewer"
 )
 
+// globalClient/globalRegistry はverify_cmd自動調達（suggestVerifyCmd、
+// researcher.go）等、Worker委任のサブプロセス起動経路（runWorkerInWorkroom）から
+// LLM呼び出しが必要な場面のために、RegisterTools呼び出し時点のclient/registryを
+// 保持しておくもの。runWorkerInWorkroomはサブプロセスランチャーでありLLM
+// クライアントを引数に持たない設計のため、既存のSetWriteApprovalHandler等と
+// 同じ「呼び出し元がグローバルに登録する」パターンで橋渡しする。
+var (
+	globalClient   *llm.Client
+	globalRegistry *tools.Registry
+)
+
 // RegisterTools はdelegate_to_worker/delegate_to_teamを既存のRegistryへ追加する。
 // tools パッケージが internal/delegate に依存しない構成
 // （internal/react→internal/tools の依存があるため、tools→delegate→toolsの
 // 循環を避けるべく、呼び出し側（cmd/mimic, internal/tui）から明示的に呼ぶ設計）。
 func RegisterTools(r *tools.Registry, client *llm.Client) {
+	globalClient = client
+	globalRegistry = r
 	r.Register("delegate_to_worker",
 		"タスクをOverlayFS隔離されたWorker（自分自身のバイナリを再帰起動）に委任し、実行結果を実プロジェクトへ適用する。"+
 			"Researcher段階は無く、taskは目的・対象範囲・制約条件を具体的に書くこと。verify_cmdを指定すると失敗するたびに同じOverlay上で最大3回まで自動修正再試行する。",
