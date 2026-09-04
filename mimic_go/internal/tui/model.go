@@ -1149,7 +1149,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.tool != nil:
 			m.flushThinkBuffer()
 			m.closeOpenLine()
-			m.log = append(m.log, fmt.Sprintf("  → %s(%s)", msg.tool.Name, msg.tool.ArgsPreview))
+			if card := renderDelegationCall(msg.tool.Name, msg.tool.ArgsPreview); card != "" {
+				m.log = append(m.log, card)
+			} else {
+				m.log = append(m.log, fmt.Sprintf("  → %s(%s)", msg.tool.Name, msg.tool.ArgsPreview))
+			}
 		case msg.done:
 			m.flushThinkBuffer()
 			m.closeOpenLine()
