@@ -498,18 +498,52 @@ func isThinkBoxLine(line string) bool {
 	return strings.HasPrefix(line, "╭─ 💭") || strings.HasPrefix(line, "│ ") || strings.HasPrefix(line, "╰")
 }
 
+// agentTurnMarker はエージェントの発言ターン開始を示すマーカー行
+// （startTurnが挿入し、renderLogが■ AGENTパネル見出しと同じcolAccentで着色する）。
+const agentTurnMarker = "■ Agent"
+
+// userLinePrefix はユーザーが送信した発言行の生テキスト上のプレフィックス
+// （Enter送信/スラッシュコマンドのエコー、両方ともこの形式で追加される）。
+const userLinePrefix = "> "
+
+// colUser はユーザー発言の着色に使う（パレット定義時から「Role表示色」と
+// コメントされていたが、ユーザー発言とエージェント発言の判別用に未使用のまま
+// だったcolPinkをここで用途通りに使う）。
+var userLineStyle = lipgloss.NewStyle().Bold(true).Foreground(colPink)
+var agentMarkerStyle = lipgloss.NewStyle().Bold(true).Foreground(colAccent)
+
+// renderUserLine はユーザー発言行を装飾する。複数行入力（Ctrl+Nで改行）の
+// 場合も想定し、先頭行の"> "だけを見やすい"❯ "に置き換えて全行を着色する。
+func renderUserLine(line string) string {
+	sub := strings.Split(line, "\n")
+	for i, s := range sub {
+		if i == 0 && strings.HasPrefix(s, userLinePrefix) {
+			s = "❯ " + strings.TrimPrefix(s, userLinePrefix)
+		}
+		sub[i] = userLineStyle.Render(s)
+	}
+	return strings.Join(sub, "\n")
+}
+
 func (m Model) renderLog() string {
 	w := m.viewport.Width()
 	rendered := make([]string, len(m.log))
 	for i, line := range m.log {
-		if isThinkBoxLine(line) {
+		switch {
+		case isThinkBoxLine(line):
 			// thinkブロックは通常のMarkdown装飾を適用せず専用カラーのみ適用する
 			// （Python版 render_markdown_thinker が通常のrender_markdownとは
 			// 別の軽量レンダラーである設計の移植）。
 			rendered[i] = lipgloss.NewStyle().Foreground(colThink).Render(line)
-			continue
+		case line == agentTurnMarker:
+			rendered[i] = agentMarkerStyle.Render(line)
+		case strings.HasPrefix(line, userLinePrefix):
+			// ユーザー発言とエージェント出力を一目で見分けられるよう、
+			// ここだけ通常のMarkdown装飾をスキップして専用スタイルを適用する。
+			rendered[i] = renderUserLine(line)
+		default:
+			rendered[i] = renderMarkdown(line)
 		}
-		rendered[i] = renderMarkdown(line)
 	}
 	if w <= 0 {
 		return strings.Join(rendered, "\n")
@@ -1163,6 +1197,10 @@ func (m *Model) adjustInputHeight() {
 
 func (m Model) startTurn() (tea.Model, tea.Cmd) {
 	m.streaming = true
+	// ユーザー発言との境界を一目で分かるように、ターン開始時にエージェント側の
+	// 発言だとわかるマーカー行を1本挟む（renderLogで■ AGENT見出しと同じ
+	// colAccentに着色される）。
+	m.log = append(m.log, agentTurnMarker)
 	m.thinkBuf = ThinkAwareBuffer{}
 	m.inThinkLine = false
 	m.thinkLineBuf = ""

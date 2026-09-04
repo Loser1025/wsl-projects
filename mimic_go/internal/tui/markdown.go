@@ -3,6 +3,8 @@ package tui
 import (
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 )
@@ -13,14 +15,20 @@ import (
 // テーブル・リンクはPython版自体にも実装が無いため対象外。
 
 var (
-	mdHeaderRe    = regexp.MustCompile(`^(#{1,4})\s+(.*)$`)
-	mdBoldRe      = regexp.MustCompile(`\*\*([^*]+)\*\*|__([^_]+)__`)
-	mdItalicRe    = regexp.MustCompile(`\*([^*]+)\*|_([^_]+)_`)
-	mdInlineCode  = regexp.MustCompile("`([^`]+)`")
-	mdBulletRe    = regexp.MustCompile(`^(\s*)[-*+]\s+(.*)$`)
-	mdNumberedRe  = regexp.MustCompile(`^(\s*)(\d+)\.\s+(.*)$`)
-	mdHRRe        = regexp.MustCompile(`^[-*_]{3,}$`)
-	mdFenceMarker = "```"
+	mdHeaderRe = regexp.MustCompile(`^(#{1,4})\s+(.*)$`)
+	// アスタリスクは単語内でも強調記号として扱ってよい（CommonMark準拠）ため単純な正規表現のまま。
+	mdBoldStarRe   = regexp.MustCompile(`\*\*([^*]+)\*\*`)
+	mdItalicStarRe = regexp.MustCompile(`\*([^*]+)\*`)
+	// アンダースコアは単語内(intraword)では強調記号として発火しない（CommonMarkの
+	// intraword emphasisルール）。read_tool_cacheのようなsnake_caseやJSON値を誤って
+	// 斜体化しないよう、replaceUnderscoreEmphasis側で前後の文字を見て判定する。
+	mdBoldUnderRe   = regexp.MustCompile(`__([^_]+)__`)
+	mdItalicUnderRe = regexp.MustCompile(`_([^_]+)_`)
+	mdInlineCode    = regexp.MustCompile("`([^`]+)`")
+	mdBulletRe      = regexp.MustCompile(`^(\s*)[-*+]\s+(.*)$`)
+	mdNumberedRe    = regexp.MustCompile(`^(\s*)(\d+)\.\s+(.*)$`)
+	mdHRRe          = regexp.MustCompile(`^[-*_]{3,}$`)
+	mdFenceMarker   = "```"
 
 	mdH1Style     = lipgloss.NewStyle().Bold(true).Foreground(colAccent)
 	mdH2Style     = lipgloss.NewStyle().Bold(true).Foreground(colAccent)
@@ -93,21 +101,48 @@ func renderInline(s string) string {
 		inner := mdInlineCode.FindStringSubmatch(match)[1]
 		return mdCodeStyle.Render(inner)
 	})
-	s = mdBoldRe.ReplaceAllStringFunc(s, func(match string) string {
-		g := mdBoldRe.FindStringSubmatch(match)
-		inner := g[1]
-		if inner == "" {
-			inner = g[2]
-		}
+	s = mdBoldStarRe.ReplaceAllStringFunc(s, func(match string) string {
+		inner := mdBoldStarRe.FindStringSubmatch(match)[1]
 		return mdBoldStyle.Render(inner)
 	})
-	s = mdItalicRe.ReplaceAllStringFunc(s, func(match string) string {
-		g := mdItalicRe.FindStringSubmatch(match)
-		inner := g[1]
-		if inner == "" {
-			inner = g[2]
-		}
+	s = replaceUnderscoreEmphasis(s, mdBoldUnderRe, mdBoldStyle)
+	s = mdItalicStarRe.ReplaceAllStringFunc(s, func(match string) string {
+		inner := mdItalicStarRe.FindStringSubmatch(match)[1]
 		return mdItalicStyle.Render(inner)
 	})
+	s = replaceUnderscoreEmphasis(s, mdItalicUnderRe, mdItalicStyle)
 	return s
+}
+
+// isEmphasisWordRune はアンダースコア強調の「単語内(intraword)」判定に使う文字種。
+// アンダースコア自体は含めない（"_word_"のように前後が"_"の場合は境界として扱う）。
+func isEmphasisWordRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// replaceUnderscoreEmphasis はre（mdBoldUnderRe/mdItalicUnderRe）にマッチした
+// _text_ / __text__ をstyleで装飾するが、CommonMarkのintraword emphasisルールに
+// 従い、区切りの前後が英数字（read_tool_cacheのようなsnake_case識別子やJSON値）に
+// 直接接している場合はマークダウンとして解釈せず元のテキストのまま残す。
+func replaceUnderscoreEmphasis(s string, re *regexp.Regexp, style lipgloss.Style) string {
+	locs := re.FindAllStringSubmatchIndex(s, -1)
+	if locs == nil {
+		return s
+	}
+	var b strings.Builder
+	last := 0
+	for _, loc := range locs {
+		start, end := loc[0], loc[1]
+		innerStart, innerEnd := loc[2], loc[3]
+		before, _ := utf8.DecodeLastRuneInString(s[:start])
+		after, _ := utf8.DecodeRuneInString(s[end:])
+		if isEmphasisWordRune(before) && isEmphasisWordRune(after) {
+			continue // 単語内: リテラルのまま残す
+		}
+		b.WriteString(s[last:start])
+		b.WriteString(style.Render(s[innerStart:innerEnd]))
+		last = end
+	}
+	b.WriteString(s[last:])
+	return b.String()
 }
