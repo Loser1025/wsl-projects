@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/progress"
+	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -45,7 +47,6 @@ import (
 // 背景色（Screen/#161b22等）はTUI全体を透過表示するため意図的に使わない
 // （端末側の背景・透過設定をそのまま透けさせる方針）。
 var (
-	colBorder   = lipgloss.Color("#21262D") // title-bar border-bottom
 	colBorderHi = lipgloss.Color("#00FF41") // 入力欄フォーカス時ボーダー・アクセント緑
 	colBorder2  = lipgloss.Color("#30363D") // status-panel border-left / input-bar 通常ボーダー
 	colText     = lipgloss.Color("#F0F6FC")
@@ -192,6 +193,11 @@ type Model struct {
 	systemCPUPercent float64
 	systemMemUsedMB  float64
 	systemMemTotalMB float64
+
+	// ステータスパネルの動的表示用（BUSY中のスピナー、CPU/MEMのバー表示）。
+	busySpinner spinner.Model
+	cpuBar      progress.Model
+	memBar      progress.Model
 }
 
 // hostExecApprovalRequest はtools.HostExecApprovalHandler経由でツール実行
@@ -386,8 +392,18 @@ func NewModel(client *llm.Client, systemPrompt string, cfg *config.Config) Model
 		activeSystemPrompt = systemPrompt + specialistSystemPrompt + delegate.LoadSavedRolesSection(10)
 	}
 
+	busySpinner := spinner.New(
+		spinner.WithSpinner(spinner.MiniDot),
+		spinner.WithStyle(lipgloss.NewStyle().Foreground(colAmber)),
+	)
+	cpuBar := progress.New(progress.WithWidth(8), progress.WithoutPercentage(), progress.WithColors(colTitle))
+	memBar := progress.New(progress.WithWidth(8), progress.WithoutPercentage(), progress.WithColors(colTitle))
+
 	return Model{
 		input:              ta,
+		busySpinner:        busySpinner,
+		cpuBar:             cpuBar,
+		memBar:             memBar,
 		client:             client,
 		cfg:                cfg,
 		systemPrompt:       activeSystemPrompt,
@@ -418,7 +434,7 @@ func mustCwd() string {
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(textarea.Blink, waitForApproval(m.approvalCh), waitForApplyApproval(m.applyApprovalCh),
-		waitForHostExecApproval(m.hostExecApprovalCh), systemTickCmd())
+		waitForHostExecApproval(m.hostExecApprovalCh), systemTickCmd(), m.busySpinner.Tick)
 }
 
 func waitForHostExecApproval(ch chan hostExecApprovalRequest) tea.Cmd {
@@ -1050,6 +1066,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.systemMemUsedMB, m.systemMemTotalMB = vcs.GetSystemMemInfo()
 		return m, systemTickCmd()
 
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.busySpinner, cmd = m.busySpinner.Update(msg)
+		return m, cmd
+
 	case approvalTimeoutMsg:
 		if m.pendingApproval != nil && m.pendingApproval.id == msg.id {
 			req := m.pendingApproval
@@ -1592,14 +1613,12 @@ func (m Model) renderTitleArt() string {
 // 再現する（固定幅36）。
 func (m Model) renderStatusPanel() string {
 	const panelWidth = 36
-	statusText := "IDLE"
-	statusColor := colAccent
+	statusText := lipgloss.NewStyle().Bold(true).Foreground(colAccent).Render("● IDLE")
 	if m.streaming {
-		statusText = "BUSY"
-		statusColor = colAmber
+		statusText = m.busySpinner.View() + lipgloss.NewStyle().Bold(true).Foreground(colAmber).Render(" BUSY")
 	}
 	heading := lipgloss.NewStyle().Bold(true).Foreground(colAccent).Render("■ AGENT")
-	status := "  Status: " + lipgloss.NewStyle().Bold(true).Foreground(statusColor).Render(statusText)
+	status := "  Status: " + statusText
 
 	memPct := 0.0
 	if m.systemMemTotalMB > 0 {
@@ -1607,20 +1626,17 @@ func (m Model) renderStatusPanel() string {
 	}
 	sysHeading := lipgloss.NewStyle().Bold(true).Foreground(colAccent).Render("■ SYSTEM")
 	valStyle := lipgloss.NewStyle().Foreground(colTitle)
-	sysCPU := fmt.Sprintf("  CPU: %s", valStyle.Render(fmt.Sprintf("%5.1f%%", m.systemCPUPercent)))
-	sysMem := fmt.Sprintf("  MEM: %s / %.0fMB (%.0f%%)",
-		valStyle.Render(fmt.Sprintf("%6.0fMB", m.systemMemUsedMB)), m.systemMemTotalMB, memPct)
+	sysCPU := fmt.Sprintf("  CPU %s %s", m.cpuBar.ViewAs(m.systemCPUPercent/100), valStyle.Render(fmt.Sprintf("%4.1f%%", m.systemCPUPercent)))
+	sysMem := fmt.Sprintf("  MEM %s %s", m.memBar.ViewAs(memPct/100), valStyle.Render(fmt.Sprintf("%.0f/%.0fMB", m.systemMemUsedMB, m.systemMemTotalMB)))
 
 	content := heading + "\n" + status + "\n" + sysHeading + "\n" + sysCPU + "\n" + sysMem
 
-	// 背景色は明示的に塗らず、端末側の背景（透過設定含む）をそのまま透けさせる。
+	// 罫線ではなく余白のみで左隣（ASCIIアート）と区切る
+	// （背景色は明示的に塗らず、端末側の背景・透過設定をそのまま透けさせる）。
 	return lipgloss.NewStyle().
-		Width(panelWidth-2).MaxWidth(panelWidth-2).
+		Width(panelWidth - 2).MaxWidth(panelWidth - 2).
 		Foreground(colText).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(colBorder2).
-		BorderLeft(true).BorderTop(false).BorderRight(false).BorderBottom(false).
-		Padding(0, 1).
+		PaddingLeft(3).
 		Render(content)
 }
 
@@ -1649,13 +1665,9 @@ func (m Model) renderHeader() string {
 			rowLines[i] = rl + strings.Repeat(" ", gap)
 		}
 	}
-	row = strings.Join(rowLines, "\n")
-
-	return lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(colBorder).
-		BorderBottom(true).BorderTop(false).BorderLeft(false).BorderRight(false).
-		Render(row)
+	// 罫線での下部境界線は使わず、アート内の淡色区切り行（renderTitleArt側で
+	// 既に描画済み）と余白のみで下と区切る。
+	return row
 }
 
 func (m Model) renderTabs() string {
@@ -1663,13 +1675,13 @@ func (m Model) renderTabs() string {
 	for i, label := range tabLabels {
 		style := lipgloss.NewStyle().Padding(0, 2).Foreground(colMuted)
 		if tabID(i) == m.active {
-			style = lipgloss.NewStyle().Padding(0, 2).Bold(true).Foreground(colOnAccent).Background(colAccent)
+			style = lipgloss.NewStyle().Padding(0, 2).Bold(true).Underline(true).Foreground(colAccent)
 		}
 		rendered = append(rendered, style.Render(fmt.Sprintf("%s [F%d]", label, i+1)))
 	}
 	bar := lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
-	// 非アクティブ部分の背景は塗らず、端末側の背景を透けさせる
-	// （アクティブタブのハイライト背景colAccentのみ残す）。
+	// 背景ブロック塗りではなく、選択タブの下線+アクセント色のみで現在地を示す
+	// （背景は端末側を透けさせる方針を全タブで統一）。
 	return lipgloss.NewStyle().Height(1).MaxHeight(1).Render(bar)
 }
 
@@ -1826,9 +1838,7 @@ func (m Model) renderFiles(width, height int) string {
 
 	left := lipgloss.NewStyle().
 		Width(treeWidth).MaxWidth(treeWidth).Height(height).MaxHeight(height).
-		Border(lipgloss.NormalBorder(), false, true, false, false).
-		BorderForeground(colBorder).
-		Padding(0, 1).
+		Padding(0, 2, 0, 1).
 		Render(tree)
 	right := lipgloss.NewStyle().
 		Width(previewWidth).MaxWidth(previewWidth).Height(height).MaxHeight(height).
