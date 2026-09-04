@@ -1,7 +1,7 @@
 {
   "/home/loser/wsl-projects": {
-    "cmd": "echo \"Schema retrieval completed. Verify that the output contains field names, types, and mode for the table 01C_alloffiices_visiting_office_interview_management.\"",
+    "cmd": "echo \"MCP multi-bq connection test completed. Verify that the server output was captured and reported.\"",
     "passes": 1,
-    "last_used": "2026-09-04T12:26:59+09:00"
+    "last_used": "2026-09-04T13:47:33+09:00"
   }
 }
