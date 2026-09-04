@@ -2,44 +2,56 @@
 const ADDRESS_SYNC_CONFIG = {
   projectId: 'consulting-report',
   sheetName: '今月面談住所一覧',
-  query: 'SELECT ' +
-         '  office_key AS `事務所名`, ' +
-         '  id AS `相談者ID`, ' +
-         '  pre_delegation_date AS `面談予約日`, ' +
-         '  address_zip AS `郵便番号`, ' +
-         '  address AS `現住所`, ' +
-         '  interview_date AS `面談日`, ' +
-         '  document_return_date AS `書類戻り日`, ' +
-         '  delegation_date AS `受任日`, ' +
-         '  latest_interview_date AS `最新面談予定日` ' +
-         'FROM ( ' +
-         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, ' +
-         '         (SELECT MAX(interview_at) FROM `se-leadu.conpas_debt_hibiki.interviews` i WHERE i.consulter_id = c.id AND i.deleted_at IS NULL) AS latest_interview_date, ' +
-         '         \'hibiki\' as office_key ' +
-         '  FROM `se-leadu.conpas_debt_hibiki.consulters` c WHERE c.deleted_at is null ' +
+  query: 'WITH interviews_all AS ( ' +
+         '  SELECT consulter_id, interview_at, interview_method_type, created_at, \"hibiki\" AS office_key FROM `se-leadu.conpas_debt_hibiki.interviews` WHERE deleted_at IS NULL ' +
          '  UNION ALL ' +
-         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, ' +
-         '         (SELECT MAX(interview_at) FROM `se-leadu.conpas_debt_aegislo.interviews` i WHERE i.consulter_id = c.id AND i.deleted_at IS NULL) AS latest_interview_date, ' +
-         '         \'aegislo\' as office_key ' +
-         '  FROM `se-leadu.conpas_debt_aegislo.consulters` c WHERE c.deleted_at is null ' +
+         '  SELECT consulter_id, interview_at, interview_method_type, created_at, \"aegislo\" AS office_key FROM `se-leadu.conpas_debt_aegislo.interviews` WHERE deleted_at IS NULL ' +
          '  UNION ALL ' +
-         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, ' +
-         '         (SELECT MAX(interview_at) FROM `se-leadu.conpas_debt_thank.interviews` i WHERE i.consulter_id = c.id AND i.deleted_at IS NULL) AS latest_interview_date, ' +
-         '         \'thank\' as office_key ' +
-         '  FROM `se-leadu.conpas_debt_thank.consulters` c WHERE c.deleted_at is null ' +
+         '  SELECT consulter_id, interview_at, interview_method_type, created_at, \"thank\" AS office_key FROM `se-leadu.conpas_debt_thank.interviews` WHERE deleted_at IS NULL ' +
          '  UNION ALL ' +
-         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, ' +
-         '         (SELECT MAX(interview_at) FROM `se-leadu.conpas_debt_kaname.interviews` i WHERE i.consulter_id = c.id AND i.deleted_at IS NULL) AS latest_interview_date, ' +
-         '         \'honoka\' as office_key ' +
-         '  FROM `se-leadu.conpas_debt_kaname.consulters` c WHERE c.deleted_at is null ' +
+         '  SELECT consulter_id, interview_at, interview_method_type, created_at, \"honoka\" AS office_key FROM `se-leadu.conpas_debt_kaname.interviews` WHERE deleted_at IS NULL ' +
          '  UNION ALL ' +
-         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, ' +
-         '         (SELECT MAX(interview_at) FROM `se-leadu.conpas_debt_mitsuba.interviews` i WHERE i.consulter_id = c.id AND i.deleted_at IS NULL) AS latest_interview_date, ' +
-         '         \'mitsuba\' as office_key ' +
-         '  FROM `se-leadu.conpas_debt_mitsuba.consulters` c WHERE c.deleted_at is null ' +
+         '  SELECT consulter_id, interview_at, interview_method_type, created_at, \"mitsuba\" AS office_key FROM `se-leadu.conpas_debt_mitsuba.interviews` WHERE deleted_at IS NULL ' +
+         '), ' +
+         'first_interview AS ( ' +
+         '  SELECT * EXCEPT(rn) FROM ( ' +
+         '    SELECT *, ROW_NUMBER() OVER (PARTITION BY office_key, consulter_id ORDER BY interview_at IS NULL, interview_at ASC, created_at ASC) AS rn ' +
+         '    FROM interviews_all ' +
+         '  ) WHERE rn = 1 ' +
+         '), ' +
+         'interviews_latest AS ( ' +
+         '  SELECT * EXCEPT(rn) FROM ( ' +
+         '    SELECT *, ROW_NUMBER() OVER (PARTITION BY office_key, consulter_id ORDER BY interview_at IS NULL, interview_at DESC, created_at DESC) AS rn ' +
+         '    FROM interviews_all ' +
+         '  ) WHERE rn = 1 ' +
+         '), ' +
+         'consulters_all AS ( ' +
+         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, \"hibiki\" as office_key FROM `se-leadu.conpas_debt_hibiki.consulters` c WHERE c.deleted_at IS NULL ' +
+         '  UNION ALL  ' +
+         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, \"aegislo\" as office_key FROM `se-leadu.conpas_debt_aegislo.consulters` c WHERE c.deleted_at IS NULL ' +
+         '  UNION ALL  ' +
+         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, \"thank\" as office_key FROM `se-leadu.conpas_debt_thank.consulters` c WHERE c.deleted_at IS NULL ' +
+         '  UNION ALL  ' +
+         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, \"honoka\" as office_key FROM `se-leadu.conpas_debt_kaname.consulters` c WHERE c.deleted_at IS NULL ' +
+         '  UNION ALL  ' +
+         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, \"mitsuba\" as office_key FROM `se-leadu.conpas_debt_mitsuba.consulters` c WHERE c.deleted_at IS NULL ' +
          ') ' +
-         'WHERE ' +
-         '  DATE_TRUNC(pre_delegation_date, MONTH) = DATE_TRUNC(CURRENT_DATE(), MONTH)'
+         'SELECT  ' +
+         '  c.office_key AS `事務所名`, ' +
+         '  c.id AS `相談者ID`, ' +
+         '  c.pre_delegation_date AS `面談予約日`, ' +
+         '  c.address_zip AS `郵便番号`, ' +
+         '  c.address AS `現住所`, ' +
+         '  c.interview_date AS `面談日`, ' +
+         '  c.document_return_date AS `書類戻り日`, ' +
+         '  c.delegation_date AS `受任日`, ' +
+         '  il.interview_at AS `最新面談予定日`, ' +
+         '  CASE fi.interview_method_type WHEN 1 THEN NULL WHEN 2 THEN \'電話先行\' WHEN 3 THEN \'来所\' WHEN 4 THEN \'訪問\' WHEN 5 THEN \'SNS経由(LINE等)\' WHEN 6 THEN \'ｵﾝﾗｲﾝ\' END AS `初回面談方法` ' +
+         'FROM consulters_all c ' +
+         'LEFT JOIN first_interview fi ON fi.consulter_id = c.id AND fi.office_key = c.office_key ' +
+         'LEFT JOIN interviews_latest il ON il.consulter_id = c.id AND il.office_key = c.office_key ' +
+         'WHERE  ' +
+         '  DATE_TRUNC(c.pre_delegation_date, MONTH) = DATE_TRUNC(CURRENT_DATE(), MONTH)'
 };
 
 // ===== メイン同期関数（手動・トリガー共用）=====

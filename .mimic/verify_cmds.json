@@ -1,7 +1,7 @@
 {
   "/home/loser/wsl-projects": {
     "cmd": "node -e \"const fs = require('fs'); const code = fs.readFileSync('/home/loser/wsl-projects/jusyo.js', 'utf8'); console.log('OK length:', code.length);\"",
-    "passes": 2,
-    "last_used": "2026-09-04T14:19:11+09:00"
+    "passes": 3,
+    "last_used": "2026-09-04T14:29:41+09:00"
   }
 }
