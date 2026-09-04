@@ -48,6 +48,30 @@ func SetSessionsDir(dir string) {
 	teamSessionsDir = dir
 }
 
+// launchEnvPath/launchProvider/launchModel はDirector自身が起動時に使った
+// .envの絶対パスと、選択中のプロバイダー/モデルの参照（SetLaunchContextで
+// 一度だけ設定）。Workerサブプロセスはoverlayでcwdが変わるため、`-env`の
+// デフォルト（cwd相対の"./.env"）に頼るとDirectorとは別の.env（project_dir側の
+// 未設定テンプレート等）を読んでしまう。Python版がload_config()の探索基準を
+// 常にパッケージ自身の固定パス（Path(__file__).parent）にすることでこの問題を
+// 構造的に回避しているのに対し、Goバイナリには固定インストール先が無いため、
+// MIMIC_SESSIONS_DIRと同じ「Directorから明示的に渡す」方式で揃える。
+// MIMIC_PROVIDER/MIMIC_MODELの引き継ぎも同じくPython版 __main__.py の移植で、
+// Workerが.envの優先順位デフォルト（openrouter→gemini→mistral）に固定されず、
+// Directorが実際に選択中のプロバイダー・モデルで動作するようにする。
+var (
+	launchEnvPath  string
+	launchProvider string
+	launchModel    string
+)
+
+// SetLaunchContext はDirector（TUI/非対話モード）起動時に一度だけ呼び出す。
+func SetLaunchContext(envPath, provider, model string) {
+	launchEnvPath = envPath
+	launchProvider = provider
+	launchModel = model
+}
+
 // SetTeamAutoGit はDirector（TUI/非対話モード）起動時に一度だけ呼び出す。
 func SetTeamAutoGit(a *vcs.AutoGit) {
 	teamAutoGit = a
@@ -439,7 +463,22 @@ func launchCommand(mimicBin, task, rolePrompt, traceID, lowerDir string, keepSes
 		traceExport = fmt.Sprintf("export MIMIC_TRACE_ID=%s\nexport MIMIC_SESSIONS_DIR=%s\n",
 			shellQuote(traceID), shellQuote(sessionsDir))
 	}
-	return fmt.Sprintf("export MIMIC_NO_AUTOGIT=1\n%s%s%s%s -auto-prompt %s", roleExport, keepExport, traceExport, shellQuote(mimicBin), shellQuote(task))
+	// Directorが使っている.envの絶対パスをWorkerにも明示的に渡す（project_dirの
+	// cwd相対 "./.env" 解決に頼らせない）。プロバイダー/モデルも合わせて渡し、
+	// Workerが.envの先頭優先設定に落ちずDirectorと同じもので動くようにする。
+	providerExport := ""
+	if launchProvider != "" {
+		providerExport = fmt.Sprintf("export MIMIC_PROVIDER=%s\n", shellQuote(launchProvider))
+		if launchModel != "" {
+			providerExport += fmt.Sprintf("export MIMIC_MODEL=%s\n", shellQuote(launchModel))
+		}
+	}
+	envFlag := ""
+	if launchEnvPath != "" {
+		envFlag = "-env " + shellQuote(launchEnvPath) + " "
+	}
+	return fmt.Sprintf("export MIMIC_NO_AUTOGIT=1\n%s%s%s%s%s %s-auto-prompt %s",
+		roleExport, keepExport, traceExport, providerExport, shellQuote(mimicBin), envFlag, shellQuote(task))
 }
 
 // buildVerifyRetryTask はverify失敗フィードバックを含む修正指示文を生成する

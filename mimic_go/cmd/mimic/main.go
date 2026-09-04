@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -61,12 +62,38 @@ func main() {
 		runStatusMode(cfg.Active.Name, cfg.Active.Model, len(cfg.Active.APIKeys))
 		return
 	}
+
+	// このプロセス自身がDirectorとしてWorkerへ委任する場合に備え、実際に使った
+	// .envの絶対パスをdelegateパッケージへ渡しておく（project_dir相対の"./.env"に
+	// Workerを迷い込ませないため。Python版がload_config()の探索基準を常に
+	// パッケージ固定パスにしているのと同じ目的、Go版はDirectorからの明示伝搬で揃える）。
+	absEnvPath, absErr := filepath.Abs(*envPath)
+	if absErr != nil {
+		absEnvPath = *envPath
+	}
+
 	if *promptFlag != "" {
+		delegate.SetLaunchContext(absEnvPath, cfg.Active.Name, cfg.Active.Model)
 		runNonInteractive(llm.NewClient(cfg.Active), cfg.SystemPrompt, *promptFlag, false)
 		return
 	}
 	if *autoPromptFlag != "" {
-		runNonInteractive(llm.NewClient(cfg.Active), cfg.SystemPrompt, *autoPromptFlag, true)
+		// Worker自身として起動された場合、Directorが選択中のプロバイダー・モデルが
+		// MIMIC_PROVIDER/MIMIC_MODELで渡されていればそちらを優先する（.envの
+		// 優先順位デフォルト(openrouter→gemini→mistral)に固定されないように。
+		// Python版 __main__.py の同名ロジックの移植）。
+		active := cfg.Active
+		if wantedProvider := os.Getenv("MIMIC_PROVIDER"); wantedProvider != "" {
+			if p, ok := cfg.Providers[wantedProvider]; ok {
+				override := *p
+				if wantedModel := os.Getenv("MIMIC_MODEL"); wantedModel != "" {
+					override.Model = wantedModel
+				}
+				active = &override
+			}
+		}
+		delegate.SetLaunchContext(absEnvPath, active.Name, active.Model)
+		runNonInteractive(llm.NewClient(active), cfg.SystemPrompt, *autoPromptFlag, true)
 		return
 	}
 
@@ -79,6 +106,7 @@ func main() {
 	// 必ず経由する（Python版 __main__.py の対話モード起動フローを踏襲）。
 	active := selector.SelectInteractively(cfg)
 	client := llm.NewClient(active)
+	delegate.SetLaunchContext(absEnvPath, active.Name, active.Model)
 
 	fmt.Fprintf(os.Stderr, "[mimic-go] provider=%s model=%s\n", client.ProviderName(), client.Model())
 
