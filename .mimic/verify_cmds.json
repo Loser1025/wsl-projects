@@ -1,7 +1,7 @@
 {
   "/home/loser/wsl-projects": {
-    "cmd": "echo \"MCP multi-bq connection test completed. Verify that the server output was captured and reported.\"",
-    "passes": 1,
-    "last_used": "2026-09-04T13:47:33+09:00"
+    "cmd": "node -e \"const fs = require('fs'); const code = fs.readFileSync('/home/loser/wsl-projects/jusyo.js', 'utf8'); console.log('OK length:', code.length);\"",
+    "passes": 2,
+    "last_used": "2026-09-04T14:19:11+09:00"
   }
 }

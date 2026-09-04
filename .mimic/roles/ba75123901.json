@@ -1,0 +1,6 @@
+{
+  "role": "視点: Google Apps Script および BigQuery クエリ編集の専門家 制約: /home/loser/wsl-projects/jusyo.js の ADDRESS_SYNC_CONFIG の query を書き換え、面談日、書類戻り日、受任日、最新面談予定日を UNION ALL 内の各テーブル選択に追加し、AS でわかりやすい日本語エイリアスを付与する。 完了基準: jusyo.js が正確に更新され、指定された4つのカラム（面談日、書類戻り日、受任日、最新面談予定日）がクエリに含まれること。",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-09-04T14:17:18+09:00"
+}

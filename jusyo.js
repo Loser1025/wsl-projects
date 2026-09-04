@@ -7,17 +7,36 @@ const ADDRESS_SYNC_CONFIG = {
          '  id AS `相談者ID`, ' +
          '  pre_delegation_date AS `面談予約日`, ' +
          '  address_zip AS `郵便番号`, ' +
-         '  address AS `現住所` ' +
+         '  address AS `現住所`, ' +
+         '  interview_date AS `面談日`, ' +
+         '  document_return_date AS `書類戻り日`, ' +
+         '  delegation_date AS `受任日`, ' +
+         '  latest_interview_date AS `最新面談予定日` ' +
          'FROM ( ' +
-         '  SELECT id, pre_delegation_date, address_zip, address, \'hibiki\' as office_key FROM `se-leadu.conpas_debt_hibiki.consulters` WHERE deleted_at is null ' +
+         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, ' +
+         '         (SELECT MAX(interview_at) FROM `se-leadu.conpas_debt_hibiki.interviews` i WHERE i.consulter_id = c.id AND i.deleted_at IS NULL) AS latest_interview_date, ' +
+         '         \'hibiki\' as office_key ' +
+         '  FROM `se-leadu.conpas_debt_hibiki.consulters` c WHERE c.deleted_at is null ' +
          '  UNION ALL ' +
-         '  SELECT id, pre_delegation_date, address_zip, address, \'aegislo\' as office_key FROM `se-leadu.conpas_debt_aegislo.consulters` WHERE deleted_at is null ' +
+         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, ' +
+         '         (SELECT MAX(interview_at) FROM `se-leadu.conpas_debt_aegislo.interviews` i WHERE i.consulter_id = c.id AND i.deleted_at IS NULL) AS latest_interview_date, ' +
+         '         \'aegislo\' as office_key ' +
+         '  FROM `se-leadu.conpas_debt_aegislo.consulters` c WHERE c.deleted_at is null ' +
          '  UNION ALL ' +
-         '  SELECT id, pre_delegation_date, address_zip, address, \'thank\' as office_key FROM `se-leadu.conpas_debt_thank.consulters` WHERE deleted_at is null ' +
+         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, ' +
+         '         (SELECT MAX(interview_at) FROM `se-leadu.conpas_debt_thank.interviews` i WHERE i.consulter_id = c.id AND i.deleted_at IS NULL) AS latest_interview_date, ' +
+         '         \'thank\' as office_key ' +
+         '  FROM `se-leadu.conpas_debt_thank.consulters` c WHERE c.deleted_at is null ' +
          '  UNION ALL ' +
-         '  SELECT id, pre_delegation_date, address_zip, address, \'honoka\' as office_key FROM `se-leadu.conpas_debt_kaname.consulters` WHERE deleted_at is null ' +
+         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, ' +
+         '         (SELECT MAX(interview_at) FROM `se-leadu.conpas_debt_kaname.interviews` i WHERE i.consulter_id = c.id AND i.deleted_at IS NULL) AS latest_interview_date, ' +
+         '         \'honoka\' as office_key ' +
+         '  FROM `se-leadu.conpas_debt_kaname.consulters` c WHERE c.deleted_at is null ' +
          '  UNION ALL ' +
-         '  SELECT id, pre_delegation_date, address_zip, address, \'mitsuba\' as office_key FROM `se-leadu.conpas_debt_mitsuba.consulters` WHERE deleted_at is null ' +
+         '  SELECT c.id, c.pre_delegation_date, c.address_zip, c.address, c.interview_date, c.document_return_date, c.delegation_date, ' +
+         '         (SELECT MAX(interview_at) FROM `se-leadu.conpas_debt_mitsuba.interviews` i WHERE i.consulter_id = c.id AND i.deleted_at IS NULL) AS latest_interview_date, ' +
+         '         \'mitsuba\' as office_key ' +
+         '  FROM `se-leadu.conpas_debt_mitsuba.consulters` c WHERE c.deleted_at is null ' +
          ') ' +
          'WHERE ' +
          '  DATE_TRUNC(pre_delegation_date, MONTH) = DATE_TRUNC(CURRENT_DATE(), MONTH)'
@@ -111,7 +130,6 @@ function fetchBigQueryDataByQuery(sqlQuery) {
     }
 
     if (!results.schema || rows.length === 0) {
-      Logger.log('クエリ結果が空です。SQL: ' + sqlQuery);
       return [];
     }
 
@@ -186,19 +204,15 @@ function removeTrigger() {
   SpreadsheetApp.getUi().alert('自動同期を停止しました。');
 }
 
+function formatNow() {
+  return Utilities.formatDate(new Date(), 'JST', 'yyyy/MM/dd HH:mm:ss');
+}
+
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('BigQuery同期')
     .addItem('今月面談住所一覧を同期', 'syncCurrentMonthAddresses')
-    .addSeparator()
-    .addItem('自動同期を開始（15分ごと）', 'setupTrigger')
+    .addItem('15分ごとの自動同期を設定', 'setupTrigger')
     .addItem('自動同期を停止', 'removeTrigger')
     .addToUi();
 }
-
-function formatNow() {
-  return Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
-}
-
-
-
