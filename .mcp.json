@@ -1,0 +1,41 @@
+{
+  "mcpServers": {
+    "multi-bq": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "/home/loser/wsl-projects/bq-mcp-package/server.py"
+      ],
+      "env": {}
+    },
+    "capcut": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/home/loser/tools/capcut-mcp/src/server.js"
+      ],
+      "env": {
+        "CAPCUT_DRAFTS_DIR": "/mnt/c/Users/andmiraina03/AppData/Local/CapCut/User Data/Projects/com.lveditor.draft",
+        "CAPCUT_TEMPLATE_DRAFT": "0902"
+      }
+    },
+    "google-workspace": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/home/loser/wsl-projects/google-workspace-mcp/dist/server.js"
+      ],
+      "env": {}
+    },
+    "bigquery": {
+      "command": "/home/loser/wsl-projects/Medicaldepartment/.venv/bin/python",
+      "args": [
+        "/home/loser/wsl-projects/Medicaldepartment/mcp_bigquery.py"
+      ],
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "/mnt/c/Users/Loser/AppData/Roaming/gcloud/application_default_credentials.json",
+        "GCLOUD_PROJECT": "stream-443709"
+      }
+    }
+  }
+}

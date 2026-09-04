@@ -1,0 +1,6 @@
+{
+  "role": "視点: BigQuery MCP を使用したスキーマ取得の専門家\n制約: bq-mcp-package のみ利用。外部認証は既に環境に設定済みとし、他のリソースやファイルには書き込まない。\n完了基準: テーブル `01C_alloffiices_visiting_office_interview_management` のスキーマが JSON 形式で返され、フィールド名、型、モードが含まれていること。",
+  "uses": 1,
+  "mode": "execute",
+  "last_used": "2026-09-04T12:26:59+09:00"
+}

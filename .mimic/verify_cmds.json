@@ -1,0 +1,7 @@
+{
+  "/home/loser/wsl-projects": {
+    "cmd": "echo \"Schema retrieval completed. Verify that the output contains field names, types, and mode for the table 01C_alloffiices_visiting_office_interview_management.\"",
+    "passes": 1,
+    "last_used": "2026-09-04T12:26:59+09:00"
+  }
+}
