@@ -1,9 +1,16 @@
 /**
- * 手動実行、またはトリガー登録して使う入口。
- * スタンドアロンのスクリプトなので onOpen メニューは効かない
- * （実行するにはこのプロジェクトのエディタから関数を選んで実行、
- *   または時間主導型トリガーを設定する）。
+ * スプレッドシートの拡張機能から作られたプロジェクト（コンテナバインド）。
+ * このスプレッドシートを開いたときにメニューが表示される。
  */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('BQ集計')
+    .addItem('契約日ベースを更新', 'syncKeiyakubiBaseSummary')
+    .addItem('反響日ベースを更新', 'syncHankyoubiBaseSummary')
+    .addItem('両方まとめて更新', 'runAll')
+    .addToUi();
+}
+
 function runAll() {
   syncKeiyakubiBaseSummary();
   syncHankyoubiBaseSummary();
