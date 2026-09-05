@@ -43,6 +43,11 @@ def _get_credentials():
     )
     if creds.expired and hasattr(creds, "refresh_token") and creds.refresh_token:
         creds.refresh(Request())
+    # gcloud configの現在プロジェクトがquota_project_idとして埋め込まれ、
+    # そのプロジェクトへのserviceusage権限がないと403になるため、
+    # quota projectを送らずクエリ対象プロジェクト自身の権限だけで認可させる
+    if hasattr(creds, "with_quota_project"):
+        creds = creds.with_quota_project(None)
     return creds
 
 

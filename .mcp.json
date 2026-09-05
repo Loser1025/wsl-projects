@@ -33,7 +33,7 @@
         "/home/loser/wsl-projects/Medicaldepartment/mcp_bigquery.py"
       ],
       "env": {
-        "GOOGLE_APPLICATION_CREDENTIALS": "/mnt/c/Users/Loser/AppData/Roaming/gcloud/application_default_credentials.json",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/home/loser/.config/gcloud/application_default_credentials.json",
         "GCLOUD_PROJECT": "stream-443709"
       }
     }
