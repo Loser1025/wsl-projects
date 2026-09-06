@@ -6,7 +6,9 @@
       "args": [
         "/home/loser/wsl-projects/bq-mcp-package/server.py"
       ],
-      "env": {}
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "/home/loser/.config/gcloud/adc-multibq.json"
+      }
     },
     "capcut": {
       "type": "stdio",
@@ -33,7 +35,7 @@
         "/home/loser/wsl-projects/Medicaldepartment/mcp_bigquery.py"
       ],
       "env": {
-        "GOOGLE_APPLICATION_CREDENTIALS": "/home/loser/.config/gcloud/application_default_credentials.json",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/home/loser/.config/gcloud/adc-stream443709.json",
         "GCLOUD_PROJECT": "stream-443709"
       }
     }

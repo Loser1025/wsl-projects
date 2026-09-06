@@ -1,0 +1,6 @@
+{
+  "role": "視点: Google Apps Script (GAS) および BigQuery クエリ編集の専門家。ADDRESS_SYNC_CONFIG のクエリ文字列を JavaScript の文字列連結リテラルとして安全に編集する。制約: (1) 対象ファイルは /home/loser/wsl-projects/jusyo.js のみ。他のファイルは変更しない。(2) ADDRESS_SYNC_CONFIG.query の WHERE句の1か所だけを書き換え、他には触らない。(3) 文字列連結の構造（'  ... ' + のチェーン）を壊さない。末尾スペースや引用符構文を維持する。(4) 構文的に有効な BigQuery SQL と有効な JavaScript であること。完了基準: /home/loser/wsl-projects/jusyo.js の 53–54 行目付近の WHERE句が、以下と完全一致する文字列リテラル内容（前後のクォート・改行・末尾スペースを含む）に書き換えられていること。\\n変更前:  'WHERE  ' +\\\\n         '  DATE_TRUNC(c.pre_delegation_date, MONTH) = DATE_TRUNC(CURRENT_DATE(), MONTH)'\\\\n変更後:  'WHERE  ' +\\\\n         '  c.pre_delegation_date \u003e= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH) + INTERVAL 19 DAY AND ' +\\\\n         '  c.pre_delegation_date \u003c= CURRENT_DATE() '\\\\nその後、`node --check /home/loser/wsl-projects/jusyo.js` で構文チェックが通ること（または同等の Node.js 構文検証コマンド）を verify_cmd として実行し、exit code 0 を確認すること。grep_codebase で「DATE_TRUNC(c.pre_delegation_date, MONTH) = DATE_TRUNC(CURRENT_DATE(), MONTH)」がヒットしないこと（古い条件が完全に除去されていること）を確認し、差分のサマリを報告すること。",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-09-06T11:21:04+09:00"
+}
