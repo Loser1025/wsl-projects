@@ -460,7 +460,26 @@ loop:
 		// cancel_futures=True相当（実行中のテストの完了を待たず、その時点の
 		// 結果だけで先に進む）とし、待たない — 10並列×最大20秒待たされる
 		// ことがあり、Enterを押しても即座に反応しないように見えるバグの原因だった。
-		testWg.Wait()
+		//
+		// ただし単純にtestWg.Wait()するだけだと、110件全部の「起動」自体は
+		// 一瞬で終わる（sem<-のセマフォ待ちだけなので）ため、上のforループを
+		// 抜けた直後からここに来るまでの間はlineChを一切見ておらず、残り数件の
+		// 低速モデル（10秒以上かかることもある）を待つだけのためにEnterが
+		// 反応しなくなる別の抜け道が残っていた。testWg.Wait()自体もlineCh/
+		// stopTestingと一緒にselectすることで、この区間でもEnterによる
+		// 早期終了を効かせる。
+		waitDone := make(chan struct{})
+		go func() {
+			testWg.Wait()
+			close(waitDone)
+		}()
+		select {
+		case <-waitDone:
+		case <-lineCh:
+			stop()
+			stoppedEarly = true
+		case <-stopTesting:
+		}
 	}
 	fmt.Printf("\r%s\r", strings.Repeat(" ", 80))
 	restoreEcho() // フェーズ3の番号選択プロンプトでは通常通りタイプ内容を見せる
