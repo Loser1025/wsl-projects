@@ -14,6 +14,20 @@ import (
 // read_file/grep_codebase等の頻繁に呼ばれるツールは1行のまま、生JSONの
 // 垂れ流しではなく主要な引数だけを読みやすく抜き出して表示する。
 
+// alwaysApprovedTools はTUI内で必ず承認ダイアログ（renderApprovalBox/
+// renderHostExecApprovalBox）が表示されるツール名の集合
+// （NewModelがtools.SetWriteApprovalHandler/SetHostExecApprovalHandlerを
+// 無条件で登録しており、auto承認でスキップされる分岐が無いため）。
+// 承認ボックス自体にツール名・パス（またはコマンド）・変更内容プレビューが
+// 含まれるため、この直前に出すツール呼び出し行は完全に重複する。
+// そのため、これらのツールはmodel.go側でツール呼び出し行自体を省略する。
+var alwaysApprovedTools = map[string]bool{
+	"write_file":       true,
+	"edit_file":        true,
+	"patch_file":       true,
+	"run_host_command": true,
+}
+
 // toolCallMeta はツールごとの表示ルール。
 //   - primary: 見出しに出す主要引数キー（先頭から順に、値がある最初のもの)
 //     を優先的に採用するのではなく、指定された全キーを順に連結して表示する。

@@ -1165,7 +1165,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if card := renderDelegationCall(msg.tool.Name, msg.tool.ArgsPreview); card != "" {
 				m.log = append(m.log, card)
 				m.pendingDelegationIdx = len(m.log) - 1
-			} else {
+			} else if !alwaysApprovedTools[msg.tool.Name] {
+				// write_file/edit_file/patch_file/run_host_commandは直後に必ず
+				// 承認ダイアログが出て、そこにツール名・パス・プレビューが
+				// 表示されるため、ここでのツール呼び出し行は省略する
+				// （表示が二重になり情報過多になるとのフィードバックを反映）。
 				m.log = append(m.log, renderToolCallLine(msg.tool.Name, msg.tool.ArgsPreview))
 			}
 		case msg.done:
