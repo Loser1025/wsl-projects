@@ -51,7 +51,8 @@ const ADDRESS_SYNC_CONFIG = {
          'LEFT JOIN first_interview fi ON fi.consulter_id = c.id AND fi.office_key = c.office_key ' +
          'LEFT JOIN interviews_latest il ON il.consulter_id = c.id AND il.office_key = c.office_key ' +
          'WHERE  ' +
-         '  DATE_TRUNC(c.pre_delegation_date, MONTH) = DATE_TRUNC(CURRENT_DATE(), MONTH)'
+         '  c.pre_delegation_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH) + INTERVAL 19 DAY AND ' +
+         '  c.pre_delegation_date <= CURRENT_DATE() '
 };
 
 // ===== メイン同期関数（手動・トリガー共用）=====
