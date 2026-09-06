@@ -1,0 +1,7 @@
+{
+  "/home/loser/wsl-projects/mimic_go": {
+    "cmd": "go test ./...",
+    "passes": 1,
+    "last_used": "2026-09-06T14:54:20+09:00"
+  }
+}
