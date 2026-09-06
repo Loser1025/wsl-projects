@@ -5,26 +5,28 @@
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('BQ集計')
-    .addItem('契約日ベースを更新', 'syncKeiyakubiBaseSummary')
-    .addItem('反響日ベースを更新', 'syncHankyoubiBaseSummary')
-    .addItem('両方まとめて更新', 'runAll')
-    .addItem('（デバッグ）判定内容をログ表示', 'debugSnapshotBlock')
+    .addItem('すべてまとめて更新', 'runAll')
+    .addItem('1時間ごとの自動更新を設定', 'setupHourlyTrigger')
     .addToUi();
 }
 
-function runAll() {
+function syncOverallSummary() {
   syncKeiyakubiBaseSummary();
   syncHankyoubiBaseSummary();
 }
 
-// 「今日」の判定がおかしいときに、実際どう判定されているか確認するための関数。
-// 実行後、Apps Scriptエディタの「実行数」からログを見てください。
-function debugSnapshotBlock() {
-  var gasToday = new Date();
-  var bqToday = getBigQueryToday_();
-  var block = getCurrentSnapshotBlock_();
+function runAll() {
+  syncOverallSummary();
+  syncShohinBetsu();
+  syncKeiyakuKara3kagetsu();
+  syncHankyoKara3kagetsu();
+  // サンキュー架電の対応率は各表の契約数を参照するため、必ず最後に実行する。
+  syncSankyuKaiden();
+  writeLastUpdatedAt_();
+}
 
-  Logger.log('GAS側のnew Date(): ' + gasToday);
-  Logger.log('BigQuery側のCURRENT_DATE: ' + bqToday);
-  Logger.log('判定されたブロック: ' + JSON.stringify(block));
+// 「全体」シートのA1に最終更新日時を書き込む。
+function writeLastUpdatedAt_() {
+  var sheet = SpreadsheetApp.openById(CONFIG.SUMMARY_SPREADSHEET_ID).getSheetByName(CONFIG.OVERALL_SHEET_NAME);
+  sheet.getRange(1, 1).setValue('更新日時: ' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss'));
 }
