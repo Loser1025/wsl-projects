@@ -1,1 +1,4 @@
 {"model":"nvidia/nemotron-3.5-lightning:free","provider":"openrouter","ts":"2026-09-06T21:01:49","type":"session_start"}
+{"content":"write_fileでテスト用のtest_approval.txtにhelloと書き込んで","ts":"2026-09-06T21:01:56","type":"user_input"}
+{"args":{"content":"hello","path":"test_approval.txt"},"step":0,"tool":"write_file","ts":"2026-09-06T21:02:15","type":"action"}
+{"result":"⚠ 警告: このファイルは現在のターンで read_file されていません。内容を確認せずに編集しています。\n書き込み完了: test_approval.txt (5 文字)","step":0,"tool":"write_file","ts":"2026-09-06T21:02:26","type":"observation"}
