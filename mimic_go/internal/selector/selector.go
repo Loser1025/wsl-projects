@@ -65,6 +65,31 @@ func geminiContextLength(modelID string) int {
 	return 1048576
 }
 
+// suppressEcho は端末のローカルエコーを無効化し、元へ戻すためのrestore関数を返す。
+// 標準入力がttyでない、またはtermios取得/設定に失敗した場合は何もしない
+// no-opのrestoreを返す（無いよりはまし、という位置づけで疎通確認自体は継続する）。
+// restoreは複数回呼んでも安全（2回目以降は何もしない）。
+func suppressEcho() (restore func()) {
+	fd := int(os.Stdin.Fd())
+	orig, err := unix.IoctlGetTermios(fd, unix.TCGETS)
+	if err != nil {
+		return func() {}
+	}
+	noEcho := *orig
+	noEcho.Lflag &^= unix.ECHO
+	if err := unix.IoctlSetTermios(fd, unix.TCSETS, &noEcho); err != nil {
+		return func() {}
+	}
+	restored := false
+	return func() {
+		if restored {
+			return
+		}
+		restored = true
+		_ = unix.IoctlSetTermios(fd, unix.TCSETS, orig)
+	}
+}
+
 var httpClient = &http.Client{}
 
 func fetchFreeModels(apiKey string) []modelInfo {
@@ -259,6 +284,15 @@ func SelectInteractively(cfg *config.Config) *config.ProviderConfig {
 	// ── フェーズ2: 疎通確認（並列、Enterキーで途中終了可）──
 	fmt.Printf("  %s  %s\n\n", gr("疎通確認中..."), y("← エンターキーで現時点の結果を表示"))
 
+	// このフェーズだけ端末のローカルエコーを無効化する。無効化しないと、Enter
+	// キー押下がターミナル側でそのままエコーされ改行としてカーソルを進めてしまい、
+	// "\r"で同じ行を上書き更新しているはずのプログレスバーが複数行に分裂して
+	// 表示される（実機のtmux上で実際に確認した見た目の不具合）。フェーズ3の
+	// 番号選択プロンプトでは通常通りタイプ内容が見えてほしいので、疎通確認の
+	// ループを抜けたら早めにrestoreEchoで元へ戻す。
+	restoreEcho := suppressEcho()
+	defer restoreEcho()
+
 	// 標準入力の読み取りはこのゴルーチン1つに一本化する。ここで「Enterキー検知」と
 	// 後段の「番号選択」の両方を、別々のbufio.Readerで同時にstdinから読もうとすると、
 	// ユーザーの入力がどちらか一方にしか届かず、番号選択の入力が横取りされて反応が
@@ -429,6 +463,7 @@ loop:
 		testWg.Wait()
 	}
 	fmt.Printf("\r%s\r", strings.Repeat(" ", 80))
+	restoreEcho() // フェーズ3の番号選択プロンプトでは通常通りタイプ内容を見せる
 
 	type workingEntry struct {
 		provider string

@@ -6,6 +6,12 @@
  * 解約の定義: status IN ('cancel','cooling_off')
  *            OR (status = 'contract' AND is_cancel_scheduled = 1)  … 処理前（解約予定フラグ）
  * 契約数・解約数は contract_group_id の重複を除いた件数（付属メニュー分は1件にまとめる）。
+ * 契約数・解約数とも、対象は「契約日が集計期間内（開始日〜ブロックの締め日）」のもの。
+ *
+ * 反響日ベースも、初回問い合わせ月だけでなく契約日にもブロックの締め日で上限をかけている。
+ * こうしないと、確定済みのはずのブロック（例:8月末）の数字が、後日その顧客が追加契約するたびに
+ * 変わり続けてしまう（真の意味で「確定」しない）ため。これにより、変動するのは常に
+ * 進行中の最新ブロックだけになり、一度確定したブロックは以後変化しない。
  */
 
 // 契約日ベース：その月に契約したものを、その月にカウント
@@ -48,6 +54,7 @@ function syncHankyoubiBaseSummary() {
     ' FROM `' + CONFIG.BQ_PROJECT + '.stream.contracts` c' +
     ' JOIN first_inquiry fi ON c.client_id = fi.client_id' +
     ' WHERE DATE(fi.first_inquired_at, "Asia/Tokyo") BETWEEN "' + CONFIG.SUMMARY_START_DATE + '" AND "' + block.endDate + '"' +
+    '   AND DATE(c.contracted_at, "Asia/Tokyo") <= "' + block.endDate + '"' +
     ' GROUP BY month' +
     ' ORDER BY month';
 

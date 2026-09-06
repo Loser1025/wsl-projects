@@ -5,9 +5,12 @@
  * これにより、チェックポイント当日が来る前でも常に最新日まで反映され、
  * チェックポイント当日を過ぎたら値が確定し、次のブロックに自動で切り替わる。
  * 例：実行日が9/6なら「9月15日」ブロックに、今日(9/6)までの実績を書き込む。
+ *
+ * 「今日」はApps Script実行サーバーの時計ではなく、BigQuery側のCURRENT_DATEを使う。
+ * （両者がズレていると、集計期間が正しく進まず古いブロックと同じ結果になってしまうため）
  */
 function getCurrentSnapshotBlock_() {
-  var today = new Date();
+  var today = getBigQueryToday_();
   var dates = CONFIG.SNAPSHOT_DATES;
 
   var targetIndex = dates.length - 1; // 全部通過済みなら最後のブロックに書く
@@ -35,4 +38,11 @@ function getCurrentSnapshotBlock_() {
       kaiyakuAmount: baseRow + 4   // 解約金額（税抜）
     }
   };
+}
+
+// BigQuery側の「今日」（Asia/Tokyo）を取得する
+function getBigQueryToday_() {
+  var rows = runBigQuery_('SELECT CURRENT_DATE("Asia/Tokyo") AS today');
+  var parts = rows[0].today.split('-'); // "YYYY-MM-DD"
+  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
 }
