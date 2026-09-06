@@ -29,6 +29,10 @@ var delegationMetaByTool = map[string]delegationMeta{
 
 const delegationFieldMax = 90
 
+// delegationPendingStyle は委任カードの下に一時的に出す「実行中...」表示のスタイル
+// （renderLog側でpendingDelegationIdxが未解決の間だけ付与する）。
+var delegationPendingStyle = lipgloss.NewStyle().Foreground(colAmber)
+
 // renderDelegationCall は委任系ツール呼び出しを、生JSONの切り詰めプレビューではなく
 // role/task/権限レベルなどを抜き出した読みやすいカード状の表示に整形する。
 // 委任系ツールでなければ空文字を返す（呼び出し側は従来のツール行にフォールバックする）。

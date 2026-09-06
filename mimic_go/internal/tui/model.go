@@ -198,6 +198,11 @@ type Model struct {
 	busySpinner spinner.Model
 	cpuBar      progress.Model
 	memBar      progress.Model
+
+	// 直近に開始した委任がまだ完了していない間、renderLogでその委任カードの
+	// 直後に「実行中...」を表示するためのm.logインデックス（未実行時は-1）。
+	// 委任ツールは同期実行のため、次のturnEventが来た時点で必ずクリアする。
+	pendingDelegationIdx int
 }
 
 // hostExecApprovalRequest はtools.HostExecApprovalHandler経由でツール実行
@@ -400,27 +405,28 @@ func NewModel(client *llm.Client, systemPrompt string, cfg *config.Config) Model
 	memBar := progress.New(progress.WithWidth(8), progress.WithoutPercentage(), progress.WithColors(colTitle))
 
 	return Model{
-		input:              ta,
-		busySpinner:        busySpinner,
-		cpuBar:             cpuBar,
-		memBar:             memBar,
-		client:             client,
-		cfg:                cfg,
-		systemPrompt:       activeSystemPrompt,
-		baseSystemPrompt:   systemPrompt,
-		registry:           activeRegistry,
-		fullRegistry:       registry,
-		specialistRegistry: specialistRegistry,
-		agentMode:          agentMode,
-		history:            history,
-		log:                log,
-		reactLog:           reactLog,
-		callLog:            vcs.NewToolCallLog(),
-		autoGit:            autoGit,
-		cwd:                cwd,
-		approvalCh:         approvalCh,
-		applyApprovalCh:    applyApprovalCh,
-		hostExecApprovalCh: hostExecApprovalCh,
+		input:                ta,
+		busySpinner:          busySpinner,
+		cpuBar:               cpuBar,
+		memBar:               memBar,
+		pendingDelegationIdx: -1,
+		client:               client,
+		cfg:                  cfg,
+		systemPrompt:         activeSystemPrompt,
+		baseSystemPrompt:     systemPrompt,
+		registry:             activeRegistry,
+		fullRegistry:         registry,
+		specialistRegistry:   specialistRegistry,
+		agentMode:            agentMode,
+		history:              history,
+		log:                  log,
+		reactLog:             reactLog,
+		callLog:              vcs.NewToolCallLog(),
+		autoGit:              autoGit,
+		cwd:                  cwd,
+		approvalCh:           approvalCh,
+		applyApprovalCh:      applyApprovalCh,
+		hostExecApprovalCh:   hostExecApprovalCh,
 	}
 }
 
@@ -543,6 +549,9 @@ func (m Model) renderLog() string {
 			rendered[i] = renderUserLine(line)
 		default:
 			rendered[i] = renderMarkdown(line)
+		}
+		if i == m.pendingDelegationIdx && m.streaming {
+			rendered[i] += "\n      " + delegationPendingStyle.Render("⏳ 実行中...")
 		}
 	}
 	if w <= 0 {
@@ -1140,6 +1149,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case turnEvent:
+		// 委任が返ってきた（＝次に何らかのイベントが来た）時点で「実行中」表示は
+		// 必ず消す。委任ツールは同期実行のため、次のイベントが来た時点でその
+		// 委任が完了しているのは保証されている。
+		m.pendingDelegationIdx = -1
 		switch {
 		case msg.finalErr != nil:
 			m.flushThinkBuffer()
@@ -1151,6 +1164,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.closeOpenLine()
 			if card := renderDelegationCall(msg.tool.Name, msg.tool.ArgsPreview); card != "" {
 				m.log = append(m.log, card)
+				m.pendingDelegationIdx = len(m.log) - 1
 			} else {
 				m.log = append(m.log, renderToolCallLine(msg.tool.Name, msg.tool.ArgsPreview))
 			}
