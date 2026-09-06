@@ -249,13 +249,9 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 
 		for _, tc := range result.ToolCalls {
 			if onTool != nil {
-				// 委任系ツールはUI側でrole/task等をJSONとして読み解いて整形表示するため、
-				// 80字に切り詰めた壊れたJSONではなく完全な引数文字列を渡す。
-				argsPreview := preview(tc.Function.Arguments)
-				if delegationTools[tc.Function.Name] {
-					argsPreview = tc.Function.Arguments
-				}
-				onTool(ToolActivity{Name: tc.Function.Name, ArgsPreview: argsPreview})
+				// UI側でrole/path/pattern等をJSONとして読み解いて整形表示するため、
+				// 切り詰めた壊れたJSONではなく完全な引数文字列を渡す。
+				onTool(ToolActivity{Name: tc.Function.Name, ArgsPreview: tc.Function.Arguments})
 			}
 			if reactLog != nil {
 				reactLog.Add("action", map[string]any{"tool": tc.Function.Name, "args": rawJSONArgs(tc.Function.Arguments), "step": step})
@@ -500,12 +496,4 @@ func extractPathArg(argsJSON string) string {
 		return ""
 	}
 	return args.Path
-}
-
-func preview(s string) string {
-	const max = 80
-	if len(s) > max {
-		return s[:max] + "..."
-	}
-	return s
 }
