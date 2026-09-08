@@ -20,7 +20,7 @@ import (
 const applyApprovalFileThreshold = 3
 
 // ApplyApprovalHandler は委任結果の適用前承認を行うコールバック。
-// label（委任の呼称）・changedFiles（変更ファイル一覧）・summary（結果サマリの先頭2000字）
+// label（委任の呼称）・changedFiles（変更ファイル一覧）・summary（結果サマリ全文）
 // を受け取り、適用してよければtrueを返す。
 type ApplyApprovalHandler func(label string, changedFiles []string, summary string) bool
 

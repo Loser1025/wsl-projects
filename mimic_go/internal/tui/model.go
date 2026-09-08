@@ -1542,24 +1542,19 @@ func renderApprovalBox(req approvalRequest) string {
 func renderApplyApprovalBox(req applyApprovalRequest) string {
 	var b strings.Builder
 	b.WriteString("\n  ┌─ 委任結果の適用確認 ──────────────────────────────────\n")
-	b.WriteString(fmt.Sprintf("  │  委任  : %s\n", firstLine(req.label, 60)))
-	b.WriteString(fmt.Sprintf("  │  変更ファイル数: %d\n", len(req.changedFiles)))
-	shown := req.changedFiles
-	if len(shown) > 10 {
-		shown = shown[:10]
+	for i, line := range strings.Split(strings.TrimSpace(req.label), "\n") {
+		prefix := "  │  委任  : "
+		if i > 0 {
+			prefix = "  │          "
+		}
+		b.WriteString(prefix + line + "\n")
 	}
-	for _, f := range shown {
+	b.WriteString(fmt.Sprintf("  │  変更ファイル数: %d\n", len(req.changedFiles)))
+	for _, f := range req.changedFiles {
 		b.WriteString("  │    - " + f + "\n")
 	}
-	if len(req.changedFiles) > len(shown) {
-		b.WriteString(fmt.Sprintf("  │    …他%d件\n", len(req.changedFiles)-len(shown)))
-	}
 	b.WriteString("  │\n")
-	summaryLines := strings.Split(req.summary, "\n")
-	if len(summaryLines) > 10 {
-		summaryLines = summaryLines[:10]
-	}
-	for _, line := range summaryLines {
+	for _, line := range strings.Split(req.summary, "\n") {
 		b.WriteString("  │  " + line + "\n")
 	}
 	b.WriteString("  └──────────────────────────────────────────────────────\n")

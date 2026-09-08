@@ -27,8 +27,6 @@ var delegationMetaByTool = map[string]delegationMeta{
 	"continue_specialist":       {"↻", "Continue"},
 }
 
-const delegationFieldMax = 90
-
 // delegationPendingStyle は委任カードの下に一時的に出す「実行中...」表示のスタイル
 // （renderLog側でpendingDelegationIdxが未解決の間だけ付与する）。
 var delegationPendingStyle = lipgloss.NewStyle().Foreground(colAmber)
@@ -56,7 +54,7 @@ func renderDelegationCall(name, argsJSON string) string {
 	labelStyle := lipgloss.NewStyle().Foreground(colMuted)
 	valueStyle := lipgloss.NewStyle().Foreground(colText)
 	field := func(label, value string) {
-		value = truncateField(value, delegationFieldMax)
+		value = strings.TrimSpace(value)
 		if value == "" {
 			return
 		}
@@ -78,7 +76,7 @@ func renderDelegationCall(name, argsJSON string) string {
 		tasks := dArgStringSlice(args, "tasks")
 		lines = append(lines, "      "+labelStyle.Render(fmt.Sprintf("tasks (%d件):", len(tasks))))
 		for i, t := range tasks {
-			lines = append(lines, "        "+valueStyle.Render(fmt.Sprintf("%d. %s", i+1, truncateField(t, delegationFieldMax))))
+			lines = append(lines, "        "+valueStyle.Render(fmt.Sprintf("%d. %s", i+1, strings.TrimSpace(t))))
 		}
 		field("verify", dArgString(args, "verify_cmd"))
 	case "delegate_research":

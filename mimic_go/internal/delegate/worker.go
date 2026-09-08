@@ -270,7 +270,7 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 	// 適用承認ゲート（APPLY_APPROVAL=ask/threshold時のみ発動。既定(auto)や
 	// ハンドラ未登録時は常に自動適用＝従来挙動）。Python版 team.py:1121-1130 の移植。
 	if len(changed) > 0 && applyChanges && needsApplyApproval(changed) {
-		if !requestApplyApproval(task, changed, truncateSummary(summary, 2000)) {
+		if !requestApplyApproval(task, changed, summary) {
 			applyChanges = false
 			discardedNote = "（ユーザーが適用を拒否したため変更は破棄されました）"
 		}
