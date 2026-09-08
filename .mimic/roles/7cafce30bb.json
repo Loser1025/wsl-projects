@@ -1,0 +1,6 @@
+{
+  "role": "視点: PythonおよびGoogle Sheets/BigQuery連携の専門家 制約: Medicaldepartment/syncColab.py を実行し、実際のSpreadsheetへの書き込みおよび処理⓪〜②の実行ログから入力先座標（開始行・終了行・列範囲）を正確に実測・取得すること。 完了基準: スクリプトを実行し、入力された正確な座標範囲（例: 処理⓪の追加範囲、処理①②の書き込み範囲）を報告すること。",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-09-08T18:06:25+09:00"
+}
