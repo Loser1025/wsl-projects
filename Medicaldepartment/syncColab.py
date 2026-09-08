@@ -215,9 +215,9 @@ def step0_import_from_block_list(gc, ws_target):
     seen_in_block = set()
 
     for idx, row in enumerate(block_rows[1:], start=2):
-        if not row or not row[0].strip():
+        if not row or len(row) <= 3 or not row[3].strip():
             continue
-        pid = row[0].strip()
+        pid = row[3].strip()
         
         # 列データの取得（インデックス範囲チェック付き）
         # T列 (20番目 -> index 19)
