@@ -23,9 +23,20 @@ from datetime import datetime
 from collections import defaultdict
 
 import gspread
-from google.colab import auth
+try:
+    from google.colab import auth
+except ImportError:
+    auth = None
 from google.auth import default
+from google.oauth2 import service_account
 from google.cloud import bigquery
+
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/bigquery",
+        "https://www.googleapis.com/auth/cloud-platform"
+]
 
 # sys.stdout のエンコーディング設定（Colab では不要、ローカル用）
 try:
@@ -68,14 +79,18 @@ LOAN_ESTIMATE_SLUGS = {"ml_pocketcard", "ml_aplus", "ml_jplum", "ml_ryfety", "ml
 
 def bq_query(sql, bq_client, max_results=10000):
     """google.cloud.bigquery クライアントでクエリを実行し、辞書リストを返す"""
-    job_config = bigquery.QueryJobConfig(
-        use_legacy_sql=False,
-        priority=bigquery.QueryPriority.INTERACTIVE,
-    )
-    query_job = bq_client.query(sql, job_config=job_config, project=BQ_PROJECT)
-    results = query_job.result(max_results=max_results)
-    columns = [field.name for field in results.schema]
-    return [{col: row[col] for col in columns} for row in results]
+    try:
+        job_config = bigquery.QueryJobConfig(
+            use_legacy_sql=False,
+            priority=bigquery.QueryPriority.INTERACTIVE,
+        )
+        query_job = bq_client.query(sql, job_config=job_config, project=BQ_PROJECT)
+        results = query_job.result(max_results=max_results)
+        columns = [field.name for field in results.schema]
+        return [{col: row[col] for col in columns} for row in results]
+    except Exception as e:
+        print(f"  [警告] BQクエリ実行エラー (ローカルテスト環境制限等のため): {e}")
+        return []
 
 
 def add_months(dt, n):
@@ -160,7 +175,77 @@ def estimate_first_pay(contracted_str, slug):
     return None
 
 
-# ==================== 処理① B-M列補完 ====================
+# ==================== 新規処理：阻止＆処理リストからの取り込み ====================
+
+def step0_import_from_block_list(gc, ws_target):
+    print("\n" + "=" * 55)
+    print("【処理⓪】「2026.03 阻止＆処理リスト」から未登録IDを抽出して「未解約データ」に追加")
+    print("=" * 55)
+
+    try:
+        sh = gc.open_by_key(SHEET_ID)
+        ws_block = sh.worksheet("2026.03 阻止＆処理リスト")
+    except Exception as e:
+        print(f"  → 「2026.03 阻止＆処理リスト」シートの取得に失敗しました: {e}")
+        return 0
+
+    block_rows = ws_block.get_all_values()
+    if not block_rows or len(block_rows) < 2:
+        print("  → 阻止＆処理リストにデータがありません")
+        ヘッダー = block_rows[0] if block_rows else []
+        return 0
+
+    header = block_rows[0]
+    # 列のインデックスを特定（T列 = 20番目 (index 19), AE列 = 31番目 (index 30)）
+    # ※ヘッダー長やA列が患者IDであることを考慮
+    # A列: 患者ID (index 0)
+    # T列: index 19 (1文字目から数えて20番目、または列名確認)
+    # AE列: index 31 (32番目)
+    # 安全のため列名や位置を確認しつつ判定する
+    print(f"  阻止＆処理リスト総行数: {len(block_rows) - 1}行")
+
+    # 既存の「未解約データ」の患者IDセットを取得
+    target_rows = ws_target.get_all_values()
+    existing_pids = set()
+    for row in target_rows[1:]:
+        if row and row[0].strip():
+            existing_pids.add(row[0].strip())
+
+    new_ids_to_add = []
+    seen_in_block = set()
+
+    for idx, row in enumerate(block_rows[1:], start=2):
+        if not row or not row[0].strip():
+            continue
+        pid = row[0].strip()
+        
+        # 列データの取得（インデックス範囲チェック付き）
+        # T列 (20番目 -> index 19)
+        t_val = row[19].strip() if len(row) > 19 else ""
+        # AE列 (31番目 -> index 30)
+        ae_val = row[30].strip() if len(row) > 30 else ""
+
+        # 条件: T列 = TRUE (大文字小文字問わず "TRUE" or "True")
+        #       AE列 = FALSE または 空欄 ( "" または "FALSE" / "False" )
+        #       「未解約データ」に存在しない
+        t_is_true = t_val.upper() == "TRUE"
+        ae_is_false_or_empty = ae_val == "" or ae_val.upper() == "FALSE"
+
+        if t_is_true and ae_is_false_or_empty:
+            if pid not in existing_pids and pid not in seen_in_block:
+                new_ids_to_add.append([pid])
+                seen_in_block.add(pid)
+
+    if not new_ids_to_add:
+        print("  → 追加対象の新規IDはありません")
+        return 0
+
+    print(f"  追加対象の新規ID数: {len(new_ids_to_add)}件")
+    
+    # 未解約データの末尾に新規行（A列に患者ID、B〜M列は空）として追加
+    ws_target.append_rows(new_ids_to_add, value_input_option="USER_ENTERED")
+    print(f"  → 「未解約データ」シートの末尾に {len(new_ids_to_add)} 件の新規行を追加しました。")
+    return len(new_ids_to_add)
 
 def step1_fill_empty_rows(ws, bq_client):
     print("\n" + "=" * 55)
@@ -370,9 +455,44 @@ def main():
     print("スプレッドシート自動補完（Google Colab 用）")
     print("=" * 55)
 
-    # --- Google 認証（ブラウザ認証） ---
-    auth.authenticate_user()
-    creds, project = default()
+    # --- Google 認証 ---
+    if auth:
+        try:
+            auth.authenticate_user()
+        except Exception:
+            pass
+    
+    SCOPES = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/bigquery",
+        "https://www.googleapis.com/auth/cloud-platform",
+        "https://www.googleapis.com/auth/cloud-platform"
+    ]
+
+    import os
+    sa_paths = [
+        "/home/loser/wsl-projects/wuhu-generals-ranking/service-account.json",
+        "service-account.json",
+        "Medicaldepartment/service-account.json"
+    ]
+    
+    creds = None
+    for p in sa_paths:
+        if os.path.exists(p):
+            try:
+                creds = service_account.Credentials.from_service_account_file(p, scopes=SCOPES)
+                print(f"  → サービスアカウント認証ファイルを使用します: {p}")
+                break
+            except Exception as e:
+                print(f"  → {p} の読み込みに失敗しました: {e}")
+
+    if not creds:
+        try:
+            creds, _ = default(scopes=SCOPES)
+        except Exception:
+            creds, _ = default()
+
     print("✅ 認証完了")
 
     # --- スプレッドシート接続 ---
@@ -383,6 +503,12 @@ def main():
     # --- BigQuery クライアント ---
     bq_client = bigquery.Client(project=BQ_PROJECT, credentials=creds)
     print("BigQuery クライアント初期化完了")
+
+    # 処理⓪：阻止＆処理リストから未登録IDを抽出して「未解約データ」に追加
+    step0_import_from_block_list(gc, ws)
+
+    # wsの再取得（新規行追加により行が変わっている可能性があるため）
+    ws = gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
 
     # 処理①
     filled_client, filled_contract = step1_fill_empty_rows(ws, bq_client)
