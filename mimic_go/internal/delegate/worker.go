@@ -57,7 +57,7 @@ func SetSessionsDir(dir string) {
 // 構造的に回避しているのに対し、Goバイナリには固定インストール先が無いため、
 // MIMIC_SESSIONS_DIRと同じ「Directorから明示的に渡す」方式で揃える。
 // MIMIC_PROVIDER/MIMIC_MODELの引き継ぎも同じくPython版 __main__.py の移植で、
-// Workerが.envの優先順位デフォルト（openrouter→gemini→mistral）に固定されず、
+// Workerが.envの優先順位デフォルト（openrouter→gemini）に固定されず、
 // Directorが実際に選択中のプロバイダー・モデルで動作するようにする。
 var (
 	launchEnvPath  string

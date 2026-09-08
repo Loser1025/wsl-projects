@@ -93,7 +93,8 @@
    という非対称設計を踏襲）
 5. ストリーミング応答でcontentが空の場合の`reasoning`フィールドへのフォールバックを実装
    （`internal/llm/stream.go`）
-6. Mistral向け`prompt_cache_key`送信を実装（セッション単位の固定キー、`internal/llm/client.go`）。
+6. ~~Mistral向け`prompt_cache_key`送信を実装~~ → Mistral対応自体を撤去したため削除済み
+   （`internal/llm/client.go`）。
    `json_mode`はPython版でも実際は一度も`True`に設定されない死んだ状態のため意図的に見送り
 7. `_repair_message_sequence`（孤立tool_calls/tool応答ペアの修復）を実装。Python版の実態に合わせ
    `internal/react/trim.go`の内容を`internal/llm/trim.go`へ移設（Python版もagent.py＝API層に

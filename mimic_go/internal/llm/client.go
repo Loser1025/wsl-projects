@@ -1,6 +1,6 @@
-// Package llm はOpenRouter/Gemini/Mistral chat-completions APIへの直接HTTP
+// Package llm はOpenRouter/Gemini chat-completions APIへの直接HTTP
 // アクセスを行う（SDK不使用というPython版agent.pyの方針を踏襲し net/http を
-// 直接使う）。3プロバイダともOpenAI互換のchat/completionsエンドポイントを
+// 直接使う）。両プロバイダともOpenAI互換のchat/completionsエンドポイントを
 // 提供するため、リクエスト/レスポンス形式は共通化できる。
 package llm
 
@@ -97,9 +97,9 @@ func NewClient(provider *config.ProviderConfig) *Client {
 		keyManager: NewKeyManager(provider.APIKeys, provider.RPMLimit),
 		model:      provider.Model,
 		http:       &http.Client{Timeout: 120 * time.Second},
-		// Mistral向けprompt_cache_key（Python版 agent.py:669 `self._session_cache_key
-		// = uuid4().hex[:16]` の移植）。セッション単位で固定のキーをリクエストに
-		// 添えることで、同一会話内でのプロンプトキャッシュヒット率を上げる。
+		// セッション単位で固定のランダムキー（Python版 agent.py:669
+		// `self._session_cache_key = uuid4().hex[:16]` の移植）。永続ダイジェストの
+		// シャドーモード保存でセッション識別子として使う。
 		sessionCacheKey: randomHex(16),
 		// Gemini向けContext Cache（Python版 agent.py::GeminiContextCacheManager の
 		// 移植）。gemini以外のプロバイダでは未使用のままだが、構造体生成コスト自体は
@@ -112,9 +112,8 @@ func (c *Client) ProviderName() string { return c.provider.Name }
 func (c *Client) Model() string        { return c.model }
 
 // SessionCacheKey はセッション単位で固定のランダムキーを返す
-// （Python版 self._session_cache_key 相当。Mistralのprompt_cache_keyに使うほか、
-// 永続ダイジェストのシャドーモード保存[_persist_digest_shadow]でも
-// セッション識別子として流用する）。
+// （Python版 self._session_cache_key 相当。永続ダイジェストのシャドーモード保存
+// [_persist_digest_shadow]でセッション識別子として使う）。
 func (c *Client) SessionCacheKey() string { return c.sessionCacheKey }
 
 // KeyStatus は現在のプロバイダのAPIキー状態一覧を返す（/status コマンド等での

@@ -1,1 +1,26 @@
 .env
+
+# Go binaries and build outputs
+/mimic
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+
+# Test binaries and cover profiles
+*.test
+*.out
+cover.out
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS metadata
+.DS_Store
+Thumbs.db

@@ -1,6 +1,6 @@
 // Package selector は起動時のマルチプロバイダ・モデルセレクター
 // （Python版 config.py::select_model_interactively_multi の移植）を実装する。
-// OpenRouter/Gemini/Mistralの利用可能モデルを並列取得し、各モデルへ最小リクエスト
+// OpenRouter/Geminiの利用可能モデルを並列取得し、各モデルへ最小リクエスト
 // を送って疎通確認（レイテンシ計測）、結果をテーブル表示して番号で選ばせる。
 // Enterキーで疎通確認を打ち切り、その時点までの結果で選択に進める。
 package selector
@@ -137,24 +137,6 @@ func fetchGeminiModels(apiKey string) []modelInfo {
 	return out
 }
 
-func fetchMistralModels(apiKey string) []modelInfo {
-	var result struct {
-		Data []struct {
-			ID               string `json:"id"`
-			MaxContextLength int    `json:"max_context_length"`
-		} `json:"data"`
-	}
-	if !fetchJSON(config.MistralAPIBase()+"/models", apiKey, &result) {
-		return nil
-	}
-	var out []modelInfo
-	for _, m := range result.Data {
-		out = append(out, modelInfo{ID: m.ID, ContextLength: m.MaxContextLength})
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out
-}
-
 func fetchJSON(url, apiKey string, out any) bool {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -205,7 +187,7 @@ func testModel(apiKey, modelID, baseURL string) (bool, float64) {
 }
 
 type entry struct {
-	provider string // "or" / "gemini" / "mistral"
+	provider string // "or" / "gemini"
 	model    modelInfo
 }
 
@@ -214,13 +196,12 @@ type testResult struct {
 	elapsed float64
 }
 
-// SelectInteractively はOpenRouter/Gemini/Mistralのモデルを並列取得・疎通テストし、
+// SelectInteractively はOpenRouter/Geminiのモデルを並列取得・疎通テストし、
 // 番号選択で使用モデルとプロバイダーを確定する。選択されたProviderConfig
 // （Model更新済み）を返す。取得失敗・キャンセル時は元の cfg.Active を返す。
 func SelectInteractively(cfg *config.Config) *config.ProviderConfig {
 	orCfg := cfg.Providers["openrouter"]
 	geminiCfg := cfg.Providers["gemini"]
-	mistralCfg := cfg.Providers["mistral"]
 	fallback := cfg.Active
 
 	const boxWidth = 76
@@ -237,7 +218,7 @@ func SelectInteractively(cfg *config.Config) *config.ProviderConfig {
 
 	// ── フェーズ1: モデル一覧を並列取得 ──
 	fmt.Printf("  %s  モデル一覧を取得中...", gr("⟳"))
-	var orModels, geminiModels, mistralModels []modelInfo
+	var orModels, geminiModels []modelInfo
 	var wg sync.WaitGroup
 	if orCfg != nil {
 		wg.Add(1)
@@ -246,10 +227,6 @@ func SelectInteractively(cfg *config.Config) *config.ProviderConfig {
 	if geminiCfg != nil {
 		wg.Add(1)
 		go func() { defer wg.Done(); geminiModels = fetchGeminiModels(geminiCfg.APIKeys[0]) }()
-	}
-	if mistralCfg != nil {
-		wg.Add(1)
-		go func() { defer wg.Done(); mistralModels = fetchMistralModels(mistralCfg.APIKeys[0]) }()
 	}
 	wg.Wait()
 
@@ -260,9 +237,6 @@ func SelectInteractively(cfg *config.Config) *config.ProviderConfig {
 	if geminiCfg != nil {
 		parts = append(parts, fmt.Sprintf("%s: %s 件のモデル", g("Gemini"), w(strconv.Itoa(len(geminiModels)))))
 	}
-	if mistralCfg != nil {
-		parts = append(parts, fmt.Sprintf("%s: %s 件のモデル", cy("Mistral"), w(strconv.Itoa(len(mistralModels)))))
-	}
 	fmt.Printf("\r  %s  %s%s\n\n", g("✓"), strings.Join(parts, "  /  "), strings.Repeat(" ", 20))
 
 	var allEntries []entry
@@ -271,9 +245,6 @@ func SelectInteractively(cfg *config.Config) *config.ProviderConfig {
 	}
 	for _, m := range geminiModels {
 		allEntries = append(allEntries, entry{"gemini", m})
-	}
-	for _, m := range mistralModels {
-		allEntries = append(allEntries, entry{"mistral", m})
 	}
 	total := len(allEntries)
 	if total == 0 {
@@ -430,8 +401,6 @@ loop:
 				ok, elapsed = testModel(orCfg.APIKeys[0], e.model.ID, config.OpenRouterAPIBase())
 			case "gemini":
 				ok, elapsed = testModel(geminiCfg.APIKeys[0], e.model.ID, config.GeminiAPIBase())
-			case "mistral":
-				ok, elapsed = testModel(mistralCfg.APIKeys[0], e.model.ID, config.MistralAPIBase())
 			}
 			select {
 			case <-stopTesting:
@@ -542,8 +511,6 @@ loop:
 		switch provider {
 		case "or":
 			return colRG + center("OR", cProv) + colRST
-		case "mistral":
-			return colCYN + center("MI", cProv) + colRST
 		default:
 			return "\033[38;2;0;255;65m" + center("GM", cProv) + colRST
 		}
@@ -555,15 +522,12 @@ loop:
 	}
 	V := gd("║")
 
-	orCur, geminiCur, mistralCur := "", "", ""
+	orCur, geminiCur := "", ""
 	if orCfg != nil {
 		orCur = orCfg.Model
 	}
 	if geminiCfg != nil {
 		geminiCur = geminiCfg.Model
-	}
-	if mistralCfg != nil {
-		mistralCur = mistralCfg.Model
 	}
 
 	fmt.Printf("  %s 件が稼働中  %s  %s\n\n", bw(strconv.Itoa(len(working))), gr("/"), gr(fmt.Sprintf("%d 件取得", total)))
@@ -574,7 +538,7 @@ loop:
 
 	for i, wk := range working {
 		mid := wk.model.ID
-		isCur := (wk.provider == "or" && mid == orCur) || (wk.provider == "gemini" && mid == geminiCur) || (wk.provider == "mistral" && mid == mistralCur)
+		isCur := (wk.provider == "or" && mid == orCur) || (wk.provider == "gemini" && mid == geminiCur)
 		isTop := i == 0
 
 		noP := center(strconv.Itoa(i+1), cN)
@@ -603,7 +567,7 @@ loop:
 	fmt.Println(hline("╚", "╝", "╩"))
 
 	activeProviders := 0
-	for _, c := range []*config.ProviderConfig{orCfg, geminiCfg, mistralCfg} {
+	for _, c := range []*config.ProviderConfig{orCfg, geminiCfg} {
 		if c != nil {
 			activeProviders++
 		}
@@ -616,9 +580,6 @@ loop:
 		if geminiCfg != nil {
 			legend = append(legend, "\033[38;2;0;255;65m"+"GM"+colRST+" = Google AI Studio")
 		}
-		if mistralCfg != nil {
-			legend = append(legend, cy("MI")+" = Mistral AI")
-		}
 		fmt.Printf("\n  凡例: %s\n\n", strings.Join(legend, "  "))
 	}
 
@@ -628,9 +589,6 @@ loop:
 	}
 	if geminiCfg != nil {
 		cancelParts = append(cancelParts, "GM "+y(geminiCfg.Model))
-	}
-	if mistralCfg != nil {
-		cancelParts = append(cancelParts, cy("MI")+" "+y(mistralCfg.Model))
 	}
 	fmt.Printf("  %s  %s  %s  %s  %s\n\n", gd("[ 0 ]"), gr("キャンセル"), gr("·"), gr("現在:"), strings.Join(cancelParts, "  /  "))
 
@@ -663,11 +621,6 @@ loop:
 				geminiCfg.ContextLength = sel.model.ContextLength
 				fmt.Printf("\n  %s  %s  GM %s\n\n", bg("✓"), w("選択:"), sel.model.ID)
 				return geminiCfg
-			case "mistral":
-				mistralCfg.Model = sel.model.ID
-				mistralCfg.ContextLength = sel.model.ContextLength
-				fmt.Printf("\n  %s  %s  %s %s\n\n", cy("✓"), w("選択:"), cy("[MI]"), cy(sel.model.ID))
-				return mistralCfg
 			}
 		}
 		fmt.Printf("  %s  1〜%d の番号を入力してください。\n", y("⚠"), len(working))

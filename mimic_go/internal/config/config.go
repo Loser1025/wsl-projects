@@ -1,8 +1,8 @@
 // Package config は .env の読み込みを担当する
-// （Python版 config.py::load_config の移植。マルチプロバイダ(OpenRouter/Gemini/
-// Mistral)対応済み。モデル一覧取得・対話的セレクターUI(config.py内の
+// （Python版 config.py::load_config の移植。マルチプロバイダ(OpenRouter/Gemini)
+// 対応済み。モデル一覧取得・対話的セレクターUI(config.py内の
 // MULTI-PROVIDER MODEL SELECTOR)は未移植 — アクティブプロバイダは
-// OpenRouter→Gemini→Mistralの優先順位で自動選択する簡略方式とする）。
+// OpenRouter→Geminiの優先順位で自動選択する簡略方式とする）。
 package config
 
 import (
@@ -15,9 +15,9 @@ import (
 )
 
 // ProviderConfig は1プロバイダ分の設定（Python版 OpenRouterConfig/
-// GoogleAIConfig/MistralConfig を統一表現にしたもの）。
+// GoogleAIConfig を統一表現にしたもの）。
 type ProviderConfig struct {
-	Name          string // "openrouter" / "gemini" / "mistral"
+	Name          string // "openrouter" / "gemini"
 	APIBase       string
 	APIKeys       []string
 	Model         string
@@ -40,14 +40,12 @@ func (p *ProviderConfig) BuildAuthHeaders(apiKey string) map[string]string {
 const (
 	openRouterAPIBase = "https://openrouter.ai/api/v1"
 	geminiAPIBase     = "https://generativelanguage.googleapis.com/v1beta/openai"
-	mistralAPIBase    = "https://api.mistral.ai/v1"
 )
 
-// OpenRouterAPIBase/GeminiAPIBase/MistralAPIBase はinternal/selector等の
+// OpenRouterAPIBase/GeminiAPIBase はinternal/selector等の
 // 外部パッケージからAPIエンドポイントを参照するための公開アクセサ。
 func OpenRouterAPIBase() string { return openRouterAPIBase }
 func GeminiAPIBase() string     { return geminiAPIBase }
-func MistralAPIBase() string    { return mistralAPIBase }
 
 type Config struct {
 	Providers    map[string]*ProviderConfig // 利用可能な全プロバイダ（未設定なら空）
@@ -153,29 +151,12 @@ func Load(envPath string) (*Config, error) {
 		}
 	}
 
-	if keys := collectKeys(raw, "MISTRAL_KEY"); len(keys) > 0 {
-		model := raw["MISTRAL_MODEL"]
-		if model == "" {
-			model = "mistral-small-latest"
-		}
-		rpm := 50
-		if v := raw["RPM_LIMIT_MISTRAL"]; v != "" {
-			if n, err := strconv.Atoi(v); err == nil {
-				rpm = n
-			}
-		}
-		providers["mistral"] = &ProviderConfig{
-			Name: "mistral", APIBase: mistralAPIBase, APIKeys: keys,
-			Model: model, RPMLimit: rpm, MaxTokens: maxTokens,
-		}
-	}
-
 	if len(providers) == 0 {
-		return nil, fmt.Errorf(".env に有効な OPENROUTER_KEY / GEMINI_KEY / MISTRAL_KEY が見つかりません: %s", envPath)
+		return nil, fmt.Errorf(".env に有効な OPENROUTER_KEY / GEMINI_KEY が見つかりません: %s", envPath)
 	}
 
 	var active *ProviderConfig
-	for _, name := range []string{"openrouter", "gemini", "mistral"} {
+	for _, name := range []string{"openrouter", "gemini"} {
 		if p, ok := providers[name]; ok {
 			active = p
 			break

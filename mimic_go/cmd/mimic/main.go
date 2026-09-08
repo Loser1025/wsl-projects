@@ -80,7 +80,7 @@ func main() {
 	if *autoPromptFlag != "" {
 		// Worker自身として起動された場合、Directorが選択中のプロバイダー・モデルが
 		// MIMIC_PROVIDER/MIMIC_MODELで渡されていればそちらを優先する（.envの
-		// 優先順位デフォルト(openrouter→gemini→mistral)に固定されないように。
+		// 優先順位デフォルト(openrouter→gemini)に固定されないように。
 		// Python版 __main__.py の同名ロジックの移植）。
 		active := cfg.Active
 		if wantedProvider := os.Getenv("MIMIC_PROVIDER"); wantedProvider != "" {

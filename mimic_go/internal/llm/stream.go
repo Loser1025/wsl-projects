@@ -25,14 +25,13 @@ const (
 )
 
 type streamRequest struct {
-	Model          string     `json:"model"`
-	Messages       []Message  `json:"messages"`
-	Stream         bool       `json:"stream"`
-	Tools          []ToolSpec `json:"tools,omitempty"`
-	ToolChoice     string     `json:"tool_choice,omitempty"`
-	MaxTokens      int        `json:"max_tokens,omitempty"`
-	PromptCacheKey string     `json:"prompt_cache_key,omitempty"`
-	CachedContent  string     `json:"cachedContent,omitempty"`
+	Model         string     `json:"model"`
+	Messages      []Message  `json:"messages"`
+	Stream        bool       `json:"stream"`
+	Tools         []ToolSpec `json:"tools,omitempty"`
+	ToolChoice    string     `json:"tool_choice,omitempty"`
+	MaxTokens     int        `json:"max_tokens,omitempty"`
+	CachedContent string     `json:"cachedContent,omitempty"`
 }
 
 type streamChunk struct {
@@ -186,11 +185,6 @@ func (c *Client) attemptStreamChat(ctx context.Context, apiKey, systemPrompt str
 	}
 	if c.provider.MaxTokens > 0 {
 		req.MaxTokens = c.provider.MaxTokens
-	}
-	// Mistral向けprompt_cache_key（Python版 agent.py:435-436 の移植。
-	// Mistral以外のプロバイダには送らない）。
-	if c.provider.Name == "mistral" {
-		req.PromptCacheKey = c.sessionCacheKey
 	}
 
 	body, err := json.Marshal(req)
