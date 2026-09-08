@@ -241,10 +241,27 @@ def step0_import_from_block_list(gc, ws_target):
         return 0
 
     print(f"  追加対象の新規ID数: {len(new_ids_to_add)}件")
+    print(f"  追加対象IDのサンプル: {new_ids_to_add[:5]}")
     
-    # 未解約データの末尾に新規行（A列に患者ID、B〜M列は空）として追加
-    ws_target.append_rows(new_ids_to_add, value_input_option="USER_ENTERED")
-    print(f"  → 「未解約データ」シートの末尾に {len(new_ids_to_add)} 件の新規行を追加しました。")
+    # 未解約データの末尾に新規行として追加
+    try:
+        print(f"  → ws_target 行追加処理開始 (row_count: {ws_target.row_count})")
+        # グリッド制限やappend_rowsの挙動によるズレを防ぐため、安全に行数を追加して範囲指定updateを使うか、
+        # あるいはws_target.append_rowsがA列から正しく挿入されるようにする
+        # ここでは各行を [pid] 形式で追加しつつ、必要に応じてws_target.add_rowsも行う
+        current_len = len(ws_target.get_all_values())
+        needed = current_len + len(new_ids_to_add) + 5
+        if ws_target.row_count < needed:
+            ws_target.add_rows(needed - ws_target.row_count)
+            
+        # 安全にappend_rowsを実行
+        ws_target.append_rows(new_ids_to_add, value_input_option="USER_ENTERED")
+        print(f"  → 「未解約データ」シートの末尾に {len(new_ids_to_add)} 件の新規行を追加しました。")
+    except Exception as e:
+        print(f"  ❌ append_rows エラー発生: {e}")
+        import traceback
+        traceback.print_exc()
+        raise e
     return len(new_ids_to_add)
 
 def step1_fill_empty_rows(ws, bq_client):
