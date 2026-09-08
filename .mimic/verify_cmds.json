@@ -1,7 +1,7 @@
 {
   "/home/loser/wsl-projects": {
     "cmd": "python3 Medicaldepartment/syncColab.py",
-    "passes": 3,
-    "last_used": "2026-09-08T17:52:00+09:00"
+    "passes": 4,
+    "last_used": "2026-09-08T17:55:07+09:00"
   }
 }

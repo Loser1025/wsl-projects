@@ -243,20 +243,34 @@ def step0_import_from_block_list(gc, ws_target):
     print(f"  追加対象の新規ID数: {len(new_ids_to_add)}件")
     print(f"  追加対象IDのサンプル: {new_ids_to_add[:5]}")
     
-    # 未解約データの末尾に新規行として追加
+    # 未解約データの末尾（A列に値が入っている最終行の次の行）を正確に検出して追加
     try:
-        print(f"  → ws_target 行追加処理開始 (row_count: {ws_target.row_count})")
-        # グリッド制限やappend_rowsの挙動によるズレを防ぐため、安全に行数を追加して範囲指定updateを使うか、
-        # あるいはws_target.append_rowsがA列から正しく挿入されるようにする
-        # ここでは各行を [pid] 形式で追加しつつ、必要に応じてws_target.add_rowsも行う
-        current_len = len(ws_target.get_all_values())
-        needed = current_len + len(new_ids_to_add) + 5
-        if ws_target.row_count < needed:
-            ws_target.add_rows(needed - ws_target.row_count)
+        print(f"  → 既存の「未解約データ」の正確な末尾行を検出中...")
+        col_a = ws_target.col_values(1)
+        # A列で値が入っている最大のインデックス（1始まり）を求める
+        last_data_row = 0
+        for i, val in enumerate(col_a):
+            if val and val.strip():
+                last_data_row = i + 1
+        
+        target_row = max(last_data_row + 1, 2)
+        print(f"  → 検出された最終データ行: {last_data_row}行目。新規追加開始行: {target_row}行目")
+        
+        # グリッドの最大行数・列数チェックと必要に応じた行追加
+        needed_row = target_row + len(new_ids_to_add) + 10
+        if ws_target.row_count < needed_row:
+            add_count = needed_row - ws_target.row_count
+            print(f"  → グリッド行数を {ws_target.row_count} から {needed_row} に拡張します (+{add_count}行)")
+            ws_target.add_rows(add_count)
             
-        # 安全にappend_rowsを実行
-        ws_target.append_rows(new_ids_to_add, value_input_option="USER_ENTERED")
-        print(f"  → 「未解約データ」シートの末尾に {len(new_ids_to_add)} 件の新規行を追加しました。")
+        # 明示的な範囲指定 (例: A{target_row}) で一括アップデートまたは各行更新
+        # これにより、append_rowsが途中の空行（スプレッドシート上のフォーマット済み行やゴミデータ）に誤挿入するのを完全に防ぐ
+        range_name = f"A{target_row}:A{target_row + len(new_ids_to_add) - 1}"
+        print(f"  → 範囲 {range_name} に {len(new_ids_to_add)} 件の患者IDを一括書き込みます")
+        
+        # updateメソッドは値リストのリストを想定: [[id1], [id2], ...]
+        ws_target.update(range_name=range_name, values=new_ids_to_add)
+        print(f"  → 「未解約データ」シートの正確な末尾（{target_row}行目以降）に {len(new_ids_to_add)} 件の新規行を追加しました。")
     except Exception as e:
         print(f"  ❌ append_rows エラー発生: {e}")
         import traceback
