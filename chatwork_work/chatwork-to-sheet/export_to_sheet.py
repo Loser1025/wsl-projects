@@ -1,132 +1,292 @@
 """
-KDDI Chatwork (rid445630230) からメッセージを取得し、
+KDDI Chatwork (rid445630230) からメッセージ・リアクションを取得し、
 既存の指定スプレッドシートに書き出すスクリプト
+
+本文・送信者・日時・メンバー名は公式API (api.chatwork.com) から取得。
+リアクションは公式APIに存在しないため、Playwrightでログインし
+Chatwork内部API (gateway/load_chat.php, load_old_chat.php) の
+レスポンスを傍受して取得する（非公開API。Chatwork側のUI変更で
+動かなくなる可能性がある点に注意）。
+
+列構成: A=message_id(重複チェック用), B=日付, C=送信者, D=内容, E=リアクション
 """
 
 import os
 import json
+import requests
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 try:
-    from config_auth import CW_EMAIL, CW_PASSWORD
+    from config_auth import CW_API_TOKEN, CW_EMAIL, CW_PASSWORD
 except ImportError:
+    CW_API_TOKEN = os.environ.get("CW_API_TOKEN", "")
     CW_EMAIL = os.environ.get("CW_EMAIL", "")
     CW_PASSWORD = os.environ.get("CW_PASSWORD", "")
 
+CW_ROOM_ID = 445630230
+ROOM_URL = f"https://kcw.kddi.ne.jp/#!rid{CW_ROOM_ID}"
+COOKIE_FILE = Path(__file__).parent / "chatwork_cookies.json"
+
+SPREADSHEET_ID = "11RAnfeZZPS8dF6llHV7T2FOd2shSdPgiBdmzeMU4sQo"
+SHEET_NAME = "シート1"
+SA_PATH = os.path.join(os.path.dirname(__file__), "../../google-workspace-mcp/credentials.json")
 JST = timezone(timedelta(hours=9))
-ROOM_ID = "445630230"
-URL = f"https://kcw.kddi.ne.jp/#!rid{ROOM_ID}"
-COOKIE_FILE = Path("chatwork_cookies.json")
 
-SPREADSHEET_ID = "13cK3BhIxFot0cZilbDHa4dzZoH_tocmNYWEk-pTnkJo"
-SHEET_NAME = "CW書き出し"
+# Chatworkのプリセットリアクションのみ日本語キャプションが存在する。
+# それ以外の絵文字リアクションは種別コードをそのまま表示する。
+REACTION_CAPTIONS = {
+    "roger": "了解",
+    "bow": "ありがとう",
+    "cracker": "おめでとう",
+    "dance": "わーい",
+    "clap": "すごい",
+    "yes": "いいね",
+}
 
-SA_PATH = Path("../../google-workspace-mcp/credentials.json")
 
 def get_sheets_service():
-    creds = service_account.Credentials.from_service_account_file(
-        str(SA_PATH),
-        scopes=["https://www.googleapis.com/auth/spreadsheets"]
-    )
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if sa_json:
+        creds = service_account.Credentials.from_service_account_info(
+            json.loads(sa_json), scopes=scopes
+        )
+    else:
+        creds = service_account.Credentials.from_service_account_file(SA_PATH, scopes=scopes)
     return build("sheets", "v4", credentials=creds)
 
-def get_messages():
-    today_str = datetime.now(JST).strftime("%Y-%m-%d")
-    print(f"=== 本日 ({today_str}) のチャット取得を開始します ===")
+
+def fetch_cw_messages(force=1):
+    """Chatwork公式APIからメッセージ取得（最新100件）"""
+    url = f"https://api.chatwork.com/v2/rooms/{CW_ROOM_ID}/messages"
+    headers = {"X-ChatWorkToken": CW_API_TOKEN}
+    resp = requests.get(url, headers=headers, params={"force": force})
+    resp.raise_for_status()
+    return resp.json()
+
+
+def fetch_room_members():
+    """Chatwork公式APIでルームメンバーのaccount_id→名前を取得（リアクション表示用）"""
+    url = f"https://api.chatwork.com/v2/rooms/{CW_ROOM_ID}/members"
+    headers = {"X-ChatWorkToken": CW_API_TOKEN}
+    resp = requests.get(url, headers=headers)
+    resp.raise_for_status()
+    return {str(m["account_id"]): m["name"] for m in resp.json()}
+
+
+def format_reactions(reactions, member_names):
+    if not reactions:
+        return ""
+    parts = []
+    for r in reactions:
+        label = REACTION_CAPTIONS.get(r["reaction_type"], r["reaction_type"])
+        names = [member_names.get(str(a["id"]), str(a["id"])) for a in r.get("accounts", [])]
+        parts.append(f"{label}({len(names)}):{'/'.join(names)}")
+    return "、".join(parts)
+
+
+def _merge_reactions(reaction_map, chat_list):
+    for item in chat_list:
+        if item.get("reactions"):
+            reaction_map[str(item["id"])] = item["reactions"]
+
+
+def _find_scroll_target(page):
+    return page.evaluate("""
+        () => {
+            const el = document.querySelector('._message');
+            let node = el;
+            while (node && node !== document.body) {
+                const style = getComputedStyle(node);
+                if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+                    const r = node.getBoundingClientRect();
+                    return { x: r.x + r.width / 2, y: r.y + 50 };
+                }
+                node = node.parentElement;
+            }
+            return null;
+        }
+    """)
+
+
+def _login(page):
+    page.wait_for_selector("#username", timeout=15000)
+    page.fill("#username", CW_EMAIL)
+    page.click("button[type='submit']")
+    page.wait_for_selector("input[type='password']", state="attached", timeout=30000)
+    page.wait_for_timeout(2000)
+    page.evaluate(
+        "document.querySelectorAll('input[type=\"password\"]').forEach(el => { el.classList.remove('hide'); el.style.display = ''; el.style.visibility = 'visible'; })"
+    )
+    page.fill("input[type='password']", CW_PASSWORD)
+    page.click("button[type='submit']")
+    page.wait_for_timeout(8000)
+
+
+def fetch_reactions(min_message_id, headless=True, max_scrolls=8):
+    """Playwrightでログインし、内部API(load_chat.php/load_old_chat.php)の
+    レスポンスからmessage_id単位のリアクションを収集する"""
+    reaction_map = {}
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=headless)
         context = browser.new_context()
 
         if COOKIE_FILE.exists():
             try:
-                cookies = json.loads(COOKIE_FILE.read_text(encoding="utf-8"))
-                context.add_cookies(cookies)
+                context.add_cookies(json.loads(COOKIE_FILE.read_text(encoding="utf-8")))
             except Exception:
                 pass
 
         page = context.new_page()
-        page.goto(URL, wait_until="commit", timeout=30000)
-        page.wait_for_timeout(5000)
+
+        resp = None
+        try:
+            with page.expect_response(lambda r: "load_chat.php" in r.url, timeout=20000) as resp_info:
+                page.goto(ROOM_URL, wait_until="commit", timeout=30000)
+            resp = resp_info.value
+        except Exception:
+            resp = None
 
         if "auth.chatwork.com" in page.url or page.locator("#username").is_visible():
-            page.wait_for_selector("#username", timeout=15000)
-            page.fill("#username", CW_EMAIL)
-            page.click("button[type='submit']")
-            page.wait_for_selector("input[type='password']", state="attached", timeout=30000)
-            page.wait_for_timeout(2000)
-            page.evaluate("document.querySelectorAll('input[type=\"password\"]').forEach(el => { el.classList.remove('hide'); el.style.display = ''; el.style.visibility = 'visible'; })")
-            page.fill("input[type='password']", CW_PASSWORD)
-            page.click("button[type='submit']")
-            page.wait_for_timeout(8000)
-            
+            _login(page)
             cookies = context.cookies()
             COOKIE_FILE.write_text(json.dumps(cookies, ensure_ascii=False, indent=2), encoding="utf-8")
-            page.goto(URL, wait_until="commit", timeout=30000)
-            page.wait_for_timeout(5000)
+            with page.expect_response(lambda r: "load_chat.php" in r.url, timeout=30000) as resp_info:
+                page.goto(ROOM_URL, wait_until="commit", timeout=30000)
+            resp = resp_info.value
 
-        page.wait_for_timeout(10000)
+        if resp is None:
+            browser.close()
+            return reaction_map
 
-        # 全ての要素からテキストを取得
-        messages = page.evaluate("""
-            () => {
-                const items = document.querySelectorAll('._message, .chatTimeLine__item, [data-testid*="message"], li[id*="message"]');
-                let results = [];
-                items.forEach(el => {
-                    const text = el.innerText || '';
-                    if (text.trim().length > 0 && !text.includes('Enterで送信') && !text.includes('検索')) {
-                        results.push(text.trim());
-                    }
-                });
-                if (results.length === 0) {
-                    // フォールバック: ページ全体の段落やli
-                    const allEls = document.querySelectorAll('p, li, div');
-                    allEls.forEach(el => {
-                        const t = el.innerText || '';
-                        if (t.length > 10 && t.length < 500 && !results.includes(t)) {
-                            results.push(t.trim());
-                        }
-                    });
-                }
-                return results;
-            }
-        """)
+        chat_list = resp.json()["result"]["chat_list"]
+        _merge_reactions(reaction_map, chat_list)
+        earliest_id = min((int(c["id"]) for c in chat_list), default=0)
+
+        page.wait_for_selector("._message", timeout=15000)
+        rect = _find_scroll_target(page)
+
+        scrolls = 0
+        while rect and earliest_id > min_message_id and scrolls < max_scrolls:
+            scrolls += 1
+            try:
+                with page.expect_response(lambda r: "load_old_chat.php" in r.url, timeout=8000) as old_resp_info:
+                    page.mouse.move(rect["x"], rect["y"])
+                    for _ in range(4):
+                        page.mouse.wheel(0, -800)
+                        page.wait_for_timeout(300)
+                chat_list2 = old_resp_info.value.json()["result"]["chat_list"]
+                if not chat_list2:
+                    break
+                _merge_reactions(reaction_map, chat_list2)
+                new_earliest = min(int(c["id"]) for c in chat_list2)
+                if new_earliest >= earliest_id:
+                    break
+                earliest_id = new_earliest
+            except Exception:
+                break
 
         browser.close()
-        return messages
+
+    return reaction_map
+
+
+def ensure_header(service):
+    header = ["message_id", "日付", "送信者", "内容", "リアクション"]
+    result = service.spreadsheets().values().get(
+        spreadsheetId=SPREADSHEET_ID,
+        range=f"{SHEET_NAME}!A1:E1"
+    ).execute()
+    values = result.get("values", [])
+    if not values or values[0] != header:
+        service.spreadsheets().values().update(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"{SHEET_NAME}!A1:E1",
+            valueInputOption="RAW",
+            body={"values": [header]}
+        ).execute()
+
+
+def backfill_reactions(service, reaction_map, member_names, message_id_to_row):
+    data = []
+    for mid, reactions in reaction_map.items():
+        row = message_id_to_row.get(mid)
+        if row:
+            data.append({
+                "range": f"{SHEET_NAME}!E{row}",
+                "values": [[format_reactions(reactions, member_names)]]
+            })
+    if data:
+        service.spreadsheets().values().batchUpdate(
+            spreadsheetId=SPREADSHEET_ID,
+            body={"valueInputOption": "RAW", "data": data}
+        ).execute()
+
 
 def main():
-    print("チャットメッセージを取得中...")
-    raw_messages = get_messages()
-    print(f"取得したメッセージ数: {len(raw_messages)}")
-
-    if not raw_messages:
-        print("書き出すメッセージがありませんでした。")
-        return
-
+    print("Google Sheetsに接続中...")
     service = get_sheets_service()
-    
-    values = [["No.", "メッセージ内容"]]
-    for i, msg in enumerate(raw_messages[:100], start=1): # 上位100件
-        values.append([str(i), msg])
+    ensure_header(service)
 
-    body = {
-        'values': values
-    }
-    
-    service.spreadsheets().values().update(
+    print("既存のmessage_idを取得中...")
+    result = service.spreadsheets().values().get(
         spreadsheetId=SPREADSHEET_ID,
-        range=f"{SHEET_NAME}!A1",
-        valueInputOption="USER_ENTERED",
-        body=body
+        range=f"{SHEET_NAME}!A:A"
     ).execute()
+    values = result.get("values", [])
+    message_id_to_row = {row[0]: i + 2 for i, row in enumerate(values[1:]) if row}
+    existing_ids = set(message_id_to_row.keys())
+    print(f"  既存: {len(existing_ids)}件")
 
-    print(f"スプレッドシート（ID: {SPREADSHEET_ID}）の「{SHEET_NAME}」シートへの書き出しが完了しました！")
+    print("チャットワークからメッセージ取得中...")
+    messages = fetch_cw_messages(force=1)
+    print(f"  取得: {len(messages)}件")
+
+    print("メンバー一覧を取得中...")
+    member_names = fetch_room_members()
+
+    print("リアクションを取得中（ブラウザでログインします）...")
+    min_id = min((int(m["message_id"]) for m in messages), default=0)
+    try:
+        reaction_map = fetch_reactions(min_id)
+        print(f"  リアクション付きメッセージ: {len(reaction_map)}件")
+    except Exception as e:
+        print(f"  [WARN] リアクション取得に失敗しました: {e}")
+        reaction_map = {}
+
+    new_rows = []
+    for msg in sorted(messages, key=lambda m: int(m["send_time"])):
+        mid = msg["message_id"]
+        if mid in existing_ids:
+            continue
+        dt = datetime.fromtimestamp(msg["send_time"], tz=JST).strftime("%Y/%m/%d %H:%M:%S")
+        sender = msg["account"]["name"]
+        body = msg["body"]
+        reaction_str = format_reactions(reaction_map.get(mid), member_names)
+        new_rows.append([mid, dt, sender, body, reaction_str])
+
+    if new_rows:
+        print(f"新規: {len(new_rows)}件を書き出し中...")
+        service.spreadsheets().values().append(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"{SHEET_NAME}!A:E",
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+            body={"values": new_rows}
+        ).execute()
+        print(f"完了: {len(new_rows)}件を追記しました。")
+    else:
+        print("新規メッセージなし。")
+
+    print("既存行のリアクションを更新中...")
+    backfill_reactions(service, reaction_map, member_names, message_id_to_row)
+    print("完了しました。")
+
 
 if __name__ == "__main__":
     main()

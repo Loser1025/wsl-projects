@@ -1,0 +1,4 @@
+requests==2.34.2
+playwright==1.60.0
+google-auth==2.53.0
+google-api-python-client==2.197.0
