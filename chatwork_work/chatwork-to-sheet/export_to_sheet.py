@@ -127,14 +127,17 @@ def _login(page):
     page.wait_for_timeout(8000)
 
 
-def fetch_reactions(min_message_id, headless=True, max_scrolls=8):
+def fetch_reactions(min_message_id, headless=True, max_scrolls=20):
     """Playwrightでログインし、内部API(load_chat.php/load_old_chat.php)の
-    レスポンスからmessage_id単位のリアクションを収集する"""
+    レスポンスからmessage_id単位のリアクションを収集する。
+    min_message_id以前のメッセージに到達するまで画面を遡ってスクロールする"""
     reaction_map = {}
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
-        context = browser.new_context()
+        # CI(Dockerコンテナ)のデフォルトviewportは1280x720で、狭いと
+        # Chatwork側のレイアウトが変わりスクロール対象の検出に失敗することがあるため固定する
+        context = browser.new_context(viewport={"width": 1920, "height": 1080})
 
         if COOKIE_FILE.exists():
             try:
@@ -170,16 +173,17 @@ def fetch_reactions(min_message_id, headless=True, max_scrolls=8):
 
         page.wait_for_selector("._message", timeout=15000)
         rect = _find_scroll_target(page)
+        print(f"  [debug] scroll target: {rect}, 初回earliest_id={earliest_id}, 目標min_id={min_message_id}")
 
         scrolls = 0
         while rect and earliest_id > min_message_id and scrolls < max_scrolls:
             scrolls += 1
             try:
-                with page.expect_response(lambda r: "load_old_chat.php" in r.url, timeout=8000) as old_resp_info:
+                with page.expect_response(lambda r: "load_old_chat.php" in r.url, timeout=15000) as old_resp_info:
                     page.mouse.move(rect["x"], rect["y"])
-                    for _ in range(4):
+                    for _ in range(5):
                         page.mouse.wheel(0, -800)
-                        page.wait_for_timeout(300)
+                        page.wait_for_timeout(400)
                 chat_list2 = old_resp_info.value.json()["result"]["chat_list"]
                 if not chat_list2:
                     break
@@ -188,9 +192,11 @@ def fetch_reactions(min_message_id, headless=True, max_scrolls=8):
                 if new_earliest >= earliest_id:
                     break
                 earliest_id = new_earliest
-            except Exception:
+            except Exception as e:
+                print(f"  [debug] scroll {scrolls}回目で停止: {e}")
                 break
 
+        print(f"  [debug] スクロール{scrolls}回、最終earliest_id={earliest_id}")
         browser.close()
 
     return reaction_map
@@ -251,7 +257,11 @@ def main():
     member_names = fetch_room_members()
 
     print("リアクションを取得中（ブラウザでログインします）...")
-    min_id = min((int(m["message_id"]) for m in messages), default=0)
+    # 今回取得したAPI分だけでなく、シートに既にある一番古いメッセージまで
+    # 遡ってスクロールすることで、過去メッセージのリアクションも更新対象にする
+    api_min_id = min((int(m["message_id"]) for m in messages), default=0)
+    sheet_min_id = min((int(mid) for mid in existing_ids), default=api_min_id)
+    min_id = min(api_min_id, sheet_min_id)
     try:
         reaction_map = fetch_reactions(min_id)
         print(f"  リアクション付きメッセージ: {len(reaction_map)}件")
