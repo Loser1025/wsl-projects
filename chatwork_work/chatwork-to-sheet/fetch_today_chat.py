@@ -40,11 +40,10 @@ def get_today_messages(email: str = CW_EMAIL, password: str = CW_PASSWORD, headl
         page = context.new_page()
         print(f"URLにアクセス中: {URL}")
         
-        # タイムアウト対策として wait_until="commit" または "networkidle" に設定
         try:
-            page.goto(URL, wait_until="commit", timeout=30000)
-        except Exception as e:
-            print(f"ページ移動時の例外 (続行します): {e}")
+            page.goto(URL, wait_until="commit", timeout=15000)
+        except Exception:
+            pass
 
         page.wait_for_timeout(5000)
 
@@ -77,38 +76,42 @@ def get_today_messages(email: str = CW_EMAIL, password: str = CW_PASSWORD, headl
             print("Cookieを保存しました。")
 
             # 再度ルームへ移動
-            page.goto(URL, wait_until="commit", timeout=30000)
+            try:
+                page.goto(URL, wait_until="commit", timeout=15000)
+            except Exception:
+                pass
             page.wait_for_timeout(5000)
 
         print(f"現在のURL: {page.url}")
         
-        # チャットメッセージ要素の読み込み待ち
-        try:
-            page.wait_for_selector("._message, [data-testid*='message'], li[id*='message']", timeout=15000)
-        except Exception:
-            print("メッセージ要素の待機がタイムアウトしました。画面のスクリーンショットを保存します。")
-            page.screenshot(path="debug_chatwork.png", full_page=True)
-            browser.close()
-            return []
+        # チャットタイムラインが描画されるまで十分待機 (例: 15秒)
+        print("チャットルームの描画を待っています...")
+        page.wait_for_timeout(15000)
 
-        messages = []
-        message_elements = page.locator("._message").all()
-        print(f"取得したメッセージ要素数: {len(message_elements)}")
+        # スクリーンショットを保存して状態を確認できるようにする
+        page.screenshot(path="debug_room.png", full_page=True)
+        print("デバッグ用スクリーンショットを debug_room.png に保存しました。")
 
-        for el in message_elements:
-            try:
-                text_content = el.inner_text()
-                messages.append({
-                    "raw_text": text_content.strip()
-                })
-            except Exception:
-                continue
+        # メッセージ抽出テスト
+        message_data = page.evaluate("""
+            () => {
+                // Chatworkのメッセージ要素を広く探す
+                const elements = document.querySelectorAll('._message, [data-testid*="message"], li[id*="message"], .chatTimeLine__item');
+                if (elements.length > 0) {
+                    return Array.from(elements).map(el => el.innerText);
+                }
+                // 見つからない場合はbodyから主要テキストを返す
+                return [];
+            }
+        """)
+
+        print(f"抽出されたメッセージ数: {len(message_data)}")
+        for text in message_data[-10:]:
+            print("---")
+            print(text)
 
         browser.close()
-        print(f"合計 {len(messages)} 件のメッセージを抽出しました。")
-        return messages
+        return message_data
 
 if __name__ == "__main__":
-    msgs = get_today_messages(headless=False)
-    for m in msgs[-10:]:
-        print(m['raw_text'])
+    get_today_messages(headless=False)
