@@ -127,11 +127,16 @@ def _login(page):
     page.wait_for_timeout(8000)
 
 
-def fetch_reactions(min_message_id, headless=True, max_scrolls=20):
+def fetch_reactions(min_message_id, headless=True, max_scroll_seconds=90):
     """Playwrightでログインし、内部API(load_chat.php/load_old_chat.php)の
     レスポンスからmessage_id単位のリアクションを収集する。
-    min_message_id以前のメッセージに到達するまで画面を遡ってスクロールする"""
+    min_message_id以前のメッセージに到達するまで画面を遡ってスクロールする。
+
+    1回のスクロール操作（数千px）ではコンテナ上端の「過去メッセージ読み込み」
+    トリガー地点に届かないことが多いため、レスポンスを都度待つのではなく
+    バックグラウンドで収集しつつ、時間予算内はスクロールを継続する"""
     reaction_map = {}
+    import time
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
@@ -146,6 +151,20 @@ def fetch_reactions(min_message_id, headless=True, max_scrolls=20):
                 pass
 
         page = context.new_page()
+
+        # load_old_chat.phpのレスポンスはバックグラウンドで常時収集しておき、
+        # スクロールのたびに逐一待ち受けない（1回のスクロールでは上端に届かず
+        # 応答が来ないことが多いため、待ち受け式だと毎回無駄にタイムアウトする）
+        old_chat_batches = []
+
+        def _on_response(response):
+            if "load_old_chat.php" in response.url:
+                try:
+                    old_chat_batches.append(response.json()["result"]["chat_list"])
+                except Exception:
+                    pass
+
+        page.on("response", _on_response)
 
         resp = None
         try:
@@ -194,28 +213,55 @@ def fetch_reactions(min_message_id, headless=True, max_scrolls=20):
         rect = _find_scroll_target(page)
         print(f"  [debug] scroll target: {rect}, 初回earliest_id={earliest_id}, 目標min_id={min_message_id}")
 
-        scrolls = 0
-        while rect and earliest_id > min_message_id and scrolls < max_scrolls:
-            scrolls += 1
-            try:
-                with page.expect_response(lambda r: "load_old_chat.php" in r.url, timeout=15000) as old_resp_info:
-                    page.mouse.move(rect["x"], rect["y"])
-                    for _ in range(5):
-                        page.mouse.wheel(0, -800)
-                        page.wait_for_timeout(400)
-                chat_list2 = old_resp_info.value.json()["result"]["chat_list"]
+        start = time.time()
+        batches_processed = 0
+        scroll_batches = 0
+        stalled_batches = 0
+        page.mouse.move(rect["x"], rect["y"]) if rect else None
+
+        while rect and earliest_id > min_message_id and (time.time() - start) < max_scroll_seconds:
+            scroll_batches += 1
+            for _ in range(5):
+                page.mouse.wheel(0, -800)
+                page.wait_for_timeout(200)
+
+            while batches_processed < len(old_chat_batches):
+                chat_list2 = old_chat_batches[batches_processed]
+                batches_processed += 1
                 if not chat_list2:
-                    break
+                    continue
                 _merge_reactions(reaction_map, chat_list2)
                 new_earliest = min(int(c["id"]) for c in chat_list2)
-                if new_earliest >= earliest_id:
-                    break
-                earliest_id = new_earliest
-            except Exception as e:
-                print(f"  [debug] scroll {scrolls}回目で停止: {e}")
+                if new_earliest < earliest_id:
+                    earliest_id = new_earliest
+                    stalled_batches = 0
+
+            # コンテナの一番上まで到達したら、それ以上遡れるものがない
+            scroll_top = page.evaluate("""
+                () => {
+                    const el = document.querySelector('._message');
+                    let node = el;
+                    while (node && node !== document.body) {
+                        const style = getComputedStyle(node);
+                        if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+                            return node.scrollTop;
+                        }
+                        node = node.parentElement;
+                    }
+                    return null;
+                }
+            """)
+            if scroll_top is not None and scroll_top <= 0:
+                print("  [debug] コンテナの一番上まで到達（これ以上の履歴なし）")
                 break
 
-        print(f"  [debug] スクロール{scrolls}回、最終earliest_id={earliest_id}")
+            stalled_batches += 1
+            if stalled_batches > 30:
+                print("  [debug] 一定回数スクロールしても進捗なし、打ち切り")
+                break
+
+        print(f"  [debug] スクロール{scroll_batches}回(応答{batches_processed}件処理)、"
+              f"最終earliest_id={earliest_id}, 経過{time.time()-start:.1f}秒")
         browser.close()
 
     return reaction_map
