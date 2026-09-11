@@ -16,7 +16,7 @@ except ImportError:
     CW_PASSWORD = os.environ.get("CW_PASSWORD", "")
 
 JST = timezone(timedelta(hours=9))
-ROOM_ID = "424170453"
+ROOM_ID = "445630230"
 URL = f"https://kcw.kddi.ne.jp/#!rid{ROOM_ID}"
 COOKIE_FILE = Path("chatwork_cookies.json")
 
