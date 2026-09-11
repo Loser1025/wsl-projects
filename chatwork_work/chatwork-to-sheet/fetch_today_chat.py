@@ -38,14 +38,9 @@ def get_today_messages(email: str = CW_EMAIL, password: str = CW_PASSWORD, headl
                 print(f"Cookieのロードに失敗しました: {e}")
 
         page = context.new_page()
-        print(f"URLにアクセス中: {URL}")
-        
-        try:
-            page.goto(URL, wait_until="commit", timeout=15000)
-        except Exception:
-            pass
-
-        page.wait_for_timeout(5000)
+        print(f"トップページにアクセス中...")
+        page.goto("https://kcw.kddi.ne.jp/", wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(3000)
 
         # ログイン画面に飛ばされた場合
         if "auth.chatwork.com" in page.url or page.locator("#username").is_visible():
@@ -75,43 +70,45 @@ def get_today_messages(email: str = CW_EMAIL, password: str = CW_PASSWORD, headl
             COOKIE_FILE.write_text(json.dumps(cookies, ensure_ascii=False, indent=2), encoding="utf-8")
             print("Cookieを保存しました。")
 
-            # 再度ルームへ移動
-            try:
-                page.goto(URL, wait_until="commit", timeout=15000)
-            except Exception:
-                pass
-            page.wait_for_timeout(5000)
+        # 目的のルームへ移動
+        print(f"チャットルームへ移動中: {URL}")
+        page.goto(URL, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(8000)
 
         print(f"現在のURL: {page.url}")
         
-        # チャットタイムラインが描画されるまで十分待機 (例: 15秒)
-        print("チャットルームの描画を待っています...")
-        page.wait_for_timeout(15000)
+        # チャットメッセージ要素が描画されるのを待つ (Chatworkのメッセージ表示用セレクタ)
+        print("チャットメッセージの読み込みを待っています...")
+        try:
+            page.wait_for_selector("._message, .chatTimeLine__item, [data-testid*='message']", timeout=15000)
+        except Exception:
+            print("タイムラインの待機がタイムアウトしました。SPAのハッシュルーティングの反映を再試行します...")
+            page.reload()
+            page.wait_for_timeout(8000)
 
-        # スクリーンショットを保存して状態を確認できるようにする
-        page.screenshot(path="debug_room.png", full_page=True)
-        print("デバッグ用スクリーンショットを debug_room.png に保存しました。")
-
-        # メッセージ抽出テスト
-        message_data = page.evaluate("""
+        # メッセージの抽出
+        messages = page.evaluate("""
             () => {
-                // Chatworkのメッセージ要素を広く探す
-                const elements = document.querySelectorAll('._message, [data-testid*="message"], li[id*="message"], .chatTimeLine__item');
-                if (elements.length > 0) {
-                    return Array.from(elements).map(el => el.innerText);
+                // Chatworkの個別メッセージブロックを広く検索
+                const items = document.querySelectorAll('._message, .chatTimeLine__item, [data-testid*="message"], li[id*="message"]');
+                if (items.length > 0) {
+                    return Array.from(items).map(el => {
+                        return {
+                            text: el.innerText || ''
+                        };
+                    });
                 }
-                // 見つからない場合はbodyから主要テキストを返す
                 return [];
             }
         """)
 
-        print(f"抽出されたメッセージ数: {len(message_data)}")
-        for text in message_data[-10:]:
+        print(f"取得したメッセージ数: {len(messages)}")
+        for m in messages[-10:]:
             print("---")
-            print(text)
+            print(m['text'])
 
         browser.close()
-        return message_data
+        return messages
 
 if __name__ == "__main__":
     get_today_messages(headless=False)
