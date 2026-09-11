@@ -307,26 +307,38 @@ def main():
     print("既存のmessage_idを取得中...")
     result = service.spreadsheets().values().get(
         spreadsheetId=SPREADSHEET_ID,
-        range=f"{SHEET_NAME}!A:A"
+        range=f"{SHEET_NAME}!A:B"
     ).execute()
     values = result.get("values", [])
     message_id_to_row = {row[0]: i + 2 for i, row in enumerate(values[1:]) if row}
     existing_ids = set(message_id_to_row.keys())
-    print(f"  既存: {len(existing_ids)}件")
+
+    today = datetime.now(JST).date()
+    today_prefix = today.strftime("%Y/%m/%d")
+    today_existing_ids = {
+        row[0] for row in values[1:]
+        if row and len(row) >= 2 and row[1].startswith(today_prefix)
+    }
+    print(f"  既存: {len(existing_ids)}件（本日分: {len(today_existing_ids)}件）")
 
     print("チャットワークからメッセージ取得中...")
-    messages = fetch_cw_messages(force=1)
-    print(f"  取得: {len(messages)}件")
+    all_messages = fetch_cw_messages(force=1)
+    messages = [
+        m for m in all_messages
+        if datetime.fromtimestamp(int(m["send_time"]), tz=JST).date() == today
+    ]
+    print(f"  取得: {len(all_messages)}件（本日分: {len(messages)}件）")
 
     print("メンバー一覧を取得中...")
     member_names = fetch_room_members()
 
     print("リアクションを取得中（ブラウザでログインします）...")
-    # 今回取得したAPI分だけでなく、シートに既にある一番古いメッセージまで
-    # 遡ってスクロールすることで、過去メッセージのリアクションも更新対象にする
-    api_min_id = min((int(m["message_id"]) for m in messages), default=0)
-    sheet_min_id = min((int(mid) for mid in existing_ids), default=api_min_id)
-    min_id = min(api_min_id, sheet_min_id)
+    # 本日分のメッセージ（API取得分・シート既存分の両方）のうち
+    # 一番古いものまで遡ってスクロールする。日をまたいだ過去分は対象にしない
+    # （日が経つほどスクロール量が際限なく増えるのを防ぐため）
+    candidates = [int(m["message_id"]) for m in messages]
+    candidates += [int(mid) for mid in today_existing_ids]
+    min_id = min(candidates) if candidates else float("inf")
     try:
         reaction_map = fetch_reactions(min_id)
         print(f"  リアクション付きメッセージ: {len(reaction_map)}件")
