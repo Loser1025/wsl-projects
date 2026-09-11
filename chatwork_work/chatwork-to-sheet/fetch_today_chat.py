@@ -11,19 +11,19 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
+# 認証情報の読み込み（config_auth.pyから取得。なければ環境変数）
+try:
+    from config_auth import CW_EMAIL, CW_PASSWORD
+except ImportError:
+    CW_EMAIL = os.environ.get("CW_EMAIL", "")
+    CW_PASSWORD = os.environ.get("CW_PASSWORD", "")
+
 JST = timezone(timedelta(hours=9))
 ROOM_ID = "424170453"
 URL = f"https://kcw.kddi.ne.jp/#!rid{ROOM_ID}"
 COOKIE_FILE = Path("chatwork_cookies.json")
 
-# ── ログイン情報の設定場所 ──────────────────────────────────────────
-# 1. 以下の変数に直接記述するか、
-# 2. 環境変数 (CW_EMAIL, CW_PASSWORD) に設定してください
-CONFIG_EMAIL = os.environ.get("CW_EMAIL", "your_email@example.com")
-CONFIG_PASSWORD = os.environ.get("CW_PASSWORD", "your_password")
-# ──────────────────────────────────────────────────────────────────
-
-def get_today_messages(email: str = CONFIG_EMAIL, password: str = CONFIG_PASSWORD, headless: bool = True):
+def get_today_messages(email: str = CW_EMAIL, password: str = CW_PASSWORD, headless: bool = True):
     today_str = datetime.now(JST).strftime("%Y-%m-%d")
     print(f"=== 本日 ({today_str}) のチャット取得を開始します ===")
 
@@ -49,7 +49,7 @@ def get_today_messages(email: str = CONFIG_EMAIL, password: str = CONFIG_PASSWOR
         if "auth.chatwork.com" in page.url or page.locator("#username").is_visible():
             print("ログインが必要です。認証を実行します...")
             if not email or email == "your_email@example.com" or not password or password == "your_password":
-                raise RuntimeError("正しいメールアドレスとパスワードを設定してください。")
+                raise RuntimeError("config_auth.py または環境変数に正しいメールアドレスとパスワードを設定してください。")
 
             print("Chatworkにログイン中...")
             page.fill("#username", email)
