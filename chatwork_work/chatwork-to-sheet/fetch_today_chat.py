@@ -11,7 +11,6 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-# 認証情報の読み込み（config_auth.pyから取得。なければ環境変数）
 try:
     from config_auth import CW_EMAIL, CW_PASSWORD
 except ImportError:
@@ -52,17 +51,15 @@ def get_today_messages(email: str = CW_EMAIL, password: str = CW_PASSWORD, headl
                 raise RuntimeError("config_auth.py または環境変数に正しいメールアドレスとパスワードを設定してください。")
 
             print("Chatworkにログイン中...")
+            page.wait_for_selector("#username", timeout=15000)
             page.fill("#username", email)
             page.click("button[type='submit']")
             
-            page.wait_for_selector("input[type='password']", timeout=30000)
-            page.evaluate("""
-                document.querySelectorAll('input[type=\'password\']').forEach(el => {
-                    el.classList.remove('hide');
-                    el.style.display = '';
-                    el.style.visibility = 'visible';
-                });
-            """)
+            page.wait_for_selector("input[type='password']", state="attached", timeout=30000)
+            page.wait_for_timeout(2000)
+            page.evaluate(
+                "document.querySelectorAll('input[type=\"password\"]').forEach(el => { el.classList.remove('hide'); el.style.display = ''; el.style.visibility = 'visible'; })"
+            )
             page.fill("input[type='password']", password)
             page.click("button[type='submit']")
             
