@@ -149,19 +149,38 @@ def fetch_reactions(min_message_id, headless=True, max_scrolls=20):
 
         resp = None
         try:
-            with page.expect_response(lambda r: "load_chat.php" in r.url, timeout=20000) as resp_info:
+            with page.expect_response(lambda r: "load_chat.php" in r.url, timeout=45000) as resp_info:
                 page.goto(ROOM_URL, wait_until="commit", timeout=30000)
             resp = resp_info.value
-        except Exception:
+        except Exception as e:
+            print(f"  [debug] 初回load_chat.php待ちタイムアウト: {e}")
             resp = None
 
         if "auth.chatwork.com" in page.url or page.locator("#username").is_visible():
+            print("  [debug] Cookie無効のためログインします")
             _login(page)
             cookies = context.cookies()
             COOKIE_FILE.write_text(json.dumps(cookies, ensure_ascii=False, indent=2), encoding="utf-8")
-            with page.expect_response(lambda r: "load_chat.php" in r.url, timeout=30000) as resp_info:
-                page.goto(ROOM_URL, wait_until="commit", timeout=30000)
-            resp = resp_info.value
+            resp = None
+            try:
+                with page.expect_response(lambda r: "load_chat.php" in r.url, timeout=45000) as resp_info:
+                    page.goto(ROOM_URL, wait_until="commit", timeout=30000)
+                resp = resp_info.value
+            except Exception as e:
+                print(f"  [debug] ログイン後load_chat.php待ちタイムアウト: {e}")
+                resp = None
+
+        # 既にログイン済み(Cookie有効)なのにload_chat.phpが検知できなかった場合、
+        # ページをリロードすると確実に再取得できることが多いため最後にもう一度試す
+        if resp is None:
+            print("  [debug] リロードで再試行します")
+            try:
+                with page.expect_response(lambda r: "load_chat.php" in r.url, timeout=30000) as resp_info:
+                    page.reload(wait_until="commit", timeout=30000)
+                resp = resp_info.value
+            except Exception as e:
+                print(f"  [debug] リロード後も取得できませんでした: {e}")
+                resp = None
 
         if resp is None:
             browser.close()
