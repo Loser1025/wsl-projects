@@ -1,0 +1,53 @@
+name: Chatwork Export to Sheet
+
+# 実行時刻はすべて JST (UTC+9) 基準。cron は UTC 指定のため 9 時間引いてある。
+#   10:00 JST -> 01:00 UTC
+#   15:00 JST -> 06:00 UTC
+#   18:00 JST -> 09:00 UTC
+#   21:00 JST -> 12:00 UTC
+on:
+  schedule:
+    - cron: "0 1 * * *"
+    - cron: "0 6 * * *"
+    - cron: "0 9 * * *"
+    - cron: "0 12 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.60.0-noble
+    defaults:
+      run:
+        working-directory: chatwork_work/chatwork-to-sheet
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python dependencies
+        run: pip install --no-cache-dir -r requirements.txt
+
+      # chatwork_cookies.json は .gitignore 対象のためコミットせず、
+      # Actions のキャッシュで前回実行分を引き継ぐ（毎回のフレッシュログインを避けるため）
+      - name: Restore login cookies
+        uses: actions/cache/restore@v4
+        with:
+          path: chatwork_work/chatwork-to-sheet/chatwork_cookies.json
+          key: chatwork-cookies-${{ github.run_id }}
+          restore-keys: |
+            chatwork-cookies-
+
+      - name: Run export script
+        env:
+          CW_API_TOKEN: ${{ secrets.CW_API_TOKEN }}
+          CW_EMAIL: ${{ secrets.CW_EMAIL }}
+          CW_PASSWORD: ${{ secrets.CW_PASSWORD }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: python3 export_to_sheet.py
+
+      - name: Save login cookies
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: chatwork_work/chatwork-to-sheet/chatwork_cookies.json
+          key: chatwork-cookies-${{ github.run_id }}
