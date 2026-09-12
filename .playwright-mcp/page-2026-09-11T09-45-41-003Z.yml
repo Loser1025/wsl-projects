@@ -1,0 +1,1122 @@
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - heading [level=1] [ref=e7]:
+      - img "Chatwork" [ref=e8]
+    - search "チャット名、メッセージ内容を検索" [ref=e15]
+    - generic [ref=e16]:
+      - navigation [ref=e17]:
+        - listitem [ref=e18]:
+          - button "タスク管理" [ref=e19] [cursor=pointer]:
+            - generic [ref=e20]: "1"
+        - listitem [ref=e21]:
+          - button "ファイル管理" [ref=e22] [cursor=pointer]
+        - listitem [ref=e23]:
+          - button "コンタクト管理" [ref=e24] [cursor=pointer]
+      - button "インフォメーション" [ref=e28] [cursor=pointer]
+      - generic [ref=e29] [cursor=pointer]
+  - generic [ref=e30]:
+    - generic [ref=e31]:
+      - generic [ref=e33]:
+        - button "チャット一覧を表示" [ref=e34] [cursor=pointer]:
+          - generic [ref=e36]: チャット
+        - button "自分宛て一覧を表示" [ref=e37] [cursor=pointer]:
+          - generic [ref=e39]: 自分宛て
+        - button "ブックマーク一覧を表示" [ref=e40] [cursor=pointer]:
+          - generic [ref=e42]: ブックマーク
+      - generic [ref=e43]:
+        - generic [ref=e45]:
+          - button "マイチャットを表示" [ref=e47] [cursor=pointer]
+          - generic [ref=e51] [cursor=pointer]:
+            - generic [ref=e52]: すべてのチャット
+            - generic [ref=e53]: (45)
+          - generic "グループチャットを新規作成,コンタクトを追加,カテゴリーを新規作成" [ref=e57]:
+            - button [ref=e58] [cursor=pointer]
+        - tablist [ref=e62]:
+          - tab "【オリパ】証拠収集⇔受任通知 連携グループ" [ref=e63] [cursor=pointer]:
+            - generic [ref=e68]:
+              - paragraph [ref=e69]: 【オリパ】証拠収集⇔受任通知 連携グループ
+              - list [ref=e70]:
+                - listitem [ref=e71]:
+                  - generic [ref=e72]: "1"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e73]
+          - tab "【オリパ】面談結果報告" [active] [selected] [ref=e76] [cursor=pointer]:
+            - paragraph [ref=e82]: 【オリパ】面談結果報告
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e83]
+          - tab "【オリパ】面談設定グループ" [ref=e86] [cursor=pointer]:
+            - paragraph [ref=e92]: 【オリパ】面談設定グループ
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e93]
+          - tab "【オリパ】（司法書士用）面談設定グループ" [ref=e96] [cursor=pointer]:
+            - paragraph [ref=e102]: 【オリパ】（司法書士用）面談設定グループ
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e103]
+          - tab "オリパ⇔債務連携チャット" [ref=e106] [cursor=pointer]:
+            - paragraph [ref=e112]: オリパ⇔債務連携チャット
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e113]
+          - tab "井上遥宇" [ref=e116] [cursor=pointer]:
+            - paragraph [ref=e122]: 井上遥宇
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e123]
+          - tab "マイチャット" [ref=e126] [cursor=pointer]:
+            - paragraph [ref=e132]: マイチャット
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e133]
+          - tab "【AC2】CL対応報告" [ref=e136] [cursor=pointer]:
+            - generic [ref=e141]:
+              - paragraph [ref=e142]: 【AC2】CL対応報告
+              - list [ref=e143]:
+                - listitem [ref=e144]:
+                  - generic [ref=e145]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e146]
+          - tab "オンライン施策G/ATOM" [ref=e149] [cursor=pointer]:
+            - generic [ref=e154]:
+              - paragraph [ref=e155]: オンライン施策G/ATOM
+              - list [ref=e156]:
+                - listitem [ref=e157]:
+                  - generic [ref=e158]: "446"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e159]
+          - tab "【共同受任】面談設定⇔CL連携チャット" [ref=e162] [cursor=pointer]:
+            - generic [ref=e167]:
+              - paragraph [ref=e168]: 【共同受任】面談設定⇔CL連携チャット
+              - list [ref=e169]:
+                - listitem [ref=e170]:
+                  - generic [ref=e171]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e172]
+          - tab "【フォロー1】CL対応報告" [ref=e175] [cursor=pointer]:
+            - generic [ref=e180]:
+              - paragraph [ref=e181]: 【フォロー1】CL対応報告
+              - list [ref=e182]:
+                - listitem [ref=e183]:
+                  - generic [ref=e184]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e185]
+          - tab "【響西新宿第2】案件チェック＆面談前引継ぎグループ" [ref=e188] [cursor=pointer]:
+            - generic [ref=e193]:
+              - paragraph [ref=e194]: 【響西新宿第2】案件チェック＆面談前引継ぎグループ
+              - list [ref=e195]:
+                - listitem [ref=e196]:
+                  - generic [ref=e197]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e198]
+          - tab "【コンシエンス】提案者" [ref=e201] [cursor=pointer]:
+            - generic [ref=e206]:
+              - paragraph [ref=e207]: 【コンシエンス】提案者
+              - list [ref=e208]:
+                - listitem [ref=e209]:
+                  - generic [ref=e210]: "367"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e211]
+          - tab "【穂】相談部 意思確認依頼ルーム" [ref=e214] [cursor=pointer]:
+            - generic [ref=e219]:
+              - paragraph [ref=e220]: 【穂】相談部 意思確認依頼ルーム
+              - list [ref=e221]:
+                - listitem [ref=e222]:
+                  - generic [ref=e223]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e224]
+          - tab "【穂】案件チェックチャット（裁判所通知受領案件は確認必須）" [ref=e227] [cursor=pointer]:
+            - generic [ref=e232]:
+              - paragraph [ref=e233]: 【穂】案件チェックチャット（裁判所通知受領案件は確認必須）
+              - list [ref=e234]:
+                - listitem [ref=e235]:
+                  - generic [ref=e236]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e237]
+          - tab "【響債務】クラウドサインチーム対応報告" [ref=e240] [cursor=pointer]:
+            - generic [ref=e245]:
+              - paragraph [ref=e246]: 【響債務】クラウドサインチーム対応報告
+              - list [ref=e247]:
+                - listitem [ref=e248]:
+                  - generic [ref=e249]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e250]
+          - tab "【奇数】CL対応報告" [ref=e253] [cursor=pointer]:
+            - generic [ref=e258]:
+              - paragraph [ref=e259]: 【奇数】CL対応報告
+              - list [ref=e260]:
+                - listitem [ref=e261]:
+                  - generic [ref=e262]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e263]
+          - tab "リーダー連携" [ref=e266] [cursor=pointer]:
+            - generic [ref=e271]:
+              - paragraph [ref=e272]: リーダー連携
+              - list [ref=e273]:
+                - listitem [ref=e274]:
+                  - generic [ref=e275]: "41"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e276]
+          - tab "【偶数】CL対応報告" [ref=e279] [cursor=pointer]:
+            - generic [ref=e284]:
+              - paragraph [ref=e285]: 【偶数】CL対応報告
+              - list [ref=e286]:
+                - listitem [ref=e287]:
+                  - generic [ref=e288]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e289]
+          - tab "【共同受任】AMUGI⇒響/サンク/イージス/つちぐり面談連携" [ref=e292] [cursor=pointer]:
+            - generic [ref=e297]:
+              - paragraph [ref=e298]: 【共同受任】AMUGI⇒響/サンク/イージス/つちぐり面談連携
+              - list [ref=e299]:
+                - listitem [ref=e300]:
+                  - generic [ref=e301]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e302]
+          - tab "未転化・保留報告" [ref=e305] [cursor=pointer]:
+            - generic [ref=e310]:
+              - paragraph [ref=e311]: 未転化・保留報告
+              - list [ref=e312]:
+                - listitem [ref=e313]:
+                  - generic [ref=e314]: "86"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e315]
+          - tab "司令塔CW★直つなぎ★" [ref=e318] [cursor=pointer]:
+            - generic [ref=e323]:
+              - paragraph [ref=e324]: 司令塔CW★直つなぎ★
+              - list [ref=e325]:
+                - listitem [ref=e326]:
+                  - generic [ref=e327]: "679"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e328]
+          - tab "【穂】即架電、既存案件引継ぎ" [ref=e331] [cursor=pointer]:
+            - generic [ref=e336]:
+              - paragraph [ref=e337]: 【穂】即架電、既存案件引継ぎ
+              - list [ref=e338]:
+                - listitem [ref=e339]:
+                  - generic [ref=e340]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e341]
+          - tab "【新規ALL】★新規・既存★CL対応報告" [ref=e344] [cursor=pointer]:
+            - generic [ref=e349]:
+              - paragraph [ref=e350]: 【新規ALL】★新規・既存★CL対応報告
+              - list [ref=e351]:
+                - listitem [ref=e352]:
+                  - generic [ref=e353]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e354]
+          - tab "【響】債務部門・面談結果連携チャット【債務整理事業部】" [ref=e357] [cursor=pointer]:
+            - generic [ref=e362]:
+              - paragraph [ref=e363]: 【響】債務部門・面談結果連携チャット【債務整理事業部】
+              - list [ref=e364]:
+                - listitem [ref=e365]:
+                  - generic [ref=e366]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e367]
+          - tab "【新規】日報＆SU連携グループ" [ref=e370] [cursor=pointer]:
+            - generic [ref=e375]:
+              - paragraph [ref=e376]: 【新規】日報＆SU連携グループ
+              - list [ref=e377]:
+                - listitem [ref=e378]:
+                  - generic [ref=e379]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e380]
+          - tab "【AMUGI】イージスサンクつちぐり⇔担当引継ぎ" [ref=e383] [cursor=pointer]:
+            - generic [ref=e388]:
+              - paragraph [ref=e389]: 【AMUGI】イージスサンクつちぐり⇔担当引継ぎ
+              - list [ref=e390]:
+                - listitem [ref=e391]:
+                  - generic [ref=e392]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e393]
+          - tab "響・西新宿オフィス全体連絡網" [ref=e396] [cursor=pointer]:
+            - generic [ref=e401]:
+              - paragraph [ref=e402]: 響・西新宿オフィス全体連絡網
+              - list [ref=e403]:
+                - listitem [ref=e404]:
+                  - generic [ref=e405]: "128"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e406]
+          - tab "【響】案件相談グループ" [ref=e409] [cursor=pointer]:
+            - generic [ref=e414]:
+              - paragraph [ref=e415]: 【響】案件相談グループ
+              - list [ref=e416]:
+                - listitem [ref=e417]:
+                  - generic [ref=e418]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e419]
+          - tab "司令塔CW★架電から★" [ref=e422] [cursor=pointer]:
+            - generic [ref=e427]:
+              - paragraph [ref=e428]: 司令塔CW★架電から★
+              - list [ref=e429]:
+                - listitem [ref=e430]:
+                  - generic [ref=e431]: "75"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e432]
+          - tab "【AMUGI】CL全体連携チャット" [ref=e435] [cursor=pointer]:
+            - generic [ref=e440]:
+              - paragraph [ref=e441]: 【AMUGI】CL全体連携チャット
+              - list [ref=e442]:
+                - listitem [ref=e443]:
+                  - generic [ref=e444]: "70"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e445]
+          - tab "【響西新宿第2】響-西新宿 CL周知チャット" [ref=e448] [cursor=pointer]:
+            - generic [ref=e453]:
+              - paragraph [ref=e454]: 【響西新宿第2】響-西新宿 CL周知チャット
+              - list [ref=e455]:
+                - listitem [ref=e456]:
+                  - generic [ref=e457]: "382"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e458]
+          - tab "【コンシエンス】稼働連携" [ref=e461] [cursor=pointer]:
+            - generic [ref=e466]:
+              - paragraph [ref=e467]: 【コンシエンス】稼働連携
+              - list [ref=e468]:
+                - listitem [ref=e469]:
+                  - generic [ref=e470]: "13"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e471]
+          - tab "【響】債務部門・面談設定グループ" [ref=e474] [cursor=pointer]:
+            - generic [ref=e479]:
+              - paragraph [ref=e480]: 【響】債務部門・面談設定グループ
+              - list [ref=e481]:
+                - listitem [ref=e482]:
+                  - generic [ref=e483]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e484]
+          - tab "【全拠点】AMUGI×はじめ連携G" [ref=e487] [cursor=pointer]:
+            - generic [ref=e492]:
+              - paragraph [ref=e493]: 【全拠点】AMUGI×はじめ連携G
+              - list [ref=e494]:
+                - listitem [ref=e495]:
+                  - generic [ref=e496]: "2"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e497]
+          - tab "【SE×Cons】質問チャット" [ref=e500] [cursor=pointer]:
+            - generic [ref=e505]:
+              - paragraph [ref=e506]: 【SE×Cons】質問チャット
+              - list [ref=e507]:
+                - listitem [ref=e508]:
+                  - generic [ref=e509]: "3"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e510]
+          - tab "【サンクWEB案件】電話面談 対応報告/引継ぎ" [ref=e513] [cursor=pointer]:
+            - generic [ref=e518]:
+              - paragraph [ref=e519]: 【サンクWEB案件】電話面談 対応報告/引継ぎ
+              - list [ref=e520]:
+                - listitem [ref=e521]:
+                  - generic [ref=e522]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e523]
+          - tab "【弁響】管理部連携グループ" [ref=e526] [cursor=pointer]:
+            - generic [ref=e531]:
+              - paragraph [ref=e532]: 【弁響】管理部連携グループ
+              - list [ref=e533]:
+                - listitem [ref=e534]:
+                  - generic [ref=e535]: "58"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e536]
+          - tab "【新規】奏⇆響 連絡板" [ref=e539] [cursor=pointer]:
+            - generic [ref=e544]:
+              - paragraph [ref=e545]: 【新規】奏⇆響 連絡板
+              - list [ref=e546]:
+                - listitem [ref=e547]:
+                  - generic [ref=e548]: "13"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e549]
+          - tab "【新橋オフィス】各所全体連携※オフィスルール以外の周知、連携厳禁※" [ref=e552] [cursor=pointer]:
+            - generic [ref=e557]:
+              - paragraph [ref=e558]: 【新橋オフィス】各所全体連携※オフィスルール以外の周知、連携厳禁※
+              - list [ref=e559]:
+                - listitem [ref=e560]:
+                  - generic [ref=e561]: "23"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e562]
+          - tab "【弁護士法人・響】全体連絡網" [ref=e565] [cursor=pointer]:
+            - generic [ref=e570]:
+              - paragraph [ref=e571]: 【弁護士法人・響】全体連絡網
+              - list [ref=e572]:
+                - listitem [ref=e573]:
+                  - generic [ref=e574]: "7"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e575]
+          - tab "【響西新宿第2】現場管理-運営チャット" [ref=e578] [cursor=pointer]:
+            - generic [ref=e583]:
+              - paragraph [ref=e584]: 【響西新宿第2】現場管理-運営チャット
+              - list [ref=e585]:
+                - listitem [ref=e586]:
+                  - generic [ref=e587]: "7"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e588]
+          - tab "【西新宿第2】アポ→提案未転化 チャット" [ref=e591] [cursor=pointer]:
+            - generic [ref=e596]:
+              - paragraph [ref=e597]: 【西新宿第2】アポ→提案未転化 チャット
+              - list [ref=e598]:
+                - listitem [ref=e599]:
+                  - generic [ref=e600]: "3"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e601]
+          - tab "【響】CL→SU連携※予約後以降" [ref=e604] [cursor=pointer]:
+            - generic [ref=e609]:
+              - paragraph [ref=e610]: 【響】CL→SU連携※予約後以降
+              - list [ref=e611]:
+                - listitem [ref=e612]:
+                  - generic [ref=e613]: "28"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e614]
+          - tab "【響西新宿第2】響-西新宿 全体周知チャット" [ref=e617] [cursor=pointer]:
+            - generic [ref=e622]:
+              - paragraph [ref=e623]: 【響西新宿第2】響-西新宿 全体周知チャット
+              - list [ref=e624]:
+                - listitem [ref=e625]:
+                  - generic [ref=e626]: "3"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e627]
+          - tab "【即確認】来所電面確認G" [ref=e630] [cursor=pointer]:
+            - generic [ref=e635]:
+              - paragraph [ref=e636]: 【即確認】来所電面確認G
+              - list [ref=e637]:
+                - listitem [ref=e638]:
+                  - generic [ref=e639]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e640]
+          - tab "CS管理者運用すり合わせ" [ref=e643] [cursor=pointer]:
+            - paragraph [ref=e649]: CS管理者運用すり合わせ
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e650]
+          - tab "【奏⇔浜離宮】案件連携CW" [ref=e653] [cursor=pointer]:
+            - generic [ref=e658]:
+              - paragraph [ref=e659]: 【奏⇔浜離宮】案件連携CW
+              - list [ref=e660]:
+                - listitem [ref=e661]:
+                  - generic [ref=e662]: "124"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e663]
+          - tab "重複・個人情報削除依頼" [ref=e666] [cursor=pointer]:
+            - generic [ref=e671]:
+              - paragraph [ref=e672]: 重複・個人情報削除依頼
+              - list [ref=e673]:
+                - listitem [ref=e674]:
+                  - generic [ref=e675]: "28"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e676]
+          - tab "【西新宿第2】響-西新宿 CL 連携/質問ﾁｬｯﾄ" [ref=e679] [cursor=pointer]:
+            - paragraph [ref=e685]: 【西新宿第2】響-西新宿 CL 連携/質問ﾁｬｯﾄ
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e686]
+          - tab "【第1G】ミス・インシデント報告チャット" [ref=e689] [cursor=pointer]:
+            - generic [ref=e694]:
+              - paragraph [ref=e695]: 【第1G】ミス・インシデント報告チャット
+              - list [ref=e696]:
+                - listitem [ref=e697]:
+                  - generic [ref=e698]: "6"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e699]
+          - tab "【本田ブレーン】" [ref=e702] [cursor=pointer]:
+            - generic [ref=e707]:
+              - paragraph [ref=e708]: 【本田ブレーン】
+              - list [ref=e709]:
+                - listitem [ref=e710]:
+                  - generic [ref=e711]: "1"
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e712]
+          - tab "【西新宿第2】吉村行雲" [ref=e715] [cursor=pointer]:
+            - paragraph [ref=e721]: 【西新宿第2】吉村行雲
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e722]
+          - tab "Cons×SE(MST)連携CWG" [ref=e725] [cursor=pointer]:
+            - paragraph [ref=e731]: Cons×SE(MST)連携CWG
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e732]
+          - tab "【奏×響】面談・案件連携チャット" [ref=e735] [cursor=pointer]:
+            - paragraph [ref=e741]: 【奏×響】面談・案件連携チャット
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e742]
+          - tab "草間優空_conscience" [ref=e745] [cursor=pointer]:
+            - paragraph [ref=e751]: 草間優空_conscience
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e752]
+          - tab "【西新宿第2】幡野智也" [ref=e755] [cursor=pointer]:
+            - paragraph [ref=e761]: 【西新宿第2】幡野智也
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e762]
+          - tab "【西新宿第2】秋山匠" [ref=e765] [cursor=pointer]:
+            - paragraph [ref=e771]: 【西新宿第2】秋山匠
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e772]
+          - tab "【西新宿第2】宮良高基" [ref=e775] [cursor=pointer]:
+            - paragraph [ref=e781]: 【西新宿第2】宮良高基
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e782]
+          - tab "※※廃止※※【共同受任】つむぐ・いざなみ⇒クレスタ面談設定" [ref=e785] [cursor=pointer]:
+            - paragraph [ref=e791]: ※※廃止※※【共同受任】つむぐ・いざなみ⇒クレスタ面談設定
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e792]
+          - tab "村上萌_conscience" [ref=e795] [cursor=pointer]:
+            - paragraph [ref=e801]: 村上萌_conscience
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e802]
+          - tab "山﨑陽向" [ref=e805] [cursor=pointer]:
+            - paragraph [ref=e811]: 山﨑陽向
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e812]
+          - tab "【奏×そうや】案件引継ぎ" [ref=e815] [cursor=pointer]:
+            - paragraph [ref=e821]: 【奏×そうや】案件引継ぎ
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e822]
+          - tab "泉瀧珠羽" [ref=e825] [cursor=pointer]:
+            - paragraph [ref=e831]: 泉瀧珠羽
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e832]
+          - tab "鈴木美嘉_conscience" [ref=e835] [cursor=pointer]:
+            - paragraph [ref=e841]: 鈴木美嘉_conscience
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e842]
+          - tab "堀江駿太朗" [ref=e845] [cursor=pointer]:
+            - paragraph [ref=e851]: 堀江駿太朗
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e852]
+          - tab "水見倫" [ref=e855] [cursor=pointer]:
+            - paragraph [ref=e861]: 水見倫
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e862]
+          - tab "林 智彦" [ref=e865] [cursor=pointer]:
+            - paragraph [ref=e871]: 林 智彦
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e872]
+          - tab "神 良輔" [ref=e875] [cursor=pointer]:
+            - paragraph [ref=e881]: 神 良輔
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e882]
+          - tab "【西新宿第2】本田顕士" [ref=e885] [cursor=pointer]:
+            - paragraph [ref=e891]: 【西新宿第2】本田顕士
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e892]
+          - tab "【西新宿第2】細井翔吾/内線531" [ref=e895] [cursor=pointer]:
+            - paragraph [ref=e901]: 【西新宿第2】細井翔吾/内線531
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e902]
+          - tab "【西新宿第2】石井誠馬" [ref=e905] [cursor=pointer]:
+            - paragraph [ref=e911]: 【西新宿第2】石井誠馬
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e912]
+          - tab "MST×響債務CS 連携G" [ref=e915] [cursor=pointer]:
+            - paragraph [ref=e921]: MST×響債務CS 連携G
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e922]
+          - tab "櫻田健太朗" [ref=e925] [cursor=pointer]:
+            - paragraph [ref=e931]: 櫻田健太朗
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e932]
+          - tab "田中みさ" [ref=e935] [cursor=pointer]:
+            - paragraph [ref=e941]: 田中みさ
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e942]
+          - tab "※使用禁止【響】未面談/イージスサンク引継ぎ報告（このCWは発言禁止!!!）" [ref=e945] [cursor=pointer]:
+            - generic [ref=e950]:
+              - paragraph [ref=e951]: ※使用禁止【響】未面談/イージスサンク引継ぎ報告（このCWは発言禁止!!!）
+              - list [ref=e952]:
+                - listitem [ref=e953]:
+                  - generic [ref=e954]: 999+
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e955]
+          - tab "吉村ユニット" [ref=e958] [cursor=pointer]:
+            - paragraph [ref=e964]: 吉村ユニット
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e965]
+          - tab "【西新宿第2】大関秀" [ref=e968] [cursor=pointer]:
+            - paragraph [ref=e974]: 【西新宿第2】大関秀
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e975]
+          - tab "【はじめ】即架電、既存案件引継ぎ" [ref=e978] [cursor=pointer]:
+            - paragraph [ref=e984]: 【はじめ】即架電、既存案件引継ぎ
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e985]
+          - tab "【西新宿第2】熊倉空大" [ref=e988] [cursor=pointer]:
+            - paragraph [ref=e994]: 【西新宿第2】熊倉空大
+            - generic "このチャットをピン留めしてチャット一覧の上に固定できます" [ref=e995]
+          - listitem [ref=e998]:
+            - paragraph [ref=e999]: 残りのチャット数:712
+            - button "さらに表示" [ref=e1002] [cursor=pointer]
+    - generic [ref=e1003]:
+      - generic [ref=e1006]:
+        - generic [ref=e1007]:
+          - img "ルームヘッダーアイコン" [ref=e1008]
+          - heading "【オリパ】面談結果報告" [level=1] [ref=e1010]:
+            - generic [ref=e1012] [cursor=pointer]
+        - generic [ref=e1014]:
+          - generic [ref=e1016]:
+            - list [ref=e1017]:
+              - listitem [ref=e1018]:
+                - button [ref=e1019]:
+                  - img "【西新宿第2】廣田珠輝" [ref=e1021] [cursor=pointer]
+              - listitem [ref=e1022]:
+                - button [ref=e1023]:
+                  - img "西川研一" [ref=e1025] [cursor=pointer]
+              - listitem [ref=e1026]:
+                - button [ref=e1027]:
+                  - img "神山宏之" [ref=e1029] [cursor=pointer]
+              - listitem [ref=e1030]:
+                - button [ref=e1031]:
+                  - img "Loading..." [ref=e1033] [cursor=pointer]
+              - listitem [ref=e1034]:
+                - button [ref=e1035]:
+                  - img "Loading..." [ref=e1037] [cursor=pointer]
+            - button "このチャットのメンバー" [ref=e1038] [cursor=pointer]:
+              - generic [ref=e1039]: 99+
+          - button "招待" [ref=e1042] [cursor=pointer]
+          - generic [ref=e1043]:
+            - button "メッセージ検索" [ref=e1046] [cursor=pointer]
+            - button "ファイル" [ref=e1050] [cursor=pointer]
+            - button "チャットの設定" [ref=e1054] [cursor=pointer]
+      - generic [ref=e1058]:
+        - main [ref=e1060]:
+          - generic [ref=e1061]:
+            - generic [ref=e1062]:
+              - img "Loading" [ref=e1063]
+              - text: メッセージを読み込んでいます...
+            - generic [ref=e1065]: 2026年9月11日
+            - generic [ref=e1071]:
+              - button [ref=e1073]:
+                - img "殿川 知哉" [ref=e1075] [cursor=pointer]
+              - generic [ref=e1076]:
+                - generic [ref=e1077]:
+                  - button [ref=e1078]:
+                    - paragraph [ref=e1079] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1080]: 株式会社GREENINE
+                - generic [ref=e1082]:
+                  - generic [ref=e1083]: "返還請求 結果報告: 依頼者名：加藤大輔"
+                  - text: "面談対応(先生): 中井たから【穂】 ① 🔴 受任 ② 依頼者氏名: 加藤大輔 ③ オリパ事業者: オリパワン ④ クレジットカード会社: 楽天カード・セゾンカード 直近3〜4か月チャージバック: ¥190,000 ⑤ 依頼者様属性: △ 何とも言えない ───────── 対応者(CS): 土師優翔 シート:"
+                  - generic [ref=e1086]:
+                    - link "https://docs.google.com/spreadsheets/d/1yXWSZBTrJO36dpnlpKWifnVDoPYtfKkYZGvAVZngV0U/edit" [ref=e1087] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1yXWSZBTrJO36dpnlpKWifnVDoPYtfKkYZGvAVZngV0U/edit
+                    - generic [ref=e1088] [cursor=pointer]: プレビュー
+                - generic [ref=e1089]:
+                  - generic "同じリアクションをする" [ref=e1090] [cursor=pointer]:
+                    - generic [ref=e1091]:
+                      - img "cracker" [ref=e1094]
+                      - paragraph [ref=e1096]: "1"
+                  - button "リアクションを確認する" [ref=e1098] [cursor=pointer]
+              - generic [ref=e1100]: 9月11日 17:21
+            - generic [ref=e1103]:
+              - generic [ref=e1104]:
+                - generic [ref=e1106]:
+                  - generic [ref=e1107]: "返還請求 結果報告: 依頼者名：村岡大夢 むらおかひろむ"
+                  - text: "面談対応(先生): 西田千晃【イージス】 ① 🔴 受任 ② 依頼者氏名: 村岡大夢 むらおかひろむ ③ オリパ事業者: 日本トレカセンター, DOPA!, Cloveオリパ ④ クレジットカード会社: 三井住友カード（Vpass）/残高 直近3〜4か月チャージバック: ¥600,000 ⑤ 依頼者様属性: 未選択 ───────── 対応者(CS): 佐伯優人 シート:"
+                  - generic [ref=e1110]:
+                    - link "https://docs.google.com/spreadsheets/d/1FZQNFshbe5FTdeeuD1vdoWgerse2W_T4zumYTi20SBg/edit" [ref=e1111] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1FZQNFshbe5FTdeeuD1vdoWgerse2W_T4zumYTi20SBg/edit
+                    - generic [ref=e1112] [cursor=pointer]: プレビュー
+                - generic [ref=e1113]:
+                  - generic "同じリアクションをする" [ref=e1114] [cursor=pointer]:
+                    - generic [ref=e1115]:
+                      - img "cracker" [ref=e1118]
+                      - paragraph [ref=e1120]: "1"
+                  - button "リアクションを確認する" [ref=e1122] [cursor=pointer]
+              - generic [ref=e1124]: 17:21
+            - generic [ref=e1127]:
+              - generic [ref=e1128]:
+                - generic [ref=e1130]:
+                  - generic [ref=e1131]: "返還請求 結果報告: 依頼者名：大塚健太郎"
+                  - text: "面談対応(先生): 古泉伸彦【響】 ① 🔴 受任 ② 依頼者氏名: 大塚健太郎 ③ オリパ事業者: オリクジ ④ クレジットカード会社: paypayカード aupayカード 直近3〜4か月チャージバック: ¥1,400,000 ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 森前孝一 シート:"
+                  - generic [ref=e1134]:
+                    - link "https://docs.google.com/spreadsheets/d/1MpcFO5xNP16yW1g--dQZ7HKougB2603lck2bntz69aw/edit" [ref=e1135] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1MpcFO5xNP16yW1g--dQZ7HKougB2603lck2bntz69aw/edit
+                    - generic [ref=e1136] [cursor=pointer]: プレビュー
+                - generic [ref=e1137]:
+                  - generic "同じリアクションをする" [ref=e1138] [cursor=pointer]:
+                    - generic [ref=e1139]:
+                      - img "cracker" [ref=e1142]
+                      - paragraph [ref=e1144]: "1"
+                  - button "リアクションを確認する" [ref=e1146] [cursor=pointer]
+              - generic [ref=e1148]: 17:23
+            - generic [ref=e1151]:
+              - button [ref=e1153]:
+                - img "殿川 知哉" [ref=e1155] [cursor=pointer]
+              - generic [ref=e1156]:
+                - generic [ref=e1157]:
+                  - button [ref=e1158]:
+                    - paragraph [ref=e1159] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1160]: 株式会社GREENINE
+                - generic [ref=e1162]:
+                  - generic [ref=e1163]: "返還請求 結果報告: 依頼者名：尾髙我道"
+                  - text: "面談対応(先生): 望月純【穂】 ① 🔴 受任 ② 依頼者氏名: 尾髙我道 ③ オリパ事業者: オリパワン, DOPA!, エクストレカ, オリクジ ④ クレジットカード会社: セゾンカード 直近3〜4か月チャージバック: ¥400,000 ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 下村大 【備考】 オリパワンで1万円程度の当選が9回、それ以外のところでは一番高額でも３万円が1回あった程度。 cloveオリパ追加でお受けしました。 シート:"
+                  - generic [ref=e1166]:
+                    - link "https://docs.google.com/spreadsheets/d/1Y7PssGWopsTl88FEkVy4eJ597hE1vDkUln1s9vrom8M/edit" [ref=e1167] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1Y7PssGWopsTl88FEkVy4eJ597hE1vDkUln1s9vrom8M/edit
+                    - generic [ref=e1168] [cursor=pointer]: プレビュー
+                - generic [ref=e1169]:
+                  - generic "同じリアクションをする" [ref=e1170] [cursor=pointer]:
+                    - generic [ref=e1171]:
+                      - img "cracker" [ref=e1174]
+                      - paragraph [ref=e1176]: "1"
+                  - button "リアクションを確認する" [ref=e1178] [cursor=pointer]
+              - generic [ref=e1180]: 9月11日 17:28
+            - generic [ref=e1183]:
+              - button [ref=e1185]:
+                - img "殿川 知哉" [ref=e1187] [cursor=pointer]
+              - generic [ref=e1188]:
+                - generic [ref=e1189]:
+                  - button [ref=e1190]:
+                    - paragraph [ref=e1191] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1192]: 株式会社GREENINE
+                - generic [ref=e1194]:
+                  - generic [ref=e1195]: "返還請求 結果報告: 依頼者名：田中志和（たなかもとかず）"
+                  - text: "面談対応(先生): 古泉伸彦【響】 ① 🔴 受任 ② 依頼者氏名: 田中志和（たなかもとかず） ③ オリパ事業者: DOPA! ④ クレジットカード会社: メルカリカード, 三井住友カード 直近3〜4か月チャージバック: ¥300,000 ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 佐藤世理 シート:"
+                  - generic [ref=e1198]:
+                    - link "https://docs.google.com/spreadsheets/d/1KqQHx6_cNVE74pcwWx_fBd1zCEiBd236UmnD7QCrCZg/edit" [ref=e1199] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1KqQHx6_cNVE74pcwWx_fBd1zCEiBd236UmnD7QCrCZg/edit
+                    - generic [ref=e1200] [cursor=pointer]: プレビュー
+                - generic [ref=e1201]:
+                  - generic "同じリアクションをする" [ref=e1202] [cursor=pointer]:
+                    - generic [ref=e1203]:
+                      - img "cracker" [ref=e1206]
+                      - paragraph [ref=e1208]: "1"
+                  - button "リアクションを確認する" [ref=e1210] [cursor=pointer]
+              - generic [ref=e1212]: 9月11日 17:34
+            - generic [ref=e1215]:
+              - button [ref=e1217]:
+                - img "下村大" [ref=e1219] [cursor=pointer]
+              - generic [ref=e1220]:
+                - generic [ref=e1221]:
+                  - button [ref=e1222]:
+                    - paragraph [ref=e1223] [cursor=pointer]: 下村大
+                  - paragraph [ref=e1224]: 株式会社CONSCIENCE
+                - generic [ref=e1226]:
+                  - generic [ref=e1227]: タスクを完了しました。
+                  - generic [ref=e1230]:
+                    - generic [ref=e1232]:
+                      - button [ref=e1233]:
+                        - img "下村大" [ref=e1235] [cursor=pointer]
+                      - generic [ref=e1237]:
+                        - paragraph [ref=e1238]: 期限
+                        - time [ref=e1239]: 2026年9月11日
+                    - generic [ref=e1241]:
+                      - generic [ref=e1242]:
+                        - generic [ref=e1244]:
+                          - generic [ref=e1246]:
+                            - button [ref=e1248]
+                            - generic [ref=e1249]: 殿川 知哉
+                          - generic [ref=e1250]: 2026年9月11日 14:22
+                        - generic [ref=e1253]:
+                          - generic [ref=e1254]: "返還請求 結果報告: 依頼者名：永坂充"
+                          - text: "面談対応(先生): 波多野健司【YA】 ① □ 受任 ② 依頼者氏名: 永坂充 ③ オリパ事業者: オリパワン ④ クレジットカード会社: 三井住友カード（Vpass） 直近3〜4か月チャージバック: ¥3,500,000 ⑤ 依頼者様属性: △ 何とも言えない ───────── 対応者(CS): 下村大 シート:"
+                          - generic [ref=e1257]:
+                            - link "https://docs.google.com/spreadsheets/d/1HMthKlMCirZWO-i79sZadDINX_ALPZqLGUGyJL9Vu5s/edit" [ref=e1258] [cursor=pointer]:
+                              - /url: https://docs.google.com/spreadsheets/d/1HMthKlMCirZWO-i79sZadDINX_ALPZqLGUGyJL9Vu5s/edit
+                            - generic [ref=e1259] [cursor=pointer]: プレビュー
+                      - text: すみません。引継事項がありました。 ・利用総額3,500,000円→6,000,000円 ・利用開始時期2026/06/01→2026/01
+                    - button "続きを見る…" [ref=e1260] [cursor=pointer]
+              - generic [ref=e1261]: 9月11日 17:35
+            - generic [ref=e1264]:
+              - button [ref=e1266]:
+                - img "殿川 知哉" [ref=e1268] [cursor=pointer]
+              - generic [ref=e1269]:
+                - generic [ref=e1270]:
+                  - button [ref=e1271]:
+                    - paragraph [ref=e1272] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1273]: 株式会社GREENINE
+                - generic [ref=e1275]:
+                  - generic [ref=e1276]: "返還請求 結果報告: 依頼者名：児玉 翔"
+                  - text: "面談対応(先生): 藤田圭介【響】 ① 🔴 受任 ② 依頼者氏名: 児玉 翔 ③ オリパ事業者: 日本トレカセンター, DOPA! ④ クレジットカード会社: 楽天カード・PAYPAY 直近3〜4か月チャージバック: ¥1,200,000 ⑤ 依頼者様属性: △ 何とも言えない ───────── 対応者(CS): 天久朋恵 【備考】 カードは結構売った クレカ利用できなくなるのかも少々気にしていた（ブラックになるわけではない、と説明） 契約ご納得いただいてクラウドサインするようにお願いした シート:"
+                  - generic [ref=e1279]:
+                    - link "https://docs.google.com/spreadsheets/d/1J3kfWAjpzPl5GKj7c_IC1cFrWgFw7fuvyNa89IO9dQw/edit" [ref=e1280] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1J3kfWAjpzPl5GKj7c_IC1cFrWgFw7fuvyNa89IO9dQw/edit
+                    - generic [ref=e1281] [cursor=pointer]: プレビュー
+              - generic [ref=e1282]: 9月11日 17:36
+            - generic [ref=e1285]:
+              - generic [ref=e1286]:
+                - generic [ref=e1288]:
+                  - generic [ref=e1289]: "返還請求 結果報告: 依頼者名：山下太一 やましたたいち"
+                  - text: "面談対応(先生): 小川智子【穂】 ① 🔴 受任 ② 依頼者氏名: 山下太一 やましたたいち ③ オリパ事業者: DOPA!, 上記と同一 ④ クレジットカード会社: ぺいぺい, イオン ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 谷口雄 【備考】 クレカで決済した分は昨年なのでチャージバック申請対象外 シート:"
+                  - generic [ref=e1292]:
+                    - link "https://docs.google.com/spreadsheets/d/1Y1DWsv9wmzxAd_KLWl2wXQHNAc5Za4MYwr1IGx4K6h8/edit" [ref=e1293] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1Y1DWsv9wmzxAd_KLWl2wXQHNAc5Za4MYwr1IGx4K6h8/edit
+                    - generic [ref=e1294] [cursor=pointer]: プレビュー
+                - generic [ref=e1295]:
+                  - generic "同じリアクションをする" [ref=e1296] [cursor=pointer]:
+                    - generic [ref=e1297]:
+                      - img "roger" [ref=e1300]
+                      - paragraph [ref=e1302]: "1"
+                  - button "リアクションを確認する" [ref=e1304] [cursor=pointer]
+              - generic [ref=e1306]: 17:39
+            - generic [ref=e1309]:
+              - generic [ref=e1312]:
+                - generic [ref=e1313]: "返還請求 結果報告: 依頼者名：佐藤智紀（さとうともき）"
+                - text: "面談対応(先生): 波多野健司【YA】 ① 🔴 受任 ② 依頼者氏名: 佐藤智紀（さとうともき） ③ オリパ事業者: DOPA!, オリパワン ④ クレジットカード会社: PayPay（残高）+Paidy 直近3〜4か月チャージバック: ¥3,500,000 ⑤ 依頼者様属性: △ 何とも言えない ───────── 対応者(CS): 柴田大悟 シート:"
+                - generic [ref=e1316]:
+                  - link "https://docs.google.com/spreadsheets/d/1GgmwVj4-_UShhWwLVPsM4dwj2wxqKt1YBakbaR9W1xs/edit" [ref=e1317] [cursor=pointer]:
+                    - /url: https://docs.google.com/spreadsheets/d/1GgmwVj4-_UShhWwLVPsM4dwj2wxqKt1YBakbaR9W1xs/edit
+                  - generic [ref=e1318] [cursor=pointer]: プレビュー
+              - generic [ref=e1319]: 17:41
+            - generic [ref=e1322]:
+              - generic [ref=e1325]:
+                - generic [ref=e1326]: "返還請求 結果報告: 依頼者名：きくちゆうき菊池優希"
+                - text: "面談対応(先生): 西村智嗣【響】 ① 🔴 受任 ② 依頼者氏名: きくちゆうき菊池優希 ③ オリパ事業者: オリパワン, 日本トレカセンター ④ クレジットカード会社: セゾンカード 直近3〜4か月チャージバック: ¥230,000 ⑤ 依頼者様属性: △ 何とも言えない ───────── 対応者(CS): 杉野由季英 【備考】 依頼後にかかってくるTEL番号が切り替わるか気にしている、担当者から案内すると伝えていますので、教えてあげてください オリパワン：金額１５０万に修正 日本トレカセンター：決済はペイペイのみに修正 シート:"
+                - generic [ref=e1329]:
+                  - link "https://docs.google.com/spreadsheets/d/164h2-iw_74-6UWG-yQcCN4KifiyFYJSzUNIiAgZcfeo/edit" [ref=e1330] [cursor=pointer]:
+                    - /url: https://docs.google.com/spreadsheets/d/164h2-iw_74-6UWG-yQcCN4KifiyFYJSzUNIiAgZcfeo/edit
+                  - generic [ref=e1331] [cursor=pointer]: プレビュー
+              - generic [ref=e1332]: 17:41
+            - generic [ref=e1335]:
+              - generic [ref=e1338]:
+                - generic [ref=e1339]: "返還請求 結果報告: 依頼者名：佐村隆"
+                - text: "面談対応(先生): 横松紀子【イージス】 ① 🔴 受任 ② 依頼者氏名: 佐村隆 ③ オリパ事業者: 日本トレカセンター, オリパワン, DOPA! ④ クレジットカード会社: — 直近3〜4か月チャージバック: ¥150,000 ⑤ 依頼者様属性: △ 何とも言えない ───────── 対応者(CS): 中嶋梨乃 【備考】 ・CSから引継ぎを受けるときに、本当に弁護士法人なのか？疑い深いという引継ぎあり。共同受任であるとCSから案内してもらった上で面談実施。 ・申告総額は、本人のクレカとかで支払った分と、妻のクレカで支払った分が混ざっている。チャージバック申請をする際には、妻からの委任が必要になる可能性はお伝え（CSからも説明したとのこと。）。 ・今後該当のサイトへの課金はしないようにという案内をしたところ、「ログインだけは継続してよいか？毎日ログインしないとサブスク分が戻ってこない」との質問あり。業者に受任通知を送るから、そもそもどこかのタイミングでログインできなくなる可能性をお伝え。加えて、ログインだけであればそれが不利益に働くことは無い気がするが、業者がどう判断するか分からない、その上で判断してとお伝え。 ・いろいろ疑い深い。仮に回収できなかったとしても必ず報告必要。丁寧に対応すべき。 シート:"
+                - generic [ref=e1342]:
+                  - link "https://docs.google.com/spreadsheets/d/1xEGvrQgE2W9zLVxHyz8hhCDzOq_X7feUevZH6DTqyR0/edit" [ref=e1343] [cursor=pointer]:
+                    - /url: https://docs.google.com/spreadsheets/d/1xEGvrQgE2W9zLVxHyz8hhCDzOq_X7feUevZH6DTqyR0/edit
+                  - generic [ref=e1344] [cursor=pointer]: プレビュー
+              - generic [ref=e1345]: 17:45
+            - generic [ref=e1348]:
+              - generic [ref=e1351]:
+                - generic [ref=e1352]: "返還請求 結果報告: 依頼者名：高橋大河"
+                - text: "面談対応(先生): 西村智嗣【響】 ① 🔴 受任 ② 依頼者氏名: 高橋大河 ③ オリパ事業者: オリパワン, 日本トレカセンター, DOPA! ④ クレジットカード会社: 楽天カード, 三井住友カード（Vpass）, PAYPAY銀行 ⑤ 依頼者様属性: △ 何とも言えない ───────── 対応者(CS): 藤野清風 【備考】 時間切れで上がってきおり、架電したところ、すでに弁護士面談を経て依頼済とのことで、謝罪し終話 シート:"
+                - generic [ref=e1355]:
+                  - link "https://docs.google.com/spreadsheets/d/18vo0MUBBVNQeunYP9lR3G6e-w1tRPRxq1bkDEaGRQ6M/edit" [ref=e1356] [cursor=pointer]:
+                    - /url: https://docs.google.com/spreadsheets/d/18vo0MUBBVNQeunYP9lR3G6e-w1tRPRxq1bkDEaGRQ6M/edit
+                  - generic [ref=e1357] [cursor=pointer]: プレビュー
+              - generic [ref=e1358]: 17:48
+            - generic [ref=e1361]:
+              - button [ref=e1363]:
+                - img "阿部 翔平" [ref=e1365] [cursor=pointer]
+              - generic [ref=e1366]:
+                - generic [ref=e1367]:
+                  - button [ref=e1368]:
+                    - paragraph [ref=e1369] [cursor=pointer]: 阿部 翔平
+                  - paragraph [ref=e1370]: 弁護士法人・響 債務整理事業部
+                - generic [ref=e1371]:
+                  - text: メンバー「
+                  - generic [ref=e1372]:
+                    - button [ref=e1374]
+                    - generic [ref=e1375]: 弁護士 内田 祥平
+                  - text: 」を追加しました。
+              - generic [ref=e1376]: 9月11日 17:52
+            - generic [ref=e1379]:
+              - generic [ref=e1381]:
+                - text: メンバー「
+                - generic [ref=e1382]:
+                  - button [ref=e1384]
+                  - generic [ref=e1385]: 弁護士 進藤 優希
+                - text: 」を追加しました。
+              - generic [ref=e1386]: 17:52
+            - generic [ref=e1389]:
+              - button [ref=e1391]:
+                - img "池場敬太" [ref=e1393] [cursor=pointer]
+              - generic [ref=e1394]:
+                - generic [ref=e1395]:
+                  - button [ref=e1396]:
+                    - paragraph [ref=e1397] [cursor=pointer]: 池場敬太
+                  - paragraph [ref=e1398]: 株式会社CONSCIENCE
+                - generic [ref=e1399]:
+                  - text: メンバー「
+                  - generic [ref=e1400]:
+                    - button [ref=e1402]
+                    - generic [ref=e1403]: 弁護士 大串 行雄
+                  - text: 」を追加しました。
+              - generic [ref=e1404]: 9月11日 17:54
+            - generic [ref=e1407]:
+              - button [ref=e1409]:
+                - img "殿川 知哉" [ref=e1411] [cursor=pointer]
+              - generic [ref=e1412]:
+                - generic [ref=e1413]:
+                  - button [ref=e1414]:
+                    - paragraph [ref=e1415] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1416]: 株式会社GREENINE
+                - generic [ref=e1418]:
+                  - generic [ref=e1419]: "返還請求 結果報告: 依頼者名：白石孝太（しらいしこうた）"
+                  - text: "面談対応(先生): 伊藤史尚【響】 ① 🔴 受任 ② 依頼者氏名: 白石孝太（しらいしこうた） ③ オリパ事業者: DOPA!, オリパワン, エクストレカ, 日本トレカセンター ④ クレジットカード会社: 楽天カード/JCBカード 直近3〜4か月チャージバック: ¥1,270,000 ⑤ 依頼者様属性: ✕ 案内しないほうがよい ───────── 対応者(CS): 鈴木佑香 【備考】 カードを買い取ってもらった時、そこに税金は発生するのか聞かれました。分かりませんとお答えしております。 それは税理士ですかね、と納得しておられたので、追って回答する必要はありませんが、一応残しておきます。 シート:"
+                  - generic [ref=e1422]:
+                    - link "https://docs.google.com/spreadsheets/d/1I19nIHPVVqHRCwcTb022qKvwMQ3mtiMNmcLLB8L1Thg/edit" [ref=e1423] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1I19nIHPVVqHRCwcTb022qKvwMQ3mtiMNmcLLB8L1Thg/edit
+                    - generic [ref=e1424] [cursor=pointer]: プレビュー
+              - generic [ref=e1425]: 9月11日 17:55
+            - generic [ref=e1428]:
+              - button [ref=e1430]:
+                - img "池場敬太" [ref=e1432] [cursor=pointer]
+              - generic [ref=e1433]:
+                - generic [ref=e1434]:
+                  - button [ref=e1435]:
+                    - paragraph [ref=e1436] [cursor=pointer]: 池場敬太
+                  - paragraph [ref=e1437]: 株式会社CONSCIENCE
+                - generic [ref=e1438]:
+                  - text: メンバー「
+                  - generic [ref=e1439]:
+                    - button [ref=e1441]
+                    - generic [ref=e1442]: 弁護士 堀口 貴音
+                  - text: 」を追加しました。
+              - generic [ref=e1443]: 9月11日 17:57
+            - generic [ref=e1446]:
+              - button [ref=e1448]:
+                - img "殿川 知哉" [ref=e1450] [cursor=pointer]
+              - generic [ref=e1451]:
+                - generic [ref=e1452]:
+                  - button [ref=e1453]:
+                    - paragraph [ref=e1454] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1455]: 株式会社GREENINE
+                - generic [ref=e1457]:
+                  - generic [ref=e1458]: "返還請求 結果報告: 依頼者名：岩永瑞穂/いわながみずほ"
+                  - text: "面談対応(先生): 可知稔基【響】 ① 🔴 受任 ② 依頼者氏名: 岩永瑞穂/いわながみずほ ③ オリパ事業者: 日本トレカセンター ④ クレジットカード会社: PayPay・コンビニ支払い, メルペイ ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 向加奈世 【備考】 おかしい点追記：還元率が表記と異なる旨も仰せ。また『なんかうらがある』と記載があるのは、以下の経緯があるとのこと。 当選したカードをカードショップに売却しにいったところ、当該ショップがトレカセンターに売却したものと説明され、他にも同様にカードをトレカセンターに売却していると言われた。これで何かおかしいと思われたとのことです。 シート:"
+                  - generic [ref=e1461]:
+                    - link "https://docs.google.com/spreadsheets/d/1_qb2_qB26M5wpM-s0LZoeK6KsdLayBkrmMffm629RR4/edit" [ref=e1462] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1_qb2_qB26M5wpM-s0LZoeK6KsdLayBkrmMffm629RR4/edit
+                    - generic [ref=e1463] [cursor=pointer]: プレビュー
+              - generic [ref=e1464]: 9月11日 18:04
+            - generic [ref=e1467]:
+              - button [ref=e1469]:
+                - img "池場敬太" [ref=e1471] [cursor=pointer]
+              - generic [ref=e1472]:
+                - generic [ref=e1473]:
+                  - button [ref=e1474]:
+                    - paragraph [ref=e1475] [cursor=pointer]: 池場敬太
+                  - paragraph [ref=e1476]: 株式会社CONSCIENCE
+                - generic [ref=e1477]:
+                  - text: メンバー「
+                  - generic [ref=e1478]:
+                    - button [ref=e1480]
+                    - generic [ref=e1481]: 弁護士 荒井 和子
+                  - text: 」を追加しました。
+              - generic [ref=e1482]: 9月11日 18:10
+            - generic [ref=e1485]:
+              - button [ref=e1487]:
+                - img "殿川 知哉" [ref=e1489] [cursor=pointer]
+              - generic [ref=e1490]:
+                - generic [ref=e1491]:
+                  - button [ref=e1492]:
+                    - paragraph [ref=e1493] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1494]: 株式会社GREENINE
+                - generic [ref=e1496]:
+                  - generic [ref=e1497]: "返還請求 結果報告: 依頼者名：潮一希(うしお かずき)"
+                  - text: "面談対応(先生): 藤田圭介【響】 ① 🔴 受任 ② 依頼者氏名: 潮一希(うしお かずき) ③ オリパ事業者: DOPA!, オリパワン, Cloveオリパ ④ クレジットカード会社: アメリカン・エキスプレス, UCカード, 楽天カード 直近3〜4か月チャージバック: ¥10,250,000 ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 小平圭 【備考】 1200万くらい セゾンアメックス・UCカード・三井住友カード・楽天カード・エポスカード・セブンカード＋をまんべんなく課金 セゾンアメックスが一番でかい 現金とペイペイも利用あり 社会問題になっていて弁護士が本気になってやっているだから勝算あるんですよね？って聞かれたので、請求するための法律構成自体はできるのでそれで進めているし、これだけ多くの問い合わせや反響があるので、それが被害の実態を証明する証拠にもなっている ただ、最終的には相手が応じるか、裁判所次第なところもある 現代版過払請求と言われているところもあるけど、過去の過払請求でも勝訴判決出ても、全然お金払わない貸金会社もいたり、武富士みたいにつぶれてしまって後々回収困難になることもあったりするので、相手方次第なところはある、とお伝え カード明日届くものがある、クレジット支払いのために既に売却予定で登録しているとのこと ログインしていくポイ活はしていく予定（アカバンリスクお伝え）"
+              - generic [ref=e1500]: 9月11日 18:10
+            - generic [ref=e1503]:
+              - button [ref=e1505]:
+                - img "池場敬太" [ref=e1507] [cursor=pointer]
+              - generic [ref=e1508]:
+                - generic [ref=e1509]:
+                  - button [ref=e1510]:
+                    - paragraph [ref=e1511] [cursor=pointer]: 池場敬太
+                  - paragraph [ref=e1512]: 株式会社CONSCIENCE
+                - generic [ref=e1513]:
+                  - text: メンバー「
+                  - generic [ref=e1514]:
+                    - button [ref=e1516]
+                    - generic [ref=e1517]: 弁護士 高村 実
+                  - text: 」を追加しました。
+              - generic [ref=e1518]: 9月11日 18:11
+            - generic [ref=e1521]:
+              - button [ref=e1523]:
+                - img "殿川 知哉" [ref=e1525] [cursor=pointer]
+              - generic [ref=e1526]:
+                - generic [ref=e1527]:
+                  - button [ref=e1528]:
+                    - paragraph [ref=e1529] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1530]: 株式会社GREENINE
+                - generic [ref=e1532]:
+                  - generic [ref=e1533]: "返還請求 結果報告: 依頼者名：まのこうすけ 眞野公輔"
+                  - text: "面談対応(先生): 古泉伸彦【響】 ① 🔴 受任 ② 依頼者氏名: まのこうすけ 眞野公輔 ③ オリパ事業者: DOPA! ④ クレジットカード会社: メルペイカード ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 佐伯優人 シート:"
+                  - generic [ref=e1536]:
+                    - link "https://docs.google.com/spreadsheets/d/1Y7avK_dJB0FoMCvS5eNL5RwOrlw8S99cqKy0LVFMwAw/edit" [ref=e1537] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1Y7avK_dJB0FoMCvS5eNL5RwOrlw8S99cqKy0LVFMwAw/edit
+                    - generic [ref=e1538] [cursor=pointer]: プレビュー
+              - generic [ref=e1539]: 9月11日 18:13
+            - generic [ref=e1542]:
+              - button [ref=e1544]:
+                - img "池場敬太" [ref=e1546] [cursor=pointer]
+              - generic [ref=e1547]:
+                - generic [ref=e1548]:
+                  - button [ref=e1549]:
+                    - paragraph [ref=e1550] [cursor=pointer]: 池場敬太
+                  - paragraph [ref=e1551]: 株式会社CONSCIENCE
+                - generic [ref=e1552]:
+                  - text: メンバー「
+                  - generic [ref=e1553]:
+                    - button [ref=e1555]
+                    - generic [ref=e1556]: 弁護士 山宮 康太
+                  - text: 」を追加しました。
+              - generic [ref=e1557]: 9月11日 18:13
+            - generic [ref=e1560]:
+              - button [ref=e1562]:
+                - img "殿川 知哉" [ref=e1564] [cursor=pointer]
+              - generic [ref=e1565]:
+                - generic [ref=e1566]:
+                  - button [ref=e1567]:
+                    - paragraph [ref=e1568] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1569]: 株式会社GREENINE
+                - generic [ref=e1571]:
+                  - generic [ref=e1572]: "返還請求 結果報告: 依頼者名：門脇良平"
+                  - text: "面談対応(先生): 望月純【穂】 ① 🔴 受任 ② 依頼者氏名: 門脇良平 ③ オリパ事業者: DOPA!, エクストレカ ④ クレジットカード会社: メルペイ ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 尾上雄太 【備考】 DOPA!の方では6万ポイントの当選があった。それまでにけっこう課金していた。 カードの発送はなし シート:"
+                  - generic [ref=e1575]:
+                    - link "https://docs.google.com/spreadsheets/d/1GuZXDjlwyN5c4C9Sx4ByzmjG-h5VTmHYshxtlsCO4SI/edit?gid=994718022#gid=994718022" [ref=e1576] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1GuZXDjlwyN5c4C9Sx4ByzmjG-h5VTmHYshxtlsCO4SI/edit?gid=994718022#gid=994718022
+                    - generic [ref=e1577] [cursor=pointer]: プレビュー
+              - generic [ref=e1578]: 9月11日 18:16
+            - generic [ref=e1581]:
+              - generic [ref=e1584]:
+                - generic [ref=e1585]: "返還請求 結果報告: 依頼者名：西田匠真"
+                - text: "面談対応(先生): 神野格【穂】 ① 🔴 受任 ② 依頼者氏名: 西田匠真 ③ オリパ事業者: 日本トレカセンター ④ クレジットカード会社: PAYPAY ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 土師優翔 【備考】 最初の利用は去年8月くらいとのこと。 シート:"
+                - generic [ref=e1588]:
+                  - link "https://docs.google.com/spreadsheets/d/1HlREt2auBINIm6i1S9D8b-Eqllma47GHNTFgwG2HXqg/edit" [ref=e1589] [cursor=pointer]:
+                    - /url: https://docs.google.com/spreadsheets/d/1HlREt2auBINIm6i1S9D8b-Eqllma47GHNTFgwG2HXqg/edit
+                  - generic [ref=e1590] [cursor=pointer]: プレビュー
+              - generic [ref=e1591]: 18:16
+            - generic [ref=e1594]:
+              - generic [ref=e1597]:
+                - generic [ref=e1598]: "返還請求 結果報告: 依頼者名：かきおかゆうた柿岡雄大"
+                - text: "面談対応(先生): 伊藤史尚【響】 ① 🔴 受任 ② 依頼者氏名: かきおかゆうた柿岡雄大 ③ オリパ事業者: オリパワン ④ クレジットカード会社: エポスカード, メルクレ 直近3〜4か月チャージバック: ¥500,000 ⑤ 依頼者様属性: ✕ 案内しないほうがよい ───────── 対応者(CS): 杉野由季英 【備考】 【要注意】 親にバレたくないらしく、実家に住んでいる関係で郵便物を家に送るのはNG。 どうしても仕方ないときは局留め。 シート:"
+                - generic [ref=e1601]:
+                  - link "https://docs.google.com/spreadsheets/d/1kyj7cO2HXqLAfPZ6b8bp9dGoVCZm3YIV1Ds7D-GgMnI/edit" [ref=e1602] [cursor=pointer]:
+                    - /url: https://docs.google.com/spreadsheets/d/1kyj7cO2HXqLAfPZ6b8bp9dGoVCZm3YIV1Ds7D-GgMnI/edit
+                  - generic [ref=e1603] [cursor=pointer]: プレビュー
+              - generic [ref=e1604]: 18:17
+            - generic [ref=e1607]:
+              - generic [ref=e1610]:
+                - generic [ref=e1611]: "返還請求 結果報告: 依頼者名：みまかける三間翔"
+                - text: "面談対応(先生): 西村智嗣【響】 ① 🔴 受任 ② 依頼者氏名: みまかける三間翔 ③ オリパ事業者: オリパスマッシュ ④ クレジットカード会社: — 直近3〜4か月チャージバック: ¥300,000 ⑤ 依頼者様属性: △ 何とも言えない ───────── 対応者(CS): 佐藤世理 【備考】 当選した景品が送られてきていないとのこと シート:"
+                - generic [ref=e1614]:
+                  - link "https://docs.google.com/spreadsheets/d/1yHOxY1mJhRR9YDi2AcghaAU1FIZ-LJrsxs3bwK2Argg/edit" [ref=e1615] [cursor=pointer]:
+                    - /url: https://docs.google.com/spreadsheets/d/1yHOxY1mJhRR9YDi2AcghaAU1FIZ-LJrsxs3bwK2Argg/edit
+                  - generic [ref=e1616] [cursor=pointer]: プレビュー
+              - generic [ref=e1617]: 18:21
+            - generic [ref=e1620]:
+              - button [ref=e1622]:
+                - img "池場敬太" [ref=e1624] [cursor=pointer]
+              - generic [ref=e1625]:
+                - generic [ref=e1626]:
+                  - button [ref=e1627]:
+                    - paragraph [ref=e1628] [cursor=pointer]: 池場敬太
+                  - paragraph [ref=e1629]: 株式会社CONSCIENCE
+                - generic [ref=e1630]:
+                  - text: メンバー「
+                  - generic [ref=e1631]:
+                    - button [ref=e1633]
+                    - generic [ref=e1634]: 弁護士 田尻 学
+                  - text: 」を追加しました。
+              - generic [ref=e1635]: 9月11日 18:26
+            - generic [ref=e1638]:
+              - button [ref=e1640]:
+                - img "殿川 知哉" [ref=e1642] [cursor=pointer]
+              - generic [ref=e1643]:
+                - generic [ref=e1644]:
+                  - button [ref=e1645]:
+                    - paragraph [ref=e1646] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1647]: 株式会社GREENINE
+                - generic [ref=e1649]:
+                  - generic [ref=e1650]: "返還請求 結果報告: 依頼者名：森井大樹"
+                  - text: "面談対応(先生): 神野格【穂】 ① 🔴 受任 ② 依頼者氏名: 森井大樹 ③ オリパ事業者: Cloveオリパ ④ クレジットカード会社: 楽天カード 直近3〜4か月チャージバック: ¥4,000 ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 下村大 シート:"
+                  - generic [ref=e1653]:
+                    - link "https://docs.google.com/spreadsheets/d/1k_TWqxIDce4fQyVpBOMhLfIxwZZZmnW6eFWBK98j3iA/edit" [ref=e1654] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1k_TWqxIDce4fQyVpBOMhLfIxwZZZmnW6eFWBK98j3iA/edit
+                    - generic [ref=e1655] [cursor=pointer]: プレビュー
+              - generic [ref=e1656]: 9月11日 18:28
+            - generic [ref=e1659]:
+              - generic [ref=e1662]:
+                - generic [ref=e1663]: "返還請求 結果報告: 依頼者名：山野達由"
+                - text: "面談対応(先生): 西田千晃【イージス】 ① 🔴 受任 ② 依頼者氏名: 山野達由 ③ オリパ事業者: 日本トレカセンター, エクストレカ ④ クレジットカード会社: PayPay, ぺいぺい 直近3〜4か月チャージバック: ¥2,200,000 ⑤ 依頼者様属性: 未選択 ───────── 対応者(CS): 小平圭 シート:"
+                - generic [ref=e1666]:
+                  - link "https://docs.google.com/spreadsheets/d/1qdHhjjyeeYnzwzzjyk1JHshBdimRnQOD9wE41Cd7zMA/edit" [ref=e1667] [cursor=pointer]:
+                    - /url: https://docs.google.com/spreadsheets/d/1qdHhjjyeeYnzwzzjyk1JHshBdimRnQOD9wE41Cd7zMA/edit
+                  - generic [ref=e1668] [cursor=pointer]: プレビュー
+              - generic [ref=e1669]: 18:29
+            - generic [ref=e1672]:
+              - generic [ref=e1673]:
+                - generic [ref=e1675]:
+                  - generic [ref=e1676]: "返還請求 結果報告: 依頼者名：中野正之 なかのせいし"
+                  - text: "面談対応(先生): 淺海菜保子【サンク】 ① 🔴 受任 ② 依頼者氏名: 中野正之 なかのせいし ③ オリパ事業者: DOPA! ④ クレジットカード会社: 三井住友カード（Vpass）, ニコス, ぺいぺい, ラインカード 直近3〜4か月チャージバック: ¥4,000,000 ⑤ 依頼者様属性: △ 何とも言えない ───────── 対応者(CS): 谷口雄 【備考】 ・弁護士面談では特に質問などありませんでしたが、受付の段階で細かめだったとのことです。 シート:"
+                  - generic [ref=e1679]:
+                    - link "https://docs.google.com/spreadsheets/d/1WUCtfVnNM5YyYb9OEgHZF8Z04pJbWgE3wUXTXVWapHU/edit" [ref=e1680] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1WUCtfVnNM5YyYb9OEgHZF8Z04pJbWgE3wUXTXVWapHU/edit
+                    - generic [ref=e1681] [cursor=pointer]: プレビュー
+                - generic [ref=e1682]:
+                  - generic "同じリアクションをする" [ref=e1683] [cursor=pointer]:
+                    - generic [ref=e1684]:
+                      - img "roger" [ref=e1687]
+                      - paragraph [ref=e1689]: "1"
+                  - button "リアクションを確認する" [ref=e1691] [cursor=pointer]
+              - generic [ref=e1693]: 18:30
+            - generic [ref=e1696]:
+              - generic [ref=e1699]:
+                - generic [ref=e1700]: "返還請求 結果報告: 依頼者名：横尾悠介(よこお)"
+                - text: "面談対応(先生): 古泉伸彦【響】 ① 🔴 受任 ② 依頼者氏名: 横尾悠介(よこお) ③ オリパ事業者: 日本トレカセンター, Cloveオリパ ④ クレジットカード会社: 三井住友カード（Vpass） 直近3〜4か月チャージバック: ¥53,500 ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 中嶋梨乃 【備考】 内線番号1264です。 シート:"
+                - generic [ref=e1703]:
+                  - link "https://docs.google.com/spreadsheets/d/1el19W0VYhZjd4-qElYVMmUt2QAPQuweMO7vQGGGp33Y/edit" [ref=e1704] [cursor=pointer]:
+                    - /url: https://docs.google.com/spreadsheets/d/1el19W0VYhZjd4-qElYVMmUt2QAPQuweMO7vQGGGp33Y/edit
+                  - generic [ref=e1705] [cursor=pointer]: プレビュー
+              - generic [ref=e1706]: 18:31
+            - generic [ref=e1709]:
+              - generic [ref=e1710]:
+                - generic [ref=e1712]:
+                  - generic [ref=e1713]: "返還請求 結果報告: 依頼者名：まつだりゅうた/松田隆大"
+                  - text: "面談対応(先生): 金澤博士【響】 ① 🔴 受任 ② 依頼者氏名: まつだりゅうた/松田隆大 ③ オリパ事業者: DOPA! ④ クレジットカード会社: ワンバンク・D払い 直近3〜4か月チャージバック: ¥2,000,000 ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 晴山大樹 シート:"
+                  - generic [ref=e1716]:
+                    - link "https://docs.google.com/spreadsheets/d/1TJQuBl1RiIlVrOuLngbQ5f-nE_wqmnTL75tp6EWgeeg/edit" [ref=e1717] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1TJQuBl1RiIlVrOuLngbQ5f-nE_wqmnTL75tp6EWgeeg/edit
+                    - generic [ref=e1718] [cursor=pointer]: プレビュー
+                - generic [ref=e1719]:
+                  - generic "同じリアクションをする" [ref=e1720] [cursor=pointer]:
+                    - generic [ref=e1721]:
+                      - img "dance" [ref=e1724]
+                      - paragraph [ref=e1726]: "1"
+                  - button "リアクションを確認する" [ref=e1728] [cursor=pointer]
+              - generic [ref=e1730]: 18:33
+            - generic [ref=e1733]:
+              - button [ref=e1735]:
+                - img "藤田圭介【弁護士】/内線108 夏季休暇9/18〜＠タイ" [ref=e1737] [cursor=pointer]
+              - generic [ref=e1738]:
+                - generic [ref=e1739]:
+                  - button [ref=e1740]:
+                    - paragraph [ref=e1741] [cursor=pointer]: 藤田圭介【弁護士】/内線108 夏季休暇9/18〜＠タイ
+                  - paragraph [ref=e1742]: 弁護士法人・響 債務整理事業部【弁護士課】
+                - generic [ref=e1743]:
+                  - generic [ref=e1744]:
+                    - link "https://kcw.kddi.ne.jp/#!rid445630269-2150189852535427072" [ref=e1745] [cursor=pointer]:
+                      - /url: https://kcw.kddi.ne.jp/#!rid445630269-2150189852535427072
+                    - generic [ref=e1746] [cursor=pointer]: メッセージリンク
+                  - text: ① 受任 ② 依頼者氏名 鈴木 友郷 スズキ ユウリ ③ オリパ事業者名（介入する事業者のみ） DOPA！、オリパワン、日本トレカセンター ④ クレジットカード会社名 楽天カード、アメックス ⑤ ご依頼者様属性（感じがよさそう＝〇、何とも言えない＝△、案内しないほうがよい＝✕） ✕ ⑥ 引継ぎ事項 カード手元あり ペイペイはデビット 少々適当な方
+              - generic [ref=e1747]: 9月11日 18:34
+            - generic [ref=e1752]:
+              - button [ref=e1754]:
+                - img "殿川 知哉" [ref=e1756] [cursor=pointer]
+              - generic [ref=e1757]:
+                - generic [ref=e1758]:
+                  - button [ref=e1759]:
+                    - paragraph [ref=e1760] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1761]: 株式会社GREENINE
+                - generic [ref=e1763]:
+                  - generic [ref=e1764]: "返還請求 結果報告: 依頼者名：髙島翔太"
+                  - text: "面談対応(先生): 中井たから【穂】 ① 🔴 受任 ② 依頼者氏名: 髙島翔太 ③ オリパ事業者: DOPA!, 日本トレカセンター, オリクジ ④ クレジットカード会社: メルペイカード, paypay残高 直近3〜4か月チャージバック: ¥10,000 ⑤ 依頼者様属性: △ 何とも言えない ───────── 対応者(CS): GREENINE蛯谷 環 シート:"
+                  - generic [ref=e1767]:
+                    - link "https://docs.google.com/spreadsheets/d/1_OnsTcUGRpk0gYwXUu05KrqgBKaV19ePSY7AvOBLmJs/edit" [ref=e1768] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1_OnsTcUGRpk0gYwXUu05KrqgBKaV19ePSY7AvOBLmJs/edit
+                    - generic [ref=e1769] [cursor=pointer]: プレビュー
+              - generic [ref=e1770]: 9月11日 18:36
+            - generic [ref=e1773]:
+              - generic [ref=e1776]:
+                - generic [ref=e1777]: "返還請求 結果報告: 依頼者名：内藤丈登（ないとうたけと）"
+                - text: "面談対応(先生): 西田千晃【イージス】 ① 🔴 受任 ② 依頼者氏名: 内藤丈登（ないとうたけと） ③ オリパ事業者: DOPA!, オリくじ ④ クレジットカード会社: メルペイ ⑤ 依頼者様属性: 未選択 ───────── 対応者(CS): 柴田大悟 シート:"
+                - generic [ref=e1780]:
+                  - link "https://docs.google.com/spreadsheets/d/1MQshyFTVgWJ1HIHLMOGCCFFn0bS0JV7yBBUYEfxV748/edit" [ref=e1781] [cursor=pointer]:
+                    - /url: https://docs.google.com/spreadsheets/d/1MQshyFTVgWJ1HIHLMOGCCFFn0bS0JV7yBBUYEfxV748/edit
+                  - generic [ref=e1782] [cursor=pointer]: プレビュー
+              - generic [ref=e1783]: 18:36
+            - generic [ref=e1786]:
+              - generic [ref=e1789]:
+                - generic [ref=e1790]: "返還請求 結果報告: 依頼者名：ｙｕｙａｎ."
+                - text: "面談対応(先生): 黒宮沙代【イージス】 ① 🔴 受任 ② 依頼者氏名: ｙｕｙａｎ. ③ オリパ事業者: DOPA!, Cloveオリパ, オリパワン, オリスタ ④ クレジットカード会社: — ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 吉村行雲 シート:"
+                - generic [ref=e1793]:
+                  - link "https://docs.google.com/spreadsheets/d/11x_jQAk2nUUTOH93wMVE2tzRc-r0DgzveJ3cUTfXo8M/edit" [ref=e1794] [cursor=pointer]:
+                    - /url: https://docs.google.com/spreadsheets/d/11x_jQAk2nUUTOH93wMVE2tzRc-r0DgzveJ3cUTfXo8M/edit
+                  - generic [ref=e1795] [cursor=pointer]: プレビュー
+              - generic [ref=e1796]: 18:37
+            - generic [ref=e1799]:
+              - button [ref=e1801]:
+                - img "弁護士 内田 祥平" [ref=e1803] [cursor=pointer]
+              - generic [ref=e1804]:
+                - generic [ref=e1805]:
+                  - button [ref=e1806]:
+                    - paragraph [ref=e1807] [cursor=pointer]: 弁護士 内田 祥平
+                  - paragraph [ref=e1808]: 弁護士法人ユア・エース/法務部
+                - generic [ref=e1809]:
+                  - button [ref=e1812]
+                  - text: 森前 孝一さん ※どちらのルームが適切かわかりかねますが、こちらで報告させていただきます。 木佐木健史 様
+                  - generic [ref=e1813]:
+                    - link "https://docs.google.com/spreadsheets/d/1blHvUgR8vIth5C1055A10mZpce4yn2Ji2DQY9G9IuBw/export?format=pdf&portrait=true&size=A4" [ref=e1814] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1blHvUgR8vIth5C1055A10mZpce4yn2Ji2DQY9G9IuBw/export?format=pdf&portrait=true&size=A4
+                    - generic [ref=e1815] [cursor=pointer]: プレビュー
+                  - text: 森前様に転送することになっておりましたが、以下の理由により、転送せず切電しております。 このあと用事があり急いでいるため、この場で結論を出せないということで、保留となりました。 なお、昨日電話の予約をして、昨日一日中待っていたが電話がなく、本日になってかかってきたとのことです。 本日の電話にしても、このあと用事があるものの20～30分程度と思っていたため対応していたが、かれこれ1時間くらいかかっており、これ以上は対応することができないとのことです。 アポを取らせていただこうとしましたが、明確に何時ということもできないので、改めてLINEから予約させてもらうとのことです。 予約日時との相違があり、ご不満をお持ちであったため、無理にアポ取りせず切電いたしました。
+                - generic [ref=e1816]:
+                  - generic "同じリアクションをする" [ref=e1817] [cursor=pointer]:
+                    - generic [ref=e1818]:
+                      - img "roger" [ref=e1821]
+                      - paragraph [ref=e1823]: "1"
+                  - button "リアクションを確認する" [ref=e1825] [cursor=pointer]
+              - generic [ref=e1827]: 9月11日 18:38
+            - generic [ref=e1832]:
+              - button [ref=e1834]:
+                - img "殿川 知哉" [ref=e1836] [cursor=pointer]
+              - generic [ref=e1837]:
+                - generic [ref=e1838]:
+                  - button [ref=e1839]:
+                    - paragraph [ref=e1840] [cursor=pointer]: 殿川 知哉
+                  - paragraph [ref=e1841]: 株式会社GREENINE
+                - generic [ref=e1843]:
+                  - generic [ref=e1844]: "返還請求 結果報告: 依頼者名：福本考平（フクモトコウヘイ）"
+                  - text: "面談対応(先生): 西村智嗣【響】 ① 保留 ② 依頼者氏名: 福本考平（フクモトコウヘイ） ③ 保留理由: 昨日の午前かかってくると聞いていたと 今からは無理とのことで、明日の１９時から面談することに ④ 再面談の要否: 要 ⑤ NA日: 2026/09/12 19:00 ───────── 対応者(CS): 今村英哲 シート:"
+                  - generic [ref=e1847]:
+                    - link "https://docs.google.com/spreadsheets/d/10nJFWJGPr84B9tNattOvUMsc4QvnBPxg-pYwmuMJnH8/edit" [ref=e1848] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/10nJFWJGPr84B9tNattOvUMsc4QvnBPxg-pYwmuMJnH8/edit
+                    - generic [ref=e1849] [cursor=pointer]: プレビュー
+              - generic [ref=e1850]: 9月11日 18:38
+            - generic [ref=e1852]:
+              - generic [ref=e1853]:
+                - generic [ref=e1856]:
+                  - generic [ref=e1857]: "返還請求 結果報告: 依頼者名：前村健一（まえむらけんいち）"
+                  - text: "面談対応(先生): 望月純【穂】 ① 🔴 受任 ② 依頼者氏名: 前村健一（まえむらけんいち） ③ オリパ事業者: DOPA!, エクストレカ ④ クレジットカード会社: 楽天カード 直近3〜4か月チャージバック: ¥200,000 ⑤ 依頼者様属性: 〇 感じがよさそう ───────── 対応者(CS): 藤野清風 【備考】 還元率の割にどんどんマイナスになっていった。 カードを利用したのは6月だったがチャージバックの期限を徒過することはないのかと質問があったので、期限内に請求はするが、認められるかどうかはカード会社次第であるとお伝えしています。 シート:"
+                  - generic [ref=e1860]:
+                    - link "https://docs.google.com/spreadsheets/d/1MjLgBdXA34lw8m6bcwsWrobrNK5QRt-DY5bmUZeHiWI/edit" [ref=e1861] [cursor=pointer]:
+                      - /url: https://docs.google.com/spreadsheets/d/1MjLgBdXA34lw8m6bcwsWrobrNK5QRt-DY5bmUZeHiWI/edit
+                    - generic [ref=e1862] [cursor=pointer]: プレビュー
+                - generic [ref=e1863]: 18:40
+              - toolbar [ref=e1865] [cursor=pointer]:
+                - listitem [ref=e1866]:
+                  - button "返信" [ref=e1867]
+                - listitem [ref=e1870]:
+                  - button "リアクション" [ref=e1871]
+                - listitem [ref=e1874]:
+                  - button "引用" [ref=e1875]
+                - listitem [ref=e1878]:
+                  - button [ref=e1879]
+        - generic [ref=e1882]:
+          - generic [ref=e1883]:
+            - generic [ref=e1884]:
+              - list [ref=e1885]:
+                - button "絵文字：気持ちを表現できます" [ref=e1888] [cursor=pointer]
+                - button "To：相手に呼びかけることができます" [ref=e1892] [cursor=pointer]
+                - button "ファイルを送信できます" [ref=e1896] [cursor=pointer]
+                - button "ビデオ/音声通話ができます" [ref=e1900] [cursor=pointer]
+              - generic [ref=e1902]:
+                - generic [ref=e1904]:
+                  - checkbox "Enterで送信" [checked] [ref=e1905]
+                  - generic [ref=e1906] [cursor=pointer]
+                  - generic [ref=e1907] [cursor=pointer]: Enterで送信
+                - generic [ref=e1909]:
+                  - button "送信" [disabled]
+                  - button [disabled]
+            - textbox "ここにメッセージ内容を入力 (Shift + Enterキーで改行)" [ref=e1913]:
+              - /placeholder: "ここにメッセージ内容を入力\n(Shift + Enterキーで改行)"
+          - button "ウインドウを拡大表示" [ref=e1916] [cursor=pointer]
+          - button "ウインドウを拡大表示" [ref=e1920] [cursor=pointer]
+      - generic [ref=e1927]:
+        - generic [ref=e1929]:
+          - paragraph [ref=e1932]: 概要
+          - generic [ref=e1936]:
+            - text: ■面談結果報告テンプレート
+            - code [ref=e1937]: 【受任の場合】 ① 受任 ② 依頼者氏名 ③ オリパ事業者名（介入する事業者のみ） ④ クレジットカード会社名 ⑤ ご依頼者様属性（感じがよさそう＝〇、何とも言えない＝△、案内しないほうがよい＝✕） ⑥ 引継ぎ事項 ※未成年課金、分割・リボでの高額決済、オリパ以外のご依頼者様の主訴があれば、必ず⑥に記載してください。 【 不受任 or 保留の場合】 ① 不受任 or 保留 ② 依頼者氏名 ③ 不受任 or 保留の理由 ④ （保留の場合）再面談の要否 ⑤ ＮＡ（あれば記載してください）
+            - text: ■ クラウド時内線番号 弁護士→クラウド：2060 ■案件管理
+            - generic [ref=e1938]:
+              - link "https://docs.google.com/spreadsheets/d/1AZXtqs-i2TcAEHNGj9NcPaQxhkMhLEu7x2cca7Yds78/edit?gid=546688801#gid=546688801" [ref=e1939] [cursor=pointer]:
+                - /url: https://docs.google.com/spreadsheets/d/1AZXtqs-i2TcAEHNGj9NcPaQxhkMhLEu7x2cca7Yds78/edit?gid=546688801#gid=546688801
+              - generic [ref=e1940] [cursor=pointer]: プレビュー
+        - generic [ref=e1944]:
+          - generic [ref=e1945]:
+            - paragraph [ref=e1946]: タスク
+            - button "テンプレートを選択" [ref=e1948] [cursor=pointer]
+          - button [ref=e1951] [cursor=pointer]:
+            - paragraph [ref=e1954]: タスク追加
+          - paragraph [ref=e1960]: 現在タスクはありません

@@ -1,0 +1,44 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e3]:
+    - banner [ref=f1e4]:
+      - img "Chatwork" [ref=f1e5]
+    - main [ref=f1e7]:
+      - generic [ref=f1e10]:
+        - generic [ref=f1e11]:
+          - heading "Enter password" [level=1] [ref=f1e12]
+          - generic:
+            - paragraph
+        - generic [ref=f1e14]:
+          - generic [ref=f1e16]:
+            - generic [ref=f1e18]:
+              - generic [ref=f1e19]: Username or email address
+              - textbox "Username or email address" [ref=f1e20]
+              - link "Edit email address" [ref=f1e21] [cursor=pointer]:
+                - /url: /u/login/identifier?state=hKFo2SBaMXdpVEdwa0E1NUxJREh5ODJaNDhLY0VGbEdvUV9ySqFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIEN2MHdNTkZ0VVF6SHRKNjBRRmhVRy1FQ2s0a0xFZG5Ro2NpZNkgZ1E3Mnl0RmplSk5hZGFQVU1CaG9uQWJibGVRQXo5RFo
+                - text: Edit
+            - generic [ref=f1e23]:
+              - generic [ref=f1e24]: Password
+              - textbox "Password" [active] [ref=f1e25]
+              - generic [aria-hidden]: Password*
+              - button "Show password" [ref=f1e26] [cursor=pointer]:
+                - generic [aria-hidden]: Show password
+          - paragraph [ref=f1e28]:
+            - link "Forgot Password?" [ref=f1e29] [cursor=pointer]:
+              - /url: /u/login/password-reset-start/Username-Password-Authentication/t.hirota%40hibiki-law.or.jp?state=hKFo2SBaMXdpVEdwa0E1NUxJREh5ODJaNDhLY0VGbEdvUV9ySqFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIEN2MHdNTkZ0VVF6SHRKNjBRRmhVRy1FQ2s0a0xFZG5Ro2NpZNkgZ1E3Mnl0RmplSk5hZGFQVU1CaG9uQWJibGVRQXo5RFo
+          - button "Login" [ref=f1e31] [cursor=pointer]
+    - link "Having trouble logging in?" [ref=f1e32] [cursor=pointer]:
+      - /url: https://l.chatwork.com/h_loginhelp_web_en
+    - link "Download app" [ref=f1e37] [cursor=pointer]:
+      - /url: https://go.chatwork.com/download/#desktop
+    - generic [ref=f1e42]:
+      - text: Click
+      - link "here" [ref=f1e43] [cursor=pointer]:
+        - /url: https://www.chatwork.com/login.php?lang=en
+      - text: to login with a non KDDI Chatwork account
+  - contentinfo [ref=f1e44]:
+    - link "Privacy Policy" [ref=f1e46] [cursor=pointer]:
+      - /url: https://www.kubell.com/en/privacy/
+    - generic [ref=f1e47]:
+      - text: ©
+      - link "KDDI" [ref=f1e48] [cursor=pointer]:
+        - /url: https://www.kddi.com/english/index.html

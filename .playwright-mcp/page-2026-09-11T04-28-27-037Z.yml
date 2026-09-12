@@ -1,0 +1,36 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - img "Chatwork" [ref=e5]
+    - main [ref=e7]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - heading "Login" [level=1] [ref=e12]
+          - generic:
+            - paragraph
+        - generic [ref=e13]:
+          - generic [ref=e16]:
+            - generic [ref=e20]:
+              - generic [ref=e21]: Email address
+              - textbox "Email address" [active] [ref=e22]
+              - generic [aria-hidden]: Email address*
+            - button "Continue" [ref=e24] [cursor=pointer]
+          - generic [ref=e26]:
+            - generic [ref=e27]: or
+            - button "Sign in with Authentication Code" [ref=e30] [cursor=pointer]
+    - link "Having trouble logging in?" [ref=e33] [cursor=pointer]:
+      - /url: https://l.chatwork.com/h_loginhelp_web_en
+    - link "Download app" [ref=e38] [cursor=pointer]:
+      - /url: https://go.chatwork.com/download/#desktop
+    - generic [ref=e43]:
+      - text: Click
+      - link "here" [ref=e44] [cursor=pointer]:
+        - /url: https://www.chatwork.com/login.php?lang=en
+      - text: to login with a non KDDI Chatwork account
+  - contentinfo [ref=e45]:
+    - link "Privacy Policy" [ref=e47] [cursor=pointer]:
+      - /url: https://www.kubell.com/en/privacy/
+    - generic [ref=e48]:
+      - text: ©
+      - link "KDDI" [ref=e49] [cursor=pointer]:
+        - /url: https://www.kddi.com/english/index.html

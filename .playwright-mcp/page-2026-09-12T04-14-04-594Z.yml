@@ -1,0 +1,30 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - banner [ref=e4]:
+        - heading [level=1] [ref=e5]:
+          - img "ChatWork" [ref=e6]
+        - link "ログアウト" [ref=e7] [cursor=pointer]:
+          - /url: https://kcw.kddi.ne.jp/logout.php
+    - generic [ref=e9]:
+      - heading "APIの利用申請" [level=1] [ref=e10]
+      - generic [ref=e13]:
+        - generic [ref=e14]:
+          - paragraph [ref=e15]: Chatwork APIのご利用には組織管理者様からの承認が必要です。ご利用を希望される方は、管理者様にAPI利用申請をおこなってください。
+          - generic [ref=e17]:
+            - generic [ref=e18]:
+              - checkbox [checked] [ref=e19] [cursor=pointer]
+              - link "API利用規約" [ref=e20] [cursor=pointer]:
+                - /url: https://go.chatwork.com/ja/terms/api.html
+              - text: に同意する
+            - generic [ref=e21]:
+              - button "API利用申請" [ref=e22] [cursor=pointer]
+              - generic "button btnSuccess"
+              - generic "Orange"
+        - list [ref=e24]:
+          - listitem [ref=e25]:
+            - text: Chatwork APIの
+            - link "ドキュメントはこちら" [ref=e26] [cursor=pointer]:
+              - /url: https://developer.chatwork.com/
+            - text: をご確認ください。
+  - text:  
