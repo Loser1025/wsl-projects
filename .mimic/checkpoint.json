@@ -1,0 +1,29 @@
+[
+  {
+    "role": "user",
+    "content": "Lステップ"
+  },
+  {
+    "role": "assistant",
+    "tool_calls": [
+      {
+        "id": "call_1270645",
+        "type": "function",
+        "function": {
+          "name": "search_history",
+          "arguments": "{\"query\":\"Lステップ\"}"
+        },
+        "extra_content": {
+          "google": {
+            "thought_signature": "El4KXAERTTIP5M/S3tAdrXdCBf45YdBWoPNmWBct5jwq53925GaeCRs9Y9iCGkfLJnGxxSovWP17lfk96mhrQp3Arh+Iwx/5dQ3NGvBx/K2aHIn317zOUThufsc8mGal"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "content": "[search_history: Lステップ] 1件ヒット\n\n--- [1] 2026-09-12_16-58\nUser: Lステップ\n",
+    "tool_call_id": "call_1270645"
+  }
+]
