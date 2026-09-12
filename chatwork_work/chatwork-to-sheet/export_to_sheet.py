@@ -343,6 +343,18 @@ def main():
     }
     print(f"  既存: {len(existing_ids)}件（本日分: {len(today_existing_ids)}件）")
 
+    # 日付が変わった後の初回実行(本日分がまだ0件)は、前日以前のデータを削除する
+    if existing_ids and not today_existing_ids:
+        print("日付が変わったため、前日以前のデータを削除します...")
+        service.spreadsheets().values().clear(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"{SHEET_NAME}!A2:H100000",
+            body={}
+        ).execute()
+        message_id_to_row = {}
+        existing_ids = set()
+        print("  削除完了")
+
     print("チャットワークからメッセージ取得中...")
     all_messages = fetch_cw_messages(force=1)
     messages = [
