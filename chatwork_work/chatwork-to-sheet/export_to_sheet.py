@@ -14,6 +14,7 @@ Chatwork内部API (gateway/load_chat.php, load_old_chat.php) の
 import os
 import json
 import re
+import time
 import requests
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -146,24 +147,6 @@ def _merge_reactions(reaction_map, chat_list):
             reaction_map[str(item["id"])] = item["reactions"]
 
 
-def _find_scroll_target(page):
-    return page.evaluate("""
-        () => {
-            const el = document.querySelector('._message');
-            let node = el;
-            while (node && node !== document.body) {
-                const style = getComputedStyle(node);
-                if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
-                    const r = node.getBoundingClientRect();
-                    return { x: r.x + r.width / 2, y: r.y + 50 };
-                }
-                node = node.parentElement;
-            }
-            return null;
-        }
-    """)
-
-
 def _login(page):
     page.wait_for_selector("#username", timeout=15000)
     page.fill("#username", CW_EMAIL)
@@ -178,143 +161,124 @@ def _login(page):
     page.wait_for_timeout(8000)
 
 
-def fetch_reactions(min_message_id, headless=True, max_scroll_seconds=90):
-    """Playwrightでログインし、内部API(load_chat.php/load_old_chat.php)の
-    レスポンスからmessage_id単位のリアクションを収集する。
-    min_message_id以前のメッセージに到達するまで画面を遡ってスクロールする。
-
-    1回のスクロール操作（数千px）ではコンテナ上端の「過去メッセージ読み込み」
-    トリガー地点に届かないことが多いため、レスポンスを都度待つのではなく
-    バックグラウンドで収集しつつ、時間予算内はスクロールを継続する"""
-    reaction_map = {}
-    import time
-
+def _refresh_cookies_via_browser():
+    """PlaywrightでKDDI Chatworkにログインし、Cookieファイルを更新する。
+    Cookieが有効な間はrequestsだけで完結するので、この関数は
+    Cookie切れ時のフォールバックとしてのみ呼ばれる"""
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless)
-        # CI(Dockerコンテナ)のデフォルトviewportは1280x720で、狭いと
-        # Chatwork側のレイアウトが変わりスクロール対象の検出に失敗することがあるため固定する
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context(viewport={"width": 1920, "height": 1080})
-
         if COOKIE_FILE.exists():
             try:
                 context.add_cookies(json.loads(COOKIE_FILE.read_text(encoding="utf-8")))
             except Exception:
                 pass
-
         page = context.new_page()
-
-        # load_old_chat.phpのレスポンスはバックグラウンドで常時収集しておき、
-        # スクロールのたびに逐一待ち受けない（1回のスクロールでは上端に届かず
-        # 応答が来ないことが多いため、待ち受け式だと毎回無駄にタイムアウトする）
-        old_chat_batches = []
-
-        def _on_response(response):
-            if "load_old_chat.php" in response.url:
-                try:
-                    old_chat_batches.append(response.json()["result"]["chat_list"])
-                except Exception:
-                    pass
-
-        page.on("response", _on_response)
-
-        resp = None
-        try:
-            with page.expect_response(lambda r: "load_chat.php" in r.url, timeout=45000) as resp_info:
-                page.goto(ROOM_URL, wait_until="commit", timeout=30000)
-            resp = resp_info.value
-        except Exception as e:
-            print(f"  [debug] 初回load_chat.php待ちタイムアウト: {e}")
-            resp = None
-
+        page.goto(ROOM_URL, wait_until="commit", timeout=30000)
+        page.wait_for_timeout(3000)
         if "auth.chatwork.com" in page.url or page.locator("#username").is_visible():
-            print("  [debug] Cookie無効のためログインします")
             _login(page)
-            cookies = context.cookies()
-            COOKIE_FILE.write_text(json.dumps(cookies, ensure_ascii=False, indent=2), encoding="utf-8")
-            resp = None
-            try:
-                with page.expect_response(lambda r: "load_chat.php" in r.url, timeout=45000) as resp_info:
-                    page.goto(ROOM_URL, wait_until="commit", timeout=30000)
-                resp = resp_info.value
-            except Exception as e:
-                print(f"  [debug] ログイン後load_chat.php待ちタイムアウト: {e}")
-                resp = None
-
-        # 既にログイン済み(Cookie有効)なのにload_chat.phpが検知できなかった場合、
-        # ページをリロードすると確実に再取得できることが多いため最後にもう一度試す
-        if resp is None:
-            print("  [debug] リロードで再試行します")
-            try:
-                with page.expect_response(lambda r: "load_chat.php" in r.url, timeout=30000) as resp_info:
-                    page.reload(wait_until="commit", timeout=30000)
-                resp = resp_info.value
-            except Exception as e:
-                print(f"  [debug] リロード後も取得できませんでした: {e}")
-                resp = None
-
-        if resp is None:
-            browser.close()
-            return reaction_map
-
-        chat_list = resp.json()["result"]["chat_list"]
-        _merge_reactions(reaction_map, chat_list)
-        earliest_id = min((int(c["id"]) for c in chat_list), default=0)
-
-        page.wait_for_selector("._message", timeout=15000)
-        rect = _find_scroll_target(page)
-        print(f"  [debug] scroll target: {rect}, 初回earliest_id={earliest_id}, 目標min_id={min_message_id}")
-
-        start = time.time()
-        batches_processed = 0
-        scroll_batches = 0
-        stalled_batches = 0
-        page.mouse.move(rect["x"], rect["y"]) if rect else None
-
-        while rect and earliest_id > min_message_id and (time.time() - start) < max_scroll_seconds:
-            scroll_batches += 1
-            for _ in range(5):
-                page.mouse.wheel(0, -800)
-                page.wait_for_timeout(200)
-
-            while batches_processed < len(old_chat_batches):
-                chat_list2 = old_chat_batches[batches_processed]
-                batches_processed += 1
-                if not chat_list2:
-                    continue
-                _merge_reactions(reaction_map, chat_list2)
-                new_earliest = min(int(c["id"]) for c in chat_list2)
-                if new_earliest < earliest_id:
-                    earliest_id = new_earliest
-                    stalled_batches = 0
-
-            # コンテナの一番上まで到達したら、それ以上遡れるものがない
-            scroll_top = page.evaluate("""
-                () => {
-                    const el = document.querySelector('._message');
-                    let node = el;
-                    while (node && node !== document.body) {
-                        const style = getComputedStyle(node);
-                        if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
-                            return node.scrollTop;
-                        }
-                        node = node.parentElement;
-                    }
-                    return null;
-                }
-            """)
-            if scroll_top is not None and scroll_top <= 0:
-                print("  [debug] コンテナの一番上まで到達（これ以上の履歴なし）")
-                break
-
-            stalled_batches += 1
-            if stalled_batches > 30:
-                print("  [debug] 一定回数スクロールしても進捗なし、打ち切り")
-                break
-
-        print(f"  [debug] スクロール{scroll_batches}回(応答{batches_processed}件処理)、"
-              f"最終earliest_id={earliest_id}, 経過{time.time()-start:.1f}秒")
+        cookies = context.cookies()
+        COOKIE_FILE.write_text(json.dumps(cookies, ensure_ascii=False, indent=2), encoding="utf-8")
         browser.close()
 
+
+def _build_cookie_jar():
+    if not COOKIE_FILE.exists():
+        return requests.cookies.RequestsCookieJar()
+    try:
+        cookies = json.loads(COOKIE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return requests.cookies.RequestsCookieJar()
+    jar = requests.cookies.RequestsCookieJar()
+    for c in cookies:
+        jar.set(c["name"], c["value"], domain=c.get("domain", "").lstrip("."), path=c.get("path", "/"))
+    return jar
+
+
+def _fetch_token_and_myid(session):
+    """トップページの生HTMLに埋め込まれているACCESS_TOKEN/MYIDを正規表現で抜き出す。
+    ブラウザでJSを実行しなくても、Cookieが有効ならこれだけで内部APIを叩ける"""
+    resp = session.get("https://kcw.kddi.ne.jp/", timeout=15)
+    token_m = re.search(r"ACCESS_TOKEN\s*=\s*'([^']+)'", resp.text)
+    myid_m = re.search(r"MYID\s*=\s*'?(\d+)'?", resp.text)
+    if not token_m or not myid_m:
+        return None, None
+    return token_m.group(1), myid_m.group(1)
+
+
+def _call_internal_api(session, myid, token, endpoint, extra_params):
+    params = {"myid": myid, "_v": "1.80a", "_av": "5", "ln": "ja"}
+    params.update(extra_params)
+    data = {"pdata": json.dumps({"load_file_version": "2", "_t": token})}
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        "Referer": ROOM_URL,
+        "Accept": "application/json, text/plain, */*",
+    }
+    resp = session.post(
+        f"https://kcw.kddi.ne.jp/gateway/{endpoint}",
+        params=params, data=data, headers=headers, timeout=15
+    )
+    resp.raise_for_status()
+    return resp.json()["result"]["chat_list"]
+
+
+def fetch_reactions(min_message_id, max_seconds=60):
+    """requestsだけで内部API(load_chat.php/load_old_chat.php)を呼び出し、
+    message_id単位のリアクションを収集する。Cookieが無効な場合のみ
+    Playwrightでログインし直す（通常運用ではブラウザ起動が発生しない）"""
+    reaction_map = {}
+
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    })
+    session.cookies = _build_cookie_jar()
+
+    token, myid = _fetch_token_and_myid(session)
+    if not token:
+        print("  [debug] Cookie無効のためPlaywrightでログインします")
+        _refresh_cookies_via_browser()
+        session.cookies = _build_cookie_jar()
+        token, myid = _fetch_token_and_myid(session)
+        if not token:
+            print("  [debug] ログイン後もトークン取得に失敗しました")
+            return reaction_map
+
+    start = time.time()
+    try:
+        chat_list = _call_internal_api(session, myid, token, "load_chat.php", {
+            "room_id": str(CW_ROOM_ID), "last_chat_id": "0", "unread_num": "0",
+            "bookmark": "1", "desc": "1"
+        })
+    except Exception as e:
+        print(f"  [debug] load_chat.php呼び出しに失敗: {e}")
+        return reaction_map
+
+    _merge_reactions(reaction_map, chat_list)
+    earliest_id = min((int(c["id"]) for c in chat_list), default=0)
+
+    batches = 0
+    while earliest_id > min_message_id and (time.time() - start) < max_seconds:
+        batches += 1
+        try:
+            chat_list2 = _call_internal_api(session, myid, token, "load_old_chat.php", {
+                "room_id": str(CW_ROOM_ID), "first_chat_id": str(earliest_id)
+            })
+        except Exception as e:
+            print(f"  [debug] load_old_chat.php {batches}回目で失敗: {e}")
+            break
+        if not chat_list2:
+            break
+        _merge_reactions(reaction_map, chat_list2)
+        new_earliest = min(int(c["id"]) for c in chat_list2)
+        if new_earliest >= earliest_id:
+            break
+        earliest_id = new_earliest
+
+    print(f"  [debug] load_old_chat.php {batches}回、最終earliest_id={earliest_id}、"
+          f"経過{time.time()-start:.1f}秒")
     return reaction_map
 
 
