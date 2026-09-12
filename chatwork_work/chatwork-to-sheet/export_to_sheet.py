@@ -33,6 +33,7 @@ COOKIE_FILE = Path(__file__).parent / "chatwork_cookies.json"
 
 SPREADSHEET_ID = "11RAnfeZZPS8dF6llHV7T2FOd2shSdPgiBdmzeMU4sQo"
 SHEET_NAME = "シート1"
+SHEET_ID = 0
 SA_PATH = os.path.join(os.path.dirname(__file__), "../../google-workspace-mcp/credentials.json")
 JST = timezone(timedelta(hours=9))
 
@@ -283,6 +284,27 @@ def ensure_header(service):
         ).execute()
 
 
+def ensure_min_rows(service, min_rows):
+    """values.update()は範囲がグリッドの行数を超えるとエラーになる
+    (appendと違い自動では広がらない)ため、書き込み前に必要な行数を確保する"""
+    meta = service.spreadsheets().get(
+        spreadsheetId=SPREADSHEET_ID,
+        fields="sheets.properties(sheetId,gridProperties.rowCount)"
+    ).execute()
+    props = next(s["properties"] for s in meta["sheets"] if s["properties"]["sheetId"] == SHEET_ID)
+    current_rows = props["gridProperties"]["rowCount"]
+    if current_rows < min_rows:
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=SPREADSHEET_ID,
+            body={"requests": [{
+                "updateSheetProperties": {
+                    "properties": {"sheetId": SHEET_ID, "gridProperties": {"rowCount": min_rows + 200}},
+                    "fields": "gridProperties.rowCount"
+                }
+            }]}
+        ).execute()
+
+
 def backfill_reactions(service, reaction_map, member_names, message_id_to_row):
     data = []
     for mid, reactions in reaction_map.items():
@@ -359,11 +381,16 @@ def main():
 
     if new_rows:
         print(f"新規: {len(new_rows)}件を書き出し中...")
-        service.spreadsheets().values().append(
+        # values.append()の「テーブル自動検出」はE〜H列の書式やシート全体の
+        # 行数(バンディング/条件付き書式で広げた範囲)に引きずられて挿入位置が
+        # 大きくずれることがあったため使わない。A列を読んで得た実際の最終行
+        # (message_id_to_row)を根拠に、書き込み範囲を自分で明示的に計算する
+        next_row = max(message_id_to_row.values(), default=1) + 1
+        ensure_min_rows(service, next_row + len(new_rows) - 1)
+        service.spreadsheets().values().update(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"{SHEET_NAME}!A:E",
+            range=f"{SHEET_NAME}!A{next_row}:E{next_row + len(new_rows) - 1}",
             valueInputOption="RAW",
-            insertDataOption="INSERT_ROWS",
             body={"values": new_rows}
         ).execute()
         print(f"完了: {len(new_rows)}件を追記しました。")
