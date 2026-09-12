@@ -1,8 +1,9 @@
 """
-単一エントリポイント。外部cronから ?job=poll (1分毎) / ?job=reset (1日1回) の
-クエリパラメータで呼び分ける。Vercelの新しいPythonランタイムがapi/配下の
-複数ファイルをそれぞれ別関数として自動認識してくれなかったため、1ファイルに
-まとめてルーティングする方式にした。
+単一エントリポイント。外部cron(GAS)から ?job=poll (1分毎) / ?job=reset (1日1回) の
+クエリパラメータで呼び分ける。
+
+日付が変わると「テンプレ」シートを複製してその日専用のシート(タブ名 MM/DD)を
+作り、そこにその日のメッセージだけを書き込む。過去日のシートは削除しない。
 """
 
 import os
@@ -15,9 +16,8 @@ from urllib.parse import urlparse, parse_qs
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from _shared import (  # noqa: E402
-    JST, SPREADSHEET_ID, SHEET_NAME,
-    get_sheets_service, ensure_header, fetch_cw_messages,
-    clear_previous_day_and_reset_checkboxes, build_new_rows, write_new_rows,
+    JST, SPREADSHEET_ID, get_sheets_service, fetch_cw_messages,
+    get_or_create_daily_sheet, build_new_rows, write_new_rows,
 )
 
 POLL_SECRET = os.environ.get("POLL_SECRET", "")
@@ -25,52 +25,31 @@ POLL_SECRET = os.environ.get("POLL_SECRET", "")
 
 def run_poll():
     service = get_sheets_service()
-    ensure_header(service)
+    today = datetime.now(JST).date()
+    sheet_id, sheet_name = get_or_create_daily_sheet(service, today)
 
     result = service.spreadsheets().values().get(
-        spreadsheetId=SPREADSHEET_ID, range=f"{SHEET_NAME}!A:B"
+        spreadsheetId=SPREADSHEET_ID,
+        range=f"{sheet_name}!A:A"
     ).execute()
     values = result.get("values", [])
-    message_id_to_row = {row[0]: i + 2 for i, row in enumerate(values[1:]) if row}
+    message_id_to_row = {row[0]: i + 2 for i, row in enumerate(values[1:]) if row and row[0]}
     existing_ids = set(message_id_to_row.keys())
-
-    today = datetime.now(JST).date()
-    today_prefix = today.strftime("%Y/%m/%d")
-    today_existing_ids = {
-        row[0] for row in values[1:]
-        if row and len(row) >= 2 and row[1].startswith(today_prefix)
-    }
-
-    reset = False
-    if existing_ids and not today_existing_ids:
-        clear_previous_day_and_reset_checkboxes(service)
-        message_id_to_row = {}
-        existing_ids = set()
-        reset = True
 
     all_messages = fetch_cw_messages()
     _today_msgs, new_rows = build_new_rows(all_messages, today, existing_ids)
-    written = write_new_rows(service, message_id_to_row, new_rows)
+    written = write_new_rows(service, sheet_name, sheet_id, message_id_to_row, new_rows)
 
-    return {"job": "poll", "fetched": len(all_messages), "written": written, "daily_reset": reset}
+    return {"job": "poll", "sheet": sheet_name, "fetched": len(all_messages), "written": written}
 
 
 def run_daily_reset():
-    """呼ばれるたびに無条件で消すと事故るため、本日分が1件も無い場合だけ実行する
-    （poll側と同じ判定。1日に何度叩かれても安全な設計にする）"""
+    """安全ネット。poll側で毎回その日のシート有無を確認しているので必須では
+    ないが、pollが長時間呼ばれなかった場合に備えてこちらでも作成しておく"""
     service = get_sheets_service()
-    result = service.spreadsheets().values().get(
-        spreadsheetId=SPREADSHEET_ID, range=f"{SHEET_NAME}!B:B"
-    ).execute()
-    values = result.get("values", [])
-    today_prefix = datetime.now(JST).date().strftime("%Y/%m/%d")
-    has_today = any(row and row[0].startswith(today_prefix) for row in values[1:])
-    has_any = any(row for row in values[1:])
-
-    if has_any and not has_today:
-        clear_previous_day_and_reset_checkboxes(service)
-        return {"job": "reset", "reset": True}
-    return {"job": "reset", "reset": False, "reason": "today's data already exists or sheet is empty"}
+    today = datetime.now(JST).date()
+    sheet_id, sheet_name = get_or_create_daily_sheet(service, today)
+    return {"job": "reset", "sheet": sheet_name, "sheet_id": sheet_id}
 
 
 class handler(BaseHTTPRequestHandler):

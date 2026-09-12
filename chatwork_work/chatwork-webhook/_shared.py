@@ -1,13 +1,18 @@
 """
 Chatwork -> Google Sheets 連携の共通ロジック。
-api/poll.py と api/daily_reset.py の両方から使う。
+api/run.py から使う。
 
 旧 chatwork_work/chatwork-to-sheet/export_to_sheet.py からリアクション取得
 (Cookie/Playwright/内部API依存)を除いたもの。公式REST APIのみで完結する。
+
+日付が変わるたびに「テンプレ」シートを複製してその日専用のシート
+(タブ名 MM/DD)を作り、そこにその日のメッセージだけを書き込んでいく。
+過去日のシートは削除・上書きせずそのまま残す。
 """
 
 import os
 import re
+import json
 import requests
 from datetime import datetime, timezone, timedelta
 from google.oauth2 import service_account
@@ -16,13 +21,9 @@ from googleapiclient.discovery import build
 CW_API_TOKEN = os.environ.get("CW_API_TOKEN", "")
 CW_ROOM_ID = int(os.environ.get("CW_ROOM_ID", "445630230"))
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "11RAnfeZZPS8dF6llHV7T2FOd2shSdPgiBdmzeMU4sQo")
-SHEET_NAME = os.environ.get("SHEET_NAME", "シート1")
-SHEET_ID = int(os.environ.get("SHEET_ID", "0"))
-CHECK_COLUMN = os.environ.get("CHECK_COLUMN", "I")
+TEMPLATE_SHEET_NAME = os.environ.get("TEMPLATE_SHEET_NAME", "テンプレ")
 
 JST = timezone(timedelta(hours=9))
-
-HEADER = ["message_id", "日付", "送信者", "内容", "面談対応(先生)", "対応者(CS)", "リアクション"]
 
 _URL_RE = re.compile(r"https?://[\w\-._~:/?#\[\]@!$&'()*+,;=%]+")
 _TEACHER_RE = re.compile(r"面談対応\(先生\)[:：]\s*(.+)")
@@ -32,7 +33,6 @@ _CS_RE = re.compile(r"対応者\(CS\)[:：]\s*(.+)")
 def get_sheets_service():
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
     sa_json = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
-    import json
     creds = service_account.Credentials.from_service_account_info(json.loads(sa_json), scopes=scopes)
     return build("sheets", "v4", credentials=creds)
 
@@ -70,7 +70,46 @@ def _link_runs_for_urls(text):
     return runs
 
 
-def apply_url_links(service, rows_with_body):
+def _list_sheets(service):
+    meta = service.spreadsheets().get(
+        spreadsheetId=SPREADSHEET_ID,
+        fields="sheets.properties(sheetId,title,gridProperties.rowCount)"
+    ).execute()
+    return [s["properties"] for s in meta["sheets"]]
+
+
+def daily_sheet_name(date):
+    return date.strftime("%m/%d")
+
+
+def get_or_create_daily_sheet(service, date):
+    """その日専用のシート(タブ名 MM/DD)のsheetIdを返す。無ければ「テンプレ」を
+    複製して作る（書式・条件付き書式・チェックボックスもテンプレのまま引き継がれる）"""
+    name = daily_sheet_name(date)
+    sheets = _list_sheets(service)
+
+    existing = next((s for s in sheets if s["title"] == name), None)
+    if existing:
+        return existing["sheetId"], name
+
+    template = next((s for s in sheets if s["title"] == TEMPLATE_SHEET_NAME), None)
+    if not template:
+        raise RuntimeError(f"テンプレートシート「{TEMPLATE_SHEET_NAME}」が見つかりません")
+
+    resp = service.spreadsheets().batchUpdate(
+        spreadsheetId=SPREADSHEET_ID,
+        body={"requests": [{
+            "duplicateSheet": {
+                "sourceSheetId": template["sheetId"],
+                "newSheetName": name,
+            }
+        }]}
+    ).execute()
+    new_sheet_id = resp["replies"][0]["duplicateSheet"]["properties"]["sheetId"]
+    return new_sheet_id, name
+
+
+def apply_url_links(service, sheet_id, rows_with_body):
     """[(行番号, 本文), ...] のD列にURLリンクのtextFormatRunsを適用する"""
     requests_body = []
     for row_number, body in rows_with_body:
@@ -80,7 +119,7 @@ def apply_url_links(service, rows_with_body):
         requests_body.append({
             "updateCells": {
                 "range": {
-                    "sheetId": SHEET_ID,
+                    "sheetId": sheet_id,
                     "startRowIndex": row_number - 1,
                     "endRowIndex": row_number,
                     "startColumnIndex": 3,
@@ -97,63 +136,21 @@ def apply_url_links(service, rows_with_body):
         ).execute()
 
 
-def ensure_header(service):
-    result = service.spreadsheets().values().get(
-        spreadsheetId=SPREADSHEET_ID,
-        range=f"{SHEET_NAME}!A1:G1"
-    ).execute()
-    values = result.get("values", [])
-    if not values or values[0] != HEADER:
-        service.spreadsheets().values().update(
-            spreadsheetId=SPREADSHEET_ID,
-            range=f"{SHEET_NAME}!A1:G1",
-            valueInputOption="RAW",
-            body={"values": [HEADER]}
-        ).execute()
-
-
-def _get_row_count(service):
-    meta = service.spreadsheets().get(
-        spreadsheetId=SPREADSHEET_ID,
-        fields="sheets.properties(sheetId,gridProperties.rowCount)"
-    ).execute()
-    props = next(s["properties"] for s in meta["sheets"] if s["properties"]["sheetId"] == SHEET_ID)
-    return props["gridProperties"]["rowCount"]
-
-
-def ensure_min_rows(service, min_rows):
+def ensure_min_rows(service, sheet_id, min_rows):
     """values.update()は範囲がグリッドの行数を超えるとエラーになる
     (appendと違い自動では広がらない)ため、書き込み前に必要な行数を確保する"""
-    current_rows = _get_row_count(service)
+    sheets = _list_sheets(service)
+    props = next(s for s in sheets if s["sheetId"] == sheet_id)
+    current_rows = props["gridProperties"]["rowCount"]
     if current_rows < min_rows:
         service.spreadsheets().batchUpdate(
             spreadsheetId=SPREADSHEET_ID,
             body={"requests": [{
                 "updateSheetProperties": {
-                    "properties": {"sheetId": SHEET_ID, "gridProperties": {"rowCount": min_rows + 200}},
+                    "properties": {"sheetId": sheet_id, "gridProperties": {"rowCount": min_rows + 200}},
                     "fields": "gridProperties.rowCount"
                 }
             }]}
-        ).execute()
-
-
-def clear_previous_day_and_reset_checkboxes(service):
-    """前日以前のデータを削除する。I列(処理完了チェック)だけは値クリアで終わらせず、
-    明示的にFALSEを敷き詰め直す（クリアだけだと空セルになり、値としてのFALSEにはならない）"""
-    service.spreadsheets().values().clear(
-        spreadsheetId=SPREADSHEET_ID,
-        range=f"{SHEET_NAME}!A2:Z100000",
-        body={}
-    ).execute()
-
-    row_count = _get_row_count(service)
-    if row_count >= 2:
-        values = [[False] for _ in range(row_count - 1)]
-        service.spreadsheets().values().update(
-            spreadsheetId=SPREADSHEET_ID,
-            range=f"{SHEET_NAME}!{CHECK_COLUMN}2:{CHECK_COLUMN}{row_count}",
-            valueInputOption="RAW",
-            body={"values": values}
         ).execute()
 
 
@@ -177,19 +174,19 @@ def build_new_rows(all_messages, today, existing_ids):
     return messages, new_rows
 
 
-def write_new_rows(service, message_id_to_row, new_rows):
+def write_new_rows(service, sheet_name, sheet_id, message_id_to_row, new_rows):
     if not new_rows:
         return 0
     # values.append()の「テーブル自動検出」はシート全体の書式・行数に引きずられて
     # 挿入位置が大きくずれることがあったため使わない。A列から得た実際の最終行を
     # 根拠に、書き込み範囲を自分で明示的に計算する
     next_row = max(message_id_to_row.values(), default=1) + 1
-    ensure_min_rows(service, next_row + len(new_rows) - 1)
+    ensure_min_rows(service, sheet_id, next_row + len(new_rows) - 1)
     service.spreadsheets().values().update(
         spreadsheetId=SPREADSHEET_ID,
-        range=f"{SHEET_NAME}!A{next_row}:G{next_row + len(new_rows) - 1}",
+        range=f"{sheet_name}!A{next_row}:G{next_row + len(new_rows) - 1}",
         valueInputOption="RAW",
         body={"values": new_rows}
     ).execute()
-    apply_url_links(service, [(next_row + i, row[3]) for i, row in enumerate(new_rows)])
+    apply_url_links(service, sheet_id, [(next_row + i, row[3]) for i, row in enumerate(new_rows)])
     return len(new_rows)
