@@ -13,6 +13,7 @@ Chatwork内部API (gateway/load_chat.php, load_old_chat.php) の
 
 import os
 import json
+import re
 import requests
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -77,6 +78,55 @@ def fetch_room_members():
     resp = requests.get(url, headers=headers)
     resp.raise_for_status()
     return {str(m["account_id"]): m["name"] for m in resp.json()}
+
+
+_URL_RE = re.compile(r"https?://[\w\-._~:/?#\[\]@!$&'()*+,;=%]+")
+
+
+def _link_runs_for_urls(text):
+    """本文中のURL部分だけをクリック可能なリンクにするtextFormatRunsを作る。
+    URLが無ければNoneを返す（セル全体をUSER_ENTEREDにしても文章中に埋め込まれた
+    URLは自動リンク化されない＝セル全体がURLの場合のみ効くため、明示的に指定する）"""
+    matches = list(_URL_RE.finditer(text))
+    if not matches:
+        return None
+    runs = []
+    pos = 0
+    for m in matches:
+        if m.start() > pos:
+            runs.append({"startIndex": pos, "format": {}})
+        runs.append({"startIndex": m.start(), "format": {"link": {"uri": m.group(0)}}})
+        pos = m.end()
+    if pos < len(text):
+        runs.append({"startIndex": pos, "format": {}})
+    return runs
+
+
+def apply_url_links(service, rows_with_body):
+    """[(行番号, 本文), ...] のD列にURLリンクのtextFormatRunsを適用する"""
+    requests_body = []
+    for row_number, body in rows_with_body:
+        runs = _link_runs_for_urls(body)
+        if not runs:
+            continue
+        requests_body.append({
+            "updateCells": {
+                "range": {
+                    "sheetId": SHEET_ID,
+                    "startRowIndex": row_number - 1,
+                    "endRowIndex": row_number,
+                    "startColumnIndex": 3,
+                    "endColumnIndex": 4
+                },
+                "rows": [{"values": [{"textFormatRuns": runs}]}],
+                "fields": "textFormatRuns"
+            }
+        })
+    if requests_body:
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=SPREADSHEET_ID,
+            body={"requests": requests_body}
+        ).execute()
 
 
 def format_reactions(reactions, member_names):
@@ -405,6 +455,8 @@ def main():
             valueInputOption="RAW",
             body={"values": new_rows}
         ).execute()
+        # D列(内容)に含まれるURLをクリック可能なリンクにする
+        apply_url_links(service, [(next_row + i, row[3]) for i, row in enumerate(new_rows)])
         print(f"完了: {len(new_rows)}件を追記しました。")
     else:
         print("新規メッセージなし。")
