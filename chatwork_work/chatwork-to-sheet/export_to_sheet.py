@@ -8,7 +8,8 @@ Chatwork内部API (gateway/load_chat.php, load_old_chat.php) の
 レスポンスを傍受して取得する（非公開API。Chatwork側のUI変更で
 動かなくなる可能性がある点に注意）。
 
-列構成: A=message_id(重複チェック用), B=日付, C=送信者, D=内容, E=リアクション
+列構成: A=message_id(重複チェック用), B=日付, C=送信者, D=内容,
+       E=面談対応(先生), F=対応者(CS), G=リアクション
 """
 
 import os
@@ -82,6 +83,13 @@ def fetch_room_members():
 
 
 _URL_RE = re.compile(r"https?://[\w\-._~:/?#\[\]@!$&'()*+,;=%]+")
+_TEACHER_RE = re.compile(r"面談対応\(先生\)[:：]\s*(.+)")
+_CS_RE = re.compile(r"対応者\(CS\)[:：]\s*(.+)")
+
+
+def _extract_field(body, pattern):
+    m = pattern.search(body)
+    return m.group(1).strip() if m else ""
 
 
 def _link_runs_for_urls(text):
@@ -283,16 +291,16 @@ def fetch_reactions(min_message_id, max_seconds=60):
 
 
 def ensure_header(service):
-    header = ["message_id", "日付", "送信者", "内容", "リアクション"]
+    header = ["message_id", "日付", "送信者", "内容", "面談対応(先生)", "対応者(CS)", "リアクション"]
     result = service.spreadsheets().values().get(
         spreadsheetId=SPREADSHEET_ID,
-        range=f"{SHEET_NAME}!A1:E1"
+        range=f"{SHEET_NAME}!A1:G1"
     ).execute()
     values = result.get("values", [])
     if not values or values[0] != header:
         service.spreadsheets().values().update(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"{SHEET_NAME}!A1:E1",
+            range=f"{SHEET_NAME}!A1:G1",
             valueInputOption="RAW",
             body={"values": [header]}
         ).execute()
@@ -325,7 +333,7 @@ def backfill_reactions(service, reaction_map, member_names, message_id_to_row):
         row = message_id_to_row.get(mid)
         if row:
             data.append({
-                "range": f"{SHEET_NAME}!E{row}",
+                "range": f"{SHEET_NAME}!G{row}",
                 "values": [[format_reactions(reactions, member_names)]]
             })
     if data:
@@ -362,7 +370,7 @@ def main():
         print("日付が変わったため、前日以前のデータを削除します...")
         service.spreadsheets().values().clear(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"{SHEET_NAME}!A2:H100000",
+            range=f"{SHEET_NAME}!A2:Z100000",
             body={}
         ).execute()
         message_id_to_row = {}
@@ -402,8 +410,10 @@ def main():
         dt = datetime.fromtimestamp(msg["send_time"], tz=JST).strftime("%Y/%m/%d %H:%M:%S")
         sender = msg["account"]["name"]
         body = msg["body"]
+        teacher = _extract_field(body, _TEACHER_RE)
+        cs = _extract_field(body, _CS_RE)
         reaction_str = format_reactions(reaction_map.get(mid), member_names)
-        new_rows.append([mid, dt, sender, body, reaction_str])
+        new_rows.append([mid, dt, sender, body, teacher, cs, reaction_str])
 
     if new_rows:
         print(f"新規: {len(new_rows)}件を書き出し中...")
@@ -415,7 +425,7 @@ def main():
         ensure_min_rows(service, next_row + len(new_rows) - 1)
         service.spreadsheets().values().update(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"{SHEET_NAME}!A{next_row}:E{next_row + len(new_rows) - 1}",
+            range=f"{SHEET_NAME}!A{next_row}:G{next_row + len(new_rows) - 1}",
             valueInputOption="RAW",
             body={"values": new_rows}
         ).execute()
