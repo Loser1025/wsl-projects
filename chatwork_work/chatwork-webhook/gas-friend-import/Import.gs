@@ -1,13 +1,16 @@
 /**
  * Lステップの「友だち詳細」CSVエクスポートを読み込み、依頼者名（G列）と
- * 本名/表示名で突き合わせて、事務所名より右の全項目が埋まっているかを
- * H列（友達情報）に書き込む。
+ * 表示名/LINE登録名/本名/システム表示名の4項目で突き合わせて、
+ * 事務所名より右の全項目が埋まっているかをH列（友達情報）に書き込む。
  *
  * CSVの想定フォーマット:
  *   1行目: 内部の友だち情報ID（友だち情報_XXXXXXX 等）
  *   2行目: 表示ラベル（ID, 表示名, LINE登録名, 本名, システム表示名, 事務所名, ...）
  *   3行目以降: 実データ（Shift-JIS）
  */
+
+// 依頼者名の突き合わせに使う名前系の列（どれか1つでも一致すればOK）
+const NAME_LABELS = ['表示名', 'LINE登録名', '本名', 'システム表示名'];
 
 // 「事務所名」から右の列を、入力必須項目とみなす
 const REQUIRED_LABELS = [
@@ -37,25 +40,29 @@ function processFriendCsv(base64Data, targetSheetChoice) {
   }
 
   const labelRow = rows[1];
-  const nameIdx = labelRow.indexOf('本名');
-  const displayIdx = labelRow.indexOf('表示名');
-  if (nameIdx === -1 || displayIdx === -1) {
-    throw new Error('CSVに「本名」または「表示名」列が見つかりません');
-  }
+  const nameIdxs = NAME_LABELS.map((label) => {
+    const idx = labelRow.indexOf(label);
+    if (idx === -1) throw new Error(`CSVに列「${label}」が見つかりません`);
+    return idx;
+  });
   const requiredIdx = REQUIRED_LABELS.map((label) => {
     const idx = labelRow.indexOf(label);
     if (idx === -1) throw new Error(`CSVに列「${label}」が見つかりません`);
     return idx;
   });
 
-  // 名前 -> 行データ のマップを作る（本名優先、無ければ表示名で代用）
+  // 名前 -> 行データ のマップを作る。表示名/LINE登録名/本名/システム表示名の
+  // いずれか1つでも一致すればヒットするよう、4項目すべてをキーとして登録する
+  // （同じキーが複数の友だちで重複する場合は最初に見つかった方を優先）
   const byName = {};
   for (let i = 2; i < rows.length; i++) {
     const row = rows[i];
-    const key = normalizeName_(row[nameIdx]) || normalizeName_(row[displayIdx]);
-    if (key && !byName[key]) {
-      byName[key] = row;
-    }
+    nameIdxs.forEach((idx) => {
+      const key = normalizeName_(row[idx]);
+      if (key && !byName[key]) {
+        byName[key] = row;
+      }
+    });
   }
 
   const targets = targetSheetChoice === '__ALL__'
