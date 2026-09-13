@@ -15,7 +15,7 @@ function showUploadDialog() {
   const sheetNames = getDateSheetNames_();
   const template = HtmlService.createTemplateFromFile('UploadDialog');
   template.sheetNames = sheetNames;
-  const html = template.evaluate().setWidth(420).setHeight(380);
+  const html = template.evaluate().setWidth(440).setHeight(480);
   SpreadsheetApp.getUi().showModalDialog(html, '友達情報の更新');
 }
 
