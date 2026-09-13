@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: sans-serif; padding: 12px; font-size: 13px; }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    select, input[type=file] { width: 100%; margin-top: 4px; box-sizing: border-box; }
+    button { margin-top: 16px; padding: 8px 16px; cursor: pointer; }
+    #status { margin-top: 12px; white-space: pre-wrap; color: #333; }
+  </style>
+</head>
+<body>
+  <label>対象シート</label>
+  <select id="sheetSelect">
+    <option value="__ALL__">すべての日付シート</option>
+    <? for (var i = 0; i < sheetNames.length; i++) { ?>
+      <option value="<?= sheetNames[i] ?>"><?= sheetNames[i] ?></option>
+    <? } ?>
+  </select>
+
+  <label>CSVファイル（友だち詳細エクスポート）</label>
+  <input type="file" id="csvFile" accept=".csv">
+
+  <button onclick="submitForm()">更新を実行</button>
+  <div id="status"></div>
+
+  <script>
+    function submitForm() {
+      var fileInput = document.getElementById('csvFile');
+      var sheetSelect = document.getElementById('sheetSelect');
+      var file = fileInput.files[0];
+      if (!file) {
+        document.getElementById('status').textContent = 'CSVファイルを選択してください';
+        return;
+      }
+      document.getElementById('status').textContent = '処理中...';
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var base64 = e.target.result.split(',')[1];
+        google.script.run
+          .withSuccessHandler(function(summary) {
+            document.getElementById('status').textContent = summary;
+          })
+          .withFailureHandler(function(err) {
+            document.getElementById('status').textContent = 'エラー: ' + err.message;
+          })
+          .processFriendCsv(base64, sheetSelect.value);
+      };
+      reader.readAsDataURL(file);
+    }
+  </script>
+</body>
+</html>
