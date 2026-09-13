@@ -2,48 +2,336 @@
 <html>
 <head>
   <base target="_top">
+  <meta charset="utf-8">
   <style>
-    body { font-family: sans-serif; padding: 12px; font-size: 13px; }
-    label { display: block; margin-top: 12px; font-weight: bold; }
-    select, input[type=file] { width: 100%; margin-top: 4px; box-sizing: border-box; }
-    button { margin-top: 16px; padding: 8px 16px; cursor: pointer; }
-    #status { margin-top: 12px; white-space: pre-wrap; color: #333; }
+    :root {
+      --bg: #f6f7fb;
+      --card-bg: #ffffff;
+      --text: #1a1d29;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+      --accent: #4f46e5;
+      --accent-hover: #4338ca;
+      --accent-soft: #eef2ff;
+      --success-bg: #ecfdf5;
+      --success-text: #047857;
+      --success-border: #a7f3d0;
+      --error-bg: #fef2f2;
+      --error-text: #b91c1c;
+      --error-border: #fecaca;
+      --radius: 14px;
+      --shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #16171d;
+        --card-bg: #1f2029;
+        --text: #f3f4f6;
+        --text-muted: #9ca3af;
+        --border: #33343f;
+        --accent: #818cf8;
+        --accent-hover: #a5b4fc;
+        --accent-soft: #2a2b52;
+        --success-bg: #052e21;
+        --success-text: #6ee7b7;
+        --success-border: #065f46;
+        --error-bg: #3a1414;
+        --error-text: #fca5a5;
+        --error-border: #7f1d1d;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .header-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: var(--accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .header-icon svg { width: 18px; height: 18px; color: var(--accent); }
+
+    h1 {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 12.5px;
+      margin: 4px 0 20px 42px;
+    }
+
+    .field { margin-top: 16px; }
+
+    .field label {
+      display: block;
+      font-weight: 600;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    select {
+      width: 100%;
+      appearance: none;
+      -webkit-appearance: none;
+      background: var(--card-bg)
+        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%236b7280" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>')
+        no-repeat right 12px center;
+      background-size: 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 36px 10px 12px;
+      font-size: 14px;
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    select:focus { outline: none; border-color: var(--accent); }
+
+    .dropzone {
+      position: relative;
+      border: 1.5px dashed var(--border);
+      border-radius: 10px;
+      padding: 20px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .dropzone:hover, .dropzone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .dropzone input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .dropzone-icon {
+      width: 28px;
+      height: 28px;
+      margin: 0 auto 8px;
+      color: var(--text-muted);
+    }
+    .dropzone-icon svg { width: 100%; height: 100%; }
+    .dropzone-text { font-weight: 600; font-size: 13px; }
+    .dropzone-hint { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+    .dropzone.has-file { border-style: solid; border-color: var(--accent); }
+    .dropzone.has-file .dropzone-icon { color: var(--accent); }
+
+    button.submit {
+      width: 100%;
+      margin-top: 22px;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+    button.submit:hover { background: var(--accent-hover); }
+    button.submit:active { transform: scale(0.98); }
+    button.submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .spinner {
+      width: 15px;
+      height: 15px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    button.submit.loading .spinner { display: inline-block; }
+    button.submit.loading .btn-label { opacity: 0.85; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      white-space: pre-wrap;
+      display: none;
+    }
+    .status.info {
+      display: block;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--accent-soft);
+    }
+    .status.success {
+      display: block;
+      background: var(--success-bg);
+      color: var(--success-text);
+      border: 1px solid var(--success-border);
+    }
+    .status.error {
+      display: block;
+      background: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid var(--error-border);
+    }
   </style>
 </head>
 <body>
-  <label>対象シート</label>
-  <select id="sheetSelect">
-    <option value="__ALL__">すべての日付シート</option>
-    <? for (var i = 0; i < sheetNames.length; i++) { ?>
-      <option value="<?= sheetNames[i] ?>"><?= sheetNames[i] ?></option>
-    <? } ?>
-  </select>
+  <div class="card">
+    <div class="header">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-8H7v8M7 3v5h8"/><path d="M21 21V7l-5-4H5a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/></svg>
+      </div>
+      <h1>友達情報の更新</h1>
+    </div>
+    <p class="subtitle">Lステップの友だち詳細CSVを取り込みます</p>
 
-  <label>CSVファイル（友だち詳細エクスポート）</label>
-  <input type="file" id="csvFile" accept=".csv">
+    <div class="field">
+      <label for="sheetSelect">対象シート</label>
+      <select id="sheetSelect">
+        <option value="__ALL__">すべての日付シート</option>
+        <? for (var i = 0; i < sheetNames.length; i++) { ?>
+          <option value="<?= sheetNames[i] ?>"><?= sheetNames[i] ?></option>
+        <? } ?>
+      </select>
+    </div>
 
-  <button onclick="submitForm()">更新を実行</button>
-  <div id="status"></div>
+    <div class="field">
+      <label>CSVファイル</label>
+      <div class="dropzone" id="dropzone">
+        <div class="dropzone-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+        </div>
+        <div class="dropzone-text" id="dropzoneText">クリックまたはドラッグ&ドロップ</div>
+        <div class="dropzone-hint" id="dropzoneHint">.csv ファイル（友だち詳細エクスポート）</div>
+        <input type="file" id="csvFile" accept=".csv">
+      </div>
+    </div>
+
+    <button class="submit" id="submitBtn" onclick="submitForm()">
+      <span class="spinner"></span>
+      <span class="btn-label" id="btnLabel">更新を実行</span>
+    </button>
+
+    <div class="status" id="status"></div>
+  </div>
 
   <script>
-    function submitForm() {
-      var fileInput = document.getElementById('csvFile');
-      var sheetSelect = document.getElementById('sheetSelect');
+    var dropzone = document.getElementById('dropzone');
+    var fileInput = document.getElementById('csvFile');
+    var dropzoneText = document.getElementById('dropzoneText');
+    var dropzoneHint = document.getElementById('dropzoneHint');
+
+    fileInput.addEventListener('change', function() {
+      updateDropzone();
+    });
+    ['dragenter', 'dragover'].forEach(function(evt) {
+      dropzone.addEventListener(evt, function(e) {
+        e.preventDefault();
+        dropzone.classList.add('drag-over');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function(evt) {
+      dropzone.addEventListener(evt, function(e) {
+        e.preventDefault();
+        dropzone.classList.remove('drag-over');
+      });
+    });
+    dropzone.addEventListener('drop', function(e) {
+      if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        updateDropzone();
+      }
+    });
+
+    function updateDropzone() {
       var file = fileInput.files[0];
+      if (file) {
+        dropzone.classList.add('has-file');
+        dropzoneText.textContent = file.name;
+        dropzoneHint.textContent = (file.size / 1024).toFixed(1) + ' KB';
+      } else {
+        dropzone.classList.remove('has-file');
+        dropzoneText.textContent = 'クリックまたはドラッグ&ドロップ';
+        dropzoneHint.textContent = '.csv ファイル（友だち詳細エクスポート）';
+      }
+    }
+
+    function setStatus(type, text) {
+      var el = document.getElementById('status');
+      el.className = 'status ' + type;
+      el.textContent = text;
+    }
+
+    function setLoading(isLoading) {
+      var btn = document.getElementById('submitBtn');
+      var label = document.getElementById('btnLabel');
+      btn.disabled = isLoading;
+      btn.classList.toggle('loading', isLoading);
+      label.textContent = isLoading ? '処理中…' : '更新を実行';
+    }
+
+    function submitForm() {
+      var file = fileInput.files[0];
+      var sheetSelect = document.getElementById('sheetSelect');
       if (!file) {
-        document.getElementById('status').textContent = 'CSVファイルを選択してください';
+        setStatus('error', 'CSVファイルを選択してください');
         return;
       }
-      document.getElementById('status').textContent = '処理中...';
+      setLoading(true);
+      setStatus('info', '読み込み中…');
       var reader = new FileReader();
       reader.onload = function(e) {
         var base64 = e.target.result.split(',')[1];
         google.script.run
           .withSuccessHandler(function(summary) {
-            document.getElementById('status').textContent = summary;
+            setLoading(false);
+            setStatus('success', summary);
           })
           .withFailureHandler(function(err) {
-            document.getElementById('status').textContent = 'エラー: ' + err.message;
+            setLoading(false);
+            setStatus('error', 'エラー: ' + err.message);
           })
           .processFriendCsv(base64, sheetSelect.value);
       };
