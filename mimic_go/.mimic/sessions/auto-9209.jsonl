@@ -1,0 +1,2 @@
+{"model":"nvidia/nemotron-3.5-lightning:free","provider":"openrouter","ts":"2026-09-14T15:19:59","type":"session_start"}
+{"content":"こんにちは","ts":"2026-09-14T15:19:59","type":"user_input"}

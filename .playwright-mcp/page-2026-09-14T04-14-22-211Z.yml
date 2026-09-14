@@ -1,0 +1,100 @@
+- application [ref=e1]:
+  - iframe [aria-hidden] [ref=e2]
+  - iframe [aria-hidden] [ref=e3]
+  - banner "メニューバー" [ref=e4]:
+    - generic [ref=e7]:
+      - link "スプレッドシート ホーム" [ref=e9] [cursor=pointer]:
+        - /url: https://docs.google.com/spreadsheets/?usp=sheets_web
+      - generic [ref=e16]:
+        - generic "阻止＆キャンセル処理一覧（通称：おばシート）" [ref=e18]:
+          - 'button "ドキュメントのステータス: ドライブに保存しました." [ref=e24]':
+            - generic [ref=e25] [cursor=pointer]: ドライブに保存しました
+        - generic [ref=e32]:
+          - generic [ref=e35]:
+            - button "AND medical group今谷 祐太" [ref=e38]:
+              - img "AND medical group今谷 祐太" [ref=e43] [cursor=pointer]
+            - button "18 人（非表示） 合計閲覧者 19 人" [ref=e44] [cursor=pointer]:
+              - generic [ref=e45]: "+18"
+          - generic [ref=e50]:
+            - button "共有します。リンクを知っている全員。 リンクを知っている全員がアクセスできます。ログインは不要です。" [disabled] [ref=e51]: 共有
+            - button "クイック共有操作" [disabled] [ref=e53]
+          - link "ログイン" [ref=e57] [cursor=pointer]:
+            - /url: https://accounts.google.com/ServiceLogin?service=wise&passive=1209600&osid=1&continue=https://docs.google.com/spreadsheets/d/1NQU2SGVykYL3n35NgzL78R0fszK0vt5yacNSV151wYI/edit?gid%3D1781095899&followup=https://docs.google.com/spreadsheets/d/1NQU2SGVykYL3n35NgzL78R0fszK0vt5yacNSV151wYI/edit?gid%3D1781095899&ltmpl=sheets&ec=GAZAmwI
+    - generic [ref=e59]:
+      - menubar [ref=e61]:
+        - menuitem "ファイル" [ref=e62] [cursor=pointer]
+        - menuitem "編集" [ref=e63] [cursor=pointer]
+        - menuitem "表示" [ref=e64] [cursor=pointer]
+        - menuitem "挿入" [disabled] [ref=e65]
+        - menuitem "表示形式" [disabled] [ref=e66]
+        - menuitem "データ" [ref=e67] [cursor=pointer]
+        - menuitem "ツール" [ref=e68] [cursor=pointer]
+        - menuitem "拡張機能" [disabled] [ref=e69]
+        - menuitem "ヘルプ" [ref=e70] [cursor=pointer]
+      - generic [ref=e71]:
+        - generic [ref=e72]:
+          - toolbar "メニューを検索 (Alt+/)" [ref=e73]:
+            - combobox "メニュー" [ref=e75]
+          - toolbar "メイン" [ref=e76]:
+            - button "印刷 (Ctrl+P)" [ref=e77] [cursor=pointer]
+            - button "フィルタ表示" [ref=e82] [cursor=pointer]
+            - combobox "ズーム" [ref=e91] [cursor=pointer]:
+              - option "ズーム のリストで 100% を選択しています。" [selected] [ref=e94]:
+                - textbox "ズーム" [ref=e95]: 100%
+            - button "モード" [ref=e99] [cursor=pointer]:
+              - generic [ref=e100]: 閲覧のみ
+        - toolbar "モードと表示" [ref=e103]:
+          - button "メニューを非表示 (Ctrl+Shift+F)" [ref=e104] [cursor=pointer]
+    - generic [ref=e111]:
+      - generic "名前ボックス (Ctrl + J)" [ref=e112]:
+        - textbox [ref=e113]: A1
+        - button "名前ボックスのメニューボタン。メニュー項目から 1 つを選択すると、対応する名前付き範囲に移動します。" [ref=e115] [cursor=pointer]
+      - textbox [ref=e131]
+  - navigation "シートタブバー" [ref=e161]:
+    - toolbar [ref=e162]:
+      - button "すべてのシート" [ref=e163] [cursor=pointer]
+    - toolbar [ref=e172]:
+      - button "2026.03 阻止＆処理リスト" [ref=e173]
+      - button "サブスク" [ref=e181] [cursor=pointer]
+      - button "対応履歴内容（阻止チーム）" [ref=e189] [cursor=pointer]
+      - button "(アポ、阻止)→処理急ぎ" [ref=e197] [cursor=pointer]
+      - button "ダウンセル案件 元契約解約チェック" [ref=e205] [cursor=pointer]
+      - button "未解約データ" [ref=e213] [cursor=pointer]
+      - button "申告日ベース" [ref=e221] [cursor=pointer]
+      - button "元シート" [ref=e229] [cursor=pointer]
+      - button "定時報告" [ref=e237] [cursor=pointer]
+      - button "アラート用" [ref=e245] [cursor=pointer]
+      - button "支払日マスタ" [ref=e253] [cursor=pointer]
+      - button "定時報告用" [ref=e261] [cursor=pointer]
+      - button "スクエア定型文" [ref=e269] [cursor=pointer]
+      - button "サブスクキャンセル進行状況" [ref=e277] [cursor=pointer]
+      - button "アプラス" [ref=e285] [cursor=pointer]
+      - button "燈火引継ぎ" [ref=e293] [cursor=pointer]
+      - button "キャンセル連絡するテレグラム班" [ref=e301] [cursor=pointer]
+      - button "月別阻止率（2026.05-08）" [ref=e309] [cursor=pointer]
+      - button "アラート" [ref=e317] [cursor=pointer]
+      - button "周知一覧" [ref=e325] [cursor=pointer]
+      - button "ユーザーマスタ" [ref=e333] [cursor=pointer]
+      - button "シフトテンプレート" [ref=e341] [cursor=pointer]
+      - button "テンプレ集" [ref=e349] [cursor=pointer]
+      - button "トーク例" [ref=e357] [cursor=pointer]
+      - button "日報" [ref=e365] [cursor=pointer]
+      - button "シナリオ設定" [ref=e373] [cursor=pointer]
+      - button "目標設定" [ref=e381] [cursor=pointer]
+      - button "QA" [ref=e389] [cursor=pointer]
+      - button "シフト_2026-03" [ref=e397] [cursor=pointer]
+      - button "シフト_2026-04" [ref=e405] [cursor=pointer]
+    - toolbar [ref=e413]:
+      - button "左へスクロール" [disabled] [ref=e414]
+      - button "右へスクロール" [ref=e419] [cursor=pointer]
+  - generic [ref=e424]:
+    - textbox [active]
+  - alert [ref=e425]:
+    - generic [ref=e427]: 現在のウィンドウは小さすぎて、このシートを正しく表示できません。ブラウザ ウィンドウのサイズを変更するか、固定行や固定列を調整してください。
+  - link "スクリーン リーダーのサポートを有効にする" [ref=e429] [cursor=pointer]:
+    - /url: "#"
+  - textbox [ref=e430]
+  - region [ref=e431]: スクリーン リーダーのサポートを有効にするには、Ctrl+Alt+Z を押します。キーボード ショートカットの詳細については、Ctrl+スラッシュ を押します。
+  - generic [ref=e432]: バナーを非表示にしました
+  - region
+  - generic [ref=e433]: 19 人の共同編集者がこのドキュメントの編集に参加しました。
