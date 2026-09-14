@@ -25,5 +25,32 @@
     "role": "tool",
     "content": "[search_history: Lステップ] 1件ヒット\n\n--- [1] 2026-09-12_16-58\nUser: Lステップ\n",
     "tool_call_id": "call_1270645"
+  },
+  {
+    "role": "user",
+    "content": "LステっプのAPIについてしらべられますか"
+  },
+  {
+    "role": "assistant",
+    "tool_calls": [
+      {
+        "id": "call_606651",
+        "type": "function",
+        "function": {
+          "name": "search_history",
+          "arguments": "{\"max_results\":5,\"query\":\"Lステップ API\"}"
+        },
+        "extra_content": {
+          "google": {
+            "thought_signature": "El4KXAERTTIPpaQEaulas8RYtWRx3vXD2tnQMWj3xWmzt0b3Rm4YPzS/H50xx9LEp1SEUbwVXpHZUBotC9J2T70B3ybWeXNEJvzseFL3j9BctE+qFj7NFkzxR8x3uCy7"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "role": "tool",
+    "content": "「Lステップ API」に一致するログが見つかりませんでした。\nヒント: query=''で最新セッションの全ターンを確認できます。",
+    "tool_call_id": "call_606651"
   }
 ]

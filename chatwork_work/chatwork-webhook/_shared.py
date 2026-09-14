@@ -28,6 +28,18 @@ JST = timezone(timedelta(hours=9))
 _URL_RE = re.compile(r"https?://[\w\-._~:/?#\[\]@!$&'()*+,;=%]+")
 _TEACHER_RE = re.compile(r"面談対応\(先生\)[:：]\s*(.+)")
 _CS_RE = re.compile(r"対応者\(CS\)[:：]\s*(.+)")
+# 「依頼者名：」(タイトル行) と「依頼者氏名:」(本文②) の両方の表記ゆれに対応
+_APPLICANT_RE = re.compile(r"依頼者(?:名|氏名)[:：]\s*([^\n\[]+)")
+# ②依頼者氏名の直後に改行して次の行に名前だけ書かれている形式(コロン無し)への保険
+_APPLICANT_NEXTLINE_RE = re.compile(r"依頼者氏名\s*\n\s*([^\n]+)")
+
+
+def extract_applicant(body):
+    m = _APPLICANT_RE.search(body)
+    if m:
+        return m.group(1).strip()
+    m = _APPLICANT_NEXTLINE_RE.search(body)
+    return m.group(1).strip() if m else ""
 
 
 def get_sheets_service():
@@ -170,7 +182,8 @@ def build_new_rows(all_messages, today, existing_ids):
         body = msg["body"]
         teacher = _extract_field(body, _TEACHER_RE)
         cs = _extract_field(body, _CS_RE)
-        new_rows.append([mid, dt, sender, body, teacher, cs, ""])
+        applicant = extract_applicant(body)
+        new_rows.append([mid, dt, sender, body, teacher, cs, applicant])
     return messages, new_rows
 
 

@@ -1,0 +1,100 @@
+- application [ref=f5e1]:
+  - iframe [aria-hidden] [ref=f5e2]
+  - iframe [aria-hidden] [ref=f5e3]
+  - banner "メニューバー" [ref=f5e4]:
+    - generic [ref=f5e7]:
+      - link "スプレッドシート ホーム" [ref=f5e9] [cursor=pointer]:
+        - /url: https://docs.google.com/spreadsheets/?usp=sheets_web
+      - generic [ref=f5e16]:
+        - generic "片岡2号" [ref=f5e18]:
+          - 'button "ドキュメントのステータス: ドライブに保存しました." [ref=f5e24]':
+            - generic [ref=f5e25] [cursor=pointer]: ドライブに保存しました
+        - generic [ref=f5e32]:
+          - button "1 人（非表示） 閲覧者 1 人" [ref=f5e36] [cursor=pointer]:
+            - generic [ref=f5e37]: "1"
+          - button "すべてのコメントを表示" [ref=f5e43] [cursor=pointer]
+          - generic [ref=f5e46]:
+            - button "共有します。リンクを知っている全員。 リンクを知っている全員がアクセスできます。ログインは不要です。" [disabled] [ref=f5e47]: 共有
+            - button "クイック共有操作" [disabled] [ref=f5e49]
+          - link "ログイン" [ref=f5e53] [cursor=pointer]:
+            - /url: https://accounts.google.com/ServiceLogin?service=wise&passive=1209600&osid=1&continue=https://docs.google.com/spreadsheets/d/1aFB2O37w-Dh0RmN_W2CultjS1X4Vb7LqxbKMb99UVp4/edit?gid%3D1312653187&followup=https://docs.google.com/spreadsheets/d/1aFB2O37w-Dh0RmN_W2CultjS1X4Vb7LqxbKMb99UVp4/edit?gid%3D1312653187&ltmpl=sheets&ec=GAZAmwI
+    - generic [ref=f5e55]:
+      - menubar [ref=f5e57]:
+        - menuitem "ファイル" [ref=f5e58] [cursor=pointer]
+        - menuitem "編集" [ref=f5e59] [cursor=pointer]
+        - menuitem "表示" [ref=f5e60] [cursor=pointer]
+        - menuitem "挿入" [ref=f5e61] [cursor=pointer]
+        - menuitem "表示形式" [ref=f5e62] [cursor=pointer]
+        - menuitem "データ" [ref=f5e63] [cursor=pointer]
+        - menuitem "ツール" [ref=f5e64] [cursor=pointer]
+        - menuitem "拡張機能" [ref=f5e65] [cursor=pointer]
+        - menuitem "ヘルプ" [ref=f5e66] [cursor=pointer]
+      - generic [ref=f5e67]:
+        - generic [ref=f5e68]:
+          - toolbar "メニューを検索 (Alt+/)" [ref=f5e69]:
+            - combobox "メニュー" [ref=f5e71]
+          - toolbar "メイン" [ref=f5e72]:
+            - button "元に戻す (Ctrl+Z)" [ref=f5e73] [cursor=pointer]
+            - button "やり直し (Ctrl+Y)" [ref=f5e78] [cursor=pointer]
+            - button "印刷 (Ctrl+P)" [ref=f5e83] [cursor=pointer]
+            - button "書式を貼り付け" [ref=f5e88] [cursor=pointer]
+            - combobox "ズーム" [ref=f5e93] [cursor=pointer]:
+              - option "ズーム のリストで 100% を選択しています。" [selected] [ref=f5e96]:
+                - textbox "ズーム" [ref=f5e97]: 100%
+            - separator [disabled] [ref=f5e101]
+            - button "表示形式を通貨に設定" [ref=f5e102] [cursor=pointer]:
+              - generic [ref=f5e103]: ¥
+            - button "表示形式をパーセントに設定" [ref=f5e105] [cursor=pointer]:
+              - generic [ref=f5e106]: "%"
+            - button "小数点以下の桁数を減らす" [ref=f5e108] [cursor=pointer]
+            - button "小数点以下の桁数を増やす" [ref=f5e113] [cursor=pointer]
+            - button "表示形式の詳細設定" [ref=f5e118] [cursor=pointer]:
+              - generic [ref=f5e119]: "123"
+            - separator [disabled] [ref=f5e122]
+            - listbox "フォント" [ref=f5e123] [cursor=pointer]:
+              - option "フォント のリストで デフォルト (Arial) を選択しています。" [selected] [ref=f5e126]: デフォルト (Arial)
+            - separator [disabled] [ref=f5e130]
+            - button "フォントサイズを縮小 (Ctrl+Shift+カンマ)" [ref=f5e131] [cursor=pointer]
+            - combobox "フォント サイズ" [ref=f5e136] [cursor=pointer]:
+              - option "フォント サイズ のリストで 10 を選択しています。" [selected] [ref=f5e139]:
+                - textbox "フォント サイズ" [ref=f5e140]: "10"
+            - button "フォントサイズを拡大 (Ctrl+Shift+ピリオド)" [ref=f5e141] [cursor=pointer]
+            - separator [disabled] [ref=f5e146]
+            - button "太字 (Ctrl+B)" [ref=f5e147] [cursor=pointer]
+            - button "斜体 (Ctrl+I)" [ref=f5e152] [cursor=pointer]
+            - button "取り消し線 (Alt+Shift+5)" [ref=f5e157] [cursor=pointer]
+            - button "テキストの色" [ref=f5e162] [cursor=pointer]
+            - separator [disabled] [ref=f5e169]
+            - button "もっと見る" [ref=f5e170] [cursor=pointer]
+        - toolbar "モードと表示" [ref=f5e177]:
+          - button "メニューを非表示 (Ctrl+Shift+F)" [ref=f5e178] [cursor=pointer]
+    - generic [ref=f5e185]:
+      - generic "名前ボックス (Ctrl + J)" [ref=f5e186]:
+        - textbox [ref=f5e187]: A1
+        - button "名前ボックスのメニューボタン。メニュー項目から 1 つを選択すると、対応する名前付き範囲に移動します。" [ref=f5e189] [cursor=pointer]
+      - textbox [ref=f5e205]
+  - navigation "シートタブバー" [ref=f5e245]:
+    - toolbar [ref=f5e246]:
+      - button "シートを追加" [ref=f5e247] [cursor=pointer]
+      - button "すべてのシート" [ref=f5e252] [cursor=pointer]
+    - toolbar [ref=f5e261]:
+      - button "全体" [ref=f5e262] [cursor=pointer]
+      - button "数字推移確認シート" [ref=f5e270] [cursor=pointer]
+      - button "3か月比較" [ref=f5e278] [cursor=pointer]
+      - button "商材別" [ref=f5e286] [cursor=pointer]
+      - button "サンキュー架電" [ref=f5e294] [cursor=pointer]
+      - button "解約状況日時管理" [ref=f5e302] [cursor=pointer]
+      - button "原本_解約状況日時管理" [ref=f5e310] [cursor=pointer]
+      - button "シート10" [ref=f5e318]
+    - toolbar [ref=f5e326]:
+      - button "左へスクロール" [ref=f5e327] [cursor=pointer]
+      - button "右へスクロール" [disabled] [ref=f5e332]
+  - generic [ref=f5e337]:
+    - textbox [active]
+  - link "スクリーン リーダーのサポートを有効にする" [ref=f5e338] [cursor=pointer]:
+    - /url: "#"
+  - textbox [ref=f5e339]
+  - region [ref=f5e340]: スクリーン リーダーのサポートを有効にするには、Ctrl+Alt+Z を押します。キーボード ショートカットの詳細については、Ctrl+スラッシュ を押します。
+  - generic [ref=f5e341]: バナーを非表示にしました
+  - region
+  - generic [ref=f5e342]: AND medical group橋本 丈博 さんがドキュメントの編集に参加しました。

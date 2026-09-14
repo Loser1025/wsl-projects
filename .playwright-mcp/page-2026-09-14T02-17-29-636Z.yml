@@ -1,0 +1,99 @@
+- application [ref=f10e1]:
+  - iframe [aria-hidden] [ref=f10e2]
+  - iframe [aria-hidden] [ref=f10e3]
+  - banner "メニューバー" [ref=f10e4]:
+    - generic [ref=f10e7]:
+      - link "スプレッドシート ホーム" [ref=f10e9] [cursor=pointer]:
+        - /url: https://docs.google.com/spreadsheets/?usp=sheets_web
+      - generic [ref=f10e16]:
+        - generic "おばシート転記(対応済案件)" [ref=f10e18]:
+          - 'button "ドキュメントのステータス: ドライブに保存しました." [ref=f10e24]':
+            - generic [ref=f10e25] [cursor=pointer]: ドライブに保存しました
+        - generic [ref=f10e32]:
+          - button "すべてのコメントを表示" [ref=f10e34] [cursor=pointer]
+          - generic [ref=f10e37]:
+            - button "共有します。リンクを知っている全員。 リンクを知っている全員がアクセスできます。ログインは不要です。" [disabled] [ref=f10e38]: 共有
+            - button "クイック共有操作" [disabled] [ref=f10e40]
+          - link "ログイン" [ref=f10e44] [cursor=pointer]:
+            - /url: https://accounts.google.com/ServiceLogin?service=wise&passive=1209600&osid=1&continue=https://docs.google.com/spreadsheets/d/1tjiYmZQFcJOecTXIdGC9AEBOfZkWlETMKYsC7qRJhVc/edit?gid%3D0&followup=https://docs.google.com/spreadsheets/d/1tjiYmZQFcJOecTXIdGC9AEBOfZkWlETMKYsC7qRJhVc/edit?gid%3D0&ltmpl=sheets&ec=GAZAmwI
+    - generic [ref=f10e46]:
+      - menubar [ref=f10e48]:
+        - menuitem "ファイル" [ref=f10e49] [cursor=pointer]
+        - menuitem "編集" [ref=f10e50] [cursor=pointer]
+        - menuitem "表示" [ref=f10e51] [cursor=pointer]
+        - menuitem "挿入" [ref=f10e52] [cursor=pointer]
+        - menuitem "表示形式" [ref=f10e53] [cursor=pointer]
+        - menuitem "データ" [ref=f10e54] [cursor=pointer]
+        - menuitem "ツール" [ref=f10e55] [cursor=pointer]
+        - menuitem "拡張機能" [ref=f10e56] [cursor=pointer]
+        - menuitem "ヘルプ" [ref=f10e57] [cursor=pointer]
+      - generic [ref=f10e58]:
+        - generic [ref=f10e59]:
+          - toolbar "メニューを検索 (Alt+/)" [ref=f10e60]:
+            - combobox "メニュー" [ref=f10e62]
+          - toolbar "メイン" [ref=f10e63]:
+            - button "元に戻す (Ctrl+Z)" [ref=f10e64] [cursor=pointer]
+            - button "やり直し (Ctrl+Y)" [ref=f10e69] [cursor=pointer]
+            - button "印刷 (Ctrl+P)" [ref=f10e74] [cursor=pointer]
+            - button "書式を貼り付け" [ref=f10e79] [cursor=pointer]
+            - combobox "ズーム" [ref=f10e84] [cursor=pointer]:
+              - option "ズーム のリストで 100% を選択しています。" [selected] [ref=f10e87]:
+                - textbox "ズーム" [ref=f10e88]: 100%
+            - separator [disabled] [ref=f10e92]
+            - button "表示形式を通貨に設定" [ref=f10e93] [cursor=pointer]:
+              - generic [ref=f10e94]: ¥
+            - button "表示形式をパーセントに設定" [ref=f10e96] [cursor=pointer]:
+              - generic [ref=f10e97]: "%"
+            - button "小数点以下の桁数を減らす" [ref=f10e99] [cursor=pointer]
+            - button "小数点以下の桁数を増やす" [ref=f10e104] [cursor=pointer]
+            - button "表示形式の詳細設定" [ref=f10e109] [cursor=pointer]:
+              - generic [ref=f10e110]: "123"
+            - separator [disabled] [ref=f10e113]
+            - listbox "フォント" [ref=f10e114] [cursor=pointer]:
+              - option "フォント のリストで Arial を選択しています。" [selected] [ref=f10e117]: Arial
+            - separator [disabled] [ref=f10e121]
+            - button "フォントサイズを縮小 (Ctrl+Shift+カンマ)" [ref=f10e122] [cursor=pointer]
+            - combobox "フォント サイズ" [ref=f10e127] [cursor=pointer]:
+              - option "フォント サイズ のリストで 11 を選択しています。" [selected] [ref=f10e130]:
+                - textbox "フォント サイズ" [ref=f10e131]: "11"
+            - button "フォントサイズを拡大 (Ctrl+Shift+ピリオド)" [ref=f10e132] [cursor=pointer]
+            - separator [disabled] [ref=f10e137]
+            - button "太字 (Ctrl+B)" [ref=f10e138] [cursor=pointer]
+            - button "斜体 (Ctrl+I)" [ref=f10e143] [cursor=pointer]
+            - button "取り消し線 (Alt+Shift+5)" [ref=f10e148] [cursor=pointer]
+            - button "テキストの色" [ref=f10e153] [cursor=pointer]
+            - separator [disabled] [ref=f10e160]
+            - button "もっと見る" [ref=f10e161] [cursor=pointer]
+        - toolbar "モードと表示" [ref=f10e168]:
+          - button "メニューを非表示 (Ctrl+Shift+F)" [ref=f10e169] [cursor=pointer]
+    - generic [ref=f10e176]:
+      - generic "名前ボックス (Ctrl + J)" [ref=f10e177]:
+        - textbox [ref=f10e178]: A1
+        - button "名前ボックスのメニューボタン。メニュー項目から 1 つを選択すると、対応する名前付き範囲に移動します。" [ref=f10e180] [cursor=pointer]
+      - textbox [ref=f10e196]
+  - navigation "シートタブバー" [ref=f10e232]:
+    - toolbar [ref=f10e233]:
+      - button "シートを追加" [ref=f10e234] [cursor=pointer]
+      - button "すべてのシート" [ref=f10e239] [cursor=pointer]
+    - toolbar [ref=f10e250]:
+      - button "キャンセル研修" [ref=f10e251] [cursor=pointer]
+      - button "キャンセル研修(済)" [ref=f10e259] [cursor=pointer]
+      - button "シート9" [ref=f10e267] [cursor=pointer]
+      - button "未解約件数集計" [ref=f10e275] [cursor=pointer]
+      - button "20260520" [ref=f10e283]
+      - button "(アポ、阻止)→処理急ぎ【対応済】" [ref=f10e291] [cursor=pointer]
+      - button "⚠️修正中⚠️2026.03 阻止＆処理リスト のコピー" [ref=f10e299] [cursor=pointer]
+      - button "未解約データ ※更新はおばシートの方です" [ref=f10e307] [cursor=pointer]
+      - button "シート6" [ref=f10e315] [cursor=pointer]
+    - toolbar [ref=f10e323]:
+      - button "左へスクロール" [ref=f10e324] [cursor=pointer]
+      - button "右へスクロール" [ref=f10e329] [cursor=pointer]
+  - generic [ref=f10e334]:
+    - textbox [active]
+  - link "スクリーン リーダーのサポートを有効にする" [ref=f10e335] [cursor=pointer]:
+    - /url: "#"
+  - textbox [ref=f10e336]
+  - region [ref=f10e337]: スクリーン リーダーのサポートを有効にするには、Ctrl+Alt+Z を押します。キーボード ショートカットの詳細については、Ctrl+スラッシュ を押します。
+  - generic [ref=f10e338]: バナーを非表示にしました
+  - region
+  - iframe [ref=f10e340]
