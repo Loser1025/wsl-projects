@@ -3,5 +3,10 @@
     "cmd": "python3 Medicaldepartment/syncColab.py",
     "passes": 9,
     "last_used": "2026-09-08T18:10:19+09:00"
+  },
+  "/home/loser/wsl-projects/google-workspace-mcp": {
+    "cmd": "node -e \"console.log('Test setup ready')\"",
+    "passes": 1,
+    "last_used": "2026-09-14T16:01:39+09:00"
   }
 }
