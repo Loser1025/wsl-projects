@@ -69,6 +69,34 @@ func detectUnverifiedClaim(text string, turnHadUnverified bool) bool {
 	return completionClaimRe.MatchString(text)
 }
 
+// verifyCapableTools はGate C判定で「検証を行った」とみなすツールの集合
+// （run_bash/run_pipeline/run_host_commandの出力先頭"[SUCCESS]"を成功判定に使う。
+// internal/tools/shell.goのtoolRunBash/toolRunPipelineが返すステータス表記に依存）。
+var verifyCapableTools = map[string]bool{
+	"run_bash":         true,
+	"run_pipeline":     true,
+	"run_host_command": true,
+}
+
+// detectUnverifiedDirectWrite はDirector自身の直接書き込み（write_file/edit_file/
+// patch_file）の後、検証コマンドの成功を確認せずに「完了/解決」と断言している
+// 最終回答を検知する（Gate C）。
+//
+// Gate Bは委任経路（delegate_to_worker等）が付与する「※未検証」タグのみを見るため、
+// Directorが自分でwrite_file等を直接呼ぶ経路には検証義務が働かない非対称があった。
+// directWriteSinceVerifyはloop.go側で「直接書き込み成功後、verifyCapableToolsが
+// [SUCCESS]で終わるまでtrueのまま」という状態で管理する（検証が失敗した場合は
+// まだ「確認済み」にはならないためtrueのまま残る）。
+func detectUnverifiedDirectWrite(text string, directWriteSinceVerify bool) bool {
+	if !directWriteSinceVerify || text == "" {
+		return false
+	}
+	if containsAny(text, "未検証", "動作未確認", "確認できていません") {
+		return false
+	}
+	return completionClaimRe.MatchString(text)
+}
+
 func containsAny(s string, subs ...string) bool {
 	for _, sub := range subs {
 		if strings.Contains(s, sub) {

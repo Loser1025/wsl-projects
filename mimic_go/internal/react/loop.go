@@ -133,7 +133,11 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 	refusals := 0
 	offloadRetryDone := false
 	unverifiedRetryDone := false
+	verifyGateRetryDone := false
 	turnHadUnverified := false
+	// directWriteSinceVerify: 直接書き込み（write_file/edit_file/patch_file）成功後、
+	// 検証コマンド（run_bash等）が[SUCCESS]で返るまでtrueのまま保持する（Gate C用）。
+	directWriteSinceVerify := false
 	hadToolCall := false
 	emptyRetryCount := 0
 	xmlToolRetryCount := 0
@@ -212,6 +216,20 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 					llm.Message{Role: "user", Content: "[システム] このターンには「※未検証」の委任結果が含まれていますが、" +
 						"回答は完了/解決したと断言しています。未検証のまま完了と報告せず、" +
 						"検証状況を正直に明記するか、可能であれば検証コマンドを実行して確認してから報告してください。", SkipSave: true},
+				)
+				continue
+			}
+
+			// 最終回答ゲートC: 直接書き込み後に検証コマンドの成功を確認せず
+			// 「完了/解決」と断言していないか検査する（Gate Bの委任専用版を
+			// Director自身の直接編集経路にも適用する。1ターンにつき1回だけ差し戻す）。
+			if !verifyGateRetryDone && detectUnverifiedDirectWrite(result.Text, directWriteSinceVerify) {
+				verifyGateRetryDone = true
+				*history = append(*history,
+					llm.Message{Role: "assistant", Content: result.Text, SkipSave: true},
+					llm.Message{Role: "user", Content: "[システム] write_file/edit_file/patch_fileで直接編集を行いましたが、" +
+						"その後run_bash等の検証コマンドで成功（[SUCCESS]）を確認せずに完了と断言しています。\n" +
+						"編集内容を検証するコマンド（テスト・ビルド確認等）を実行し、成功を確認してから報告してください。", SkipSave: true},
 				)
 				continue
 			}
@@ -375,6 +393,15 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 			}
 			if strings.Contains(output, "※未検証") {
 				turnHadUnverified = true
+			}
+			// Gate C用の状態更新: 直接書き込み成功→未検証フラグを立てる。
+			// 検証コマンドが[SUCCESS]で返った時点でフラグを下ろす（失敗時は
+			// まだ「確認済み」ではないため立てたままにする）。
+			if vcs.WriteTools[tc.Function.Name] && !isFailForLog {
+				directWriteSinceVerify = true
+			}
+			if verifyCapableTools[tc.Function.Name] && strings.HasPrefix(output, "[SUCCESS]") {
+				directWriteSinceVerify = false
 			}
 			isFail := isFailForLog
 			outputForHistory := output

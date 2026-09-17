@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"mimic/internal/sandbox"
@@ -112,6 +113,16 @@ const (
 	// MaxVerifyRetries はverify失敗時の修正再試行上限（Python版 MAX_VERIFY_RETRIES）。
 	MaxVerifyRetries = 3
 
+	// BestOfNFallbackAttempts は、同じOverlay上でのエラーフィードバック再試行
+	// （MaxVerifyRetries）を使い切ってもverify_cmdが通らなかった場合の最後の手段
+	// として、元のタスク（エラーフィードバック無し）を独立したOverlayで並行に
+	// やり直す試行数（Python版には存在しない拡張）。弱いモデルは同じ間違いを
+	// 言い回しを変えて繰り返すことが多く、直前の失敗を踏まえた修正よりも、
+	// 白紙から別アプローチを試みる方が別解に到達しやすいという判断による。
+	// 「生成は安い・検証だけ厳密にする」非対称戦略（verify_cmdが機械的に判定できる
+	// ため、複数候補から通過したものを選ぶコストは低い）。
+	BestOfNFallbackAttempts = 2
+
 	// MaxResumeAttempts はWorkerが完了マーカーなしで予期せず終了した場合に、
 	// 同じOverlay上で（チェックポイントが残っていれば）再起動を試みる上限
 	// （Python版 subagent.py::_MAX_RESUME_ATTEMPTS = 3 を踏襲）。
@@ -195,6 +206,14 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 		}
 	}
 
+	// 軽量静的解析コマンド（verify_cmdより安価・高速。テストフレームワークの
+	// 有無やverify_cmdの設定に関わらず常時実行する。1リクエストにつき言語は
+	// 変わらないためループの外で1回だけ判定する）。
+	staticCmd := ""
+	if applyChanges {
+		staticCmd = StaticCheckCmd(w.Lower)
+	}
+
 	// 委任履歴（直近の委任の要約）をハーネス側でタスク冒頭に自動注入する。
 	// task変数自体は汚さない（履歴記録・結果サマリには元のtaskを使う。
 	// Python版 team.py:1046-1048 の移植）。
@@ -225,6 +244,29 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 		crashed = !strings.Contains(launchRes.Output, finalMarker)
 		crashResumeAttempts = resumeAttempts
 		summary = extractFinalAnswer(launchRes.Output)
+
+		// 軽量静的解析: 本番verify_cmd（テスト実行等、コストが高いことが多い）より
+		// 先に安価なビルド可否チェックを常時実行する。ここで失敗が判明した場合、
+		// 本番verify_cmdの実行自体をスキップしてリトライへ回す（Worker自身の
+		// self-reportに依存せず、ビルドを壊すタイポ等を機械的に検出するための
+		// セーフティネット）。
+		if staticCmd != "" {
+			staticRes, sErr := w.Run(ctx, staticCmd, defaultVerifyTimeout)
+			if sErr != nil {
+				return "", fmt.Errorf("静的解析コマンド実行に失敗しました: %w", sErr)
+			}
+			if !staticRes.TimedOut && staticRes.ExitCode != 0 {
+				exitCode := staticRes.ExitCode
+				verifyExit = &exitCode
+				verifyOutput = fmt.Sprintf("[静的解析: %s]\n%s", staticCmd, staticRes.Output)
+				if attempt > MaxVerifyRetries {
+					break
+				}
+				triedSummaries = append(triedSummaries, truncateSummary(summary, 200))
+				currentTask = buildVerifyRetryTask(task, staticCmd, exitCode, verifyOutput, attempt, triedSummaries)
+				continue
+			}
+		}
 
 		if verifyCmd == "" {
 			break
@@ -258,6 +300,32 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 
 	if timedOut {
 		return fmt.Sprintf("[Worker] タイムアウトしました（%s経過）。変更は破棄されました。", defaultWorkerTimeout), nil
+	}
+
+	// Best-of-N フォールバック: エラーフィードバック付きの逐次リトライを
+	// 使い切ってもverify_cmd（または静的解析）が通らなかった場合、独立した
+	// Overlayで元のタスクから並行にやり直し、最初に検証を通過したものを採用する。
+	// どれも通過しなければ既存の（失敗した）結果をそのまま使う——純粋な追加であり、
+	// 既存の挙動を後退させない。
+	if !timedOut && (verifyCmd != "" || staticCmd != "") && (verifyExit == nil || *verifyExit != 0) {
+		effectiveVerify := verifyCmd
+		if effectiveVerify == "" {
+			effectiveVerify = staticCmd
+		}
+		if bestW, bestSummary, bestExit, bestOutput, ok := runBestOfNFallback(
+			ctx, w.Lower, task, rolePrompt, effectiveVerify, traceID, mimicBin, keepSession); ok {
+			w.Cleanup()
+			w = bestW
+			summary = bestSummary
+			exitCode := bestExit
+			verifyExit = &exitCode
+			verifyOutput = bestOutput
+			crashed = false
+			triedSummaries = append(triedSummaries, "[Best-of-N] 独立した再試行で検証通過")
+			if verifyCmd != "" {
+				SaveLearnedVerifyCmd(w.Lower, verifyCmd)
+			}
+		}
 	}
 
 	changed, err := w.ChangedFiles()
@@ -420,6 +488,69 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 // タイムアウトしておらずチェックポイントが残っている限り、同じOverlay上で
 // 最大MaxResumeAttempts回まで再起動する（Python版 subagent.py の
 // resume_attemptループの移植）。戻り値の第2引数は実際に再開した回数。
+// bestOfNAttemptResult は runBestOfNFallback の1試行分の結果を保持する。
+type bestOfNAttemptResult struct {
+	w        *sandbox.Workroom
+	summary  string
+	exitCode int
+	output   string
+	passed   bool
+}
+
+// runBestOfNFallback は元のタスク（エラーフィードバック無し）を独立したOverlーで
+// BestOfNFallbackAttempts回並行して試行し、verifyCmdが最初に通過したものを返す。
+// どれも通過しなければ ok=false を返す。勝者以外のWorkroomはここでCleanupする
+// （呼び出し元は勝者のWorkroomをそのまま使い続けるか、ok=falseなら元のWorkroomを
+// 変更せず使い続ける）。
+func runBestOfNFallback(ctx context.Context, projectDir, task, rolePrompt, verifyCmd, traceIDBase, mimicBin string, keepSession bool) (*sandbox.Workroom, string, int, string, bool) {
+	results := make([]bestOfNAttemptResult, BestOfNFallbackAttempts)
+	var wg sync.WaitGroup
+	for i := 0; i < BestOfNFallbackAttempts; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			w, err := sandbox.NewWorkroom(projectDir)
+			if err != nil {
+				return
+			}
+			results[idx].w = w
+			fallbackTraceID := fmt.Sprintf("%s-bestofn%d", traceIDBase, idx+1)
+			launchRes, _, runErr := runWithResume(ctx, w,
+				launchCommand(mimicBin, task, rolePrompt, fallbackTraceID, w.Lower, keepSession), defaultWorkerTimeout)
+			if runErr != nil || launchRes.TimedOut {
+				return
+			}
+			results[idx].summary = extractFinalAnswer(launchRes.Output)
+			verifyRes, vErr := w.Run(ctx, verifyCmd, defaultVerifyTimeout)
+			if vErr != nil || verifyRes.TimedOut {
+				return
+			}
+			results[idx].exitCode = verifyRes.ExitCode
+			results[idx].output = verifyRes.Output
+			results[idx].passed = verifyRes.ExitCode == 0
+		}(i)
+	}
+	wg.Wait()
+
+	winnerIdx := -1
+	for i := range results {
+		if results[i].passed {
+			winnerIdx = i
+			break
+		}
+	}
+	for i := range results {
+		if i != winnerIdx && results[i].w != nil {
+			results[i].w.Cleanup()
+		}
+	}
+	if winnerIdx == -1 {
+		return nil, "", 0, "", false
+	}
+	winner := results[winnerIdx]
+	return winner.w, winner.summary, winner.exitCode, winner.output, true
+}
+
 func runWithResume(ctx context.Context, w *sandbox.Workroom, command string, timeout time.Duration) (sandbox.RunResult, int, error) {
 	var last sandbox.RunResult
 	for resumeAttempt := 0; resumeAttempt <= MaxResumeAttempts; resumeAttempt++ {

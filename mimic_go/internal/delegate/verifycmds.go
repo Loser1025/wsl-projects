@@ -133,3 +133,37 @@ func TemplateVerifyCmd(projectDir string) string {
 	}
 	return ""
 }
+
+// staticCheckTemplates は言語別の「軽量静的解析」コマンド（verify_cmdより
+// 安価・高速で、ビルド不能・構文エラーのような最低限の破損を検出するための
+// もの）。テストフレームワークの有無に関わらず常時実行する前提のため、
+// 外部ツールのインストールを前提にできるgo/cargo以外は標準ライブラリのみで
+// 動く手段（python: compileall）に限定する。tsc等の外部ツール導入前提の言語は
+// 対象外（未インストール環境で常時失敗になるのを避けるため）。
+var staticCheckTemplates = []struct {
+	manifest string
+	cmd      string
+}{
+	{"go.mod", "go build ./..."},
+	{"pyproject.toml", "python -m compileall -q ."},
+	{"pytest.ini", "python -m compileall -q ."},
+	{"setup.py", "python -m compileall -q ."},
+	{"Cargo.toml", "cargo check"},
+}
+
+// StaticCheckCmd はプロジェクトルートのマニフェストファイル検出から
+// 「軽量静的解析」コマンドを1つ返す（読み取りのみ）。検出できなければ空文字。
+// verify_cmd（テスト実行等、コストが高いことが多い）の前段として常時実行し、
+// ビルドを壊すタイポ等をWorkerの自己申告に依存せず機械的に検出するために使う。
+// 環境変数 MIMIC_STATIC_CHECK=0 で無効化できる。
+func StaticCheckCmd(projectDir string) string {
+	if os.Getenv("MIMIC_STATIC_CHECK") == "0" {
+		return ""
+	}
+	for _, t := range staticCheckTemplates {
+		if info, err := os.Stat(filepath.Join(projectDir, t.manifest)); err == nil && !info.IsDir() {
+			return t.cmd
+		}
+	}
+	return ""
+}
