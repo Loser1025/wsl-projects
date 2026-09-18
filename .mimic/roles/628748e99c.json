@@ -1,0 +1,6 @@
+{
+  "role": "視点: Google Apps Script (GAS) および CSV処理の専門家。制約: chatwork_work/chatwork-webhook/gas/ 配下の Import.gs と UploadDialog.html を修正し、1. ぽけてる予約一覧CSV（ステータス「完了」の案件を抽出）と、2. Lステップ友達詳細CSV（氏名正規化による突合）の両方を受け取り、スプレッドシートへのマッピング・更新を行う完全な機能を追加すること。完了基準: Import.gs および UploadDialog.html に両方のCSV入力および統合マッピング処理が正しく実装され、既存の関数や命名規則と矛盾しないこと。",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-09-18T10:20:58+09:00"
+}
