@@ -116,104 +116,116 @@
       background-size: 16px;
       border: 1.5px solid var(--border);
       border-radius: 10px;
-      padding: 10px 36px 10px 12px;
+      padding: 10px 14px;
       font-size: 14px;
       color: var(--text);
+      outline: none;
       cursor: pointer;
-      transition: border-color 0.15s ease;
+      transition: border-color 0.2s;
     }
-    select:focus { outline: none; border-color: var(--accent); }
+    select:focus { border-color: var(--accent); }
 
     .dropzone {
-      position: relative;
-      border: 1.5px dashed var(--border);
+      border: 2px dashed var(--border);
       border-radius: 10px;
-      padding: 20px 16px;
+      padding: 18px 14px;
       text-align: center;
       cursor: pointer;
-      transition: border-color 0.15s ease, background 0.15s ease;
+      position: relative;
+      background: var(--bg);
+      transition: all 0.2s;
     }
     .dropzone:hover, .dropzone.drag-over {
       border-color: var(--accent);
       background: var(--accent-soft);
     }
-    .dropzone input[type=file] {
+    .dropzone.has-file {
+      border-style: solid;
+      border-color: var(--success-border);
+      background: var(--success-bg);
+    }
+    .dropzone input[type="file"] {
       position: absolute;
-      inset: 0;
+      top: 0; left: 0; width: 100%; height: 100%;
       opacity: 0;
       cursor: pointer;
     }
     .dropzone-icon {
-      width: 28px;
-      height: 28px;
-      margin: 0 auto 8px;
+      width: 26px; height: 26px; margin: 0 auto 6px;
       color: var(--text-muted);
     }
-    .dropzone-icon svg { width: 100%; height: 100%; }
-    .dropzone-text { font-weight: 600; font-size: 13px; }
-    .dropzone-hint { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
-    .dropzone.has-file { border-style: solid; border-color: var(--accent); }
-    .dropzone.has-file .dropzone-icon { color: var(--accent); }
+    .dropzone.has-file .dropzone-icon { color: var(--success-text); }
+    .dropzone-text {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .dropzone.has-file .dropzone-text { color: var(--success-text); }
+    .dropzone-hint {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .dropzone.has-file .dropzone-hint { color: var(--success-text); opacity: 0.8; }
 
-    button.submit {
-      width: 100%;
+    .submit {
       margin-top: 22px;
-      padding: 12px 16px;
+      width: 100%;
+      background: var(--accent);
+      color: #ffffff;
       border: none;
       border-radius: 10px;
-      background: var(--accent);
-      color: #fff;
+      padding: 12px;
       font-size: 14px;
-      font-weight: 700;
+      font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      transition: background 0.15s ease, transform 0.1s ease;
+      transition: background 0.2s, opacity 0.2s;
+      box-shadow: 0 1px 2px rgba(79, 70, 229, 0.2);
     }
-    button.submit:hover { background: var(--accent-hover); }
-    button.submit:active { transform: scale(0.98); }
-    button.submit:disabled { opacity: 0.6; cursor: not-allowed; }
+    .submit:hover { background: var(--accent-hover); }
+    .submit:disabled { opacity: 0.6; cursor: not-allowed; }
 
     .spinner {
-      width: 15px;
-      height: 15px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: #fff;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #ffffff;
       border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      animation: spin 0.6s linear infinite;
       display: none;
     }
-    button.submit.loading .spinner { display: inline-block; }
-    button.submit.loading .btn-label { opacity: 0.85; }
+    .submit.loading .spinner { display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .status {
-      margin-top: 16px;
-      padding: 12px 14px;
+      margin-top: 14px;
+      padding: 10px 14px;
       border-radius: 10px;
       font-size: 13px;
-      white-space: pre-wrap;
       display: none;
-    }
-    .status.info {
-      display: block;
-      background: var(--accent-soft);
-      color: var(--accent);
-      border: 1px solid var(--accent-soft);
-    }
-    .status.success {
-      display: block;
-      background: var(--success-bg);
-      color: var(--success-text);
-      border: 1px solid var(--success-border);
+      white-space: pre-wrap;
+      word-break: break-all;
     }
     .status.error {
-      display: block;
       background: var(--error-bg);
       color: var(--error-text);
       border: 1px solid var(--error-border);
+      display: block;
+    }
+    .status.success {
+      background: var(--success-bg);
+      color: var(--success-text);
+      border: 1px solid var(--success-border);
+      display: block;
+    }
+    .status.info {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--border);
+      display: block;
     }
   </style>
 </head>
@@ -223,9 +235,9 @@
       <div class="header-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-8H7v8M7 3v5h8"/><path d="M21 21V7l-5-4H5a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/></svg>
       </div>
-      <h1>友達情報の更新</h1>
+      <h1>CSVデータの統合インポート</h1>
     </div>
-    <p class="subtitle">Lステップの友だち詳細CSVを取り込みます</p>
+    <p class="subtitle">Lステップ友だち詳細CSV ＆ ぽけてる予約一覧CSVを連携</p>
 
     <div class="field">
       <label for="sheetSelect">対象シート</label>
@@ -238,65 +250,82 @@
     </div>
 
     <div class="field">
-      <label>CSVファイル</label>
-      <div class="dropzone" id="dropzone">
+      <label>1. Lステップ 友だち詳細CSV（必須）</label>
+      <div class="dropzone" id="lstepDropzone">
         <div class="dropzone-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
         </div>
-        <div class="dropzone-text" id="dropzoneText">クリックまたはドラッグ&ドロップ</div>
-        <div class="dropzone-hint" id="dropzoneHint">.csv ファイル（友だち詳細エクスポート）</div>
-        <input type="file" id="csvFile" accept=".csv">
+        <div class="dropzone-text" id="lstepText">クリックまたはドラッグ&ドロップ</div>
+        <div class="dropzone-hint" id="lstepHint">.csv ファイル（Lステップ友だち詳細）</div>
+        <input type="file" id="lstepFile" accept=".csv">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>2. ぽけてる予約一覧CSV（完了案件フィルタ用・任意）</label>
+      <div class="dropzone" id="poketeruDropzone">
+        <div class="dropzone-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+        </div>
+        <div class="dropzone-text" id="poketeruText">クリックまたはドラッグ&ドロップ</div>
+        <div class="dropzone-hint" id="poketeruHint">.csv ファイル（ぽけてる予約一覧）</div>
+        <input type="file" id="poketeruFile" accept=".csv">
       </div>
     </div>
 
     <button class="submit" id="submitBtn" onclick="submitForm()">
       <span class="spinner"></span>
-      <span class="btn-label" id="btnLabel">更新を実行</span>
+      <span class="btn-label" id="btnLabel">統合更新を実行</span>
     </button>
 
     <div class="status" id="status"></div>
   </div>
 
   <script>
-    var dropzone = document.getElementById('dropzone');
-    var fileInput = document.getElementById('csvFile');
-    var dropzoneText = document.getElementById('dropzoneText');
-    var dropzoneHint = document.getElementById('dropzoneHint');
+    function setupDropzone(dropzoneId, fileInputId, textId, hintId, defaultHint) {
+      var dropzone = document.getElementById(dropzoneId);
+      var fileInput = document.getElementById(fileInputId);
+      var dropzoneText = document.getElementById(textId);
+      var dropzoneHint = document.getElementById(hintId);
 
-    fileInput.addEventListener('change', function() {
-      updateDropzone();
-    });
-    ['dragenter', 'dragover'].forEach(function(evt) {
-      dropzone.addEventListener(evt, function(e) {
-        e.preventDefault();
-        dropzone.classList.add('drag-over');
+      fileInput.addEventListener('change', function() {
+        updateDropzoneState(dropzone, fileInput, dropzoneText, dropzoneHint, defaultHint);
       });
-    });
-    ['dragleave', 'drop'].forEach(function(evt) {
-      dropzone.addEventListener(evt, function(e) {
-        e.preventDefault();
-        dropzone.classList.remove('drag-over');
+      ['dragenter', 'dragover'].forEach(function(evt) {
+        dropzone.addEventListener(evt, function(e) {
+          e.preventDefault();
+          dropzone.classList.add('drag-over');
+        });
       });
-    });
-    dropzone.addEventListener('drop', function(e) {
-      if (e.dataTransfer.files.length) {
-        fileInput.files = e.dataTransfer.files;
-        updateDropzone();
-      }
-    });
+      ['dragleave', 'drop'].forEach(function(evt) {
+        dropzone.addEventListener(evt, function(e) {
+          e.preventDefault();
+          dropzone.classList.remove('drag-over');
+        });
+      });
+      dropzone.addEventListener('drop', function(e) {
+        if (e.dataTransfer.files.length) {
+          fileInput.files = e.dataTransfer.files;
+          updateDropzoneState(dropzone, fileInput, dropzoneText, dropzoneHint, defaultHint);
+        }
+      });
+    }
 
-    function updateDropzone() {
+    function updateDropzoneState(dropzone, fileInput, textEl, hintEl, defaultHint) {
       var file = fileInput.files[0];
       if (file) {
         dropzone.classList.add('has-file');
-        dropzoneText.textContent = file.name;
-        dropzoneHint.textContent = (file.size / 1024).toFixed(1) + ' KB';
+        textEl.textContent = file.name;
+        hintEl.textContent = (file.size / 1024).toFixed(1) + ' KB';
       } else {
         dropzone.classList.remove('has-file');
-        dropzoneText.textContent = 'クリックまたはドラッグ&ドロップ';
-        dropzoneHint.textContent = '.csv ファイル（友だち詳細エクスポート）';
+        textEl.textContent = 'クリックまたはドラッグ&ドロップ';
+        hintEl.textContent = defaultHint;
       }
     }
+
+    setupDropzone('lstepDropzone', 'lstepFile', 'lstepText', 'lstepHint', '.csv ファイル（Lステップ友だち詳細）');
+    setupDropzone('poketeruDropzone', 'poketeruFile', 'poketeruText', 'poketeruHint', '.csv ファイル（ぽけてる予約一覧）');
 
     function setStatus(type, text) {
       var el = document.getElementById('status');
@@ -309,33 +338,59 @@
       var label = document.getElementById('btnLabel');
       btn.disabled = isLoading;
       btn.classList.toggle('loading', isLoading);
-      label.textContent = isLoading ? '処理中…' : '更新を実行';
+      label.textContent = isLoading ? '処理中…' : '統合更新を実行';
     }
 
     function submitForm() {
-      var file = fileInput.files[0];
+      var lstepFile = document.getElementById('lstepFile').files[0];
+      var poketeruFile = document.getElementById('poketeruFile').files[0];
       var sheetSelect = document.getElementById('sheetSelect');
-      if (!file) {
-        setStatus('error', 'CSVファイルを選択してください');
+
+      if (!lstepFile) {
+        setStatus('error', 'Lステップ 友だち詳細CSVファイルを選択してください');
         return;
       }
+
       setLoading(true);
-      setStatus('info', '読み込み中…');
-      var reader = new FileReader();
-      reader.onload = function(e) {
-        var base64 = e.target.result.split(',')[1];
-        google.script.run
-          .withSuccessHandler(function(summary) {
+      setStatus('info', 'CSVデータを読み込み中…');
+
+      var readerLStep = new FileReader();
+      readerLStep.onload = function(e1) {
+        var lstepBase64 = e1.target.result.split(',')[1];
+
+        if (poketeruFile) {
+          var readerPoketeru = new FileReader();
+          readerPoketeru.onload = function(e2) {
+            var poketeruBase64 = e2.target.result.split(',')[1];
+            callBackend(lstepBase64, poketeruBase64, sheetSelect.value);
+          };
+          readerPoketeru.onerror = function() {
             setLoading(false);
-            setStatus('success', summary);
-          })
-          .withFailureHandler(function(err) {
-            setLoading(false);
-            setStatus('error', 'エラー: ' + err.message);
-          })
-          .processFriendCsv(base64, sheetSelect.value);
+            setStatus('error', 'ぽけてるCSVの読み込みに失敗しました');
+          };
+          readerPoketeru.readAsDataURL(poketeruFile);
+        } else {
+          callBackend(lstepBase64, null, sheetSelect.value);
+        }
       };
-      reader.readAsDataURL(file);
+      readerLStep.onerror = function() {
+        setLoading(false);
+        setStatus('error', 'LステップCSVの読み込みに失敗しました');
+      };
+      readerLStep.readAsDataURL(lstepFile);
+    }
+
+    function callBackend(lstepBase64, poketeruBase64, sheetChoice) {
+      google.script.run
+        .withSuccessHandler(function(summary) {
+          setLoading(false);
+          setStatus('success', summary);
+        })
+        .withFailureHandler(function(err) {
+          setLoading(false);
+          setStatus('error', 'エラー: ' + err.message);
+        })
+        .processDualCsv(lstepBase64, poketeruBase64, sheetChoice);
     }
   </script>
 </body>
