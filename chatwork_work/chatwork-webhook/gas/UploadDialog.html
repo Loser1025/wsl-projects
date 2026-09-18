@@ -94,6 +94,17 @@
       margin: 4px 0 20px 42px;
     }
 
+    .hint-banner {
+      margin: 10px 0 20px;
+      padding: 10px 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
     .field { margin-top: 16px; }
 
     .field label {
@@ -220,6 +231,7 @@
       color: var(--success-text);
       border: 1px solid var(--success-border);
       display: block;
+      white-space: normal;
     }
     .status.info {
       background: var(--accent-soft);
@@ -227,6 +239,39 @@
       border: 1px solid var(--border);
       display: block;
     }
+
+    .legend {
+      margin-top: 14px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .result-sheet-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--success-border);
+    }
+    .result-sheet-row:last-child { border-bottom: none; }
+    .result-sheet-name { font-weight: 700; white-space: nowrap; }
+    .result-sheet-stat { text-align: right; }
+    .result-sheet-error { color: var(--error-text); }
+
+    .pending-box {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--success-border);
+    }
+    .pending-box.warn .pending-title { color: var(--error-text); }
+    .pending-title { font-weight: 700; margin-bottom: 4px; }
+    .pending-list {
+      margin: 4px 0 0;
+      padding-left: 18px;
+    }
+    .pending-list li { margin-bottom: 2px; }
+    .pending-none { color: var(--text-muted); }
   </style>
 </head>
 <body>
@@ -238,6 +283,7 @@
       <h1>CSVデータの統合インポート</h1>
     </div>
     <p class="subtitle">Lステップ友だち詳細CSV ＆ ぽけてる予約一覧CSVを連携</p>
+    <p class="hint-banner">📋 ぽけてるCSVも入れてください（完了案件の抽出・提案日/担当者未入力チェックに必要です）</p>
 
     <div class="field">
       <label for="sheetSelect">対象シート</label>
@@ -272,6 +318,10 @@
         <input type="file" id="poketeruFile" accept=".csv">
       </div>
     </div>
+
+    <p class="legend">
+      結果の見方：<b>済</b>＝Lステップ情報が揃っている　<b>未：項目名</b>＝その項目が未入力　<b>該当なし</b>＝Lステップに未登録
+    </p>
 
     <button class="submit" id="submitBtn" onclick="submitForm()">
       <span class="spinner"></span>
@@ -333,6 +383,64 @@
       el.textContent = text;
     }
 
+    function renderResult(result) {
+      var el = document.getElementById('status');
+      el.className = 'status success';
+      el.textContent = '';
+
+      result.sheets.forEach(function(s) {
+        var row = document.createElement('div');
+        row.className = 'result-sheet-row';
+
+        var nameEl = document.createElement('span');
+        nameEl.className = 'result-sheet-name';
+        nameEl.textContent = s.name;
+        row.appendChild(nameEl);
+
+        var statEl = document.createElement('span');
+        if (s.error) {
+          statEl.className = 'result-sheet-stat result-sheet-error';
+          statEl.textContent = s.error;
+        } else {
+          statEl.className = 'result-sheet-stat';
+          var text = '一致' + s.matched + '件（完了' + s.complete + '件）／未一致' + s.notFound + '件';
+          if (s.poketeruMatched !== null && s.poketeruMatched !== undefined) {
+            text += '　ぽけてる完了一致' + s.poketeruMatched + '件';
+          }
+          statEl.textContent = text;
+        }
+        row.appendChild(statEl);
+        el.appendChild(row);
+      });
+
+      if (result.pending) {
+        var box = document.createElement('div');
+        box.className = 'pending-box' + (result.pending.count > 0 ? ' warn' : '');
+
+        var title = document.createElement('div');
+        title.className = 'pending-title';
+        title.textContent = 'ぽけてる完了 かつ 提案日・担当者が未入力（' + result.pending.count + '件）';
+        box.appendChild(title);
+
+        if (result.pending.count > 0) {
+          var ul = document.createElement('ul');
+          ul.className = 'pending-list';
+          result.pending.names.forEach(function(n) {
+            var li = document.createElement('li');
+            li.textContent = n;
+            ul.appendChild(li);
+          });
+          box.appendChild(ul);
+        } else {
+          var none = document.createElement('div');
+          none.className = 'pending-none';
+          none.textContent = '該当案件はありません';
+          box.appendChild(none);
+        }
+        el.appendChild(box);
+      }
+    }
+
     function setLoading(isLoading) {
       var btn = document.getElementById('submitBtn');
       var label = document.getElementById('btnLabel');
@@ -382,9 +490,9 @@
 
     function callBackend(lstepBase64, poketeruBase64, sheetChoice) {
       google.script.run
-        .withSuccessHandler(function(summary) {
+        .withSuccessHandler(function(result) {
           setLoading(false);
-          setStatus('success', summary);
+          renderResult(result);
         })
         .withFailureHandler(function(err) {
           setLoading(false);

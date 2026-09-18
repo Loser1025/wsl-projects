@@ -6,8 +6,8 @@
  */
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('友達情報')
-    .addItem('CSVから友達情報を更新', 'showUploadDialog')
+    .createMenu('友達情報連携')
+    .addItem('CSVを取り込む（Lステップ／ぽけてる）', 'showUploadDialog')
     .addToUi();
 }
 
@@ -15,8 +15,8 @@ function showUploadDialog() {
   const sheetNames = getDateSheetNames_();
   const template = HtmlService.createTemplateFromFile('UploadDialog');
   template.sheetNames = sheetNames;
-  const html = template.evaluate().setWidth(440).setHeight(480);
-  SpreadsheetApp.getUi().showModalDialog(html, '友達情報の更新');
+  const html = template.evaluate().setWidth(440).setHeight(560);
+  SpreadsheetApp.getUi().showModalDialog(html, 'CSV取込：Lステップ × ぽけてる連携');
 }
 
 /** タブ名が MM/DD 形式のシート（テンプレは除く）を全て返す */

@@ -92,11 +92,35 @@ function parsePoketeruCompletedCsv_(base64Data) {
       const customerName = row[customerIdx];
       const key = normalizeName_(customerName);
       if (key) {
-        completedMap[key] = row;
+        completedMap[key] = { row: row, name: customerName };
       }
     }
   }
   return completedMap;
+}
+
+/**
+ * ぽけてる完了案件のうち、Lステップ側で「提案予約日」「担当者」が
+ * どちらも未入力（空欄）の案件名の一覧を返す
+ * @param {Object} poketeruCompletedMap normalizeName_キー => {row, name}
+ * @param {Object} lstepByName normalizeName_キー => Lステップ行
+ * @param {number[]} requiredIdx REQUIRED_LABELSに対応する列インデックス
+ * @return {string[]} 該当する依頼者名（ぽけてるCSV上の表記）の一覧
+ */
+function findPoketeruCompletedPending_(poketeruCompletedMap, lstepByName, requiredIdx) {
+  const proposalIdx = requiredIdx[REQUIRED_LABELS.indexOf('提案予約日')];
+  const assigneeIdx = requiredIdx[REQUIRED_LABELS.indexOf('担当者')];
+
+  const pending = [];
+  Object.keys(poketeruCompletedMap).forEach((key) => {
+    const lstepRow = lstepByName[key];
+    const proposalBlank = !lstepRow || !lstepRow[proposalIdx] || !String(lstepRow[proposalIdx]).trim();
+    const assigneeBlank = !lstepRow || !lstepRow[assigneeIdx] || !String(lstepRow[assigneeIdx]).trim();
+    if (proposalBlank && assigneeBlank) {
+      pending.push(poketeruCompletedMap[key].name);
+    }
+  });
+  return pending;
 }
 
 /**
@@ -105,7 +129,7 @@ function parsePoketeruCompletedCsv_(base64Data) {
  * @param {string} lstepBase64 Lステップ友達詳細CSVのBase64
  * @param {string} poketeruBase64 ぽけてる予約一覧CSVのBase64 (省略可・null可)
  * @param {string} targetSheetChoice シート名、または '__ALL__'
- * @return {string} 処理結果サマリー
+ * @return {Object} { sheets: [...], pending: {count, names}|null } 形式の処理結果
  */
 function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
   // 1. LステップCSVのパース
@@ -143,8 +167,10 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
 
   // 2. ぽけてる予約一覧CSVのパース（指定されている場合）
   let poketeruCompletedMap = null;
+  let poketeruPending = [];
   if (poketeruBase64 && poketeruBase64.trim() !== '') {
     poketeruCompletedMap = parsePoketeruCompletedCsv_(poketeruBase64);
+    poketeruPending = findPoketeruCompletedPending_(poketeruCompletedMap, lstepByName, requiredIdx);
   }
 
   const targets = targetSheetChoice === '__ALL__'
@@ -152,17 +178,17 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
     : [targetSheetChoice];
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const summaryLines = [];
+  const sheetResults = [];
 
   targets.forEach((sheetName) => {
     const sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
-      summaryLines.push(`${sheetName}: シートが見つかりません`);
+      sheetResults.push({ name: sheetName, error: 'シートが見つかりません' });
       return;
     }
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
-      summaryLines.push(`${sheetName}: 対象データなし`);
+      sheetResults.push({ name: sheetName, error: '対象データなし' });
       return;
     }
 
@@ -209,15 +235,22 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
     });
 
     sheet.getRange(2, 8, results.length, 1).setValues(results); // H列=友達情報
-    
-    let lineSummary = `${sheetName}: 一致${matched}件（完了${complete}件） / 未一致${notFound}件`;
-    if (poketeruCompletedMap) {
-      lineSummary += ` [ぽけてる完了一致: ${poketeruMatchedCount}件]`;
-    }
-    summaryLines.push(lineSummary);
+
+    sheetResults.push({
+      name: sheetName,
+      error: null,
+      matched: matched,
+      complete: complete,
+      notFound: notFound,
+      poketeruMatched: poketeruCompletedMap ? poketeruMatchedCount : null,
+    });
   });
 
-  return summaryLines.join('\n');
+  const result = { sheets: sheetResults, pending: null };
+  if (poketeruCompletedMap) {
+    result.pending = { count: poketeruPending.length, names: poketeruPending };
+  }
+  return result;
 }
 
 /**
