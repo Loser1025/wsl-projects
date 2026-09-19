@@ -16,7 +16,7 @@ from urllib.parse import urlparse, parse_qs
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from _shared import (  # noqa: E402
-    JST, SPREADSHEET_ID, get_sheets_service, fetch_cw_messages,
+    JST, SPREADSHEET_ID, get_sheets_service, fetch_all_cw_messages,
     get_or_create_daily_sheet, build_new_rows, write_new_rows,
 )
 
@@ -36,7 +36,7 @@ def run_poll():
     message_id_to_row = {row[0]: i + 2 for i, row in enumerate(values[1:]) if row and row[0]}
     existing_ids = set(message_id_to_row.keys())
 
-    all_messages = fetch_cw_messages()
+    all_messages = fetch_all_cw_messages()
     _today_msgs, new_rows = build_new_rows(all_messages, today, existing_ids)
     written = write_new_rows(service, sheet_name, sheet_id, message_id_to_row, new_rows)
 
