@@ -158,9 +158,12 @@ function resolveLstepRow_(lstepByKey, applicantRaw, ctx) {
 }
 
 /**
- * ぽけてる予約一覧CSVを解析し、ステータスが「完了」の案件を抽出してマップを返す
+ * ぽけてる予約一覧CSVを解析し、ステータスが「完了」の案件を抽出してマップを返す。
+ * ぽけてるの「顧客名」は本名でなくLINE名（ニックネーム）が入っていることが多く、
+ * 同じニックネームで別人の完了案件が複数存在することもあるため、
+ * 1キーにつき配列で複数件保持できるようにする
  * @param {string} base64Data
- * @return {Object} 完了案件の顧客名正規化キー => 予約データのマップ
+ * @return {Object} 完了案件の顧客名正規化キー => 予約データ配列
  */
 function parsePoketeruCompletedCsv_(base64Data) {
   const bytes = Utilities.base64Decode(base64Data);
@@ -194,13 +197,13 @@ function parsePoketeruCompletedCsv_(base64Data) {
       const customerName = row[customerIdx];
       const key = normalizeName_(customerName);
       if (key) {
-        completedMap[key] = {
-          row: row,
+        const list = completedMap[key] || (completedMap[key] = []);
+        list.push({
           name: customerName,
           phone: phoneIdx !== -1 ? (row[phoneIdx] || '').trim() : '',
           csStaff: csStaffIdx !== -1 ? (row[csStaffIdx] || '').trim() : '',
           office: officeIdx !== -1 ? (row[officeIdx] || '').trim() : '',
-        };
+        });
       }
     }
   }
@@ -208,9 +211,26 @@ function parsePoketeruCompletedCsv_(base64Data) {
 }
 
 /**
+ * 依頼者名（本名・LINE名フォールバック込み）が、ぽけてる完了案件マップに
+ * 存在するかどうかを判定する。ぽけてるの「顧客名」はLINE名（ニックネーム）である
+ * ことが多いため、本名キーだけでなくLINE名キーでも照合する
+ * @param {Object} poketeruCompletedMap normalizeName_キー => 完了案件配列
+ * @param {string} applicantRaw 依頼者名（生の文字列）
+ * @return {boolean}
+ */
+function isPoketeruCompleted_(poketeruCompletedMap, applicantRaw) {
+  const baseKey = normalizeName_(applicantRaw);
+  if (poketeruCompletedMap[baseKey] && poketeruCompletedMap[baseKey].length) return true;
+  const lineKey = extractLineNameCandidate_(applicantRaw);
+  if (lineKey && poketeruCompletedMap[lineKey] && poketeruCompletedMap[lineKey].length) return true;
+  return false;
+}
+
+/**
  * ぽけてる完了案件のうち、Lステップ側で「提案予約日」「担当者」が
- * どちらも未入力（空欄）の案件の一覧を返す（電話番号・CS担当・事務所も付与）
- * @param {Object} poketeruCompletedMap normalizeName_キー => {row, name, phone, csStaff, office}
+ * どちらも未入力（空欄）の案件の一覧を返す（電話番号・CS担当・事務所も付与）。
+ * 同じキーに複数の完了案件がぶら下がっている場合は、区別できるようすべて列挙する
+ * @param {Object} poketeruCompletedMap normalizeName_キー => 完了案件配列
  * @param {Object} lstepByKey normalizeName_キー => Lステップ行の配列（同じキーに複数該当する場合あり）
  * @param {number[]} requiredIdx REQUIRED_LABELSに対応する列インデックス
  * @return {Object[]} {name, phone, csStaff, office} の一覧
@@ -227,12 +247,13 @@ function findPoketeruCompletedPending_(poketeruCompletedMap, lstepByKey, require
     const proposalBlank = !lstepRow || !lstepRow[proposalIdx] || !String(lstepRow[proposalIdx]).trim();
     const assigneeBlank = !lstepRow || !lstepRow[assigneeIdx] || !String(lstepRow[assigneeIdx]).trim();
     if (proposalBlank && assigneeBlank) {
-      const entry = poketeruCompletedMap[key];
-      pending.push({
-        name: entry.name,
-        phone: entry.phone || '',
-        csStaff: entry.csStaff || '',
-        office: entry.office || '',
+      poketeruCompletedMap[key].forEach((entry) => {
+        pending.push({
+          name: entry.name,
+          phone: entry.phone || '',
+          csStaff: entry.csStaff || '',
+          office: entry.office || '',
+        });
       });
     }
   });
@@ -333,11 +354,9 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
       }
 
       // ぽけてるCSVが指定されている場合の完了案件チェック（オプション/補足連携）
-      if (poketeruCompletedMap) {
-        const isPoketeruCompleted = !!poketeruCompletedMap[key];
-        if (isPoketeruCompleted) {
-          poketeruMatchedCount++;
-        }
+      // ぽけてるの「顧客名」はLINE名（ニックネーム）であることが多いため、本名・LINE名の両方で照合する
+      if (poketeruCompletedMap && isPoketeruCompleted_(poketeruCompletedMap, name)) {
+        poketeruMatchedCount++;
       }
 
       const resolved = resolveLstepRow_(lstepByKey, name, {
