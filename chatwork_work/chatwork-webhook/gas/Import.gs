@@ -68,7 +68,8 @@ function normalizeName_(s) {
 function parsePoketeruCompletedCsv_(base64Data) {
   const bytes = Utilities.base64Decode(base64Data);
   const blob = Utilities.newBlob(bytes);
-  const csvText = blob.getDataAsString('Windows-31J');
+  // ぽけてるのCSVエクスポートはUTF-8(BOM付き)。LステップCSV(Windows-31J)とは異なるので注意
+  const csvText = blob.getDataAsString('UTF-8');
   const rows = Utilities.parseCsv(csvText);
 
   if (rows.length < 2) {
