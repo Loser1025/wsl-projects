@@ -181,6 +181,10 @@ function parsePoketeruCompletedCsv_(base64Data) {
   if (customerIdx === -1 || statusIdx === -1) {
     throw new Error('ぽけてる予約一覧CSVに「顧客名」または「ステータス」列が見つかりません');
   }
+  // 以下は無くてもエラーにはせず、あれば未対応リストの補足情報として使う
+  const phoneIdx = header.indexOf('電話番号');
+  const csStaffIdx = header.indexOf('CS担当');
+  const officeIdx = header.indexOf('事務所');
 
   const completedMap = {};
   for (let i = 1; i < rows.length; i++) {
@@ -190,7 +194,13 @@ function parsePoketeruCompletedCsv_(base64Data) {
       const customerName = row[customerIdx];
       const key = normalizeName_(customerName);
       if (key) {
-        completedMap[key] = { row: row, name: customerName };
+        completedMap[key] = {
+          row: row,
+          name: customerName,
+          phone: phoneIdx !== -1 ? (row[phoneIdx] || '').trim() : '',
+          csStaff: csStaffIdx !== -1 ? (row[csStaffIdx] || '').trim() : '',
+          office: officeIdx !== -1 ? (row[officeIdx] || '').trim() : '',
+        };
       }
     }
   }
@@ -199,11 +209,11 @@ function parsePoketeruCompletedCsv_(base64Data) {
 
 /**
  * ぽけてる完了案件のうち、Lステップ側で「提案予約日」「担当者」が
- * どちらも未入力（空欄）の案件名の一覧を返す
- * @param {Object} poketeruCompletedMap normalizeName_キー => {row, name}
+ * どちらも未入力（空欄）の案件の一覧を返す（電話番号・CS担当・事務所も付与）
+ * @param {Object} poketeruCompletedMap normalizeName_キー => {row, name, phone, csStaff, office}
  * @param {Object} lstepByKey normalizeName_キー => Lステップ行の配列（同じキーに複数該当する場合あり）
  * @param {number[]} requiredIdx REQUIRED_LABELSに対応する列インデックス
- * @return {string[]} 該当する依頼者名（ぽけてるCSV上の表記）の一覧
+ * @return {Object[]} {name, phone, csStaff, office} の一覧
  */
 function findPoketeruCompletedPending_(poketeruCompletedMap, lstepByKey, requiredIdx) {
   const proposalIdx = requiredIdx[REQUIRED_LABELS.indexOf('提案予約日')];
@@ -217,7 +227,13 @@ function findPoketeruCompletedPending_(poketeruCompletedMap, lstepByKey, require
     const proposalBlank = !lstepRow || !lstepRow[proposalIdx] || !String(lstepRow[proposalIdx]).trim();
     const assigneeBlank = !lstepRow || !lstepRow[assigneeIdx] || !String(lstepRow[assigneeIdx]).trim();
     if (proposalBlank && assigneeBlank) {
-      pending.push(poketeruCompletedMap[key].name);
+      const entry = poketeruCompletedMap[key];
+      pending.push({
+        name: entry.name,
+        phone: entry.phone || '',
+        csStaff: entry.csStaff || '',
+        office: entry.office || '',
+      });
     }
   });
   return pending;
@@ -367,7 +383,7 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
 
   const result = { sheets: sheetResults, pending: null };
   if (poketeruCompletedMap) {
-    result.pending = { count: poketeruPending.length, names: poketeruPending };
+    result.pending = { count: poketeruPending.length, items: poketeruPending };
   }
   return result;
 }

@@ -425,9 +425,10 @@
         if (result.pending.count > 0) {
           var ul = document.createElement('ul');
           ul.className = 'pending-list';
-          result.pending.names.forEach(function(n) {
+          result.pending.items.forEach(function(item) {
             var li = document.createElement('li');
-            li.textContent = n;
+            var detail = [item.csStaff, item.phone, item.office].filter(Boolean).join(' / ');
+            li.textContent = detail ? (item.name + '（' + detail + '）') : item.name;
             ul.appendChild(li);
           });
           box.appendChild(ul);
