@@ -28,9 +28,12 @@ const KANJI_VARIANTS = {
 };
 
 const PURE_KANA_RE = /^[ぁ-んァ-ヶー]+$/;
-const PAREN_RE = /[（(][^）)]*[）)]/g;
-// 依頼者名「本名（LINE名: ニックネーム）」からLINE名部分だけを取り出す
-const LINE_NAME_RE = /LINE名[:：]\s*([^)）]+)/;
+// 括弧内にさらに半角括弧が1段だけ入れ子になっているケース（例:「さかい(箱)」）も
+// 丸ごと1つの括弧として除去できるよう、入れ子を許容する
+const PAREN_RE = /[（(](?:[^（）()]|[（(][^（）()]*[）)])*[）)]/g;
+// 依頼者名「本名（LINE名: ニックネーム）」末尾の括弧全体（入れ子1段まで許容）を取り出す
+const APPLICANT_PAREN_CONTENT_RE = /[（(]((?:[^（）()]|[（(][^（）()]*[）)])*)[）)]\s*$/;
+const LINE_NAME_RE = /LINE名[:：]\s*(.+)/;
 // 「面談対応(先生): 〇〇〇〇【事務所名】」の【】部分を取り出す
 const OFFICE_RE = /【(.+?)】/;
 // 日付候補（YYYY-MM-DD / YYYY/MM/DD、時刻付きも可）の先頭一致
@@ -67,10 +70,15 @@ function normalizeName_(s) {
   return unifyKanjiVariants_(coreTokens.join(''));
 }
 
-/** 「本名（LINE名: ニックネーム）」形式からLINE名部分だけを正規化して返す。無ければ空文字 */
+/** 「本名（LINE名: ニックネーム）」形式からLINE名部分だけを正規化して返す。無ければ空文字
+ * 末尾の括弧全体（入れ子1段まで）をまず取り出してから中身を見るため、
+ * ニックネーム自体に半角括弧が含まれる場合（例:「さかい(箱)」）でも途中で切れない */
 function extractLineNameCandidate_(applicantRaw) {
-  const m = LINE_NAME_RE.exec(String(applicantRaw || ''));
-  return m ? normalizeName_(m[1]) : '';
+  const s = String(applicantRaw || '');
+  const parenMatch = APPLICANT_PAREN_CONTENT_RE.exec(s);
+  const content = parenMatch ? parenMatch[1] : s;
+  const m = LINE_NAME_RE.exec(content);
+  return m ? normalizeName_(m[1].trim()) : '';
 }
 
 /** 「面談対応(先生): 〇〇〇〇【事務所名】」の【】部分を取り出す。無ければ空文字 */
