@@ -19,13 +19,8 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 CW_API_TOKEN = os.environ.get("CW_API_TOKEN", "")
-# (room_id, グループ名) のリスト。ここに追加すればポーリング対象を増やせる
-CW_ROOMS = [
-    (445630230, "響"),
-    (448116441, "ユア・エース"),
-    (448116472, "サンク"),
-    (448116511, "イージス"),
-]
+# ポーリング対象ルームID。ここに追加すれば取得対象グループを増やせる
+CW_ROOM_IDS = [445630230, 448116441, 448116472, 448116511]
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "11RAnfeZZPS8dF6llHV7T2FOd2shSdPgiBdmzeMU4sQo")
 TEMPLATE_SHEET_NAME = os.environ.get("TEMPLATE_SHEET_NAME", "テンプレ")
 
@@ -65,11 +60,10 @@ def fetch_cw_messages(room_id, force=1):
 
 
 def fetch_all_cw_messages(force=1):
-    """CW_ROOMSの全グループからメッセージを取得し、(message, グループ名)のリストで返す"""
+    """CW_ROOM_IDSの全グループからメッセージを取得し、1つのリストにまとめて返す"""
     combined = []
-    for room_id, label in CW_ROOMS:
-        for msg in fetch_cw_messages(room_id, force=force):
-            combined.append((msg, label))
+    for room_id in CW_ROOM_IDS:
+        combined.extend(fetch_cw_messages(room_id, force=force))
     return combined
 
 
@@ -182,14 +176,13 @@ def ensure_min_rows(service, sheet_id, min_rows):
 
 
 def build_new_rows(all_messages, today, existing_ids):
-    """本日分かつ未追記のメッセージから、シートに書き込む行データを作る
-    all_messages: (message, グループ名) のリスト（fetch_all_cw_messagesの戻り値）"""
+    """本日分かつ未追記のメッセージから、シートに書き込む行データを作る"""
     messages = [
-        (m, label) for m, label in all_messages
+        m for m in all_messages
         if datetime.fromtimestamp(int(m["send_time"]), tz=JST).date() == today
     ]
     new_rows = []
-    for msg, label in sorted(messages, key=lambda x: int(x[0]["send_time"])):
+    for msg in sorted(messages, key=lambda m: int(m["send_time"])):
         mid = msg["message_id"]
         if mid in existing_ids:
             continue
@@ -199,7 +192,7 @@ def build_new_rows(all_messages, today, existing_ids):
         teacher = _extract_field(body, _TEACHER_RE)
         cs = _extract_field(body, _CS_RE)
         applicant = extract_applicant(body)
-        new_rows.append([mid, dt, sender, body, teacher, cs, applicant, label])
+        new_rows.append([mid, dt, sender, body, teacher, cs, applicant])
     return messages, new_rows
 
 
@@ -213,7 +206,7 @@ def write_new_rows(service, sheet_name, sheet_id, message_id_to_row, new_rows):
     ensure_min_rows(service, sheet_id, next_row + len(new_rows) - 1)
     service.spreadsheets().values().update(
         spreadsheetId=SPREADSHEET_ID,
-        range=f"{sheet_name}!A{next_row}:H{next_row + len(new_rows) - 1}",
+        range=f"{sheet_name}!A{next_row}:G{next_row + len(new_rows) - 1}",
         valueInputOption="RAW",
         body={"values": new_rows}
     ).execute()
