@@ -29,6 +29,13 @@ const KANJI_VARIANTS = {
 
 const PURE_KANA_RE = /^[ぁ-んァ-ヶー]+$/;
 const PAREN_RE = /[（(][^）)]*[）)]/g;
+// 依頼者名「本名（LINE名: ニックネーム）」からLINE名部分だけを取り出す
+const LINE_NAME_RE = /LINE名[:：]\s*([^)）]+)/;
+// 「面談対応(先生): 〇〇〇〇【事務所名】」の【】部分を取り出す
+const OFFICE_RE = /【(.+?)】/;
+// 日付候補（YYYY-MM-DD / YYYY/MM/DD、時刻付きも可）の先頭一致
+const YMD_RE = /^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/;
+const DATE_MATCH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 日付突合の許容幅（7日）
 
 function unifyKanjiVariants_(s) {
   let out = '';
@@ -58,6 +65,88 @@ function normalizeName_(s) {
   const nonKana = tokens.filter((t) => !PURE_KANA_RE.test(t));
   const coreTokens = nonKana.length > 0 ? nonKana : tokens;
   return unifyKanjiVariants_(coreTokens.join(''));
+}
+
+/** 「本名（LINE名: ニックネーム）」形式からLINE名部分だけを正規化して返す。無ければ空文字 */
+function extractLineNameCandidate_(applicantRaw) {
+  const m = LINE_NAME_RE.exec(String(applicantRaw || ''));
+  return m ? normalizeName_(m[1]) : '';
+}
+
+/** 「面談対応(先生): 〇〇〇〇【事務所名】」の【】部分を取り出す。無ければ空文字 */
+function extractOffice_(teacherField) {
+  const m = OFFICE_RE.exec(String(teacherField || ''));
+  return m ? m[1].trim() : '';
+}
+
+/** "2026-09-14 13:45" / "2026/09/14" 等の先頭日付部分だけをUnix時刻(ms)に変換。パース不可ならnull */
+function parseYmd_(s) {
+  if (!s) return null;
+  const m = YMD_RE.exec(String(s).trim());
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
+
+/**
+ * 候補が複数ある場合に、日付が最も近い1件だけに絞り込む。
+ * 最も近い候補が2件以上（同点）の場合や、許容幅(7日)を超える場合は諦めてnullを返す
+ * （安全側：誤マッチよりも「該当なし」を優先）
+ */
+function narrowByDate_(candidates, messageDateMs, proposalIdx, interviewIdx) {
+  if (messageDateMs == null) return null;
+  const scored = candidates
+    .map((row) => {
+      const d1 = parseYmd_(row[proposalIdx]);
+      const d2 = parseYmd_(row[interviewIdx]);
+      const diffs = [d1, d2].filter((d) => d !== null).map((d) => Math.abs(d - messageDateMs));
+      return { row: row, diff: diffs.length ? Math.min.apply(null, diffs) : Infinity };
+    })
+    .filter((s) => s.diff <= DATE_MATCH_WINDOW_MS);
+  if (scored.length === 0) return null;
+  scored.sort((a, b) => a.diff - b.diff);
+  if (scored.length === 1 || scored[0].diff < scored[1].diff) return scored[0].row;
+  return null;
+}
+
+/**
+ * 候補配列(同じキーに複数のLステップ行がぶら下がっている場合がある)を、
+ * 事務所名でまず絞り込み、それでも複数残る場合のみ日付で最終タイブレークする。
+ * 事務所名が不明（本文に【】が無い等）な状態で候補が複数残る場合は、
+ * 日付だけを頼りに当てにいくと誤爆リスクが高いため確定させずnullを返す
+ */
+function narrowCandidates_(candidates, office, officeIdx, messageDateMs, proposalIdx, interviewIdx) {
+  if (!candidates || candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+  if (!office) return null;
+
+  const byOffice = candidates.filter((row) => (row[officeIdx] || '').trim() === office);
+  if (byOffice.length === 0) return null;
+  if (byOffice.length === 1) return byOffice[0];
+
+  return narrowByDate_(byOffice, messageDateMs, proposalIdx, interviewIdx);
+}
+
+/**
+ * 依頼者名からLステップ行を特定する。本名で一意に決まらない場合は、
+ * 括弧内のLINE名でも試し、複数候補が残る場合は事務所名→日付で絞り込む。
+ * @return {{row: (Array|null), method: (string|null)}}
+ */
+function resolveLstepRow_(lstepByKey, applicantRaw, ctx) {
+  const baseKey = normalizeName_(applicantRaw);
+  const narrow = (candidates) => narrowCandidates_(
+    candidates, ctx.office, ctx.officeIdx, ctx.messageDateMs, ctx.proposalIdx, ctx.interviewIdx
+  );
+
+  let row = narrow(lstepByKey[baseKey]);
+  if (row) return { row: row, method: '本名' };
+
+  const lineKey = extractLineNameCandidate_(applicantRaw);
+  if (lineKey && lineKey !== baseKey) {
+    row = narrow(lstepByKey[lineKey]);
+    if (row) return { row: row, method: 'LINE名' };
+  }
+  return { row: null, method: null };
 }
 
 /**
@@ -104,17 +193,19 @@ function parsePoketeruCompletedCsv_(base64Data) {
  * ぽけてる完了案件のうち、Lステップ側で「提案予約日」「担当者」が
  * どちらも未入力（空欄）の案件名の一覧を返す
  * @param {Object} poketeruCompletedMap normalizeName_キー => {row, name}
- * @param {Object} lstepByName normalizeName_キー => Lステップ行
+ * @param {Object} lstepByKey normalizeName_キー => Lステップ行の配列（同じキーに複数該当する場合あり）
  * @param {number[]} requiredIdx REQUIRED_LABELSに対応する列インデックス
  * @return {string[]} 該当する依頼者名（ぽけてるCSV上の表記）の一覧
  */
-function findPoketeruCompletedPending_(poketeruCompletedMap, lstepByName, requiredIdx) {
+function findPoketeruCompletedPending_(poketeruCompletedMap, lstepByKey, requiredIdx) {
   const proposalIdx = requiredIdx[REQUIRED_LABELS.indexOf('提案予約日')];
   const assigneeIdx = requiredIdx[REQUIRED_LABELS.indexOf('担当者')];
 
   const pending = [];
   Object.keys(poketeruCompletedMap).forEach((key) => {
-    const lstepRow = lstepByName[key];
+    // 事務所名・日付での絞り込みはここでは行わず、一意に決まる場合のみ判定に使う
+    const candidates = lstepByKey[key];
+    const lstepRow = candidates && candidates.length === 1 ? candidates[0] : null;
     const proposalBlank = !lstepRow || !lstepRow[proposalIdx] || !String(lstepRow[proposalIdx]).trim();
     const assigneeBlank = !lstepRow || !lstepRow[assigneeIdx] || !String(lstepRow[assigneeIdx]).trim();
     if (proposalBlank && assigneeBlank) {
@@ -155,23 +246,29 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
     return idx;
   });
 
-  const lstepByName = {};
+  // キー => Lステップ行の配列（同一人物が複数の名前列で一致した場合はID重複除去、
+  // 別人が同じニックネーム等でキーが衝突した場合はそのまま複数件残す＝後段の絞り込みに使う）
+  const lstepByKey = {};
+  const idIdx = 0; // 先頭列がID
   for (let i = 2; i < lstepRows.length; i++) {
     const row = lstepRows[i];
     nameIdxs.forEach((idx) => {
       const key = normalizeName_(row[idx]);
-      if (key && !lstepByName[key]) {
-        lstepByName[key] = row;
-      }
+      if (!key) return;
+      const list = lstepByKey[key] || (lstepByKey[key] = []);
+      if (!list.some((r) => r[idIdx] === row[idIdx])) list.push(row);
     });
   }
+  const officeIdx = requiredIdx[REQUIRED_LABELS.indexOf('事務所名')];
+  const proposalDateIdx = requiredIdx[REQUIRED_LABELS.indexOf('提案予約日')];
+  const interviewDateIdx = requiredIdx[REQUIRED_LABELS.indexOf('面談実施日')];
 
   // 2. ぽけてる予約一覧CSVのパース（指定されている場合）
   let poketeruCompletedMap = null;
   let poketeruPending = [];
   if (poketeruBase64 && poketeruBase64.trim() !== '') {
     poketeruCompletedMap = parsePoketeruCompletedCsv_(poketeruBase64);
-    poketeruPending = findPoketeruCompletedPending_(poketeruCompletedMap, lstepByName, requiredIdx);
+    poketeruPending = findPoketeruCompletedPending_(poketeruCompletedMap, lstepByKey, requiredIdx);
   }
 
   const targets = targetSheetChoice === '__ALL__'
@@ -193,14 +290,18 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
       return;
     }
 
-    const applicantNames = sheet.getRange(2, 7, lastRow - 1, 1).getValues(); // G列=依頼者名
+    // B:日付, C:送信者, D:内容, E:面談対応(先生), F:対応者(CS), G:依頼者名 をまとめて取得
+    const rowsData = sheet.getRange(2, 2, lastRow - 1, 6).getValues();
     const results = [];
     let matched = 0;
     let complete = 0;
     let notFound = 0;
     let poketeruMatchedCount = 0;
 
-    applicantNames.forEach(([name]) => {
+    rowsData.forEach((r) => {
+      const messageDateStr = r[0]; // B列
+      const teacherField = r[3]; // E列
+      const name = r[5]; // G列
       const key = normalizeName_(name);
       if (!key) {
         results.push(['']);
@@ -215,7 +316,14 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
         }
       }
 
-      const row = lstepByName[key];
+      const resolved = resolveLstepRow_(lstepByKey, name, {
+        office: extractOffice_(teacherField),
+        officeIdx: officeIdx,
+        messageDateMs: parseYmd_(messageDateStr),
+        proposalIdx: proposalDateIdx,
+        interviewIdx: interviewDateIdx,
+      });
+      const row = resolved.row;
       if (!row) {
         results.push(['該当なし']);
         notFound++;
@@ -227,11 +335,13 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
       requiredIdx.forEach((idx, i) => {
         if (!row[idx] || !String(row[idx]).trim()) missing.push(REQUIRED_LABELS[i]);
       });
+      // 本名の直接一致以外（LINE名フォールバック等）で決まった場合は、目視確認できるよう明記する
+      const methodSuffix = resolved.method === 'LINE名' ? '［LINE名突合］' : '';
       if (missing.length === 0) {
-        results.push(['済']);
+        results.push([`済${methodSuffix}`]);
         complete++;
       } else {
-        results.push([`未：${missing.join('、')}`]);
+        results.push([`未：${missing.join('、')}${methodSuffix}`]);
       }
     });
 
