@@ -87,6 +87,12 @@ function extractOffice_(teacherField) {
   return m ? m[1].trim() : '';
 }
 
+/** 電話番号からハイフン・空白等を除いた数字だけの文字列を返す。無ければ空文字 */
+function normalizePhone_(s) {
+  if (!s) return '';
+  return String(s).replace(/[^0-9]/g, '');
+}
+
 /** "2026-09-14 13:45" / "2026/09/14" 等の先頭日付部分だけをUnix時刻(ms)に変換。パース不可ならnull */
 function parseYmd_(s) {
   if (!s) return null;
@@ -232,10 +238,11 @@ function isPoketeruCompleted_(poketeruCompletedMap, applicantRaw) {
  * 同じキーに複数の完了案件がぶら下がっている場合は、区別できるようすべて列挙する
  * @param {Object} poketeruCompletedMap normalizeName_キー => 完了案件配列
  * @param {Object} lstepByKey normalizeName_キー => Lステップ行の配列（同じキーに複数該当する場合あり）
+ * @param {Object} lstepByPhone 正規化した電話番号 => Lステップ行の配列（電話番号列が無いCSVでは空）
  * @param {number[]} requiredIdx REQUIRED_LABELSに対応する列インデックス
  * @return {Object[]} {name, phone, csStaff, office} の一覧
  */
-function findPoketeruCompletedPending_(poketeruCompletedMap, lstepByKey, requiredIdx) {
+function findPoketeruCompletedPending_(poketeruCompletedMap, lstepByKey, lstepByPhone, requiredIdx) {
   const proposalIdx = requiredIdx[REQUIRED_LABELS.indexOf('提案予約日')];
   const assigneeIdx = requiredIdx[REQUIRED_LABELS.indexOf('担当者')];
 
@@ -248,27 +255,35 @@ function findPoketeruCompletedPending_(poketeruCompletedMap, lstepByKey, require
   const pending = [];
   Object.keys(poketeruCompletedMap).forEach((key) => {
     const candidates = lstepByKey[key] || [];
-    // 事務所名（ぽけてる側は「YA」等の略称でLステップ側「ユアエース」等と表記が
-    // 異なり単純比較できないため）ここでは絞り込みに使わない。
-    // 候補が複数（同じニックネーム等での衝突）で一意に絞れない場合、
-    // どれか1件でも入力済みなら「対応済みの可能性あり」とみなし誤検出を避けるため、
-    // 全候補が両方空欄の場合のみ未対応と判定する
-    let isPending;
-    if (candidates.length === 0) {
-      isPending = true; // Lステップに未登録＝完全未対応
-    } else {
-      isPending = candidates.every(bothBlank);
-    }
-    if (isPending) {
-      poketeruCompletedMap[key].forEach((entry) => {
+    poketeruCompletedMap[key].forEach((entry) => {
+      // 電話番号は氏名と違って衝突しにくいため、一意に絞れるなら最優先で使う
+      // （名前・ニックネームの衝突より信頼できる）
+      const phone = normalizePhone_(entry.phone);
+      const phoneCandidates = phone ? lstepByPhone[phone] : null;
+
+      let isPending;
+      if (phoneCandidates && phoneCandidates.length === 1) {
+        isPending = bothBlank(phoneCandidates[0]);
+      } else if (candidates.length === 0) {
+        isPending = true; // Lステップに未登録＝完全未対応
+      } else if (candidates.length === 1) {
+        isPending = bothBlank(candidates[0]);
+      } else {
+        // 名前（ニックネーム等）が衝突して一意に絞れない場合、
+        // どれか1件でも入力済みなら「対応済みの可能性あり」とみなし誤検出を避けるため、
+        // 全候補が両方空欄の場合のみ未対応と判定する
+        isPending = candidates.every(bothBlank);
+      }
+
+      if (isPending) {
         pending.push({
           name: entry.name,
           phone: entry.phone || '',
           csStaff: entry.csStaff || '',
           office: entry.office || '',
         });
-      });
-    }
+      }
+    });
   });
   return pending;
 }
@@ -307,7 +322,10 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
   // キー => Lステップ行の配列（同一人物が複数の名前列で一致した場合はID重複除去、
   // 別人が同じニックネーム等でキーが衝突した場合はそのまま複数件残す＝後段の絞り込みに使う）
   const lstepByKey = {};
+  // 正規化した電話番号 => Lステップ行の配列（電話番号列が無いCSVでは常に空のまま）
+  const lstepByPhone = {};
   const idIdx = 0; // 先頭列がID
+  const lstepPhoneIdx = labelRow.indexOf('電話番号');
   for (let i = 2; i < lstepRows.length; i++) {
     const row = lstepRows[i];
     nameIdxs.forEach((idx) => {
@@ -316,6 +334,13 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
       const list = lstepByKey[key] || (lstepByKey[key] = []);
       if (!list.some((r) => r[idIdx] === row[idIdx])) list.push(row);
     });
+    if (lstepPhoneIdx !== -1) {
+      const phone = normalizePhone_(row[lstepPhoneIdx]);
+      if (phone) {
+        const list = lstepByPhone[phone] || (lstepByPhone[phone] = []);
+        if (!list.some((r) => r[idIdx] === row[idIdx])) list.push(row);
+      }
+    }
   }
   const officeIdx = requiredIdx[REQUIRED_LABELS.indexOf('事務所名')];
   const proposalDateIdx = requiredIdx[REQUIRED_LABELS.indexOf('提案予約日')];
@@ -326,7 +351,7 @@ function processDualCsv(lstepBase64, poketeruBase64, targetSheetChoice) {
   let poketeruPending = [];
   if (poketeruBase64 && poketeruBase64.trim() !== '') {
     poketeruCompletedMap = parsePoketeruCompletedCsv_(poketeruBase64);
-    poketeruPending = findPoketeruCompletedPending_(poketeruCompletedMap, lstepByKey, requiredIdx);
+    poketeruPending = findPoketeruCompletedPending_(poketeruCompletedMap, lstepByKey, lstepByPhone, requiredIdx);
   }
 
   const targets = targetSheetChoice === '__ALL__'
