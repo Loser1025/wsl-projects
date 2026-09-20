@@ -239,14 +239,27 @@ function findPoketeruCompletedPending_(poketeruCompletedMap, lstepByKey, require
   const proposalIdx = requiredIdx[REQUIRED_LABELS.indexOf('提案予約日')];
   const assigneeIdx = requiredIdx[REQUIRED_LABELS.indexOf('担当者')];
 
+  const bothBlank = (row) => {
+    const proposalBlank = !row[proposalIdx] || !String(row[proposalIdx]).trim();
+    const assigneeBlank = !row[assigneeIdx] || !String(row[assigneeIdx]).trim();
+    return proposalBlank && assigneeBlank;
+  };
+
   const pending = [];
   Object.keys(poketeruCompletedMap).forEach((key) => {
-    // 事務所名・日付での絞り込みはここでは行わず、一意に決まる場合のみ判定に使う
-    const candidates = lstepByKey[key];
-    const lstepRow = candidates && candidates.length === 1 ? candidates[0] : null;
-    const proposalBlank = !lstepRow || !lstepRow[proposalIdx] || !String(lstepRow[proposalIdx]).trim();
-    const assigneeBlank = !lstepRow || !lstepRow[assigneeIdx] || !String(lstepRow[assigneeIdx]).trim();
-    if (proposalBlank && assigneeBlank) {
+    const candidates = lstepByKey[key] || [];
+    // 事務所名（ぽけてる側は「YA」等の略称でLステップ側「ユアエース」等と表記が
+    // 異なり単純比較できないため）ここでは絞り込みに使わない。
+    // 候補が複数（同じニックネーム等での衝突）で一意に絞れない場合、
+    // どれか1件でも入力済みなら「対応済みの可能性あり」とみなし誤検出を避けるため、
+    // 全候補が両方空欄の場合のみ未対応と判定する
+    let isPending;
+    if (candidates.length === 0) {
+      isPending = true; // Lステップに未登録＝完全未対応
+    } else {
+      isPending = candidates.every(bothBlank);
+    }
+    if (isPending) {
       poketeruCompletedMap[key].forEach((entry) => {
         pending.push({
           name: entry.name,
