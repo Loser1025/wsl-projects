@@ -1,0 +1,24 @@
+- generic [ref=f7e4]:
+  - generic [ref=f7e5]:
+    - generic [ref=f7e6]:
+      - generic [ref=f7e7]: ぽけかかく
+      - generic [ref=f7e8]: POKEMON CARD PRICE CATALOG
+    - generic [ref=f7e609]:
+      - button "パック" [ref=f7e610] [cursor=pointer]
+      - button "コレクション" [active] [ref=f7e611] [cursor=pointer]
+      - button "価格差ランキング" [ref=f7e612] [cursor=pointer]
+  - generic [ref=f7e9]:
+    - generic [ref=f7e1177]: コレクション
+    - generic [ref=f7e1178]: 所持カード 1種
+    - generic [ref=f7e1180]:
+      - generic [ref=f7e1181] [cursor=pointer]:
+        - generic [ref=f7e1182]: RR
+        - generic [ref=f7e1185]:
+          - generic [ref=f7e1186]: ポケモンカードゲーム MEGA 拡張パック 30th CELEBRATION
+          - generic [ref=f7e1187]: ホゲータex
+          - generic [ref=f7e1188]: 009/165
+          - generic [ref=f7e1189]: 60円〜200円
+      - generic [ref=f7e1190]:
+        - button "−" [ref=f7e1191] [cursor=pointer]
+        - generic [ref=f7e1192]: "1"
+        - button "+" [ref=f7e1193] [cursor=pointer]

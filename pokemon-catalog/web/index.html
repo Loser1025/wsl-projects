@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ぽけかかく — ポケモンカード価格図鑑</title>
+<script src="./support.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
+<script>
+(function(){
+  var cfg = {
+    apiKey:            "AIzaSyA8p3-UVh2p0Apr5tYGeaz-G4FYtcXVzpg",
+    authDomain:        "pokemon-catalog-6c823.firebaseapp.com",
+    databaseURL:       "https://pokemon-catalog-6c823-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:         "pokemon-catalog-6c823",
+    storageBucket:     "pokemon-catalog-6c823.firebasestorage.app",
+    messagingSenderId: "423071182175",
+    appId:             "1:423071182175:web:826efd1939feaedad45aea"
+  };
+  firebase.initializeApp(cfg);
+  window._db = firebase.database();
+})();
+</script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f5f9; --surface:#fff; --ink:#0b0b12; --muted:#8b8f98; --border:#e6e7eb;
+    --navy-deep:#0a1338; --navy:#152565; --navy-light:#2a49a8;
+    --gold:#cf9a1e; --gold-bright:#f0c33c; --gold-tint:#fbf0d2;
+    --accent1:#1e3a8a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg);color-scheme:light;font-family:'Noto Sans JP','Inter',sans-serif;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select{font-family:inherit;font-size:13px;}
+  input[type="text"],input[type="number"]{border:1px solid #d8d8d8;border-radius:8px;padding:9px 12px;outline:none;}
+  input[type="text"]:focus,input[type="number"]:focus,select:focus{border-color:var(--accent1);}
+  select{border:1px solid #d8d8d8;border-radius:8px;padding:9px 10px;background:#fff;outline:none;}
+  .chip{border:1px solid #d8d8d8;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;background:#fff;color:#555;white-space:nowrap;transition:transform .12s ease;}
+  .chip.active{color:#fff;border-color:transparent;}
+  .chip:hover{transform:translateY(-1px);}
+
+  .masthead{background:radial-gradient(circle at 28% 15%,var(--navy-light) 0%,var(--navy) 45%,var(--navy-deep) 100%);
+    color:#fff;border-bottom:3px solid var(--gold);box-shadow:0 2px 0 rgba(207,154,30,.35);}
+  .brand{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:27px;letter-spacing:.02em;
+    color:var(--gold-bright);-webkit-text-stroke:1px var(--navy-deep);
+    text-shadow:0 1px 0 var(--navy-deep),0 2px 3px rgba(0,0,0,.35);}
+  .brand-sub{font-size:10.5px;color:rgba(255,255,255,.5);letter-spacing:.1em;}
+  .tab-btn{padding:11px 14px;border:none;background:transparent;font-size:13px;font-weight:600;
+    color:rgba(255,255,255,.55);cursor:pointer;border-radius:8px 8px 0 0;border-bottom:2px solid transparent;
+    transition:color .12s ease,background .12s ease,border-color .12s ease;}
+  .tab-btn:hover{color:rgba(255,255,255,.9);}
+  .tab-btn.active{color:var(--gold-bright);background:rgba(240,195,60,.10);border-bottom:2px solid var(--gold);}
+
+  .pack-card{display:flex;align-items:center;gap:16px;width:100%;background:var(--surface);border:1px solid var(--border);
+    border-radius:16px;padding:14px;text-align:left;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
+  .pack-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(10,19,56,.12);border-color:var(--gold);}
+  .pack-thumb{width:60px;height:60px;border-radius:12px;overflow:hidden;flex-shrink:0;border:2px solid var(--gold-tint);
+    background:linear-gradient(135deg,var(--navy-light),var(--navy));display:flex;align-items:center;justify-content:center;}
+  .pack-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .set-badge{display:inline-block;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:11px;letter-spacing:.04em;
+    color:#8a6410;background:var(--gold-tint);border-radius:6px;padding:1px 7px;margin-top:4px;}
+
+  .card-tile{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;
+    display:flex;flex-direction:column;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
+  .card-tile:hover{transform:translateY(-3px);box-shadow:0 14px 28px rgba(10,19,56,.12);border-color:var(--gold);}
+  .card-tile-bar{height:4px;width:100%;}
+  .row-card{cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:12px 14px;display:flex;align-items:center;gap:12px;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
+  .row-card:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(10,19,56,.10);border-color:var(--gold);}
+</style>
+</helmet>
+<div style="min-height:100vh;background:var(--bg);color:#0a0a0a;padding-bottom:64px;">
+
+  <!-- MASTHEAD -->
+  <div class="masthead" style="position:sticky;top:0;z-index:10;">
+    <div style="max-width:960px;margin:0 auto;padding:16px 18px 10px;display:flex;align-items:baseline;gap:12px;">
+      <div class="brand">ぽけかかく</div>
+      <div class="brand-sub">POKEMON CARD PRICE CATALOG</div>
+    </div>
+    <sc-if value="{{ showTabs }}">
+      <div style="max-width:960px;margin:0 auto;padding:0 14px;display:flex;gap:4px;">
+        <button class="{{ tabPacksClass }}" onClick="{{ onTabPacks }}">パック</button>
+        <button class="{{ tabCollectionClass }}" onClick="{{ onTabCollection }}">コレクション</button>
+        <button class="{{ tabRankingClass }}" onClick="{{ onTabRanking }}">価格差ランキング</button>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="max-width:960px;margin:0 auto;padding:20px 18px;">
+
+    <!-- LOADING -->
+    <sc-if value="{{ isLoading }}">
+      <div style="padding:60px 0;text-align:center;color:#999;font-size:13px;">読み込み中…</div>
+    </sc-if>
+
+    <!-- CONNECTION ERROR -->
+    <sc-if value="{{ hasError }}">
+      <div style="padding:20px;background:#fff0c2;border-radius:8px;font-size:13px;line-height:1.7;">
+        データベースに接続できませんでした（{{ errorMessage }}）。Firebaseのセキュリティルール設定が未完了の可能性があります。
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ showEmptyPacks }}">
+      <div style="padding:60px 20px;text-align:center;color:#888;font-size:13px;line-height:1.8;">
+        まだパックが登録されていません。<br>価格取得スクリプトの実行を待っています。
+      </div>
+    </sc-if>
+
+    <!-- PACK LIST VIEW -->
+    <sc-if value="{{ showPackList }}">
+      <div style="display:grid;gap:10px;">
+        <sc-for list="{{ packRows }}" as="p" hint-placeholder-count="3">
+          <button class="pack-card" onClick="{{ p.onOpen }}">
+            <div class="pack-thumb">
+              <sc-if value="{{ p.thumbnailUrl }}">
+                <img src="{{ p.thumbnailUrl }}">
+              </sc-if>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:15px;font-weight:700;">{{ p.name }}</div>
+              <span class="set-badge">{{ p.setCode }}</span>
+            </div>
+            <div style="font-size:12px;color:#666;white-space:nowrap;">{{ p.cardCountLabel }}</div>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- CARD LIST VIEW -->
+    <sc-if value="{{ showCardList }}">
+      <button onClick="{{ onBackToPacks }}" style="background:transparent;border:none;color:var(--accent1);font-size:13px;padding:0 0 14px;">← パック一覧に戻る</button>
+      <div style="font-size:16px;font-weight:700;margin-bottom:14px;">{{ selectedPackName }}</div>
+
+      <!-- SEARCH -->
+      <input type="text" placeholder="カード名・型番で検索" value="{{ searchQuery }}" onInput="{{ onSearchInput }}" style="width:100%;margin-bottom:10px;">
+
+      <!-- RARITY CHIPS -->
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+        <sc-for list="{{ rarityChips }}" as="r" hint-placeholder-count="3">
+          <button class="{{ r.className }}" onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</button>
+        </sc-for>
+      </div>
+
+      <!-- PRICE + OWNED FILTER + SORT -->
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="number" placeholder="下限" value="{{ priceMin }}" onInput="{{ onPriceMinInput }}" style="width:80px;">
+          <span style="font-size:12px;color:#999;">円 〜</span>
+          <input type="number" placeholder="上限" value="{{ priceMax }}" onInput="{{ onPriceMaxInput }}" style="width:80px;">
+          <span style="font-size:12px;color:#999;">円</span>
+        </div>
+        <select value="{{ ownedFilter }}" onChange="{{ onOwnedFilterChange }}">
+          <option value="all">所持状態: すべて</option>
+          <option value="owned">所持のみ</option>
+          <option value="not_owned">未所持のみ</option>
+        </select>
+        <select value="{{ sortBy }}" onChange="{{ onSortChange }}">
+          <option value="number">型番順</option>
+          <option value="price_asc">価格が安い順</option>
+          <option value="price_desc">価格が高い順</option>
+        </select>
+        <sc-if value="{{ hasActiveFilters }}">
+          <button onClick="{{ onClearFilters }}" style="background:transparent;border:none;color:var(--accent1);font-size:12px;">フィルターをクリア</button>
+        </sc-if>
+      </div>
+
+      <div style="font-size:12px;color:#999;margin-bottom:12px;">{{ resultCountLabel }}</div>
+
+      <sc-if value="{{ showEmptyCards }}">
+        <div style="padding:40px 0;text-align:center;color:#888;font-size:13px;">このパックのカードはまだありません。</div>
+      </sc-if>
+
+      <sc-if value="{{ showNoResults }}">
+        <div style="padding:40px 0;text-align:center;color:#888;font-size:13px;">条件に一致するカードがありません。</div>
+      </sc-if>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;">
+        <sc-for list="{{ cardRows }}" as="c" hint-placeholder-count="6">
+          <div class="card-tile">
+            <div class="card-tile-bar" style="{{ c.rarityBadgeStyle }}"></div>
+            <div onClick="{{ c.onOpen }}" style="cursor:pointer;">
+              <div style="position:relative;aspect-ratio:3/4;background:#f0f0f0;">
+                <sc-if value="{{ c.imageUrl }}">
+                  <img src="{{ c.imageUrl }}" style="width:100%;height:100%;object-fit:cover;display:block;">
+                </sc-if>
+                <div style="position:absolute;top:6px;left:6px;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;color:#fff;{{ c.rarityBadgeStyle }}">{{ c.rarity }}</div>
+              </div>
+              <div style="padding:9px 10px 0;">
+                <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ c.name }}</div>
+                <div style="font-size:10.5px;color:#999;margin-top:2px;">{{ c.cardNumber }}</div>
+                <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;margin-top:5px;line-height:1.3;">{{ c.priceLabel }}</div>
+              </div>
+            </div>
+            <div style="padding:7px 10px 11px;display:flex;align-items:center;gap:6px;">
+              <button onClick="{{ c.onDecrement }}" style="width:24px;height:24px;border:1px solid #d8d8d8;border-radius:6px;background:#fff;line-height:1;">−</button>
+              <span style="font-size:12px;min-width:16px;text-align:center;">{{ c.ownedCount }}</span>
+              <button onClick="{{ c.onIncrement }}" style="width:24px;height:24px;border:1px solid #d8d8d8;border-radius:6px;background:#fff;line-height:1;">+</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- COLLECTION VIEW -->
+    <sc-if value="{{ showCollection }}">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px;">コレクション</div>
+      <div style="font-size:12px;color:#999;margin-bottom:14px;">{{ collectionCountLabel }}</div>
+
+      <sc-if value="{{ showEmptyCollection }}">
+        <div style="padding:60px 20px;text-align:center;color:#888;font-size:13px;line-height:1.8;">
+          まだ所持カードが登録されていません。<br>カード一覧の「+」で所持数を記録できます。
+        </div>
+      </sc-if>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;">
+        <sc-for list="{{ collectionRows }}" as="c" hint-placeholder-count="6">
+          <div class="card-tile">
+            <div class="card-tile-bar" style="{{ c.rarityBadgeStyle }}"></div>
+            <div onClick="{{ c.onOpen }}" style="cursor:pointer;">
+              <div style="position:relative;aspect-ratio:3/4;background:#f0f0f0;">
+                <sc-if value="{{ c.imageUrl }}">
+                  <img src="{{ c.imageUrl }}" style="width:100%;height:100%;object-fit:cover;display:block;">
+                </sc-if>
+                <div style="position:absolute;top:6px;left:6px;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;color:#fff;{{ c.rarityBadgeStyle }}">{{ c.rarity }}</div>
+              </div>
+              <div style="padding:9px 10px 0;">
+                <div style="font-size:9.5px;color:#bbb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ c.packName }}</div>
+                <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ c.name }}</div>
+                <div style="font-size:10.5px;color:#999;margin-top:2px;">{{ c.cardNumber }}</div>
+                <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;margin-top:5px;line-height:1.3;">{{ c.priceLabel }}</div>
+              </div>
+            </div>
+            <div style="padding:7px 10px 11px;display:flex;align-items:center;gap:6px;">
+              <button onClick="{{ c.onDecrement }}" style="width:24px;height:24px;border:1px solid #d8d8d8;border-radius:6px;background:#fff;line-height:1;">−</button>
+              <span style="font-size:12px;min-width:16px;text-align:center;">{{ c.ownedCount }}</span>
+              <button onClick="{{ c.onIncrement }}" style="width:24px;height:24px;border:1px solid #d8d8d8;border-radius:6px;background:#fff;line-height:1;">+</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- RANKING VIEW -->
+    <sc-if value="{{ showRanking }}">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px;">日米価格差ランキング</div>
+      <div style="font-size:12px;color:#999;margin-bottom:14px;">米国価格(円換算)が高い順</div>
+
+      <sc-if value="{{ showEmptyRanking }}">
+        <div style="padding:60px 20px;text-align:center;color:#888;font-size:13px;line-height:1.8;">
+          米国価格のデータがまだありません。<br>
+          日本限定発売のセットが中心のため、規約に反しない米国側の価格取得手段が今のところ見つかっていません。<br>
+          データが取得でき次第、ここにランキングが表示されます。
+        </div>
+      </sc-if>
+
+      <div style="display:grid;gap:8px;">
+        <sc-for list="{{ rankingRows }}" as="c" hint-placeholder-count="4">
+          <div class="row-card" onClick="{{ c.onOpen }}">
+            <sc-if value="{{ c.imageUrl }}">
+              <img src="{{ c.imageUrl }}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;">
+            </sc-if>
+            <div style="min-width:0;flex:1;">
+              <div style="font-size:9.5px;color:#bbb;">{{ c.packName }}</div>
+              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ c.name }}</div>
+              <div style="font-size:11px;color:#999;">{{ c.priceLabel }}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:#059669;">{{ c.diffLabel }}</div>
+              <div style="font-size:11px;color:#999;">{{ c.diffRateLabel }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- CARD DETAIL VIEW -->
+    <sc-if value="{{ showDetail }}">
+      <button onClick="{{ onBackFromDetail }}" style="background:transparent;border:none;color:var(--accent1);font-size:13px;padding:0 0 14px;">← 戻る</button>
+      <div style="max-width:360px;margin:0 auto;">
+        <div style="position:relative;border-radius:16px;overflow:hidden;background:#f0f0f0;aspect-ratio:3/4;box-shadow:0 20px 40px rgba(10,19,56,.18);border:2px solid var(--gold-tint);">
+          <sc-if value="{{ detail.imageUrl }}">
+            <img src="{{ detail.imageUrl }}" style="width:100%;height:100%;object-fit:cover;display:block;">
+          </sc-if>
+          <div style="position:absolute;top:10px;left:10px;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;{{ detail.rarityBadgeStyle }}">{{ detail.rarity }}</div>
+        </div>
+        <div style="font-size:11px;color:#999;margin-top:14px;">{{ detail.packName }}</div>
+        <div style="font-size:21px;font-weight:800;margin-top:2px;">{{ detail.name }}</div>
+        <div style="font-size:13px;color:#999;margin-top:2px;">{{ detail.cardNumber }}</div>
+
+        <div style="background:#fff;border:1px solid #e6e6e6;border-left:3px solid var(--gold);border-radius:12px;padding:16px;margin-top:16px;">
+          <div style="font-size:11px;color:#999;">日本価格(参考)</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;margin-top:4px;">{{ detail.priceLabel }}</div>
+          <sc-if value="{{ detail.listingCountLabel }}">
+            <div style="font-size:11px;color:#999;margin-top:4px;">{{ detail.listingCountLabel }}</div>
+          </sc-if>
+          <sc-if value="{{ detail.hasSourceUrl }}">
+            <a href="{{ detail.sourceUrl }}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;font-size:12px;color:var(--accent1);">最安値の出品を見る ↗</a>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ detail.hasUsdPrice }}">
+          <div style="background:#fff;border:1px solid #e6e6e6;border-left:3px solid var(--navy-light);border-radius:12px;padding:16px;margin-top:12px;">
+            <div style="font-size:11px;color:#999;">米国価格(参考・billsarchive.com)</div>
+            <div style="font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;margin-top:4px;">{{ detail.usdPriceLabel }}</div>
+          </div>
+        </sc-if>
+
+        <div style="background:#fff;border:1px solid #e6e6e6;border-radius:12px;padding:16px;margin-top:12px;">
+          <div style="font-size:12px;font-weight:700;margin-bottom:10px;">所持管理</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button onClick="{{ detail.onDecrement }}" style="width:32px;height:32px;border:1px solid #d8d8d8;border-radius:8px;background:#fff;">−</button>
+            <span style="font-size:18px;font-weight:700;min-width:24px;text-align:center;">{{ detail.ownedCount }}</span>
+            <button onClick="{{ detail.onIncrement }}" style="width:32px;height:32px;border:1px solid #d8d8d8;border-radius:8px;background:#fff;">+</button>
+            <span style="font-size:12px;color:#999;">枚所持</span>
+          </div>
+          <div style="margin-top:12px;">
+            <label style="font-size:11px;color:#999;">状態</label><br>
+            <input type="text" placeholder="例: PSA10、傷あり等" value="{{ detail.condition }}" onInput="{{ detail.onConditionInput }}" style="width:100%;margin-top:4px;">
+          </div>
+          <div style="margin-top:10px;">
+            <label style="font-size:11px;color:#999;">メモ</label><br>
+            <input type="text" placeholder="メモ" value="{{ detail.note }}" onInput="{{ detail.onNoteInput }}" style="width:100%;margin-top:4px;">
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    loading: !!window._db,
+    error: null,
+    view: 'packs',
+    packs: {},
+    cards: {},
+    collection: {},
+    selectedPackId: null,
+    selectedCardId: null,
+    detailFrom: 'packs',
+    searchQuery: '',
+    rarityFilter: [],
+    priceMin: '',
+    priceMax: '',
+    ownedFilter: 'all',
+    sortBy: 'number',
+  };
+
+  get RARITY_ORDER(){ return ['C','U','R','RR','AR','SR','MA','SAR','UR','HR','BWR','FUR','MUR','CHR','CSR','ACE','A','S','SSR','PR','PROMO','K']; }
+  get RARITY_COLORS(){
+    return {
+      C:'#9ca3af', U:'#6b7280', R:'#3b82f6', RR:'#2563EB', AR:'#059669',
+      SR:'#d97706', MA:'#0d9488', SAR:'#ea580c', UR:'#dc2626', HR:'#dc2626',
+      BWR:'#374151', FUR:'#7c3aed', MUR:'#111827', CHR:'#7c3aed', CSR:'#7c3aed', SSR:'#db2777',
+    };
+  }
+
+  componentDidMount(){
+    if (!window._db) {
+      this.setState({ loading:false, error:'Firebase未初期化' });
+      return;
+    }
+    this._pending = { packs:true, cards:true, collection:true };
+    this._loadTimer = setTimeout(() => this.setState({ loading:false }), 8000);
+    const bind = (path, stateKey) => {
+      const ref = window._db.ref(path);
+      ref.on('value', snap => {
+        this._pending[stateKey] = false;
+        const allLoaded = !this._pending.packs && !this._pending.cards && !this._pending.collection;
+        if (allLoaded) clearTimeout(this._loadTimer);
+        this.setState({ [stateKey]: snap.val() || {}, loading: !allLoaded, error:null });
+      }, err => {
+        clearTimeout(this._loadTimer);
+        this.setState({ loading:false, error: err.message || String(err) });
+      });
+      return ref;
+    };
+    this._packsRef = bind('packs', 'packs');
+    this._cardsRef = bind('cards', 'cards');
+    this._collectionRef = bind('collection', 'collection');
+  }
+
+  componentWillUnmount(){
+    if (this._packsRef) this._packsRef.off();
+    if (this._cardsRef) this._cardsRef.off();
+    if (this._collectionRef) this._collectionRef.off();
+    clearTimeout(this._loadTimer);
+  }
+
+  toggleRarity(r){
+    const cur = this.state.rarityFilter;
+    const next = cur.includes(r) ? cur.filter(x => x !== r) : [...cur, r];
+    this.setState({ rarityFilter: next });
+  }
+
+  clearFilters(){
+    this.setState({ searchQuery:'', rarityFilter:[], priceMin:'', priceMax:'', ownedFilter:'all' });
+  }
+
+  priceRangeLabel(min, max){
+    if (min == null) return '—';
+    const fmt = n => n.toLocaleString() + '円';
+    return min === max ? fmt(min) : fmt(min) + '〜' + fmt(max);
+  }
+
+  setOwnedCount(cardId, delta){
+    const current = this.state.collection[cardId] || {};
+    const next = Math.max(0, (current.ownedCount || 0) + delta);
+    const entry = { ...current, ownedCount: next, updatedAt: new Date().toISOString() };
+    if (window._db) window._db.ref('collection/' + cardId).set(entry);
+    this.setState({ collection: { ...this.state.collection, [cardId]: entry } });
+  }
+
+  setCollectionField(cardId, field, value){
+    const current = this.state.collection[cardId] || { ownedCount: 0 };
+    const entry = { ...current, [field]: value, updatedAt: new Date().toISOString() };
+    if (window._db) window._db.ref('collection/' + cardId).set(entry);
+    this.setState({ collection: { ...this.state.collection, [cardId]: entry } });
+  }
+
+  openDetail(cardId, fromView){
+    this.setState({ view:'cardDetail', selectedCardId: cardId, detailFrom: fromView });
+  }
+
+  renderVals(){
+    const { loading, error, view, packs, cards, collection, selectedPackId, selectedCardId, detailFrom,
+             searchQuery, rarityFilter, priceMin, priceMax, ownedFilter, sortBy } = this.state;
+
+    const packList = Object.keys(packs).map(id => ({ id, ...packs[id] }));
+    const cardList = Object.keys(cards).map(id => ({ id, ...cards[id] }));
+    const packNameById = Object.fromEntries(packList.map(p => [p.id, p.name || p.id]));
+
+    const cardToRow = (c, showPack) => {
+      const owned = (collection[c.id] && collection[c.id].ownedCount) || 0;
+      return {
+        id: c.id,
+        name: c.name,
+        packName: showPack ? (packNameById[c.packId] || c.packId) : '',
+        rarity: c.rarityRaw || c.rarity || '—',
+        rarityBadgeStyle: { background: this.RARITY_COLORS[c.rarity] || '#6b7280' },
+        cardNumber: c.cardNumber || '—',
+        priceLabel: this.priceRangeLabel(c.latestPriceJpyMin, c.latestPriceJpyMax),
+        imageUrl: c.imageUrl || null,
+        noImage: !c.imageUrl,
+        ownedCount: owned,
+        onIncrement: () => this.setOwnedCount(c.id, 1),
+        onDecrement: () => this.setOwnedCount(c.id, -1),
+        onOpen: () => this.openDetail(c.id, view),
+      };
+    };
+
+    let activeTab = 'packs';
+    if (view === 'collection' || (view === 'cardDetail' && detailFrom === 'collection')) activeTab = 'collection';
+    else if (view === 'ranking' || (view === 'cardDetail' && detailFrom === 'ranking')) activeTab = 'ranking';
+    const tabClass = (name) => activeTab === name ? 'tab-btn active' : 'tab-btn';
+
+    const packRows = packList.map(p => {
+      const inPack = cardList.filter(c => c.packId === p.id);
+      // Represent the pack by its priciest card's image (its "chase card").
+      const thumbCard = [...inPack].sort((a, b) => (b.latestPriceJpyMax ?? -1) - (a.latestPriceJpyMax ?? -1))[0];
+      return {
+        id: p.id,
+        name: p.name || p.id,
+        setCode: p.setCode || '',
+        cardCountLabel: inPack.length + '枚',
+        thumbnailUrl: (thumbCard && thumbCard.imageUrl) || null,
+        onOpen: () => this.setState({ view:'cards', selectedPackId: p.id }),
+      };
+    });
+
+    const selectedPack = packList.find(p => p.id === selectedPackId);
+    const cardsInPack = selectedPackId ? cardList.filter(c => c.packId === selectedPackId) : [];
+
+    // Rarity chips: only rarities actually present in this pack, in canonical order.
+    const presentRarities = [...new Set(cardsInPack.map(c => c.rarity).filter(Boolean))];
+    presentRarities.sort((a, b) => {
+      const ia = this.RARITY_ORDER.indexOf(a), ib = this.RARITY_ORDER.indexOf(b);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+    const rarityChips = presentRarities.map(r => {
+      const active = rarityFilter.includes(r);
+      const color = this.RARITY_COLORS[r] || '#6b7280';
+      return {
+        label: r,
+        className: active ? 'chip active' : 'chip',
+        style: active ? { background: color } : {},
+        onClick: () => this.toggleRarity(r),
+      };
+    });
+
+    const priceMinNum = priceMin !== '' ? Number(priceMin) : null;
+    const priceMaxNum = priceMax !== '' ? Number(priceMax) : null;
+    const queryNorm = searchQuery.trim().toLowerCase();
+
+    let filtered = cardsInPack.filter(c => {
+      if (queryNorm && !(c.name || '').toLowerCase().includes(queryNorm) && !(c.cardNumber || '').includes(queryNorm)) return false;
+      if (rarityFilter.length && !rarityFilter.includes(c.rarity)) return false;
+      if (priceMinNum != null && !(c.latestPriceJpyMax != null && c.latestPriceJpyMax >= priceMinNum)) return false;
+      if (priceMaxNum != null && !(c.latestPriceJpyMin != null && c.latestPriceJpyMin <= priceMaxNum)) return false;
+      const owned = (collection[c.id] && collection[c.id].ownedCount) || 0;
+      if (ownedFilter === 'owned' && owned === 0) return false;
+      if (ownedFilter === 'not_owned' && owned > 0) return false;
+      return true;
+    });
+
+    const numOf = c => parseInt((c.cardNumber || '').split('/')[0], 10) || 0;
+    if (sortBy === 'price_asc') filtered = [...filtered].sort((a, b) => (a.latestPriceJpyMin ?? Infinity) - (b.latestPriceJpyMin ?? Infinity));
+    else if (sortBy === 'price_desc') filtered = [...filtered].sort((a, b) => (b.latestPriceJpyMin ?? -Infinity) - (a.latestPriceJpyMin ?? -Infinity));
+    else filtered = [...filtered].sort((a, b) => numOf(a) - numOf(b));
+
+    const cardRows = filtered.map(c => cardToRow(c, false));
+
+    const hasActiveFilters = !!searchQuery || rarityFilter.length > 0 || priceMin !== '' || priceMax !== '' || ownedFilter !== 'all';
+
+    // COLLECTION: owned cards across every pack.
+    const ownedCards = cardList.filter(c => ((collection[c.id] && collection[c.id].ownedCount) || 0) > 0);
+    const collectionRows = ownedCards.map(c => cardToRow(c, true));
+
+    // RANKING: JP vs US price difference. No compliant US price source has
+    // been found yet for these JP-exclusive sets (see conversation/design
+    // notes) so this always renders empty for now; the moment a card gains
+    // a US-price field this list will populate without further UI changes.
+    const rankingRows = cardList
+      .filter(c => c.latestPriceJpyMin != null && c.latestPriceUsdJpyEquiv != null)
+      .map(c => {
+        const diff = c.latestPriceUsdJpyEquiv - c.latestPriceJpyMin;
+        const diffRate = c.latestPriceJpyMin > 0 ? (diff / c.latestPriceJpyMin * 100) : null;
+        return { ...cardToRow(c, true), diff, usdJpyEquiv: c.latestPriceUsdJpyEquiv,
+                 diffLabel: `${diff >= 0 ? '+' : ''}${diff.toLocaleString()}円`,
+                 diffRateLabel: diffRate != null ? `(${diffRate >= 0 ? '+' : ''}${diffRate.toFixed(0)}%)` : '' };
+      })
+      .sort((a, b) => b.usdJpyEquiv - a.usdJpyEquiv);
+
+    // DETAIL
+    const detailCard = selectedCardId ? cardList.find(c => c.id === selectedCardId) : null;
+    const detailEntry = detailCard ? (collection[detailCard.id] || {}) : {};
+    const detail = detailCard ? {
+      id: detailCard.id,
+      name: detailCard.name,
+      packName: packNameById[detailCard.packId] || detailCard.packId,
+      rarity: detailCard.rarityRaw || detailCard.rarity || '—',
+      rarityBadgeStyle: { background: this.RARITY_COLORS[detailCard.rarity] || '#6b7280' },
+      cardNumber: detailCard.cardNumber || '—',
+      priceLabel: this.priceRangeLabel(detailCard.latestPriceJpyMin, detailCard.latestPriceJpyMax),
+      listingCountLabel: detailCard.priceListingCount ? `${detailCard.priceListingCount}件の出品から算出` : '',
+      imageUrl: detailCard.imageUrl || null,
+      noImage: !detailCard.imageUrl,
+      sourceUrl: detailCard.priceSourceUrl || null,
+      hasSourceUrl: !!detailCard.priceSourceUrl,
+      usdPriceLabel: detailCard.latestPriceUsd != null ? '$' + detailCard.latestPriceUsd.toLocaleString() : '',
+      hasUsdPrice: detailCard.latestPriceUsd != null,
+      ownedCount: detailEntry.ownedCount || 0,
+      condition: detailEntry.condition || '',
+      note: detailEntry.note || '',
+      onIncrement: () => this.setOwnedCount(detailCard.id, 1),
+      onDecrement: () => this.setOwnedCount(detailCard.id, -1),
+      onConditionInput: (e) => this.setCollectionField(detailCard.id, 'condition', e.target.value),
+      onNoteInput: (e) => this.setCollectionField(detailCard.id, 'note', e.target.value),
+    } : null;
+
+    return {
+      isLoading: loading,
+      hasError: !!error,
+      errorMessage: error || '',
+      showPackList: !loading && !error && view === 'packs' && packRows.length > 0,
+      showEmptyPacks: !loading && !error && view === 'packs' && packRows.length === 0,
+      showCardList: !loading && !error && view === 'cards',
+      showEmptyCards: cardsInPack.length === 0,
+      showNoResults: cardsInPack.length > 0 && cardRows.length === 0,
+      resultCountLabel: cardsInPack.length ? `${cardRows.length} / ${cardsInPack.length} 枚` : '',
+      selectedPackName: selectedPack ? selectedPack.name : '',
+      packRows,
+      cardRows,
+      rarityChips,
+      searchQuery,
+      priceMin,
+      priceMax,
+      ownedFilter,
+      sortBy,
+      hasActiveFilters,
+      onBackToPacks: () => this.setState({ view:'packs', selectedPackId:null }),
+      onSearchInput: (e) => this.setState({ searchQuery: e.target.value }),
+      onPriceMinInput: (e) => this.setState({ priceMin: e.target.value }),
+      onPriceMaxInput: (e) => this.setState({ priceMax: e.target.value }),
+      onOwnedFilterChange: (e) => this.setState({ ownedFilter: e.target.value }),
+      onSortChange: (e) => this.setState({ sortBy: e.target.value }),
+      onClearFilters: () => this.clearFilters(),
+
+      showTabs: !loading && !error && view !== 'cardDetail',
+      tabPacksClass: tabClass('packs'),
+      tabCollectionClass: tabClass('collection'),
+      tabRankingClass: tabClass('ranking'),
+      onTabPacks: () => this.setState({ view:'packs', selectedPackId:null }),
+      onTabCollection: () => this.setState({ view:'collection' }),
+      onTabRanking: () => this.setState({ view:'ranking' }),
+
+      showCollection: !loading && !error && view === 'collection',
+      collectionRows,
+      showEmptyCollection: view === 'collection' && collectionRows.length === 0,
+      collectionCountLabel: `所持カード ${collectionRows.length}種`,
+
+      showRanking: !loading && !error && view === 'ranking',
+      rankingRows,
+      showEmptyRanking: rankingRows.length === 0,
+
+      showDetail: !loading && !error && view === 'cardDetail' && !!detail,
+      detail,
+      onBackFromDetail: () => this.setState({ view: detailFrom || 'packs' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

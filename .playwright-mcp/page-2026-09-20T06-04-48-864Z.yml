@@ -1,0 +1,17 @@
+- generic [ref=f4e4]:
+  - generic [ref=f4e6]:
+    - generic [ref=f4e7]: ぽけかかく
+    - generic [ref=f4e8]: POKEMON CARD PRICE CATALOG
+  - generic [ref=f4e9]:
+    - button "← パック一覧に戻る" [ref=f4e17] [cursor=pointer]
+    - generic [ref=f4e18]: 検証用テストパック
+    - generic [ref=f4e20]:
+      - generic [ref=f4e21]:
+        - generic [ref=f4e22]: テストカード
+        - generic [ref=f4e23]: R ・ 1/100
+      - generic [ref=f4e24]:
+        - generic [ref=f4e25]: 1,200円
+        - generic [ref=f4e26]:
+          - button "−" [ref=f4e27] [cursor=pointer]
+          - generic [ref=f4e28]: "1"
+          - button "+" [active] [ref=f4e29] [cursor=pointer]

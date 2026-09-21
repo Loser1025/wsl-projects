@@ -1,0 +1,373 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]: ぽけかかく
+      - generic [ref=e8]: POKEMON CARD PRICE CATALOG
+    - generic [ref=e11]:
+      - button "パック" [ref=e12] [cursor=pointer]
+      - button "コレクション" [ref=e13] [cursor=pointer]
+      - button "価格差ランキング" [active] [ref=e14] [cursor=pointer]
+  - generic [ref=e9]:
+    - generic [ref=e51]: 日米価格差ランキング
+    - generic [ref=e52]: 米国価格(円換算)が高い順
+    - generic [ref=e53]:
+      - generic [ref=e54] [cursor=pointer]:
+        - generic [ref=e56]:
+          - generic [ref=e57]: 拡張パック ストームエメラルダ
+          - generic [ref=e58]: メガレックウザex
+          - generic [ref=e59]: 99,700円〜287,100円
+        - generic [ref=e60]:
+          - generic [ref=e61]: +70,323円
+          - generic [ref=e62]: (+71%)
+      - generic [ref=e63] [cursor=pointer]:
+        - generic [ref=e65]:
+          - generic [ref=e66]: 拡張パック ストームエメラルダ
+          - generic [ref=e67]: メガレックウザex
+          - generic [ref=e68]: 41,800円〜101,210円
+        - generic [ref=e69]:
+          - generic [ref=e70]: +40,579円
+          - generic [ref=e71]: (+97%)
+      - generic [ref=e72] [cursor=pointer]:
+        - generic [ref=e74]:
+          - generic [ref=e75]: 拡張パック ストームエメラルダ
+          - generic [ref=e76]: ライコウex
+          - generic [ref=e77]: 5,480円〜11,570円
+        - generic [ref=e78]:
+          - generic [ref=e79]: +6,975円
+          - generic [ref=e80]: (+127%)
+      - generic [ref=e81] [cursor=pointer]:
+        - generic [ref=e83]:
+          - generic [ref=e84]: 拡張パック ストームエメラルダ
+          - generic [ref=e85]: メガレックウザex
+          - generic [ref=e86]: 3,480円〜7,660円
+        - generic [ref=e87]:
+          - generic [ref=e88]: +3,777円
+          - generic [ref=e89]: (+109%)
+      - generic [ref=e90] [cursor=pointer]:
+        - generic [ref=e92]:
+          - generic [ref=e93]: 拡張パック ストームエメラルダ
+          - generic [ref=e94]: ヒガナの信頼
+          - generic [ref=e95]: 2,180円〜4,760円
+        - generic [ref=e96]:
+          - generic [ref=e97]: +3,726円
+          - generic [ref=e98]: (+171%)
+      - generic [ref=e99] [cursor=pointer]:
+        - generic [ref=e101]:
+          - generic [ref=e102]: 拡張パック ストームエメラルダ
+          - generic [ref=e103]: メガゴルーグex
+          - generic [ref=e104]: 1,380円〜2,440円
+        - generic [ref=e105]:
+          - generic [ref=e106]: +2,211円
+          - generic [ref=e107]: (+160%)
+      - generic [ref=e108] [cursor=pointer]:
+        - generic [ref=e110]:
+          - generic [ref=e111]: 拡張パック ストームエメラルダ
+          - generic [ref=e112]: メガグソクムシャex
+          - generic [ref=e113]: 980円〜2,440円
+        - generic [ref=e114]:
+          - generic [ref=e115]: +2,133円
+          - generic [ref=e116]: (+218%)
+      - generic [ref=e117] [cursor=pointer]:
+        - generic [ref=e119]:
+          - generic [ref=e120]: 拡張パック ストームエメラルダ
+          - generic [ref=e121]: カクレオン
+          - generic [ref=e122]: 680円〜2,290円
+        - generic [ref=e123]:
+          - generic [ref=e124]: +2,249円
+          - generic [ref=e125]: (+331%)
+      - generic [ref=e126] [cursor=pointer]:
+        - generic [ref=e128]:
+          - generic [ref=e129]: 拡張パック ストームエメラルダ
+          - generic [ref=e130]: カイオーガ
+          - generic [ref=e131]: 980円〜2,350円
+        - generic [ref=e132]:
+          - generic [ref=e133]: +1,902円
+          - generic [ref=e134]: (+194%)
+      - generic [ref=e135] [cursor=pointer]:
+        - generic [ref=e137]:
+          - generic [ref=e138]: 拡張パック ストームエメラルダ
+          - generic [ref=e139]: グラードン
+          - generic [ref=e140]: 980円〜2,440円
+        - generic [ref=e141]:
+          - generic [ref=e142]: +1,585円
+          - generic [ref=e143]: (+162%)
+      - generic [ref=e144] [cursor=pointer]:
+        - generic [ref=e146]:
+          - generic [ref=e147]: 拡張パック ストームエメラルダ
+          - generic [ref=e148]: ガーディ
+          - generic [ref=e149]: 280円〜1,130円
+        - generic [ref=e150]:
+          - generic [ref=e151]: +1,687円
+          - generic [ref=e152]: (+603%)
+      - generic [ref=e153] [cursor=pointer]:
+        - generic [ref=e155]:
+          - generic [ref=e156]: 拡張パック ストームエメラルダ
+          - generic [ref=e157]: ギリー
+          - generic [ref=e158]: 680円〜1,792円
+        - generic [ref=e159]:
+          - generic [ref=e160]: +1,236円
+          - generic [ref=e161]: (+182%)
+      - generic [ref=e162] [cursor=pointer]:
+        - generic [ref=e164]:
+          - generic [ref=e165]: 拡張パック ストームエメラルダ
+          - generic [ref=e166]: ライコウex
+          - generic [ref=e167]: 580円〜990円
+        - generic [ref=e168]:
+          - generic [ref=e169]: +896円
+          - generic [ref=e170]: (+154%)
+      - generic [ref=e171] [cursor=pointer]:
+        - generic [ref=e173]:
+          - generic [ref=e174]: 拡張パック ストームエメラルダ
+          - generic [ref=e175]: フウとランの修行
+          - generic [ref=e176]: 580円〜1,130円
+        - generic [ref=e177]:
+          - generic [ref=e178]: +845円
+          - generic [ref=e179]: (+146%)
+      - generic [ref=e180] [cursor=pointer]:
+        - generic [ref=e182]:
+          - generic [ref=e183]: 拡張パック ストームエメラルダ
+          - generic [ref=e184]: ギリー
+          - generic [ref=e185]: 550円〜990円
+        - generic [ref=e186]:
+          - generic [ref=e187]: +864円
+          - generic [ref=e188]: (+157%)
+      - generic [ref=e189] [cursor=pointer]:
+        - generic [ref=e191]:
+          - generic [ref=e192]: 拡張パック ストームエメラルダ
+          - generic [ref=e193]: ヒガナの信頼
+          - generic [ref=e194]: 580円〜1,860円
+        - generic [ref=e195]:
+          - generic [ref=e196]: +772円
+          - generic [ref=e197]: (+133%)
+      - generic [ref=e198] [cursor=pointer]:
+        - generic [ref=e200]:
+          - generic [ref=e201]: 拡張パック ストームエメラルダ
+          - generic [ref=e202]: ルリリ
+          - generic [ref=e203]: 350円〜550円
+        - generic [ref=e204]:
+          - generic [ref=e205]: +705円
+          - generic [ref=e206]: (+201%)
+      - generic [ref=e207] [cursor=pointer]:
+        - generic [ref=e209]:
+          - generic [ref=e210]: 拡張パック ストームエメラルダ
+          - generic [ref=e211]: メガグソクムシャex
+          - generic [ref=e212]: 400円〜840円
+        - generic [ref=e213]:
+          - generic [ref=e214]: +630円
+          - generic [ref=e215]: (+158%)
+      - generic [ref=e216] [cursor=pointer]:
+        - generic [ref=e218]:
+          - generic [ref=e219]: 拡張パック ストームエメラルダ
+          - generic [ref=e220]: チルタリス
+          - generic [ref=e221]: 350円〜580円
+        - generic [ref=e222]:
+          - generic [ref=e223]: +672円
+          - generic [ref=e224]: (+192%)
+      - generic [ref=e225] [cursor=pointer]:
+        - generic [ref=e227]:
+          - generic [ref=e228]: 拡張パック ストームエメラルダ
+          - generic [ref=e229]: メガゴルーグex
+          - generic [ref=e230]: 580円〜840円
+        - generic [ref=e231]:
+          - generic [ref=e232]: +334円
+          - generic [ref=e233]: (+58%)
+      - generic [ref=e234] [cursor=pointer]:
+        - generic [ref=e236]:
+          - generic [ref=e237]: 拡張パック ストームエメラルダ
+          - generic [ref=e238]: メガカラマネロex
+          - generic [ref=e239]: 580円〜840円
+        - generic [ref=e240]:
+          - generic [ref=e241]: +259円
+          - generic [ref=e242]: (+45%)
+      - generic [ref=e243] [cursor=pointer]:
+        - generic [ref=e245]:
+          - generic [ref=e246]: 拡張パック ストームエメラルダ
+          - generic [ref=e247]: MCの盛り上げ
+          - generic [ref=e248]: 580円〜1,130円
+        - generic [ref=e249]:
+          - generic [ref=e250]: +221円
+          - generic [ref=e251]: (+38%)
+      - generic [ref=e252] [cursor=pointer]:
+        - generic [ref=e254]:
+          - generic [ref=e255]: 拡張パック ストームエメラルダ
+          - generic [ref=e256]: ヒートロトムex
+          - generic [ref=e257]: 450円〜812円
+        - generic [ref=e258]:
+          - generic [ref=e259]: +201円
+          - generic [ref=e260]: (+45%)
+      - generic [ref=e261] [cursor=pointer]:
+        - generic [ref=e263]:
+          - generic [ref=e264]: 拡張パック ストームエメラルダ
+          - generic [ref=e265]: ブーバーン
+          - generic [ref=e266]: 300円〜550円
+        - generic [ref=e267]:
+          - generic [ref=e268]: +321円
+          - generic [ref=e269]: (+107%)
+      - generic [ref=e270] [cursor=pointer]:
+        - generic [ref=e272]:
+          - generic [ref=e273]: 拡張パック ストームエメラルダ
+          - generic [ref=e274]: ファイアローex
+          - generic [ref=e275]: 1,480円〜2,440円
+        - generic [ref=e276]:
+          - generic [ref=e277]: "-889円"
+          - generic [ref=e278]: (-60%)
+      - generic [ref=e279] [cursor=pointer]:
+        - generic [ref=e281]:
+          - generic [ref=e282]: 拡張パック ストームエメラルダ
+          - generic [ref=e283]: エレキブル
+          - generic [ref=e284]: 300円〜550円
+        - generic [ref=e285]:
+          - generic [ref=e286]: +243円
+          - generic [ref=e287]: (+81%)
+      - generic [ref=e288] [cursor=pointer]:
+        - generic [ref=e290]:
+          - generic [ref=e291]: 拡張パック ストームエメラルダ
+          - generic [ref=e292]: マーイーカ
+          - generic [ref=e293]: 300円〜550円
+        - generic [ref=e294]:
+          - generic [ref=e295]: +224円
+          - generic [ref=e296]: (+75%)
+      - generic [ref=e297] [cursor=pointer]:
+        - generic [ref=e299]:
+          - generic [ref=e300]: 拡張パック ストームエメラルダ
+          - generic [ref=e301]: ヨワシex
+          - generic [ref=e302]: 480円〜840円
+        - generic [ref=e303]:
+          - generic [ref=e304]: +33円
+          - generic [ref=e305]: (+7%)
+      - generic [ref=e306] [cursor=pointer]:
+        - generic [ref=e308]:
+          - generic [ref=e309]: 拡張パック ストームエメラルダ
+          - generic [ref=e310]: バチンウニ
+          - generic [ref=e311]: 300円〜550円
+        - generic [ref=e312]:
+          - generic [ref=e313]: +210円
+          - generic [ref=e314]: (+70%)
+      - generic [ref=e315] [cursor=pointer]:
+        - generic [ref=e317]:
+          - generic [ref=e318]: 拡張パック ストームエメラルダ
+          - generic [ref=e319]: メガレックウザex
+          - generic [ref=e320]: 180円〜840円
+        - generic [ref=e321]:
+          - generic [ref=e322]: +254円
+          - generic [ref=e323]: (+141%)
+      - generic [ref=e324] [cursor=pointer]:
+        - generic [ref=e326]:
+          - generic [ref=e327]: 拡張パック ストームエメラルダ
+          - generic [ref=e328]: アメモース
+          - generic [ref=e329]: 180円〜550円
+        - generic [ref=e330]:
+          - generic [ref=e331]: +195円
+          - generic [ref=e332]: (+108%)
+      - generic [ref=e333] [cursor=pointer]:
+        - generic [ref=e335]:
+          - generic [ref=e336]: 拡張パック ストームエメラルダ
+          - generic [ref=e337]: ラブトロス
+          - generic [ref=e338]: 350円〜550円
+        - generic [ref=e339]:
+          - generic [ref=e340]: "-7円"
+          - generic [ref=e341]: (-2%)
+      - generic [ref=e342] [cursor=pointer]:
+        - generic [ref=e344]:
+          - generic [ref=e345]: 拡張パック ストームエメラルダ
+          - generic [ref=e346]: ぼうけんのランタン
+          - generic [ref=e347]: 280円〜550円
+        - generic [ref=e348]:
+          - generic [ref=e349]: "-37円"
+          - generic [ref=e350]: (-13%)
+      - generic [ref=e351] [cursor=pointer]:
+        - generic [ref=e353]:
+          - generic [ref=e354]: 拡張パック ストームエメラルダ
+          - generic [ref=e355]: とくちゅうチョッキ
+          - generic [ref=e356]: 200円〜410円
+        - generic [ref=e357]:
+          - generic [ref=e358]: "-3円"
+          - generic [ref=e359]: (-2%)
+      - generic [ref=e360] [cursor=pointer]:
+        - generic [ref=e362]:
+          - generic [ref=e363]: 拡張パック ストームエメラルダ
+          - generic [ref=e364]: ファイアローex
+          - generic [ref=e365]: 280円〜1,250円
+        - generic [ref=e366]:
+          - generic [ref=e367]: "-107円"
+          - generic [ref=e368]: (-38%)
+      - generic [ref=e369] [cursor=pointer]:
+        - generic [ref=e371]:
+          - generic [ref=e372]: 拡張パック ストームエメラルダ
+          - generic [ref=e373]: バブル水エネルギー
+          - generic [ref=e374]: 200円〜410円
+        - generic [ref=e375]:
+          - generic [ref=e376]: "-67円"
+          - generic [ref=e377]: (-34%)
+      - generic [ref=e378] [cursor=pointer]:
+        - generic [ref=e380]:
+          - generic [ref=e381]: 拡張パック ストームエメラルダ
+          - generic [ref=e382]: ポケモンキャッチャー
+          - generic [ref=e383]: 230円〜410円
+        - generic [ref=e384]:
+          - generic [ref=e385]: "-104円"
+          - generic [ref=e386]: (-45%)
+      - generic [ref=e387] [cursor=pointer]:
+        - generic [ref=e389]:
+          - generic [ref=e390]: 拡張パック ストームエメラルダ
+          - generic [ref=e391]: ニトロ炎エネルギー
+          - generic [ref=e392]: 200円〜410円
+        - generic [ref=e393]:
+          - generic [ref=e394]: "-81円"
+          - generic [ref=e395]: (-41%)
+      - generic [ref=e396] [cursor=pointer]:
+        - generic [ref=e398]:
+          - generic [ref=e399]: 拡張パック ストームエメラルダ
+          - generic [ref=e400]: メガカラマネロex
+          - generic [ref=e401]: 80円〜200円
+        - generic [ref=e402]:
+          - generic [ref=e403]: +38円
+          - generic [ref=e404]: (+48%)
+      - generic [ref=e405] [cursor=pointer]:
+        - generic [ref=e407]:
+          - generic [ref=e408]: 拡張パック ストームエメラルダ
+          - generic [ref=e409]: メガグソクムシャex
+          - generic [ref=e410]: 80円〜200円
+        - generic [ref=e411]:
+          - generic [ref=e412]: +36円
+          - generic [ref=e413]: (+45%)
+      - generic [ref=e414] [cursor=pointer]:
+        - generic [ref=e416]:
+          - generic [ref=e417]: 拡張パック ストームエメラルダ
+          - generic [ref=e418]: ライコウex
+          - generic [ref=e419]: 80円〜200円
+        - generic [ref=e420]:
+          - generic [ref=e421]: +36円
+          - generic [ref=e422]: (+45%)
+      - generic [ref=e423] [cursor=pointer]:
+        - generic [ref=e425]:
+          - generic [ref=e426]: 拡張パック ストームエメラルダ
+          - generic [ref=e427]: グロウ草エネルギー
+          - generic [ref=e428]: 250円〜410円
+        - generic [ref=e429]:
+          - generic [ref=e430]: "-164円"
+          - generic [ref=e431]: (-66%)
+      - generic [ref=e432] [cursor=pointer]:
+        - generic [ref=e434]:
+          - generic [ref=e435]: 拡張パック ストームエメラルダ
+          - generic [ref=e436]: メガゴルーグex
+          - generic [ref=e437]: 80円〜200円
+        - generic [ref=e438]:
+          - generic [ref=e439]: "-1円"
+          - generic [ref=e440]: (-1%)
+      - generic [ref=e441] [cursor=pointer]:
+        - generic [ref=e443]:
+          - generic [ref=e444]: 拡張パック ストームエメラルダ
+          - generic [ref=e445]: ヒートロトムex
+          - generic [ref=e446]: 80円〜200円
+        - generic [ref=e447]:
+          - generic [ref=e448]: "-5円"
+          - generic [ref=e449]: (-6%)
+      - generic [ref=e450] [cursor=pointer]:
+        - generic [ref=e452]:
+          - generic [ref=e453]: 拡張パック ストームエメラルダ
+          - generic [ref=e454]: ヨワシex
+          - generic [ref=e455]: 80円〜200円
+        - generic [ref=e456]:
+          - generic [ref=e457]: "-13円"
+          - generic [ref=e458]: (-16%)

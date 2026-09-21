@@ -1,0 +1,56 @@
+<!doctype html><html lang="ja"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>フェーズ1・解析確認</title>
+<style>body{font:15px/1.7 system-ui;background:#f5f6f8;color:#18293b;margin:36px}h1{font-size:26px}table{border-collapse:collapse;width:100%;background:white}th,td{padding:12px;border-bottom:1px solid #ddd;text-align:left}th{background:#e1eaf3}pre{white-space:pre-wrap;background:#fff;padding:20px;border-radius:10px}.notice{background:#fff0c2;padding:16px;border-radius:10px}</style>
+<h1>フェーズ1 · 解析確認</h1><p class="notice">架空のテストデータです。実際の相場・商品ではありません。</p><p>画像の直リンク・外部通信はありません。</p><table><thead><tr><th>名前</th><th>元レアリティ</th><th>正規化</th><th>型番</th><th>セット</th><th>価格</th><th>在庫</th><th>元タイトル</th></tr></thead><tbody><tr><td>テストカードα</td><td>SAR</td><td>SAR</td><td>90/66</td><td>TEST</td><td>11,400円</td><td>91</td><td>テストカードα(検証)【SAR】{０９０/０６６} [TEST]</td></tr><tr><td>テストカードβ</td><td> r </td><td>R</td><td>2/66</td><td>TEST</td><td>50円</td><td>0</td><td>テストカードβ(検証)【 r 】{002/066} [TEST]</td></tr><tr><td>テストカードγ</td><td>C</td><td>C</td><td>3/66</td><td>TEST</td><td>49円</td><td>12</td><td>テストカードγ(検証)【C】{003/066} [TEST]</td></tr><tr><td>テストカードδ</td><td>AR</td><td>AR</td><td>4/66</td><td>TEST</td><td>200円</td><td>0</td><td>テストカードδ(検証)【AR】{004/066} [TEST]</td></tr><tr><td>在庫欠損テスト</td><td>U</td><td>U</td><td>5/66</td><td>TEST</td><td>100円</td><td>欠損</td><td>在庫欠損テスト(検証)【U】{005/066} [TEST]</td></tr></tbody></table><h2>実行結果・要確認項目</h2><pre>{
+  &quot;run_id&quot;: &quot;20260920T043416443723Z&quot;,
+  &quot;started_at&quot;: &quot;2026-09-20T04:34:16.443723+00:00&quot;,
+  &quot;phase&quot;: 1,
+  &quot;live_html_validated&quot;: false,
+  &quot;origin&quot;: &quot;synthetic&quot;,
+  &quot;issues&quot;: [
+    {
+      &quot;url&quot;: &quot;https://www.cardrush-pokemon.jp/product/900000005&quot;,
+      &quot;title&quot;: &quot;在庫欠損テスト(検証)【U】{005/066} [TEST]&quot;,
+      &quot;reason&quot;: &quot;在庫数欠損（価格は保存・在庫はNULL）&quot;
+    },
+    {
+      &quot;url&quot;: &quot;https://www.cardrush-pokemon.jp/product/900000006&quot;,
+      &quot;title&quot;: &quot;型番欠損テスト【R】 [TEST]&quot;,
+      &quot;reason&quot;: &quot;タイトル形式不明（名前・レアリティ・型番を確認）&quot;
+    },
+    {
+      &quot;url&quot;: &quot;https://www.cardrush-pokemon.jp/product/900000007&quot;,
+      &quot;title&quot;: &quot;未知レアリティテスト【???】{007/066} [TEST]&quot;,
+      &quot;reason&quot;: &quot;未対応レアリティ: ???&quot;
+    },
+    {
+      &quot;url&quot;: &quot;https://www.cardrush-pokemon.jp/product/900000008&quot;,
+      &quot;title&quot;: &quot;価格不明テスト【R】{008/066} [TEST]&quot;,
+      &quot;reason&quot;: &quot;商品の価格領域が見つかりません&quot;
+    },
+    {
+      &quot;url&quot;: &quot;https://www.cardrush-pokemon.jp/product/900000009&quot;,
+      &quot;title&quot;: &quot;複数価格テスト【R】{009/066} [TEST]&quot;,
+      &quot;reason&quot;: &quot;複数価格があり販売価格を確定できません&quot;
+    }
+  ],
+  &quot;pages&quot;: 1,
+  &quot;stats&quot;: {
+    &quot;parsed&quot;: 5,
+    &quot;inserted&quot;: 4,
+    &quot;updated&quot;: 0,
+    &quot;below_threshold_new&quot;: 1,
+    &quot;conflicts&quot;: 0
+  },
+  &quot;database&quot;: &quot;C:\\Users\\mitsuba864\\Documents\\Codex\\2026-09-20\\files-pasted-by-the-user-ai\\outputs\\pokemon-catalog\\data\\demo\\demo.sqlite3&quot;,
+  &quot;status&quot;: &quot;stored_with_issues&quot;,
+  &quot;image_status&quot;: &quot;未取得。パイロットでは外部画像を表示・直リンクしません&quot;,
+  &quot;phase_1_passed&quot;: false,
+  &quot;remaining_checks&quot;: [
+    &quot;実HTMLとの目視照合&quot;,
+    &quot;許可された接続経路での連続アクセス検証&quot;,
+    &quot;画像ホスト・利用条件の確認&quot;
+  ],
+  &quot;finished_at&quot;: &quot;2026-09-20T04:34:16.680915+00:00&quot;,
+  &quot;request_count&quot;: 0
+}</pre></html>

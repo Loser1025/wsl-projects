@@ -1,0 +1,13 @@
+- generic [ref=f7e4]:
+  - generic [ref=f7e5]:
+    - generic [ref=f7e6]:
+      - generic [ref=f7e7]: ぽけかかく
+      - generic [ref=f7e8]: POKEMON CARD PRICE CATALOG
+    - generic [ref=f7e609]:
+      - button "パック" [ref=f7e610] [cursor=pointer]
+      - button "コレクション" [ref=f7e611] [cursor=pointer]
+      - button "価格差ランキング" [active] [ref=f7e612] [cursor=pointer]
+  - generic [ref=f7e9]:
+    - generic [ref=f7e1194]: 日米価格差ランキング
+    - generic [ref=f7e1195]: 米国価格(円換算) − 日本価格が大きい順
+    - generic [ref=f7e1196]: 米国価格のデータがまだありません。 日本限定発売のセットが中心のため、規約に反しない米国側の価格取得手段が今のところ見つかっていません。 データが取得でき次第、ここにランキングが表示されます。

@@ -44,3 +44,5 @@ mimic_tui/mimic.log
 slides_design_tool/credentials.json
 customer-calendar-app/firebase-service-account.json
 customer-calendar-app/google-service-account.json
+pokemon-catalog/firebase-service-account.json
+pokemon-catalog/.env

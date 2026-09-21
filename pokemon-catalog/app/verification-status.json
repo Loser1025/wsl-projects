@@ -1,0 +1,18 @@
+{
+  "checked_on": "2026-09-20",
+  "phase": 1,
+  "phase_1_passed": false,
+  "permission_basis": "ユーザーが『確認済みだから進めてください』と回答",
+  "policy_url": "https://cardrush.media/data_policy",
+  "robots_url": "https://www.cardrush-pokemon.jp/robots.txt",
+  "robots_status": 200,
+  "robots_body": "User-agent: GPTBot\nUser-agent: Bytespider\nUser-Agent: TikTokSpider\nUser-agent: meta-externalagent\nDisallow: /\n",
+  "category_url": "https://www.cardrush-pokemon.jp/group",
+  "category_status": 403,
+  "category_body_title": "Just a moment...",
+  "category_attempts": 1,
+  "consecutive_access_test_performed": false,
+  "real_products_fetched": 0,
+  "real_html_parser_verified": false,
+  "next_required": "許可された接続方法または提供HTMLで実パックを検証。403の回避や自動再試行は行わない"
+}

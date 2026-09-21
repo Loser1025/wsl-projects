@@ -1,0 +1,88 @@
+{
+  "assembled_on": "2026-09-20",
+  "original_app_files_verified": 10,
+  "sqlite_integrity": "ok",
+  "demo_card_count": 4,
+  "files": [
+    {
+      "path": "app/data/demo/demo.sqlite3",
+      "bytes": 49152,
+      "sha256": "27fbdd6fc17058ab7b70514e5bd2416422f7b00a1e7c7efc2ec7deba5ce941ab"
+    },
+    {
+      "path": "app/data/demo/report.json",
+      "bytes": 2000,
+      "sha256": "d782f01a867ff2d2b8cc10d162badf035198b766434dcee2a01f8343ef02f9b6"
+    },
+    {
+      "path": "app/data/demo/review.html",
+      "bytes": 4500,
+      "sha256": "18c2ff7e7f8f32c01a2daa8ba9725a395ec41389c8f497e122c1aa7ca0942b2e"
+    },
+    {
+      "path": "app/fixtures/synthetic.html",
+      "bytes": 1650,
+      "sha256": "989b38b8b585a9cac18fa56f8eb2f54abb8baa167fa281057b3dc51b3bc61516"
+    },
+    {
+      "path": "app/pilot.py",
+      "bytes": 25651,
+      "sha256": "bdb94e08bfa8638244786bef9a827a67da8688de2b6476a0c5698f48ec6effff"
+    },
+    {
+      "path": "app/README.md",
+      "bytes": 5509,
+      "sha256": "62df81e7864aec8c96d2ee1db7e87400c86fea10e2a665fbf34807b21f32370c"
+    },
+    {
+      "path": "app/test_pilot.py",
+      "bytes": 10482,
+      "sha256": "682c3717828c73849056699ac74e1091fa8028296411d659b09a6f534b2f8587"
+    },
+    {
+      "path": "app/TESTING.md",
+      "bytes": 2230,
+      "sha256": "2cafd059b18724217050b6941a34daf281ab00a99a42f0edf36a9c884629a2f0"
+    },
+    {
+      "path": "app/verification-status.json",
+      "bytes": 859,
+      "sha256": "3222e86910cadd741887f870093457dcd40e95df3ae1d59edf35ba21122a9634"
+    },
+    {
+      "path": "app/検証する.cmd",
+      "bytes": 429,
+      "sha256": "5b19873f5fb3e402279c7b82ed425a9438a9e3ded537d655154fbfb51ad9a894"
+    },
+    {
+      "path": "docs/当初の実装要件.txt",
+      "bytes": 11902,
+      "sha256": "80185fefe9ce7dbfc8a4950906ba28c172b6f9a14a85bea221e5bb3093bc569e"
+    },
+    {
+      "path": "docs/現行DBスキーマ.sql",
+      "bytes": 1460,
+      "sha256": "eea9bec7d7d21b1b261a1d389f636173d95034b56dbbb664ae1d9d514218308e"
+    },
+    {
+      "path": "docs/設計書.md",
+      "bytes": 12298,
+      "sha256": "341948fb10cf474987d37681b50dd29513f3b644e2941b0b9912037d5e4078b4"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2813,
+      "sha256": "c26c493fc5bcb6fd66710ea41de15e5c77ccdf30d28a8fd0baf1e80392d084cf"
+    },
+    {
+      "path": "既存成果物_phase1.zip",
+      "bytes": 23588,
+      "sha256": "be3f38730933852657599c78e646b7ece34854ed499d07ecd0a861b9d3584c95"
+    },
+    {
+      "path": "確認画面を開く.cmd",
+      "bytes": 52,
+      "sha256": "73f2719da19b20c5336c1321653208b94176156e0419e0accc5bdcde130c7d69"
+    }
+  ]
+}

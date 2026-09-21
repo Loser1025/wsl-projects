@@ -1,0 +1,23 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "ポケてる" [level=1] [ref=e5]
+      - paragraph [ref=e6]: 電話アポ采配・対応記録・成績可視化ツール
+    - generic [ref=e7]:
+      - button "Googleでログイン" [ref=e8]
+      - generic [ref=e14]: or
+      - generic [ref=e18]:
+        - button "パスワードでログイン" [ref=e19]
+        - button "パスワード未設定/忘れた" [ref=e20]
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]: メールアドレス
+          - textbox "メールアドレス" [ref=e24]:
+            - /placeholder: you@example.com
+        - generic [ref=e25]:
+          - generic [ref=e26]: パスワード
+          - textbox "パスワード" [ref=e27]:
+            - /placeholder: "********"
+        - button "ログイン" [disabled]
+        - paragraph [ref=e28]: パスワード未設定/忘れた方は 上の 「パスワード未設定/忘れた」 タブへ
+  - alert [ref=e29]

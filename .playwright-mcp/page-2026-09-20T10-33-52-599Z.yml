@@ -1,0 +1,519 @@
+- generic [ref=f8e4]:
+  - generic [ref=f8e5]:
+    - generic [ref=f8e6]:
+      - generic [ref=f8e7]: ぽけかかく
+      - generic [ref=f8e8]: POKEMON CARD PRICE CATALOG
+    - generic [ref=f8e11]:
+      - button "パック" [ref=f8e12] [cursor=pointer]
+      - button "コレクション" [ref=f8e13] [cursor=pointer]
+      - button "価格差ランキング" [ref=f8e14] [cursor=pointer]
+  - generic [ref=f8e9]:
+    - button "← パック一覧に戻る" [ref=f8e26] [cursor=pointer]
+    - generic [ref=f8e27]: 拡張パック ムニキスゼロ
+    - textbox "カード名・型番で検索" [ref=f8e28]
+    - generic [ref=f8e29]:
+      - button "RR" [ref=f8e30] [cursor=pointer]
+      - button "AR" [ref=f8e31] [cursor=pointer]
+      - button "SR" [ref=f8e32] [cursor=pointer]
+      - button "SAR" [ref=f8e33] [cursor=pointer]
+      - button "MUR" [ref=f8e34] [cursor=pointer]
+    - generic [ref=f8e35]:
+      - generic [ref=f8e36]:
+        - spinbutton "下限" [ref=f8e37]
+        - generic [ref=f8e38]: 円 〜
+        - spinbutton "上限" [ref=f8e39]
+        - generic [ref=f8e40]: 円
+      - combobox [ref=f8e41]:
+        - 'option "所持状態: すべて" [selected]'
+        - option "所持のみ"
+        - option "未所持のみ"
+      - combobox [ref=f8e42]:
+        - option "型番順" [selected]
+        - option "価格が安い順"
+        - option "価格が高い順"
+    - generic [ref=f8e43]: 44 / 44 枚
+    - generic [ref=f8e44]:
+      - generic [ref=f8e45]:
+        - generic [ref=f8e46] [cursor=pointer]:
+          - generic [ref=f8e47]: RR
+          - generic [ref=f8e50]:
+            - generic [ref=f8e51]: ジュナイパーex
+            - generic [ref=f8e52]: 012/80
+            - generic [ref=f8e53]: 50円〜120円
+        - generic [ref=f8e54]:
+          - button "−" [ref=f8e55] [cursor=pointer]
+          - generic [ref=f8e56]: "0"
+          - button "+" [ref=f8e57] [cursor=pointer]
+      - generic [ref=f8e58]:
+        - generic [ref=f8e59] [cursor=pointer]:
+          - generic [ref=f8e60]: RR
+          - generic [ref=f8e63]:
+            - generic [ref=f8e64]: エンニュートex
+            - generic [ref=f8e65]: 016/80
+            - generic [ref=f8e66]: 40円〜120円
+        - generic [ref=f8e67]:
+          - button "−" [ref=f8e68] [cursor=pointer]
+          - generic [ref=f8e69]: "0"
+          - button "+" [ref=f8e70] [cursor=pointer]
+      - generic [ref=f8e71]:
+        - generic [ref=f8e72] [cursor=pointer]:
+          - generic [ref=f8e73]: RR
+          - generic [ref=f8e76]:
+            - generic [ref=f8e77]: メガスターミーex
+            - generic [ref=f8e78]: 021/80
+            - generic [ref=f8e79]: 100円〜280円
+        - generic [ref=f8e80]:
+          - button "−" [ref=f8e81] [cursor=pointer]
+          - generic [ref=f8e82]: "0"
+          - button "+" [ref=f8e83] [cursor=pointer]
+      - generic [ref=f8e84]:
+        - generic [ref=f8e85] [cursor=pointer]:
+          - generic [ref=f8e86]: RR
+          - generic [ref=f8e89]:
+            - generic [ref=f8e90]: メガピクシーex
+            - generic [ref=f8e91]: 030/80
+            - generic [ref=f8e92]: 80円〜200円
+        - generic [ref=f8e93]:
+          - button "−" [ref=f8e94] [cursor=pointer]
+          - generic [ref=f8e95]: "0"
+          - button "+" [ref=f8e96] [cursor=pointer]
+      - generic [ref=f8e97]:
+        - generic [ref=f8e98] [cursor=pointer]:
+          - generic [ref=f8e99]: RR
+          - generic [ref=f8e102]:
+            - generic [ref=f8e103]: メガジガルデex
+            - generic [ref=f8e104]: 046/80
+            - generic [ref=f8e105]: 170円〜480円
+        - generic [ref=f8e106]:
+          - button "−" [ref=f8e107] [cursor=pointer]
+          - generic [ref=f8e108]: "0"
+          - button "+" [ref=f8e109] [cursor=pointer]
+      - generic [ref=f8e110]:
+        - generic [ref=f8e111] [cursor=pointer]:
+          - generic [ref=f8e112]: RR
+          - generic [ref=f8e115]:
+            - generic [ref=f8e116]: イベルタルex
+            - generic [ref=f8e117]: 052/80
+            - generic [ref=f8e118]: 80円〜200円
+        - generic [ref=f8e119]:
+          - button "−" [ref=f8e120] [cursor=pointer]
+          - generic [ref=f8e121]: "0"
+          - button "+" [ref=f8e122] [cursor=pointer]
+      - generic [ref=f8e123]:
+        - generic [ref=f8e124] [cursor=pointer]:
+          - generic [ref=f8e125]: RR
+          - generic [ref=f8e128]:
+            - generic [ref=f8e129]: メガエアームドex
+            - generic [ref=f8e130]: 054/80
+            - generic [ref=f8e131]: 80円〜200円
+        - generic [ref=f8e132]:
+          - button "−" [ref=f8e133] [cursor=pointer]
+          - generic [ref=f8e134]: "0"
+          - button "+" [ref=f8e135] [cursor=pointer]
+      - generic [ref=f8e136]:
+        - generic [ref=f8e137] [cursor=pointer]:
+          - generic [ref=f8e138]: RR
+          - generic [ref=f8e141]:
+            - generic [ref=f8e142]: ニャースex
+            - generic [ref=f8e143]: 061/80
+            - generic [ref=f8e144]: 580円〜1,370円
+        - generic [ref=f8e145]:
+          - button "−" [ref=f8e146] [cursor=pointer]
+          - generic [ref=f8e147]: "0"
+          - button "+" [ref=f8e148] [cursor=pointer]
+      - generic [ref=f8e149]:
+        - generic [ref=f8e150] [cursor=pointer]:
+          - generic [ref=f8e151]: AR
+          - generic [ref=f8e154]:
+            - generic [ref=f8e155]: コフーライ
+            - generic [ref=f8e156]: 081/80
+            - generic [ref=f8e157]: 320円〜700円
+        - generic [ref=f8e158]:
+          - button "−" [ref=f8e159] [cursor=pointer]
+          - generic [ref=f8e160]: "0"
+          - button "+" [ref=f8e161] [cursor=pointer]
+      - generic [ref=f8e162]:
+        - generic [ref=f8e163] [cursor=pointer]:
+          - generic [ref=f8e164]: AR
+          - generic [ref=f8e167]:
+            - generic [ref=f8e168]: モクロー
+            - generic [ref=f8e169]: 082/80
+            - generic [ref=f8e170]: 340円〜980円
+        - generic [ref=f8e171]:
+          - button "−" [ref=f8e172] [cursor=pointer]
+          - generic [ref=f8e173]: "0"
+          - button "+" [ref=f8e174] [cursor=pointer]
+      - generic [ref=f8e175]:
+        - generic [ref=f8e176] [cursor=pointer]:
+          - generic [ref=f8e177]: AR
+          - generic [ref=f8e180]:
+            - generic [ref=f8e181]: ファイアロー
+            - generic [ref=f8e182]: 083/80
+            - generic [ref=f8e183]: 320円〜680円
+        - generic [ref=f8e184]:
+          - button "−" [ref=f8e185] [cursor=pointer]
+          - generic [ref=f8e186]: "0"
+          - button "+" [ref=f8e187] [cursor=pointer]
+      - generic [ref=f8e188]:
+        - generic [ref=f8e189] [cursor=pointer]:
+          - generic [ref=f8e190]: AR
+          - generic [ref=f8e193]:
+            - generic [ref=f8e194]: アマルルガ
+            - generic [ref=f8e195]: 084/80
+            - generic [ref=f8e196]: 320円〜680円
+        - generic [ref=f8e197]:
+          - button "−" [ref=f8e198] [cursor=pointer]
+          - generic [ref=f8e199]: "0"
+          - button "+" [ref=f8e200] [cursor=pointer]
+      - generic [ref=f8e201]:
+        - generic [ref=f8e202] [cursor=pointer]:
+          - generic [ref=f8e203]: AR
+          - generic [ref=f8e206]:
+            - generic [ref=f8e207]: デデンネ
+            - generic [ref=f8e208]: 085/80
+            - generic [ref=f8e209]: 540円〜1,680円
+        - generic [ref=f8e210]:
+          - button "−" [ref=f8e211] [cursor=pointer]
+          - generic [ref=f8e212]: "0"
+          - button "+" [ref=f8e213] [cursor=pointer]
+      - generic [ref=f8e214]:
+        - generic [ref=f8e215] [cursor=pointer]:
+          - generic [ref=f8e216]: AR
+          - generic [ref=f8e219]:
+            - generic [ref=f8e220]: ピッピ
+            - generic [ref=f8e221]: 086/80
+            - generic [ref=f8e222]: 380円〜1,880円
+        - generic [ref=f8e223]:
+          - button "−" [ref=f8e224] [cursor=pointer]
+          - generic [ref=f8e225]: "0"
+          - button "+" [ref=f8e226] [cursor=pointer]
+      - generic [ref=f8e227]:
+        - generic [ref=f8e228] [cursor=pointer]:
+          - generic [ref=f8e229]: AR
+          - generic [ref=f8e232]:
+            - generic [ref=f8e233]: ニャスパー
+            - generic [ref=f8e234]: 087/80
+            - generic [ref=f8e235]: 350円〜840円
+        - generic [ref=f8e236]:
+          - button "−" [ref=f8e237] [cursor=pointer]
+          - generic [ref=f8e238]: "0"
+          - button "+" [ref=f8e239] [cursor=pointer]
+      - generic [ref=f8e240]:
+        - generic [ref=f8e241] [cursor=pointer]:
+          - generic [ref=f8e242]: AR
+          - generic [ref=f8e245]:
+            - generic [ref=f8e246]: ダイノーズ
+            - generic [ref=f8e247]: 088/80
+            - generic [ref=f8e248]: 320円〜700円
+        - generic [ref=f8e249]:
+          - button "−" [ref=f8e250] [cursor=pointer]
+          - generic [ref=f8e251]: "0"
+          - button "+" [ref=f8e252] [cursor=pointer]
+      - generic [ref=f8e253]:
+        - generic [ref=f8e254] [cursor=pointer]:
+          - generic [ref=f8e255]: AR
+          - generic [ref=f8e258]:
+            - generic [ref=f8e259]: チゴラス
+            - generic [ref=f8e260]: 089/80
+            - generic [ref=f8e261]: 350円〜700円
+        - generic [ref=f8e262]:
+          - button "−" [ref=f8e263] [cursor=pointer]
+          - generic [ref=f8e264]: "0"
+          - button "+" [ref=f8e265] [cursor=pointer]
+      - generic [ref=f8e266]:
+        - generic [ref=f8e267] [cursor=pointer]:
+          - generic [ref=f8e268]: AR
+          - generic [ref=f8e271]:
+            - generic [ref=f8e272]: ドラピオン
+            - generic [ref=f8e273]: 090/80
+            - generic [ref=f8e274]: 350円〜700円
+        - generic [ref=f8e275]:
+          - button "−" [ref=f8e276] [cursor=pointer]
+          - generic [ref=f8e277]: "0"
+          - button "+" [ref=f8e278] [cursor=pointer]
+      - generic [ref=f8e279]:
+        - generic [ref=f8e280] [cursor=pointer]:
+          - generic [ref=f8e281]: AR
+          - generic [ref=f8e284]:
+            - generic [ref=f8e285]: ニダンギル
+            - generic [ref=f8e286]: 091/80
+            - generic [ref=f8e287]: 350円〜840円
+        - generic [ref=f8e288]:
+          - button "−" [ref=f8e289] [cursor=pointer]
+          - generic [ref=f8e290]: "0"
+          - button "+" [ref=f8e291] [cursor=pointer]
+      - generic [ref=f8e292]:
+        - generic [ref=f8e293] [cursor=pointer]:
+          - generic [ref=f8e294]: AR
+          - generic [ref=f8e297]:
+            - generic [ref=f8e298]: ラッタ
+            - generic [ref=f8e299]: 092/80
+            - generic [ref=f8e300]: 350円〜840円
+        - generic [ref=f8e301]:
+          - button "−" [ref=f8e302] [cursor=pointer]
+          - generic [ref=f8e303]: "0"
+          - button "+" [ref=f8e304] [cursor=pointer]
+      - generic [ref=f8e305]:
+        - generic [ref=f8e306] [cursor=pointer]:
+          - generic [ref=f8e307]: SR
+          - generic [ref=f8e310]:
+            - generic [ref=f8e311]: ジュナイパーex
+            - generic [ref=f8e312]: 093/80
+            - generic [ref=f8e313]: 540円〜700円
+        - generic [ref=f8e314]:
+          - button "−" [ref=f8e315] [cursor=pointer]
+          - generic [ref=f8e316]: "0"
+          - button "+" [ref=f8e317] [cursor=pointer]
+      - generic [ref=f8e318]:
+        - generic [ref=f8e319] [cursor=pointer]:
+          - generic [ref=f8e320]: SR
+          - generic [ref=f8e323]:
+            - generic [ref=f8e324]: エンニュートex
+            - generic [ref=f8e325]: 094/80
+            - generic [ref=f8e326]: 480円〜840円
+        - generic [ref=f8e327]:
+          - button "−" [ref=f8e328] [cursor=pointer]
+          - generic [ref=f8e329]: "0"
+          - button "+" [ref=f8e330] [cursor=pointer]
+      - generic [ref=f8e331]:
+        - generic [ref=f8e332] [cursor=pointer]:
+          - generic [ref=f8e333]: SR
+          - generic [ref=f8e336]:
+            - generic [ref=f8e337]: メガスターミーex
+            - generic [ref=f8e338]: 095/80
+            - generic [ref=f8e339]: 380円〜1,130円
+        - generic [ref=f8e340]:
+          - button "−" [ref=f8e341] [cursor=pointer]
+          - generic [ref=f8e342]: "0"
+          - button "+" [ref=f8e343] [cursor=pointer]
+      - generic [ref=f8e344]:
+        - generic [ref=f8e345] [cursor=pointer]:
+          - generic [ref=f8e346]: SR
+          - generic [ref=f8e349]:
+            - generic [ref=f8e350]: メガピクシーex
+            - generic [ref=f8e351]: 096/80
+            - generic [ref=f8e352]: 580円〜840円
+        - generic [ref=f8e353]:
+          - button "−" [ref=f8e354] [cursor=pointer]
+          - generic [ref=f8e355]: "0"
+          - button "+" [ref=f8e356] [cursor=pointer]
+      - generic [ref=f8e357]:
+        - generic [ref=f8e358] [cursor=pointer]:
+          - generic [ref=f8e359]: SR
+          - generic [ref=f8e362]:
+            - generic [ref=f8e363]: メガジガルデex
+            - generic [ref=f8e364]: 097/80
+            - generic [ref=f8e365]: 280円〜1,420円
+        - generic [ref=f8e366]:
+          - button "−" [ref=f8e367] [cursor=pointer]
+          - generic [ref=f8e368]: "0"
+          - button "+" [ref=f8e369] [cursor=pointer]
+      - generic [ref=f8e370]:
+        - generic [ref=f8e371] [cursor=pointer]:
+          - generic [ref=f8e372]: SR
+          - generic [ref=f8e375]:
+            - generic [ref=f8e376]: イベルタルex
+            - generic [ref=f8e377]: 098/80
+            - generic [ref=f8e378]: 280円〜990円
+        - generic [ref=f8e379]:
+          - button "−" [ref=f8e380] [cursor=pointer]
+          - generic [ref=f8e381]: "0"
+          - button "+" [ref=f8e382] [cursor=pointer]
+      - generic [ref=f8e383]:
+        - generic [ref=f8e384] [cursor=pointer]:
+          - generic [ref=f8e385]: SR
+          - generic [ref=f8e388]:
+            - generic [ref=f8e389]: メガエアームドex
+            - generic [ref=f8e390]: 099/80
+            - generic [ref=f8e391]: 450円〜840円
+        - generic [ref=f8e392]:
+          - button "−" [ref=f8e393] [cursor=pointer]
+          - generic [ref=f8e394]: "0"
+          - button "+" [ref=f8e395] [cursor=pointer]
+      - generic [ref=f8e396]:
+        - generic [ref=f8e397] [cursor=pointer]:
+          - generic [ref=f8e398]: SR
+          - generic [ref=f8e401]:
+            - generic [ref=f8e402]: ニャースex
+            - generic [ref=f8e403]: 100/80
+            - generic [ref=f8e404]: 2,280円〜4,170円
+        - generic [ref=f8e405]:
+          - button "−" [ref=f8e406] [cursor=pointer]
+          - generic [ref=f8e407]: "0"
+          - button "+" [ref=f8e408] [cursor=pointer]
+      - generic [ref=f8e409]:
+        - generic [ref=f8e410] [cursor=pointer]:
+          - generic [ref=f8e411]: SR
+          - generic [ref=f8e414]:
+            - generic [ref=f8e415]: エネルギーリサイクル
+            - generic [ref=f8e416]: 101/80
+            - generic [ref=f8e417]: 320円〜680円
+        - generic [ref=f8e418]:
+          - button "−" [ref=f8e419] [cursor=pointer]
+          - generic [ref=f8e420]: "0"
+          - button "+" [ref=f8e421] [cursor=pointer]
+      - generic [ref=f8e422]:
+        - generic [ref=f8e423] [cursor=pointer]:
+          - generic [ref=f8e424]: SR
+          - generic [ref=f8e427]:
+            - generic [ref=f8e428]: ポケパッド
+            - generic [ref=f8e429]: 103/80
+            - generic [ref=f8e430]: 480円〜1,860円
+        - generic [ref=f8e431]:
+          - button "−" [ref=f8e432] [cursor=pointer]
+          - generic [ref=f8e433]: "0"
+          - button "+" [ref=f8e434] [cursor=pointer]
+      - generic [ref=f8e435]:
+        - generic [ref=f8e436] [cursor=pointer]:
+          - generic [ref=f8e437]: SR
+          - generic [ref=f8e440]:
+            - generic [ref=f8e441]: ワンダーパッチ
+            - generic [ref=f8e442]: 104/80
+            - generic [ref=f8e443]: 350円〜700円
+        - generic [ref=f8e444]:
+          - button "−" [ref=f8e445] [cursor=pointer]
+          - generic [ref=f8e446]: "0"
+          - button "+" [ref=f8e447] [cursor=pointer]
+      - generic [ref=f8e448]:
+        - generic [ref=f8e449] [cursor=pointer]:
+          - generic [ref=f8e450]: SR
+          - generic [ref=f8e453]:
+            - generic [ref=f8e454]: タラゴン
+            - generic [ref=f8e455]: 105/80
+            - generic [ref=f8e456]: 450円〜730円
+        - generic [ref=f8e457]:
+          - button "−" [ref=f8e458] [cursor=pointer]
+          - generic [ref=f8e459]: "0"
+          - button "+" [ref=f8e460] [cursor=pointer]
+      - generic [ref=f8e461]:
+        - generic [ref=f8e462] [cursor=pointer]:
+          - generic [ref=f8e463]: SR
+          - generic [ref=f8e466]:
+            - generic [ref=f8e467]: ピュール
+            - generic [ref=f8e468]: 106/80
+            - generic [ref=f8e469]: 580円〜840円
+        - generic [ref=f8e470]:
+          - button "−" [ref=f8e471] [cursor=pointer]
+          - generic [ref=f8e472]: "0"
+          - button "+" [ref=f8e473] [cursor=pointer]
+      - generic [ref=f8e474]:
+        - generic [ref=f8e475] [cursor=pointer]:
+          - generic [ref=f8e476]: SR
+          - generic [ref=f8e479]:
+            - generic [ref=f8e480]: メイのはげまし
+            - generic [ref=f8e481]: 107/80
+            - generic [ref=f8e482]: 1,580円〜4,760円
+        - generic [ref=f8e483]:
+          - button "−" [ref=f8e484] [cursor=pointer]
+          - generic [ref=f8e485]: "0"
+          - button "+" [ref=f8e486] [cursor=pointer]
+      - generic [ref=f8e487]:
+        - generic [ref=f8e488] [cursor=pointer]:
+          - generic [ref=f8e489]: SR
+          - generic [ref=f8e492]:
+            - generic [ref=f8e493]: ユカリ
+            - generic [ref=f8e494]: 108/80
+            - generic [ref=f8e495]: 280円〜1,420円
+        - generic [ref=f8e496]:
+          - button "−" [ref=f8e497] [cursor=pointer]
+          - generic [ref=f8e498]: "0"
+          - button "+" [ref=f8e499] [cursor=pointer]
+      - generic [ref=f8e500]:
+        - generic [ref=f8e501] [cursor=pointer]:
+          - generic [ref=f8e502]: SR
+          - generic [ref=f8e505]:
+            - generic [ref=f8e506]: 活力の森
+            - generic [ref=f8e507]: 109/80
+            - generic [ref=f8e508]: 230円〜680円
+        - generic [ref=f8e509]:
+          - button "−" [ref=f8e510] [cursor=pointer]
+          - generic [ref=f8e511]: "0"
+          - button "+" [ref=f8e512] [cursor=pointer]
+      - generic [ref=f8e513]:
+        - generic [ref=f8e514] [cursor=pointer]:
+          - generic [ref=f8e515]: SR
+          - generic [ref=f8e518]:
+            - generic [ref=f8e519]: ミアレシティ
+            - generic [ref=f8e520]: 110/80
+            - generic [ref=f8e521]: 280円〜680円
+        - generic [ref=f8e522]:
+          - button "−" [ref=f8e523] [cursor=pointer]
+          - generic [ref=f8e524]: "0"
+          - button "+" [ref=f8e525] [cursor=pointer]
+      - generic [ref=f8e526]:
+        - generic [ref=f8e527] [cursor=pointer]:
+          - generic [ref=f8e528]: SAR
+          - generic [ref=f8e531]:
+            - generic [ref=f8e532]: メガスターミーex
+            - generic [ref=f8e533]: 111/80
+            - generic [ref=f8e534]: 2,480円〜7,220円
+        - generic [ref=f8e535]:
+          - button "−" [ref=f8e536] [cursor=pointer]
+          - generic [ref=f8e537]: "0"
+          - button "+" [ref=f8e538] [cursor=pointer]
+      - generic [ref=f8e539]:
+        - generic [ref=f8e540] [cursor=pointer]:
+          - generic [ref=f8e541]: SAR
+          - generic [ref=f8e544]:
+            - generic [ref=f8e545]: メガピクシーex
+            - generic [ref=f8e546]: 112/80
+            - generic [ref=f8e547]: 2,180円〜6,350円
+        - generic [ref=f8e548]:
+          - button "−" [ref=f8e549] [cursor=pointer]
+          - generic [ref=f8e550]: "0"
+          - button "+" [ref=f8e551] [cursor=pointer]
+      - generic [ref=f8e552]:
+        - generic [ref=f8e553] [cursor=pointer]:
+          - generic [ref=f8e554]: SAR
+          - generic [ref=f8e557]:
+            - generic [ref=f8e558]: メガジガルデex
+            - generic [ref=f8e559]: 113/80
+            - generic [ref=f8e560]: 2,480円〜4,080円
+        - generic [ref=f8e561]:
+          - button "−" [ref=f8e562] [cursor=pointer]
+          - generic [ref=f8e563]: "0"
+          - button "+" [ref=f8e564] [cursor=pointer]
+      - generic [ref=f8e565]:
+        - generic [ref=f8e566] [cursor=pointer]:
+          - generic [ref=f8e567]: SAR
+          - generic [ref=f8e570]:
+            - generic [ref=f8e571]: ニャースex
+            - generic [ref=f8e572]: 114/80
+            - generic [ref=f8e573]: 9,380円〜24,360円
+        - generic [ref=f8e574]:
+          - button "−" [ref=f8e575] [cursor=pointer]
+          - generic [ref=f8e576]: "0"
+          - button "+" [ref=f8e577] [cursor=pointer]
+      - generic [ref=f8e578]:
+        - generic [ref=f8e579] [cursor=pointer]:
+          - generic [ref=f8e580]: SAR
+          - generic [ref=f8e583]:
+            - generic [ref=f8e584]: メイのはげまし
+            - generic [ref=f8e585]: 115/80
+            - generic [ref=f8e586]: 12,000円〜34,510円
+        - generic [ref=f8e587]:
+          - button "−" [ref=f8e588] [cursor=pointer]
+          - generic [ref=f8e589]: "0"
+          - button "+" [ref=f8e590] [cursor=pointer]
+      - generic [ref=f8e591]:
+        - generic [ref=f8e592] [cursor=pointer]:
+          - generic [ref=f8e593]: SAR
+          - generic [ref=f8e596]:
+            - generic [ref=f8e597]: ユカリ
+            - generic [ref=f8e598]: 116/80
+            - generic [ref=f8e599]: 480円〜2,870円
+        - generic [ref=f8e600]:
+          - button "−" [ref=f8e601] [cursor=pointer]
+          - generic [ref=f8e602]: "0"
+          - button "+" [ref=f8e603] [cursor=pointer]
+      - generic [ref=f8e604]:
+        - generic [ref=f8e605] [cursor=pointer]:
+          - generic [ref=f8e606]: MUR
+          - generic [ref=f8e609]:
+            - generic [ref=f8e610]: メガジガルデex
+            - generic [ref=f8e611]: 117/80
+            - generic [ref=f8e612]: 25,280円〜57,710円
+        - generic [ref=f8e613]:
+          - button "−" [ref=f8e614] [cursor=pointer]
+          - generic [ref=f8e615]: "0"
+          - button "+" [ref=f8e616] [cursor=pointer]

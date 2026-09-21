@@ -1,0 +1,7 @@
+[     155ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8801/%7B%7B%20p.thumbnailUrl%20%7D%7D:0
+[     160ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8801/%7B%7B%20c.imageUrl%20%7D%7D:0
+[     179ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8801/%7B%7B%20detail.imageUrl%20%7D%7D:0
+[     208ms] [WARNING] The specified value "{{ priceMin }}" cannot be parsed, or is out of range. @ http://127.0.0.1:8801/index.html:155
+[     208ms] [WARNING] The specified value "{{ priceMax }}" cannot be parsed, or is out of range. @ http://127.0.0.1:8801/index.html:157
+[     237ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8801/%7B%7B%20c.imageUrl%20%7D%7D:0
+[     335ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8801/favicon.ico:0

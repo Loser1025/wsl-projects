@@ -1,0 +1,33 @@
+- generic [ref=f10e4]:
+  - generic [ref=f10e6]:
+    - generic [ref=f10e7]: ぽけかかく
+    - generic [ref=f10e8]: POKEMON CARD PRICE CATALOG
+  - generic [ref=f10e9]:
+    - button "← 戻る" [ref=f10e449] [cursor=pointer]
+    - generic [ref=f10e450]:
+      - generic [ref=f10e451]: MUR
+      - generic [ref=f10e454]: 拡張パック ストームエメラルダ
+      - generic [ref=f10e455]: メガレックウザex
+      - generic [ref=f10e456]: 113/76
+      - generic [ref=f10e457]:
+        - generic [ref=f10e458]: 日本価格(参考)
+        - generic [ref=f10e459]: 99,700円〜287,100円
+        - generic [ref=f10e460]: 8件の出品から算出
+        - link "最安値の出品を見る ↗" [ref=f10e461] [cursor=pointer]:
+          - /url: https://store.shopping.yahoo.co.jp/suruga-ya/gu820944.html
+      - generic [ref=f10e462]:
+        - generic [ref=f10e463]: 米国価格(参考・billsarchive.com)
+        - generic [ref=f10e464]: $1,070
+      - generic [ref=f10e465]:
+        - generic [ref=f10e466]: 所持管理
+        - generic [ref=f10e467]:
+          - button "−" [ref=f10e468] [cursor=pointer]
+          - generic [ref=f10e469]: "0"
+          - button "+" [ref=f10e470] [cursor=pointer]
+          - generic [ref=f10e471]: 枚所持
+        - generic [ref=f10e472]:
+          - text: 状態
+          - 'textbox "例: PSA10、傷あり等" [ref=f10e473]'
+        - generic [ref=f10e474]:
+          - text: メモ
+          - textbox "メモ" [ref=f10e475]

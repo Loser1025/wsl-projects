@@ -1,0 +1,53 @@
+{
+  "run_id": "20260920T043416443723Z",
+  "started_at": "2026-09-20T04:34:16.443723+00:00",
+  "phase": 1,
+  "live_html_validated": false,
+  "origin": "synthetic",
+  "issues": [
+    {
+      "url": "https://www.cardrush-pokemon.jp/product/900000005",
+      "title": "在庫欠損テスト(検証)【U】{005/066} [TEST]",
+      "reason": "在庫数欠損（価格は保存・在庫はNULL）"
+    },
+    {
+      "url": "https://www.cardrush-pokemon.jp/product/900000006",
+      "title": "型番欠損テスト【R】 [TEST]",
+      "reason": "タイトル形式不明（名前・レアリティ・型番を確認）"
+    },
+    {
+      "url": "https://www.cardrush-pokemon.jp/product/900000007",
+      "title": "未知レアリティテスト【???】{007/066} [TEST]",
+      "reason": "未対応レアリティ: ???"
+    },
+    {
+      "url": "https://www.cardrush-pokemon.jp/product/900000008",
+      "title": "価格不明テスト【R】{008/066} [TEST]",
+      "reason": "商品の価格領域が見つかりません"
+    },
+    {
+      "url": "https://www.cardrush-pokemon.jp/product/900000009",
+      "title": "複数価格テスト【R】{009/066} [TEST]",
+      "reason": "複数価格があり販売価格を確定できません"
+    }
+  ],
+  "pages": 1,
+  "stats": {
+    "parsed": 5,
+    "inserted": 4,
+    "updated": 0,
+    "below_threshold_new": 1,
+    "conflicts": 0
+  },
+  "database": "C:\\Users\\mitsuba864\\Documents\\Codex\\2026-09-20\\files-pasted-by-the-user-ai\\outputs\\pokemon-catalog\\data\\demo\\demo.sqlite3",
+  "status": "stored_with_issues",
+  "image_status": "未取得。パイロットでは外部画像を表示・直リンクしません",
+  "phase_1_passed": false,
+  "remaining_checks": [
+    "実HTMLとの目視照合",
+    "許可された接続経路での連続アクセス検証",
+    "画像ホスト・利用条件の確認"
+  ],
+  "finished_at": "2026-09-20T04:34:16.680915+00:00",
+  "request_count": 0
+}

@@ -1,0 +1,4 @@
+[    1231ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://web-sigma-green-16.vercel.app/%7B%7B%20c.imageUrl%20%7D%7D:0
+[    1316ms] [WARNING] The specified value "{{ priceMin }}" cannot be parsed, or is out of range. @ https://web-sigma-green-16.vercel.app/:107
+[    1316ms] [WARNING] The specified value "{{ priceMax }}" cannot be parsed, or is out of range. @ https://web-sigma-green-16.vercel.app/:109
+[    2149ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://web-sigma-green-16.vercel.app/favicon.ico:0

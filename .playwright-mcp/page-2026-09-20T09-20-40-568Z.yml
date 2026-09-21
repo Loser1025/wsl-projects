@@ -1,0 +1,130 @@
+- generic [ref=f4e4]:
+  - generic [ref=f4e6]:
+    - generic [ref=f4e7]: ぽけかかく
+    - generic [ref=f4e8]: POKEMON CARD PRICE CATALOG
+  - generic [ref=f4e9]:
+    - button "← パック一覧に戻る" [ref=f4e17] [cursor=pointer]
+    - generic [ref=f4e18]: ポケモンカードゲーム MEGA 拡張パック 30th CELEBRATION
+    - textbox "カード名・型番で検索" [ref=f4e19]
+    - generic [ref=f4e20]:
+      - button "RR" [ref=f4e21] [cursor=pointer]
+      - button "AR" [ref=f4e22] [cursor=pointer]
+      - button "SAR" [active] [ref=f4e23] [cursor=pointer]
+      - button "FUR" [ref=f4e24] [cursor=pointer]
+    - generic [ref=f4e25]:
+      - generic [ref=f4e26]:
+        - spinbutton "下限" [ref=f4e27]
+        - generic [ref=f4e28]: 円 〜
+        - spinbutton "上限" [ref=f4e29]
+        - generic [ref=f4e30]: 円
+      - combobox [ref=f4e31]:
+        - 'option "所持状態: すべて" [selected]'
+        - option "所持のみ"
+        - option "未所持のみ"
+      - combobox [ref=f4e32]:
+        - option "型番順" [selected]
+        - option "価格が安い順"
+        - option "価格が高い順"
+      - button "フィルターをクリア" [ref=f4e539] [cursor=pointer]
+    - generic [ref=f4e33]: 10 / 42 枚
+    - generic [ref=f4e34]:
+      - generic [ref=f4e35]:
+        - generic [ref=f4e36]: SAR
+        - generic [ref=f4e39]:
+          - generic [ref=f4e40]: ホゲータex
+          - generic [ref=f4e41]: 124/165
+          - generic [ref=f4e42]: 2,350円
+          - generic [ref=f4e43]:
+            - button "−" [ref=f4e44] [cursor=pointer]
+            - generic [ref=f4e45]: "0"
+            - button "+" [ref=f4e46] [cursor=pointer]
+      - generic [ref=f4e47]:
+        - generic [ref=f4e48]: SAR
+        - generic [ref=f4e51]:
+          - generic [ref=f4e52]: ゲッコウガex
+          - generic [ref=f4e53]: 125/165
+          - generic [ref=f4e54]: 800円
+          - generic [ref=f4e55]:
+            - button "−" [ref=f4e56] [cursor=pointer]
+            - generic [ref=f4e57]: "0"
+            - button "+" [ref=f4e58] [cursor=pointer]
+      - generic [ref=f4e59]:
+        - generic [ref=f4e60]: SAR
+        - generic [ref=f4e63]:
+          - generic [ref=f4e64]: ピカチュウex
+          - generic [ref=f4e65]: 126/165
+          - generic [ref=f4e66]: 13,800円
+          - generic [ref=f4e67]:
+            - button "−" [ref=f4e68] [cursor=pointer]
+            - generic [ref=f4e69]: "0"
+            - button "+" [ref=f4e70] [cursor=pointer]
+      - generic [ref=f4e71]:
+        - generic [ref=f4e72]: SAR
+        - generic [ref=f4e75]:
+          - generic [ref=f4e76]: ピカチュウex
+          - generic [ref=f4e77]: 127/165
+          - generic [ref=f4e78]: 13,800円
+          - generic [ref=f4e79]:
+            - button "−" [ref=f4e80] [cursor=pointer]
+            - generic [ref=f4e81]: "0"
+            - button "+" [ref=f4e82] [cursor=pointer]
+      - generic [ref=f4e83]:
+        - generic [ref=f4e84]: SAR
+        - generic [ref=f4e87]:
+          - generic [ref=f4e88]: ミュウツーex
+          - generic [ref=f4e89]: 128/165
+          - generic [ref=f4e90]: 1,100円
+          - generic [ref=f4e91]:
+            - button "−" [ref=f4e92] [cursor=pointer]
+            - generic [ref=f4e93]: "0"
+            - button "+" [ref=f4e94] [cursor=pointer]
+      - generic [ref=f4e95]:
+        - generic [ref=f4e96]: SAR
+        - generic [ref=f4e99]:
+          - generic [ref=f4e100]: ミュウex
+          - generic [ref=f4e101]: 129/165
+          - generic [ref=f4e102]: 11,800円
+          - generic [ref=f4e103]:
+            - button "−" [ref=f4e104] [cursor=pointer]
+            - generic [ref=f4e105]: "0"
+            - button "+" [ref=f4e106] [cursor=pointer]
+      - generic [ref=f4e107]:
+        - generic [ref=f4e108]: SAR
+        - generic [ref=f4e111]:
+          - generic [ref=f4e112]: ニンフィアex
+          - generic [ref=f4e113]: 130/165
+          - generic [ref=f4e114]: 11,170円
+          - generic [ref=f4e115]:
+            - button "−" [ref=f4e116] [cursor=pointer]
+            - generic [ref=f4e117]: "0"
+            - button "+" [ref=f4e118] [cursor=pointer]
+      - generic [ref=f4e119]:
+        - generic [ref=f4e120]: SAR
+        - generic [ref=f4e123]:
+          - generic [ref=f4e124]: ゲンガーex
+          - generic [ref=f4e125]: 131/165
+          - generic [ref=f4e126]: 9,980円
+          - generic [ref=f4e127]:
+            - button "−" [ref=f4e128] [cursor=pointer]
+            - generic [ref=f4e129]: "0"
+            - button "+" [ref=f4e130] [cursor=pointer]
+      - generic [ref=f4e131]:
+        - generic [ref=f4e132]: SAR
+        - generic [ref=f4e135]:
+          - generic [ref=f4e136]: ジラーチex
+          - generic [ref=f4e137]: 132/165
+          - generic [ref=f4e138]: 6,980円
+          - generic [ref=f4e139]:
+            - button "−" [ref=f4e140] [cursor=pointer]
+            - generic [ref=f4e141]: "0"
+            - button "+" [ref=f4e142] [cursor=pointer]
+      - generic [ref=f4e143]:
+        - generic [ref=f4e144]: SAR
+        - generic [ref=f4e147]:
+          - generic [ref=f4e148]: ボーマンダex
+          - generic [ref=f4e149]: 133/165
+          - generic [ref=f4e150]: 2,770円
+          - generic [ref=f4e151]:
+            - button "−" [ref=f4e152] [cursor=pointer]
+            - generic [ref=f4e153]: "0"
+            - button "+" [ref=f4e154] [cursor=pointer]
