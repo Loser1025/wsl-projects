@@ -1,8 +1,8 @@
 {
   "/home/loser/wsl-projects": {
     "cmd": "node -e \"console.log('check')\"",
-    "passes": 1,
-    "last_used": "2026-09-18T10:20:58+09:00"
+    "passes": 2,
+    "last_used": "2026-09-21T12:46:41+09:00"
   },
   "/home/loser/wsl-projects/google-workspace-mcp": {
     "cmd": "node -e \"console.log('Full scan up to 10k rows ready')\"",

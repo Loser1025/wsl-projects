@@ -1,0 +1,7 @@
+[editor]
+# 長い行を右端で折り返す
+line-wrapping.enable = true
+
+# (任意) 単語の途中ではなく、単語単位で折り返す（見やすくなります）
+# ※ この設定はHelixのバージョンによって利用可能です
+line-wrapping.max-wrap = 25
