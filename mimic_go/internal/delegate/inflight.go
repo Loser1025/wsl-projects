@@ -24,17 +24,18 @@ var inflightMu sync.Mutex
 
 // InflightEntry は1件の進行中委任の記録。
 type InflightEntry struct {
-	TraceID       string   `json:"trace_id"`
-	Base          string   `json:"base"`
-	ProjectDir    string   `json:"project_dir"`
-	Task          string   `json:"task"`
-	Label         string   `json:"label"`
-	VerifyCmd     string   `json:"verify_cmd"`
-	Kind          string   `json:"kind"`
-	RolePrompt    string   `json:"role_prompt,omitempty"`
-	ApplyChanges  bool     `json:"apply_changes"`
-	StartedAt     string   `json:"started_at"`
-	CheckpointAge *float64 `json:"-"`
+	TraceID         string   `json:"trace_id"`
+	Base            string   `json:"base"`
+	ProjectDir      string   `json:"project_dir"`
+	Task            string   `json:"task"`
+	Label           string   `json:"label"`
+	VerifyCmd       string   `json:"verify_cmd"`
+	Kind            string   `json:"kind"`
+	RolePrompt      string   `json:"role_prompt,omitempty"`
+	ApplyChanges    bool     `json:"apply_changes"`
+	ExtraWritePaths []string `json:"extra_write_paths,omitempty"`
+	StartedAt       string   `json:"started_at"`
+	CheckpointAge   *float64 `json:"-"`
 }
 
 func inflightManifestPath() string {
@@ -75,14 +76,14 @@ func newTraceID() string {
 }
 
 // registerInflight は委任開始時（Overlay作成後・Worker起動前）に呼ぶ。
-func registerInflight(traceID, base, projectDir, task, label, verifyCmd, kind string, rolePrompt string, applyChanges bool) {
+func registerInflight(traceID, base, projectDir, task, label, verifyCmd, kind string, rolePrompt string, applyChanges bool, extraWritePaths []string) {
 	inflightMu.Lock()
 	defer inflightMu.Unlock()
 	m := loadInflightManifest()
 	m[traceID] = InflightEntry{
 		TraceID: traceID, Base: base, ProjectDir: projectDir, Task: task,
 		Label: label, VerifyCmd: verifyCmd, Kind: kind,
-		RolePrompt: rolePrompt, ApplyChanges: applyChanges,
+		RolePrompt: rolePrompt, ApplyChanges: applyChanges, ExtraWritePaths: extraWritePaths,
 		StartedAt: time.Now().Format(time.RFC3339),
 	}
 	_ = saveInflightManifest(m)
@@ -163,7 +164,7 @@ func ResumeDelegation(ctx context.Context, traceID string) (string, error) {
 	// keepSession=false固定: 再開対象はクラッシュ等で中断された孤立委任であり、
 	// continue_specialist用のセッション保持対象として扱うのは安全側でない
 	// （Kindは常に"worker"で記録されるため元の委任種別を区別できない）。
-	result, err := runWorkerInWorkroom(ctx, w, entry.Task, entry.VerifyCmd, entry.RolePrompt, entry.ApplyChanges, false, nil)
+	result, err := runWorkerInWorkroom(ctx, w, entry.Task, entry.VerifyCmd, entry.RolePrompt, entry.ApplyChanges, false, nil, entry.ExtraWritePaths)
 	if err != nil {
 		return "", err
 	}

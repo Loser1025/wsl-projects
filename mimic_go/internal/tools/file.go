@@ -11,11 +11,33 @@ import (
 const largeFileThreshold = 5000 // Python版 _LARGE_FILE_THRESHOLD を踏襲
 const readFileChunk = 10000     // Python版 _TOOL_CHUNK_SIZE を踏襲（read_tool_cacheと同じ値）
 
+// ExpandHome はパス先頭の "~" をホームディレクトリに展開する（シェルと異なり
+// Goのosパッケージは "~" を特別扱いしないため、LLMが "~/foo" のようなパスを
+// 渡すとカレントディレクトリからの相対パスとして解釈され、文字通り "~" という
+// 名前のディレクトリが作られてしまう不具合があったための対策）。
+func ExpandHome(path string) string {
+	if path != "~" && !strings.HasPrefix(path, "~/") {
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	if path == "~" {
+		return home
+	}
+	return filepath.Join(home, path[2:])
+}
+
 // checkWorkerWriteBoundary はWorker（OverlayFS隔離サブプロセス）実行時、
 // 作業ディレクトリの外への書き込みを拒否する（Python版 tools.py::_check_worker_write_boundary
 // の移植）。Overlay隔離は作業ディレクトリ（merged）のマウントにしか効かないため、
 // 絶対パスで外部へ書くとホストFSへ直接書き込まれ、差分検出（changed_files）にも
 // 掛からず適用もロールバックもできない「見えない書き込み」になる。
+// ただしMIMIC_EXTRA_WRITE_PATHS（delegate側のextra_write_paths引数から設定される、
+// 改行区切りの絶対パス一覧）に含まれるパス配下は例外的に許可する——このexplicit
+// allowlistに載ったパスへの書き込みも同じ理由でdiff検出・適用前レビュー・失敗時
+// 破棄の対象外になる（Directorがrole/taskでその旨を最終回答に含めるよう促す運用）。
 // 空文字列以外を返した場合、呼び出し元は書き込みを行わずそれをそのまま返すこと。
 func checkWorkerWriteBoundary(path string) string {
 	if os.Getenv("MIMIC_NO_AUTOGIT") == "" {
@@ -33,16 +55,44 @@ func checkWorkerWriteBoundary(path string) string {
 	if err != nil {
 		return ""
 	}
-	rel, err := filepath.Rel(root, abs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return fmt.Sprintf(
-			"エラー: 作業ディレクトリ（%s）の外への書き込みは禁止されています: %s\n"+
-				"この環境はOverlayFS隔離されており、外部への書き込みは差分として検出・適用されません。\n"+
-				"作業ディレクトリ内の相対パスで書き込んでください。"+
-				"外部ファイルの変更が必要な場合は、その旨を最終回答でDirectorに報告してください。",
-			root, path)
+	if pathWithinRoot(root, abs) {
+		return ""
 	}
-	return ""
+	for _, extra := range extraWriteRoots() {
+		if pathWithinRoot(extra, abs) {
+			return ""
+		}
+	}
+	return fmt.Sprintf(
+		"エラー: 作業ディレクトリ（%s）の外への書き込みは禁止されています: %s\n"+
+			"この環境はOverlayFS隔離されており、外部への書き込みは差分として検出・適用されません。\n"+
+			"作業ディレクトリ内の相対パスで書き込んでください。"+
+			"外部ファイルの変更が必要な場合は、その旨を最終回答でDirectorに報告してください。",
+		root, path)
+}
+
+// pathWithinRoot はabsがroot自身、もしくはroot配下かを判定する。
+func pathWithinRoot(root, abs string) bool {
+	rel, err := filepath.Rel(root, abs)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// extraWriteRoots はMIMIC_EXTRA_WRITE_PATHS環境変数（改行区切り、
+// internal/delegate/worker.go::launchCommandがexpandHome+Abs済みの絶対パスとして
+// 設定する）を読み取る。
+func extraWriteRoots() []string {
+	raw := os.Getenv("MIMIC_EXTRA_WRITE_PATHS")
+	if raw == "" {
+		return nil
+	}
+	lines := strings.Split(raw, "\n")
+	out := make([]string, 0, len(lines))
+	for _, l := range lines {
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 func registerFileTools(r *Registry) {
@@ -132,7 +182,7 @@ func registerFileTools(r *Registry) {
 }
 
 func toolReadFile(args map[string]any) (string, error) {
-	path := argString(args, "path")
+	path := ExpandHome(argString(args, "path"))
 	offset := argInt(args, "offset", 0)
 
 	data, err := os.ReadFile(path)
@@ -199,7 +249,7 @@ func firstNLines(s string, n int) string {
 }
 
 func toolWriteFile(args map[string]any) (string, error) {
-	path := argString(args, "path")
+	path := ExpandHome(argString(args, "path"))
 	content := argString(args, "content")
 
 	if boundaryErr := checkWorkerWriteBoundary(path); boundaryErr != "" {
@@ -236,7 +286,7 @@ func toolWriteFile(args map[string]any) (string, error) {
 }
 
 func toolEditFile(args map[string]any) (string, error) {
-	path := argString(args, "path")
+	path := ExpandHome(argString(args, "path"))
 	oldString := argString(args, "old_string")
 	newString := argString(args, "new_string")
 
@@ -289,7 +339,7 @@ func toolEditFile(args map[string]any) (string, error) {
 // フェーズ2の本バッチでは簡略化のため未移植（1: 完全一致、2: インデント
 // 正規化ファジーマッチの2段のみ）。
 func toolPatchFile(args map[string]any) (string, error) {
-	path := argString(args, "path")
+	path := ExpandHome(argString(args, "path"))
 	search := argString(args, "search")
 	replace := argString(args, "replace")
 
@@ -546,7 +596,7 @@ func equalStrings(a, b []string) bool {
 }
 
 func toolFileInfo(args map[string]any) (string, error) {
-	path := argString(args, "path")
+	path := ExpandHome(argString(args, "path"))
 	info, err := os.Stat(path)
 	if err != nil {
 		return "", err
@@ -573,7 +623,7 @@ func toolFileInfo(args map[string]any) (string, error) {
 }
 
 func toolSmartRead(args map[string]any) (string, error) {
-	path := argString(args, "path")
+	path := ExpandHome(argString(args, "path"))
 	focus := argString(args, "focus")
 	contextLines := argInt(args, "context_lines", 5)
 
@@ -610,7 +660,7 @@ func toolSmartRead(args map[string]any) (string, error) {
 }
 
 func toolListDirectory(args map[string]any) (string, error) {
-	path := argString(args, "path")
+	path := ExpandHome(argString(args, "path"))
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return "", err

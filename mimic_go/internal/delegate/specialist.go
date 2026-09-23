@@ -98,9 +98,12 @@ func buildDynamicSystemPrompt(role string, canWrite, canExecute bool) string {
 // （Python版 team.py::run_specialist_task の移植。3段階権限:
 // 読み取り専用（デフォルト）/ can_execute=True（実行専用、変更は破棄）/
 // can_write=True（実装・適用）。expectedFilesが空でなければ、実際の変更
-// ファイルが想定外の場合に警告を付す）。
+// ファイルが想定外の場合に警告を付す）。extraWritePathsはcan_write/can_execute時、
+// プロジェクト外でも書き込みを許可する追加パス（RunWorkerOnce/runWorkerInWorkroomの
+// 同名引数を参照。診断専用のcan_execute=Trueであっても、この経路の書き込みは
+// applyChanges=falseによる破棄の対象外＝実際にホストへ反映される点に注意）。
 func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *tools.Registry,
-	role, task, projectDir, verifyCmd string, canWrite, canExecute bool, expectedFiles []string) (string, error) {
+	role, task, projectDir, verifyCmd string, canWrite, canExecute bool, expectedFiles, extraWritePaths []string) (string, error) {
 
 	dynamicPrompt := buildDynamicSystemPrompt(role, canWrite, canExecute)
 
@@ -135,7 +138,7 @@ func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *to
 	if !canWrite {
 		// can_execute=True（実行専用）はセッション継続の対象外
 		// （Python版もcan_write=Trueの完了時のみセッションWorkerを保持する）。
-		result, err := RunWorkerOnce(ctx, task, projectDir, verifyCmd, dynamicPrompt, false)
+		result, err := RunWorkerOnce(ctx, task, projectDir, verifyCmd, dynamicPrompt, false, extraWritePaths)
 		if err != nil {
 			return "", err
 		}
@@ -150,12 +153,12 @@ func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *to
 	if err != nil {
 		return "", fmt.Errorf("workroom作成に失敗しました: %w", err)
 	}
-	result, err := runWorkerInWorkroom(ctx, w, task, verifyCmd, dynamicPrompt, true, true, expectedFiles)
+	result, err := runWorkerInWorkroom(ctx, w, task, verifyCmd, dynamicPrompt, true, true, expectedFiles, extraWritePaths)
 	if err != nil {
 		w.Cleanup()
 		return "", err
 	}
-	setSessionWorker(w, dynamicPrompt, projectDir, verifyCmd)
+	setSessionWorker(w, dynamicPrompt, projectDir, verifyCmd, extraWritePaths)
 	if strings.Contains(result, "✓ 通過しました") {
 		SaveSpecialistRole(role, "write")
 	}
@@ -169,10 +172,11 @@ func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *to
 // 保持は常に最新1件のみ）。
 
 type sessionWorkerState struct {
-	workroom   *sandbox.Workroom
-	rolePrompt string
-	projectDir string
-	verifyCmd  string
+	workroom        *sandbox.Workroom
+	rolePrompt      string
+	projectDir      string
+	verifyCmd       string
+	extraWritePaths []string
 }
 
 var (
@@ -180,10 +184,10 @@ var (
 	session   *sessionWorkerState
 )
 
-func setSessionWorker(w *sandbox.Workroom, rolePrompt, projectDir, verifyCmd string) {
+func setSessionWorker(w *sandbox.Workroom, rolePrompt, projectDir, verifyCmd string, extraWritePaths []string) {
 	sessionMu.Lock()
 	old := session
-	session = &sessionWorkerState{workroom: w, rolePrompt: rolePrompt, projectDir: projectDir, verifyCmd: verifyCmd}
+	session = &sessionWorkerState{workroom: w, rolePrompt: rolePrompt, projectDir: projectDir, verifyCmd: verifyCmd, extraWritePaths: extraWritePaths}
 	sessionMu.Unlock()
 	if old != nil && old.workroom != w {
 		old.workroom.Cleanup()
@@ -224,7 +228,7 @@ func RunSpecialistContinue(ctx context.Context, task, verifyCmd string) (string,
 	if verifyCmd == "" {
 		verifyCmd = s.verifyCmd
 	}
-	result, err := runWorkerInWorkroom(ctx, s.workroom, task, verifyCmd, s.rolePrompt, true, true, nil)
+	result, err := runWorkerInWorkroom(ctx, s.workroom, task, verifyCmd, s.rolePrompt, true, true, nil, s.extraWritePaths)
 	if err != nil {
 		return "", err
 	}

@@ -21,6 +21,20 @@ var (
 	globalRegistry *tools.Registry
 )
 
+// extraWritePathsSchema はdelegate_to_worker/delegate_to_specialist共通の
+// extra_write_pathsパラメータ定義。プロジェクト外への書き込みをこの明示的な
+// パス一覧に限って許可する（internal/tools/file.go::checkWorkerWriteBoundaryの
+// MIMIC_EXTRA_WRITE_PATHS参照）。指定パス配下の書き込みはOverlayFS隔離を経由せず
+// ホストへ直接反映されるため、diff確認・適用前レビュー・失敗時の自動破棄の対象外
+// になる——本当に必要な場合のみ最小限のパスを指定すること。
+var extraWritePathsSchema = map[string]any{
+	"type":  "array",
+	"items": map[string]any{"type": "string"},
+	"description": "プロジェクト外でも書き込みを許可する追加パス（例: [\"~/.config/helix/config.toml\"]）。" +
+		"このパス配下の変更はOverlayFS隔離を経由せずホストへ直接反映され、diff確認・適用前レビュー・" +
+		"失敗時の自動破棄の対象外になる。本当にプロジェクト外への書き込みが必要な場合のみ、必要最小限のパスを指定すること。",
+}
+
 // RegisterTools はdelegate_to_worker/delegate_to_teamを既存のRegistryへ追加する。
 // tools パッケージが internal/delegate に依存しない構成
 // （internal/react→internal/tools の依存があるため、tools→delegate→toolsの
@@ -34,15 +48,20 @@ func RegisterTools(r *tools.Registry, client *llm.Client) {
 		map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"task":        map[string]any{"type": "string", "description": "Workerへの具体的な指示（目的・対象範囲・制約条件を含む）"},
-				"project_dir": map[string]any{"type": "string", "description": "作業対象のプロジェクトディレクトリのフルパス（デフォルト: 現在の作業フォルダ）", "default": "."},
-				"verify_cmd":  map[string]any{"type": "string", "description": "Worker完了後に実行する検証コマンド（省略可、失敗時は自動修正リトライ）", "default": ""},
+				"task":              map[string]any{"type": "string", "description": "Workerへの具体的な指示（目的・対象範囲・制約条件を含む）"},
+				"project_dir":       map[string]any{"type": "string", "description": "作業対象のプロジェクトディレクトリのフルパス（デフォルト: 現在の作業フォルダ）", "default": "."},
+				"verify_cmd":        map[string]any{"type": "string", "description": "Worker完了後に実行する検証コマンド（省略可、失敗時は自動修正リトライ）", "default": ""},
+				"extra_write_paths": extraWritePathsSchema,
 			},
 			"required": []string{"task"},
 		},
 		func(args map[string]any) (string, error) {
+			extraPaths, err := argStrArray(args, "extra_write_paths")
+			if err != nil {
+				return "", err
+			}
 			return RunWorkerOnce(context.Background(),
-				argStr(args, "task"), defaultDir(argStr(args, "project_dir")), argStr(args, "verify_cmd"), "", true)
+				argStr(args, "task"), defaultDir(argStr(args, "project_dir")), argStr(args, "verify_cmd"), "", true, extraPaths)
 		})
 
 	r.Register("delegate_to_team",
@@ -128,6 +147,7 @@ func RegisterTools(r *tools.Registry, client *llm.Client) {
 					"type": "array", "items": map[string]any{"type": "string"},
 					"description": "変更を想定しているファイルパス一覧（省略可）。can_write=True時、これ以外のファイルが変更されると警告が付く",
 				},
+				"extra_write_paths": extraWritePathsSchema,
 			},
 			"required": []string{"role", "task"},
 		},
@@ -137,9 +157,13 @@ func RegisterTools(r *tools.Registry, client *llm.Client) {
 				return roleErr, nil
 			}
 			expectedFiles, _ := argStrArray(args, "expected_files")
+			extraPaths, err := argStrArray(args, "extra_write_paths")
+			if err != nil {
+				return "", err
+			}
 			return RunSpecialistTask(context.Background(), client, r,
 				role, argStr(args, "task"), defaultDir(argStr(args, "project_dir")), argStr(args, "verify_cmd"),
-				argBool(args, "can_write"), argBool(args, "can_execute"), expectedFiles)
+				argBool(args, "can_write"), argBool(args, "can_execute"), expectedFiles, extraPaths)
 		})
 
 	r.Register("continue_specialist",
@@ -204,11 +228,11 @@ func argStrArray(args map[string]any, key string) ([]string, error) {
 		return nil, nil
 	}
 	if _, isStr := v.(string); isStr {
-		return nil, fmt.Errorf("tasksは文字列ではなく、文字列の配列（list[str]）で渡してください。例: [\"タスク1の説明\", \"タスク2の説明\"]")
+		return nil, fmt.Errorf("%sは文字列ではなく、文字列の配列（list[str]）で渡してください。", key)
 	}
 	arr, ok := v.([]any)
 	if !ok {
-		return nil, fmt.Errorf("tasksの形式が不正です")
+		return nil, fmt.Errorf("%sの形式が不正です", key)
 	}
 	out := make([]string, 0, len(arr))
 	for _, item := range arr {

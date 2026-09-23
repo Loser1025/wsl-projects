@@ -198,7 +198,7 @@ func RunTeamTask(ctx context.Context, client *llm.Client, baseRegistry *tools.Re
 		workerTask = task + "\n\n[Researcherによる設計ワークフロー]\n" + research
 	}
 
-	result, err := RunWorkerOnce(ctx, workerTask, projectDir, verifyCmd, "", true)
+	result, err := RunWorkerOnce(ctx, workerTask, projectDir, verifyCmd, "", true, nil)
 	if err != nil {
 		return "", err
 	}

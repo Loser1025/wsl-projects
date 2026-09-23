@@ -143,13 +143,18 @@ var abortExitCodes = map[int]bool{2: true, 126: true, 127: true}
 // applyChanges=falseの場合、変更は実プロジェクトへ適用せず破棄する
 // （can_execute=True・実行専用Specialist用。verify/実行はそのまま行われる）。
 // Workroomは毎回新規作成し、完了後に破棄する（継続不可の単発実行）。
-func RunWorkerOnce(ctx context.Context, task, projectDir, verifyCmd, rolePrompt string, applyChanges bool) (string, error) {
+// extraWritePathsは、プロジェクト外でも書き込みを許可する追加パス
+// （delegate_to_worker/delegate_to_specialistのextra_write_paths引数、
+// internal/tools/file.go::checkWorkerWriteBoundaryのMIMIC_EXTRA_WRITE_PATHS参照）。
+// このパス配下の書き込みはOverlayFS隔離を経由せずホストへ直接反映されるため、
+// diff確認・適用前レビュー・失敗時の自動破棄の対象外になる点に注意。
+func RunWorkerOnce(ctx context.Context, task, projectDir, verifyCmd, rolePrompt string, applyChanges bool, extraWritePaths []string) (string, error) {
 	w, err := sandbox.NewWorkroom(projectDir)
 	if err != nil {
 		return "", fmt.Errorf("workroom作成に失敗しました: %w", err)
 	}
 	defer w.Cleanup()
-	return runWorkerInWorkroom(ctx, w, task, verifyCmd, rolePrompt, applyChanges, false, nil)
+	return runWorkerInWorkroom(ctx, w, task, verifyCmd, rolePrompt, applyChanges, false, nil, extraWritePaths)
 }
 
 // runWorkerInWorkroom は既存のWorkroom内でWorkerを実行する共通処理。
@@ -158,7 +163,7 @@ func RunWorkerOnce(ctx context.Context, task, projectDir, verifyCmd, rolePrompt 
 // 消さずに残す（continue_specialistでの追加指示継続用）。
 // expectedFilesが空でなければ、実際の変更ファイルと食い違う場合に警告を付す
 // （Python版 team.py::expected_files の移植。delegate_to_specialist専用）。
-func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyCmd, rolePrompt string, applyChanges, keepSession bool, expectedFiles []string) (string, error) {
+func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyCmd, rolePrompt string, applyChanges, keepSession bool, expectedFiles []string, extraWritePaths []string) (string, error) {
 	// 競合検出用: この時刻以降に本体側(project dir)で変更されたファイルを
 	// 適用時に警告する（Python版 team.py:1044 `_t_start = time.time()` の移植）。
 	tStart := time.Now()
@@ -182,7 +187,7 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 	}
 
 	traceID := newTraceID()
-	registerInflight(traceID, w.Base, w.Lower, task, rolePrompt, verifyCmd, "worker", rolePrompt, applyChanges)
+	registerInflight(traceID, w.Base, w.Lower, task, rolePrompt, verifyCmd, "worker", rolePrompt, applyChanges, extraWritePaths)
 	defer unregisterInflight(traceID)
 
 	mimicBin, err := os.Executable()
@@ -233,7 +238,7 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 			"event": "team_worker_start", "attempt": attempt, "trace_id": traceID,
 			"task": truncateSummary(task, 200), "resumed": attempt > 1,
 		})
-		launchRes, resumeAttempts, runErr := runWithResume(ctx, w, launchCommand(mimicBin, currentTask, rolePrompt, traceID, w.Lower, keepSession), defaultWorkerTimeout)
+		launchRes, resumeAttempts, runErr := runWithResume(ctx, w, launchCommand(mimicBin, currentTask, rolePrompt, traceID, w.Lower, keepSession, extraWritePaths), defaultWorkerTimeout)
 		if runErr != nil {
 			return "", fmt.Errorf("Worker実行に失敗しました: %w", runErr)
 		}
@@ -313,7 +318,7 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 			effectiveVerify = staticCmd
 		}
 		if bestW, bestSummary, bestExit, bestOutput, ok := runBestOfNFallback(
-			ctx, w.Lower, task, rolePrompt, effectiveVerify, traceID, mimicBin, keepSession); ok {
+			ctx, w.Lower, task, rolePrompt, effectiveVerify, traceID, mimicBin, keepSession, extraWritePaths); ok {
 			w.Cleanup()
 			w = bestW
 			summary = bestSummary
@@ -502,7 +507,7 @@ type bestOfNAttemptResult struct {
 // どれも通過しなければ ok=false を返す。勝者以外のWorkroomはここでCleanupする
 // （呼び出し元は勝者のWorkroomをそのまま使い続けるか、ok=falseなら元のWorkroomを
 // 変更せず使い続ける）。
-func runBestOfNFallback(ctx context.Context, projectDir, task, rolePrompt, verifyCmd, traceIDBase, mimicBin string, keepSession bool) (*sandbox.Workroom, string, int, string, bool) {
+func runBestOfNFallback(ctx context.Context, projectDir, task, rolePrompt, verifyCmd, traceIDBase, mimicBin string, keepSession bool, extraWritePaths []string) (*sandbox.Workroom, string, int, string, bool) {
 	results := make([]bestOfNAttemptResult, BestOfNFallbackAttempts)
 	var wg sync.WaitGroup
 	for i := 0; i < BestOfNFallbackAttempts; i++ {
@@ -516,7 +521,7 @@ func runBestOfNFallback(ctx context.Context, projectDir, task, rolePrompt, verif
 			results[idx].w = w
 			fallbackTraceID := fmt.Sprintf("%s-bestofn%d", traceIDBase, idx+1)
 			launchRes, _, runErr := runWithResume(ctx, w,
-				launchCommand(mimicBin, task, rolePrompt, fallbackTraceID, w.Lower, keepSession), defaultWorkerTimeout)
+				launchCommand(mimicBin, task, rolePrompt, fallbackTraceID, w.Lower, keepSession, extraWritePaths), defaultWorkerTimeout)
 			if runErr != nil || launchRes.TimedOut {
 				return
 			}
@@ -570,7 +575,7 @@ func runWithResume(ctx context.Context, w *sandbox.Workroom, command string, tim
 	return last, MaxResumeAttempts, nil
 }
 
-func launchCommand(mimicBin, task, rolePrompt, traceID, lowerDir string, keepSession bool) string {
+func launchCommand(mimicBin, task, rolePrompt, traceID, lowerDir string, keepSession bool, extraWritePaths []string) string {
 	// Worker自身にはAutoGitのbackup/checkpoint/squashを行わせない
 	// （upperdirに.gitの変更が混入し差分サマリが汚染されるのを防ぐ。
 	// Python版 NullAutoGit と同じ意図をMIMIC_NO_AUTOGIT環境変数で伝える）。
@@ -608,8 +613,26 @@ func launchCommand(mimicBin, task, rolePrompt, traceID, lowerDir string, keepSes
 	if launchEnvPath != "" {
 		envFlag = "-env " + shellQuote(launchEnvPath) + " "
 	}
-	return fmt.Sprintf("export MIMIC_NO_AUTOGIT=1\n%s%s%s%s%s %s-auto-prompt %s",
-		roleExport, keepExport, traceExport, providerExport, shellQuote(mimicBin), envFlag, shellQuote(task))
+	// MIMIC_EXTRA_WRITE_PATHSは、プロジェクト外でも書き込みを許可する追加パスの
+	// explicit allowlist（internal/tools/file.go::checkWorkerWriteBoundaryが参照）。
+	// この経路の書き込みはOverlayFS隔離を経由せずホストへ直接反映されるため
+	// diff検出・適用前レビュー・失敗時破棄の対象外になる。相対パス/"~"付きパスを
+	// そのまま渡すとWorker側のcwd（overlay越しのmerged）基準で誤解決されるため、
+	// Director側（このプロセス）でExpandHome+Absしてから渡す。
+	extraWriteExport := ""
+	if len(extraWritePaths) > 0 {
+		normalized := make([]string, 0, len(extraWritePaths))
+		for _, p := range extraWritePaths {
+			if abs, err := filepath.Abs(tools.ExpandHome(p)); err == nil {
+				normalized = append(normalized, abs)
+			}
+		}
+		if len(normalized) > 0 {
+			extraWriteExport = fmt.Sprintf("export MIMIC_EXTRA_WRITE_PATHS=%s\n", shellQuote(strings.Join(normalized, "\n")))
+		}
+	}
+	return fmt.Sprintf("export MIMIC_NO_AUTOGIT=1\n%s%s%s%s%s%s %s-auto-prompt %s",
+		roleExport, keepExport, traceExport, providerExport, extraWriteExport, shellQuote(mimicBin), envFlag, shellQuote(task))
 }
 
 // buildVerifyRetryTask はverify失敗フィードバックを含む修正指示文を生成する

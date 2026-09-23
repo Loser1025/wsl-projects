@@ -1,0 +1,6 @@
+{
+  "role": "視点: Helix editor configuration specialist. 制約: Only edit/create ~/.config/helix/config.toml, do not modify other files or run destructive commands. 完了基準: The file ~/.config/helix/config.toml exists and contains the [editor] section with line-wrapping.enable = true, the word-wrap comment (optional), and line-wrapping.max-wrap = 25, with no duplicate settings.",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-09-21T12:46:41+09:00"
+}
