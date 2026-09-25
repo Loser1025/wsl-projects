@@ -1,0 +1,8 @@
+{
+  "role": "視点: Python 3.10+向けデスクトップアプリの設定管理を担当するエンジニア。制約: 標準ライブラリのみ使用しdataclassで型安全に。GUIやSTT等の他モジュールの実装詳細には踏み込まず、設定値の定義のみに専念すること。完了基準: zoom_translator/config.pyが作成され、Config dataclassにSOURCE_LANG, TARGET_LANG(argos-translate用の言語コード、例: 'en','ja')、SPEAKER_DEVICE_NAME(None=デフォルト出力デバイス)、SAMPLE_RATE(int, 16000)、CHUNK_DURATION_SEC(float, 4.0)、WHISPER_MODEL_SIZE(str, 'small')、WHISPER_COMPUTE_TYPE(str, 'int8')、SUBTITLE_FONT_FAMILY、SUBTITLE_FONT_SIZE、SUBTITLE_BG_COLOR(透過キー用)、SUBTITLE_FG_COLOR、WINDOW_ALPHA(float)のフィールドが定義され、モジュールレベルにdefault_config = Config()のインスタンスが用意されていること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T19:20:00+09:00"
+}
