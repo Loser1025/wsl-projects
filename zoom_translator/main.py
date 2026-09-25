@@ -49,39 +49,65 @@ def main():
     # 各コンポーネントの初期化
     translator_engine = TranslatorEngine(config=config)
     sentence_buffer = SentenceBuffer(config=config)
+    # 音声チャンクを受け渡すためのオーディオキューを新設
+    audio_queue = queue.Queue()
     result_queue = queue.Queue()
 
     # AudioCapturerのon_chunkコールバック関数
     def handle_audio_chunk(audio_chunk):
         """
-        AudioCapturerのバックグラウンドスレッドから呼ばれるコールバック。
-        音声チャンクを translator_engine.transcribe(audio_chunk) でテキスト化し、
-        sentence_buffer.add_fragment(text) に渡す。
-        完成した文が得られたら translator_engine.translate(sentence) で翻訳し、
-        (sentence, translated) のタプルを result_queue に格納する。
+        AudioCapturerのバックグラウンドスレッドから呼ばれる軽量コールバック。
+        音声チャンクを audio_queue に put するだけで即座に return し、
+        録音スレッドをブロックしない。
         """
         try:
-            # 1. 音声認識 (Transcribe)
-            fragment = translator_engine.transcribe(audio_chunk)
-            if not fragment:
-                return
-
-            logger.info(f"認識断片: {fragment}")
-
-            # 2. 文バッファに追加 (SentenceBuffer)
-            sentence = sentence_buffer.add_fragment(fragment)
-            if sentence:
-                logger.info(f"完成文(原文): {sentence}")
-                # 3. 翻訳 (Translate)
-                translated = translator_engine.translate(sentence)
-                logger.info(f"翻訳文: {translated}")
-
-                # 4. キューに格納 (original, translated)
-                result_queue.put((sentence, translated))
-
+            audio_queue.put(audio_chunk)
         except Exception as e:
-            logger.error(f"音声チャンク処理中にエラーが発生しました: {e}")
-            logger.debug(traceback.format_exc())
+            logger.error(f"音声チャンクのキュー投入中にエラーが発生しました: {e}")
+
+    # STT・翻訳処理を行うバックグラウンドワーカー関数を新設
+    def stt_worker():
+        """
+        audio_queueを監視し、音声チャンクを取り出して
+        transcribe → add_fragment → (文完成時) translate → result_queue.put
+        の一連の重い処理を非同期で行うワーカー関数。
+        """
+        logger.info("STTワーカー（音声処理スレッド）を開始しました。")
+        while True:
+            try:
+                audio_chunk = audio_queue.get()
+                if audio_chunk is None:  # 終了シグナル
+                    audio_queue.task_done()
+                    break
+
+                # 1. 音声認識 (Transcribe)
+                fragment = translator_engine.transcribe(audio_chunk)
+                if not fragment:
+                    audio_queue.task_done()
+                    continue
+
+                logger.info(f"認識断片: {fragment}")
+
+                # 2. 文バッファに追加 (SentenceBuffer)
+                sentence = sentence_buffer.add_fragment(fragment)
+                if sentence:
+                    logger.info(f"完成文(原文): {sentence}")
+                    # 3. 翻訳 (Translate)
+                    translated = translator_engine.translate(sentence)
+                    logger.info(f"翻訳文: {translated}")
+
+                    # 4. キューに格納 (original, translated)
+                    result_queue.put((sentence, translated))
+
+                audio_queue.task_done()
+
+            except Exception as e:
+                logger.error(f"STTワーカー処理中にエラーが発生しました: {e}")
+                logger.debug(traceback.format_exc())
+                try:
+                    audio_queue.task_done()
+                except Exception:
+                    pass
 
     # AudioCapturerのインスタンス化
     audio_capturer = AudioCapturer(config=config, on_chunk=handle_audio_chunk)
@@ -126,7 +152,10 @@ def main():
         except Exception:
             pass
 
-        # キュー消費スレッドの起動
+        # キュー消費スレッドの起動 (stt_worker と pipeline_worker)
+        stt_thread = threading.Thread(target=stt_worker, daemon=True)
+        stt_thread.start()
+
         worker_thread = threading.Thread(target=pipeline_worker, daemon=True)
         worker_thread.start()
 
@@ -162,6 +191,11 @@ def main():
             logger.error(f"SentenceBufferフラッシュ時にエラー: {e}")
 
         # キューに終了シグナルを入れてワーカーを終了させる
+        try:
+            audio_queue.put(None)
+        except Exception:
+            pass
+
         try:
             result_queue.put(None)
         except Exception:

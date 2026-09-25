@@ -1,0 +1,8 @@
+{
+  "role": "視点: 音声認識精度のチューニングを担当するMLエンジニア。制約: TranslatorEngineのtranslate()メソッドやargos-translate関連のロジックには一切触れない(翻訳エンジンは現状維持)。transcribe()メソッド内のfaster-whisper呼び出し部分のみを変更する。他ファイルには触れない。完了基準: zoom_translator/translator_engine.pyのtranscribe()メソッド内、self._whisper_model.transcribe(...)の呼び出しで、既存のbeam_size=5というハードコード値をself.config.BEAM_SIZEに置き換え、新たにcondition_on_previous_text=self.config.WHISPER_CONDITION_ON_PREVIOUS_TEXT、vad_filter=self.config.WHISPER_VAD_FILTERの2つの引数を追加すること。それ以外のロジック(空/無音チェック、遅延初期化等)は変更しない。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T21:09:27+09:00"
+}

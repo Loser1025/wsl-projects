@@ -1,6 +1,0 @@
-{
-  "role": "視点: Google Workspace MCP の実行テスト専門家。\n制約: \n1. google-workspace-mcp を使用して、指定スプレッドシート（ID: 1aFB2O37w-Dh0RmN_W2CultjS1X4Vb7LqxbKMb99UVp4）のデータを取得できるかテストすること。\n2. 変更は行わない（読み取りテストのみ）。\n完了基準:\n1. `sheets_get_values` などのテストスクリプトまたはMCPツール呼び出しを行い、スプレッドシートの中身（シート一覧やセル値）が取得できることを確認・報告すること。",
-  "uses": 1,
-  "mode": "write",
-  "last_used": "2026-09-14T16:01:39+09:00"
-}

@@ -7,8 +7,8 @@ class Config:
     """Zoomなどのシステム音声をリアルタイム翻訳字幕表示するデスクトップアプリの設定を保持するデータクラス"""
 
     # argos-translate用の言語コード（例: 'en', 'ja'）
-    SOURCE_LANG: str = "en"
-    TARGET_LANG: str = "ja"
+    SOURCE_LANG: str = "ja"
+    TARGET_LANG: str = "ko"
 
     # スピーカーデバイス名（Noneの場合はデフォルト出力デバイスを使用）
     SPEAKER_DEVICE_NAME: Optional[str] = None
@@ -20,13 +20,14 @@ class Config:
     CHUNK_DURATION_SEC: float = 4.0
 
     # Whisperモデルサイズ（例: 'tiny', 'base', 'small', 'medium', 'large-v3'）
-    WHISPER_MODEL_SIZE: str = "large-v3"
+    # CPU推論ではlarge-v3は実用的な速度が出ないため、精度と速度のバランスでmediumを既定にする
+    WHISPER_MODEL_SIZE: str = "medium"
 
     # Whisperの演算データ型（例: 'int8', 'float16', 'float32'）
     WHISPER_COMPUTE_TYPE: str = "int8"
 
-    # ビームサーチの探索幅（大きいほど精度が上がるが処理が遅くなる）
-    BEAM_SIZE: int = 8
+    # ビームサーチの探索幅（大きいほど精度が上がるが処理が遅くなる）。CPU向けに5へ抑える
+    BEAM_SIZE: int = 5
 
     # VADで切り出した短い音声チャンクで前チャンクの文脈を引きずりハルシネーション（存在しない文の混入）が起きるのを防ぐためFalseにする
     WHISPER_CONDITION_ON_PREVIOUS_TEXT: bool = False
@@ -62,8 +63,10 @@ class Config:
     MIN_SEGMENT_SEC: float = 0.5
 
     # --- 文単位バッファリング関連設定 ---
-    # 文末とみなす記号文字列
-    SENTENCE_END_CHARS: str = ".?!"
+    # 文末とみなす記号文字列（日本語の全角句読点も含める。SOURCE_LANGが日本語の場合、
+    # Whisperの認識結果は「。」「！」「？」で終わることが多く、半角記号だけだと
+    # 文単位バッファリングが文の完成を検出できなくなるため）
+    SENTENCE_END_CHARS: str = ".?!。！？"
     # 句読点が来なくても強制的に翻訳に回す最大待ち秒数
     SENTENCE_MAX_WAIT_SEC: float = 6.0
 
