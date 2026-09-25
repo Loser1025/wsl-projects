@@ -11,6 +11,7 @@ import logging
 import traceback
 import sys
 import os
+import time
 
 # サードパーティの大量のINFOログを抑制 (HTTPX, HTTPCore, HuggingFace Hub, Urllib3)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -115,9 +116,13 @@ def main():
         AudioCapturerのバックグラウンドスレッドから呼ばれる軽量コールバック。
         音声チャンクを audio_queue に put するだけで即座に return し、
         録音スレッドをブロックしない。
+        キュー投入時刻とチャンクの音声長(秒)も一緒に積み、stt_worker側で
+        「録音〜処理開始までの待ち時間」と「音声の実長」をログに出せるようにする。
         """
         try:
-            audio_queue.put(audio_chunk)
+            queued_at = time.monotonic()
+            segment_duration_sec = len(audio_chunk) / float(config.SAMPLE_RATE)
+            audio_queue.put((audio_chunk, queued_at, segment_duration_sec))
         except Exception as e:
             logger.error(f"音声チャンクのキュー投入中にエラーが発生しました: {e}")
 
@@ -131,14 +136,28 @@ def main():
         logger.info("STTワーカー（音声処理スレッド）を開始しました。")
         while True:
             try:
-                audio_chunk = audio_queue.get()
-                if audio_chunk is None:  # 終了シグナル
+                # 音声チャンクがaudio_queueに積まれてから取り出されるまでの待ち時間を計測するため、
+                # AudioCapturer側でチャンクが確定した時刻(queued_at)も一緒に受け取る
+                item = audio_queue.get()
+                if item is None:  # 終了シグナル
                     audio_queue.task_done()
                     break
+                audio_chunk, queued_at, segment_duration_sec = item
 
-                # 1. 音声認識 (Transcribe)
+                dequeued_at = time.monotonic()
+                queue_wait_sec = dequeued_at - queued_at
+                backlog = audio_queue.qsize()
+
+                # 1. 音声認識 (Transcribe) の所要時間を計測
+                t0 = time.monotonic()
                 fragment = translator_engine.transcribe(audio_chunk)
+                transcribe_sec = time.monotonic() - t0
+
                 if not fragment:
+                    logger.info(
+                        f"[TIMING] 無音/認識結果なし | 音声長={segment_duration_sec:.2f}s "
+                        f"キュー待ち={queue_wait_sec:.2f}s 認識={transcribe_sec:.2f}s 未処理キュー残={backlog}"
+                    )
                     audio_queue.task_done()
                     continue
 
@@ -146,14 +165,25 @@ def main():
 
                 # 2. 文バッファに追加 (SentenceBuffer)
                 sentence = sentence_buffer.add_fragment(fragment)
+                translate_sec = 0.0
                 if sentence:
                     logger.info(f"完成文(原文): {sentence}")
-                    # 3. 翻訳 (Translate)
+                    # 3. 翻訳 (Translate) の所要時間を計測
+                    t1 = time.monotonic()
                     translated = translator_engine.translate(sentence)
+                    translate_sec = time.monotonic() - t1
                     logger.info(f"翻訳文: {translated}")
 
                     # 4. キューに格納 (original, translated)
                     result_queue.put((sentence, translated))
+
+                # このチャンク1件にかかった総所要時間の内訳をログ出力する
+                # (queue_wait: 録音〜処理開始までの待ち行列時間, transcribe/translate: 各処理の実処理時間)
+                logger.info(
+                    f"[TIMING] 音声長={segment_duration_sec:.2f}s "
+                    f"キュー待ち={queue_wait_sec:.2f}s 認識={transcribe_sec:.2f}s 翻訳={translate_sec:.2f}s "
+                    f"未処理キュー残={backlog}"
+                )
 
                 audio_queue.task_done()
 

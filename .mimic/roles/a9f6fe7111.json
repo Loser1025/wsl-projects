@@ -1,0 +1,8 @@
+{
+  "role": "視点: 複数モジュールを統合するアプリケーション統合エンジニア。制約: config.py, audio_capturer.py, translator_engine.py, sentence_buffer.py, settings_store.py, gui.pyの各インターフェースは一切変更せず、それらを組み合わせて呼び出すだけに専念する。フラットな`from config import ...`形式のインポートを維持する。既存のパイプライン(audio_queue, result_queue, stt_worker, pipeline_worker等)のロジックは壊さない。前提インターフェース: audio_capturer.list_speaker_devices() -\u003e list[str]。settings_store.load_settings(config) -\u003e None(configインスタンスを直接書き換える)。settings_store.save_settings(config) -\u003e None。SubtitleWindow(config, get_devices_fn=None, save_settings_fn=None) — get_devices_fnは引数無しでlist[str]を返す関数、save_settings_fnは(source_lang: str, target_lang: str, device_name: str)を受け取る関数。完了基準: zoom_translator/main.pyに以下を実装すること。(1) main()冒頭、config = default_config の直後に settings_store.load_settings(config) を呼び、前回保存された言語ペア・デバイス設定を復元する。(2) 新たに on_save_settings(source_lang, target_lang, device_name) 関数を定義し、内部で config.SOURCE_LANG = source_lang、config.TARGET_LANG = target_lang を設定し、device_nameが空文字でなければconfig.SPEAKER_DEVICE_NAME = device_name、空文字ならconfig.SPEAKER_DEVICE_NAME = Noneを設定した上でsettings_store.save_settings(config)を呼んで永続化する。さらに、AudioCapturerを再起動する(audio_capturer.stop()してからaudio_capturer.start()、新しいconfig値に基づき再接続される)。言語ペアが変わった場合はsentence_buffer.flush()で残っている未完成の文を破棄する(古い言語設定の残骸が新しい言語設定に混ざらないように)。例外はtry/exceptで保護し、エラーがあってもアプリをクラッシュさせない。(3) SubtitleWindow(config=config) のインスタンス化箇所を SubtitleWindow(config=config, get_devices_fn=list_speaker_devices, save_settings_fn=on_save_settings) に変更する(list_speaker_devicesはaudio_capturerからインポートする)。日本語コメントで変更意図を説明すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T22:00:03+09:00"
+}

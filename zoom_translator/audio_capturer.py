@@ -108,14 +108,16 @@ class AudioCapturer:
         print(f"[AudioCapturer] Starting VAD recording. Device: {device_name or 'Default'}, Sample Rate: {sample_rate}Hz, VAD Mode: {vad_aggressiveness}")
 
         try:
-            # スピーカーデバイスの取得（loopback=True）
+            # ループバック録音はsoundcardでは「マイク」側API(all_microphones/get_microphone)に
+            # include_loopback=Trueを渡す形で提供される（all_speakers/default_speakerには
+            # include_loopback引数は存在しない）。
             speaker = None
             if device_name:
                 try:
-                    speakers = sc.all_speakers(include_loopback=True)
-                    for s in speakers:
-                        if device_name.lower() in s.name.lower():
-                            speaker = s
+                    mics = sc.all_microphones(include_loopback=True)
+                    for m in mics:
+                        if device_name.lower() in m.name.lower():
+                            speaker = m
                             break
                     if speaker is None:
                         print(f"[AudioCapturer Warning] Speaker device '{device_name}' not found. Falling back to default loopback.")
@@ -123,7 +125,18 @@ class AudioCapturer:
                     print(f"[AudioCapturer Warning] Failed to find speaker '{device_name}': {e}. Falling back to default.")
 
             if speaker is None:
-                speaker = sc.default_speaker(include_loopback=True)
+                # デフォルトスピーカーの名前を取得し、ループバック対応マイク一覧の中から
+                # 同名のものを探す（見つからなければ先頭のループバックデバイスにフォールバック）
+                default_spk = sc.default_speaker()
+                loopback_mics = sc.all_microphones(include_loopback=True)
+                for m in loopback_mics:
+                    if m.name == default_spk.name:
+                        speaker = m
+                        break
+                if speaker is None and loopback_mics:
+                    speaker = loopback_mics[0]
+                if speaker is None:
+                    raise RuntimeError("No loopback speaker device available.")
 
             # soundcardのレコーダーを開始
             # blocksizeはframe_samplesに合わせるのが効率的
@@ -227,7 +240,8 @@ def list_speaker_devices() -> list[str]:
     if sc is None:
         return []
     try:
-        devices = sc.all_speakers(include_loopback=True)
+        # include_loopbackはall_microphones/get_microphone側の引数(all_speakersには存在しない)
+        devices = sc.all_microphones(include_loopback=True)
         names = []
         for dev in devices:
             if hasattr(dev, 'name') and dev.name:

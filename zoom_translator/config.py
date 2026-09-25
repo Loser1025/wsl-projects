@@ -20,20 +20,22 @@ class Config:
     CHUNK_DURATION_SEC: float = 4.0
 
     # Whisperモデルサイズ（例: 'tiny', 'base', 'small', 'medium', 'large-v3'）
-    # CPU推論ではlarge-v3は実用的な速度が出ないため、精度と速度のバランスでmediumを既定にする
-    WHISPER_MODEL_SIZE: str = "medium"
+    # 実測でmedium+beam5は8秒の音声認識に11〜19秒かかり実時間に追いつかなかったため、
+    # 速度優先でsmallに変更する（実時間より遅いと待ち行列が無限に伸び続けるため精度より優先度が高い）
+    WHISPER_MODEL_SIZE: str = "small"
 
     # Whisperの演算データ型（例: 'int8', 'float16', 'float32'）
     WHISPER_COMPUTE_TYPE: str = "int8"
 
-    # ビームサーチの探索幅（大きいほど精度が上がるが処理が遅くなる）。CPU向けに5へ抑える
-    BEAM_SIZE: int = 5
+    # ビームサーチの探索幅（大きいほど精度が上がるが処理が遅くなる）。速度優先で1(貪欲探索)に抑える
+    BEAM_SIZE: int = 1
 
     # VADで切り出した短い音声チャンクで前チャンクの文脈を引きずりハルシネーション（存在しない文の混入）が起きるのを防ぐためFalseにする
     WHISPER_CONDITION_ON_PREVIOUS_TEXT: bool = False
 
-    # faster-whisper内蔵のVADフィルタで無音区間の誤認識を抑制する
-    WHISPER_VAD_FILTER: bool = True
+    # faster-whisper内蔵のVADフィルタで無音区間の誤認識を抑制する。
+    # audio_capturer.py側で既にVAD区切り済みのためデフォルトはFalse(二重VADの無駄な処理時間を省く)
+    WHISPER_VAD_FILTER: bool = False
 
     # 字幕フォントファミリー
     SUBTITLE_FONT_FAMILY: str = "Arial"

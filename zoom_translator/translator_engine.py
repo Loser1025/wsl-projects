@@ -30,23 +30,71 @@ class TranslatorEngine:
             source_lang = self.config.SOURCE_LANG
             target_lang = self.config.TARGET_LANG
 
-            installed_packages = argostranslate.package.get_installed_packages()
-            package_found = any(
-                p.from_code == source_lang and p.to_code == target_lang
-                for p in installed_packages
-            )
-
-            if not package_found:
-                argostranslate.package.update_package_index()
-                available_packages = argostranslate.package.get_available_packages()
-                target_package = next(
-                    (p for p in available_packages if p.from_code == source_lang and p.to_code == target_lang),
-                    None
+            # ステップ1: 直接の言語ペアパッケージ（例: source_lang -> target_lang）がインストール済みか確認し、なければインストールする
+            try:
+                installed_packages = argostranslate.package.get_installed_packages()
+                package_found = any(
+                    p.from_code == source_lang and p.to_code == target_lang
+                    for p in installed_packages
                 )
-                if target_package:
-                    download_path = target_package.download()
-                    argostranslate.package.install_from_path(download_path)
 
+                if not package_found:
+                    argostranslate.package.update_package_index()
+                    available_packages = argostranslate.package.get_available_packages()
+                    target_package = next(
+                        (p for p in available_packages if p.from_code == source_lang and p.to_code == target_lang),
+                        None
+                    )
+                    if target_package:
+                        download_path = target_package.download()
+                        argostranslate.package.install_from_path(download_path)
+            except Exception:
+                # 一部の処理が失敗してもクラッシュさせない
+                pass
+
+            # ステップ2: 直接パッケージが見つからない、またはインストールできない場合で、ソース言語やターゲット言語が英語("en")以外の場合、英語経由のピボット翻訳（source_lang -> "en" および "en" -> target_lang）を確認・インストールする
+            if source_lang != "en" or target_lang != "en":
+                # ソースから英語へのパッケージ確認・インストール
+                if source_lang != "en":
+                    try:
+                        installed_packages = argostranslate.package.get_installed_packages()
+                        src_en_found = any(
+                            p.from_code == source_lang and p.to_code == "en"
+                            for p in installed_packages
+                        )
+                        if not src_en_found:
+                            available_packages = argostranslate.package.get_available_packages()
+                            src_en_pkg = next(
+                                (p for p in available_packages if p.from_code == source_lang and p.to_code == "en"),
+                                None
+                            )
+                            if src_en_pkg:
+                                download_path = src_en_pkg.download()
+                                argostranslate.package.install_from_path(download_path)
+                    except Exception:
+                        pass
+
+                # 英語からターゲットへのパッケージ確認・インストール
+                if target_lang != "en":
+                    try:
+                        installed_packages = argostranslate.package.get_installed_packages()
+                        en_tgt_found = any(
+                            p.from_code == "en" and p.to_code == target_lang
+                            for p in installed_packages
+                        )
+                        if not en_tgt_found:
+                            available_packages = argostranslate.package.get_available_packages()
+                            en_tgt_pkg = next(
+                                (p for p in available_packages if p.from_code == "en" and p.to_code == target_lang),
+                                None
+                            )
+                            if en_tgt_pkg:
+                                download_path = en_tgt_pkg.download()
+                                argostranslate.package.install_from_path(download_path)
+                    except Exception:
+                        pass
+
+            # ステップ3: 初回初期化フラグをTrueに設定
             self._argos_initialized = True
 
     def transcribe(self, audio_np: np.ndarray) -> str:
