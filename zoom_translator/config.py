@@ -40,6 +40,32 @@ class Config:
     # ウィンドウの透明度（0.0〜1.0）
     WINDOW_ALPHA: float = 0.8
 
+    # --- VAD（音声区切り検出）関連設定 ---
+    # webrtcvadの0-3感度（数値が大きいほど非音声と判定しやすくなる）
+    VAD_AGGRESSIVENESS: int = 2
+    # webrtcvadが要求するフレーム長ミリ秒（10, 20, 30のいずれか）
+    VAD_FRAME_MS: int = 30
+    # 無音がこのミリ秒以上続いたら発話区切りとみなす
+    VAD_SILENCE_MS: int = 500
+    # 無音が来なくても強制的にチャンクを区切る上限秒数
+    MAX_SEGMENT_SEC: float = 8.0
+    # これより短い音声はノイズとして破棄する秒数
+    MIN_SEGMENT_SEC: float = 0.5
+
+    # --- 文単位バッファリング関連設定 ---
+    # 文末とみなす記号文字列
+    SENTENCE_END_CHARS: str = ".?!"
+    # 句読点が来なくても強制的に翻訳に回す最大待ち秒数
+    SENTENCE_MAX_WAIT_SEC: float = 6.0
+
+    # --- GUI関連設定 ---
+    # GUIウィンドウの幅（px）
+    GUI_WINDOW_WIDTH: int = 900
+    # GUIウィンドウの高さ（px）
+    GUI_WINDOW_HEIGHT: int = 180
+    # 画面下端からの余白（px）
+    GUI_BOTTOM_MARGIN: int = 60
+
 
 # モジュールレベルのデフォルト設定インスタンス
 default_config = Config()
