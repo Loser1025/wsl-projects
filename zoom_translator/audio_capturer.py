@@ -12,7 +12,7 @@ try:
 except ImportError:
     sc = None
 
-from zoom_translator.config import Config, default_config
+from config import Config, default_config
 
 
 class AudioCapturer:

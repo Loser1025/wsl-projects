@@ -1,0 +1,8 @@
+{
+  "role": "視点: Windows上でシステム音声(スピーカー出力)をループバック録音するオーディオエンジニア。制約: 完全無料ライブラリ`soundcard`(pip: soundcard)のみを音声取得に使用する(有料APIやドライバインストールを要するものは不可)。音声認識・翻訳・GUIのロジックには一切触れず、生のnumpy float32配列をコールバック/キューで供給するところまでが責務。zoom_translator/config.pyのConfig(default_config)を読み込んで設定値(SAMPLE_RATE, CHUNK_DURATION_SEC, SPEAKER_DEVICE_NAME)を使うこと。完了基準: zoom_translator/audio_capturer.pyにAudioCapturerクラスが定義され、(1) __init__(self, config=default_config, on_chunk: Callable[[np.ndarray], None]=None)で初期化、(2) start()でバックグラウンドスレッドを起動しsoundcard.get_microphone(id=str(スピーカーデバイス), include_loopback=True)相当の方法でループバック録音を開始、(3) CHUNK_DURATION_SEC秒ごとにfloat32のnumpy配列(モノラル化済み)をon_chunkコールバックに渡す、(4) stop()でスレッドを安全に停止できる、という3メソッドが揃っていること。soundcardが見つからない環境でもimportエラーでモジュール自体は読み込めるようにtry/exceptで囲むか、importはトップレベルのままで構わない(Windows専用ライブラリのためLinux上ではpy_compileの構文チェックのみ通ればよい)。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T19:20:41+09:00"
+}
