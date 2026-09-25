@@ -72,7 +72,9 @@ class TranslatorEngine:
         segments, info = self._whisper_model.transcribe(
             audio_np,
             language=self.config.SOURCE_LANG,
-            beam_size=5
+            beam_size=self.config.BEAM_SIZE,
+            condition_on_previous_text=self.config.WHISPER_CONDITION_ON_PREVIOUS_TEXT,
+            vad_filter=self.config.WHISPER_VAD_FILTER
         )
 
         transcript_text = " ".join([segment.text.strip() for segment in segments]).strip()

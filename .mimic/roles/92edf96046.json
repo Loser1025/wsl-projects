@@ -1,0 +1,8 @@
+{
+  "role": "視点: 音声認識精度のチューニングを担当するMLエンジニア。制約: zoom_translator/config.pyの既存Config dataclassの既存フィールドは削除しない(WHISPER_MODEL_SIZEの値のみ変更可)。他ファイルには触れない。完了基準: (1) 既存のWHISPER_MODEL_SIZEのデフォルト値を\"small\"から\"large-v3\"に変更する(中国語・韓国語などの非英語言語での認識精度を最優先するため)。(2) 新しいフィールドとしてBEAM_SIZE(int, デフォルト8, ビームサーチの探索幅、大きいほど精度が上がるが遅くなる)、WHISPER_CONDITION_ON_PREVIOUS_TEXT(bool, デフォルトFalse, VADで切り出した短い音声チャンクでは前チャンクの文脈を引きずるとハルシネーション(存在しない文の混入)が起きやすいためFalseにする)、WHISPER_VAD_FILTER(bool, デフォルトTrue, faster-whisper内蔵のVADフィルタで無音区間の誤認識を抑制する)を追加し、default_configにも反映する。各フィールドに日本語コメントで用途と理由を説明すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T21:08:29+09:00"
+}

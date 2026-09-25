@@ -1,6 +1,0 @@
-{
-  "role": "視点: Google Workspace MCP および Google Sheets 連携の専門家。\n制約: \n1. 読み取り専用のファイル確認およびMCP（google-workspace-mcp）の構成確認のみを行うこと。\n2. 外部への書き込みや危険なコマンド実行は行わないこと。\n完了基準:\n1. /home/loser/wsl-projects/google-workspace-mcp/ の存在やビルド状態、クレデンシャルの有無を確認し報告すること。\n2. 指定されたスプレッドシートID (1aFB2O37w-Dh0RmN_W2CultjS1X4Vb7LqxbKMb99UVp4) に対してGoogle Workspace MCPのツールでアクセスできる環境が整っているか評価すること。",
-  "uses": 1,
-  "mode": "read",
-  "last_used": "2026-09-14T15:59:30+09:00"
-}
