@@ -49,30 +49,25 @@ class TranslatorEngine:
 
             self._argos_initialized = True
 
-    def transcribe_and_translate(self, audio_np: np.ndarray) -> Tuple[str, str]:
+    def transcribe(self, audio_np: np.ndarray) -> str:
         """
         numpy配列の音声データを入力として受け取り、
-        faster-whisperで音声認識（文字起こし）を行い、
-        argos-translateでターゲット言語へ翻訳して (認識テキスト, 翻訳テキスト) を返す。
+        faster-whisperで音声認識（文字起こし）を行い、認識結果テキストを返す。
+        空または無音の場合は空文字を返す。
 
         Args:
             audio_np (np.ndarray): float32型、config.SAMPLE_RATEのモノラル音声配列
 
         Returns:
-            Tuple[str, str]: (認識結果テキスト, 翻訳結果テキスト)
+            str: 認識されたテキスト（無音・空の場合は空文字）
         """
         if audio_np is None or audio_np.size == 0:
-            return ("", "")
+            return ""
 
         if not np.any(audio_np):
-            return ("", "")
+            return ""
 
         self._load_whisper()
-
-        try:
-            self._ensure_argos_package()
-        except Exception:
-            pass
 
         segments, info = self._whisper_model.transcribe(
             audio_np,
@@ -81,19 +76,35 @@ class TranslatorEngine:
         )
 
         transcript_text = " ".join([segment.text.strip() for segment in segments]).strip()
+        return transcript_text
 
-        if not transcript_text:
-            return ("", "")
+    def translate(self, text: str) -> str:
+        """
+        与えられたテキストを config.SOURCE_LANG から config.TARGET_LANG へ
+        argos-translate で翻訳して返す。
+        空文字入力なら空文字を返す。翻訳失敗時は元のテキストをそのまま返す。
 
-        translated_text = transcript_text
+        Args:
+            text (str): 翻訳対象のテキスト
+
+        Returns:
+            str: 翻訳されたテキスト（失敗時または空文字の場合はそのまま）
+        """
+        if not text:
+            return ""
+
+        try:
+            self._ensure_argos_package()
+        except Exception:
+            pass
+
         try:
             import argostranslate.translate
             translated_text = argostranslate.translate.translate(
-                transcript_text,
+                text,
                 self.config.SOURCE_LANG,
                 self.config.TARGET_LANG
             )
+            return translated_text
         except Exception:
-            translated_text = transcript_text
-
-        return (transcript_text, translated_text)
+            return text

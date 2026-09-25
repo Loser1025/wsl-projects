@@ -1,0 +1,8 @@
+{
+  "role": "視点: Windows上でのリアルタイム音声区切り検出(VAD)を専門とするオーディオエンジニア。制約: 音声取得はsoundcard、発話区切り検出は`webrtcvad`(pip: webrtcvad)のみを使用する。翻訳・GUIロジックには一切触れない。zoom_translator/config.pyとは同一ディレクトリのフラットな`from config import Config, default_config`形式でインポートすること。webrtcvadはint16 PCMモノラルの16kHz/8kHz/32kHz/48kHzかつ10/20/30msフレーム単位でしか動かない点に注意し、soundcardから取得したfloat32データをint16 PCMバイト列に変換してからvad.is_speech(frame_bytes, sample_rate)に渡すこと。完了基準: zoom_translator/audio_capturer.pyのAudioCapturerクラスが、固定時間チャンクではなく以下のロジックで動くよう書き換えられていること: (1) config.VAD_FRAME_MSごとの小フレームを継続的に録音してwebrtcvad.Vad(config.VAD_AGGRESSIVENESS)で発話/無音を判定する、(2) 発話フレームが検出されている間はfloat32フレームをセグメントバッファに蓄積する、(3) 発話開始後、連続無音がconfig.VAD_SILENCE_MS以上続いたら、セグメントの長さがconfig.MIN_SEGMENT_SEC以上ならそのセグメント(float32 numpy配列、連結済み)をon_chunkコールバックに渡してバッファをリセットする(config.MIN_SEGMENT_SEC未満ならノイズとして破棄してリセットのみ)、(4) 発話が途切れずconfig.MAX_SEGMENT_SECを超えた場合は無音を待たず強制的にその時点のセグメントをon_chunkに渡してリセットする(青天井にならないためのフェイルセーフ)、(5) start()/stop()の公開インターフェースは変更しない。soundcard未インストール環境でもimportエラーにならないよう既存のtry/except構造は維持すること。日本語コメントで各処理を説明すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T20:29:30+09:00"
+}

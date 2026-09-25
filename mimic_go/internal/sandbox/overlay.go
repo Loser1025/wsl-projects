@@ -50,6 +50,12 @@ var noiseDirNames = map[string]bool{
 	"node_modules":  true,
 	".mypy_cache":   true,
 	".ruff_cache":   true,
+	// .git: Workerがコンテキスト探索中に`git status`相当を走らせるだけでも
+	// index refresh(実質無害なキャッシュ更新)が発生し、無関係な兄弟リポジトリの
+	// .git/indexまで「変更ファイル」として検出されてしまうため除外する
+	// （プロジェクト内で.gitへの意図的な変更が必要なケースはAutoGit経由の
+	// チェックポイントが担うため、specialist経由の適用対象にする必要はない）。
+	".git": true,
 }
 
 // noiseFileExts は拡張子のみで判定するノイズファイル（コンパイル済みキャッシュ等）。
