@@ -1,0 +1,8 @@
+{
+  "role": "視点: リアルタイムパイプラインのスレッド設計を担当するエンジニア。制約: config.py, audio_capturer.py, translator_engine.py, sentence_buffer.py, gui.pyのインターフェースは一切変更しない。main.pyのみを変更する。既存のログ抑制設定(httpx等)やwindow.set_on_close等の既存動作は維持する。完了基準: 現在main.pyのhandle_audio_chunk(AudioCapturerのon_chunkコールバック)内で同期的に実行されているtranslator_engine.transcribe()・sentence_buffer.add_fragment()・translator_engine.translate()の重い処理を、別スレッドに移すこと。具体的には: (1) audio_queue = queue.Queue() を新設する。(2) handle_audio_chunk(AudioCapturerに渡すコールバック)は、audio_chunkをaudio_queue.put(audio_chunk)するだけの軽量処理にし、即座にreturnする(録音スレッドをブロックしない)。(3) 新たにstt_worker()という関数を定義し、無限ループでaudio_queue.get()しつつ、これまでhandle_audio_chunkが行っていたtranscribe→add_fragment→(文が完成したら)translate→result_queue.put(...)の処理を行う。例外はtry/exceptで保護し処理を継続する。(4) start_pipeline()内で、既存のpipeline_worker用スレッドに加えて、stt_worker用のバックグラウンドスレッド(daemon=True)も起動する。(5) on_closing()でのクリーンアップは既存のresult_queue.put(None)に加え、audio_queue側にも終端シグナル(None)を入れ、stt_worker側もNoneを受け取ったらループを抜けるようにする。日本語コメントで変更意図を説明すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T21:47:05+09:00"
+}

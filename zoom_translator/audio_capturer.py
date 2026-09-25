@@ -90,113 +90,84 @@ class AudioCapturer:
             print(f"[AudioCapturer Error] Unsupported VAD frame ms: {vad_frame_ms}. Supported: 10, 20, 30")
             return
 
-        vad_silence_ms = self.config.VAD_SILENCE_MS
+        # webrtcvad初期化
+        vad = webrtcvad.Vad(vad_aggressiveness)
+
+        # 1フレームあたりのサンプル数 (例: 16000Hz * 0.03s = 480 samples)
+        frame_samples = int(sample_rate * (vad_frame_ms / 1000.0))
+        # 1フレームあたりのバイト数 (16bit PCM = 2 bytes per sample)
+        frame_bytes = frame_samples * 2
+
+        # VADパラメータ設定
+        silence_ms = self.config.VAD_SILENCE_MS
         max_segment_sec = self.config.MAX_SEGMENT_SEC
         min_segment_sec = self.config.MIN_SEGMENT_SEC
 
-        # 1小フレームあたりのサンプル数 (例: 16000Hz * 0.03s = 480 サンプル)
-        frame_samples = int(sample_rate * vad_frame_ms / 1000)
+        required_silent_frames = int(silence_ms / vad_frame_ms)
+
+        print(f"[AudioCapturer] Starting VAD recording. Device: {device_name or 'Default'}, Sample Rate: {sample_rate}Hz, VAD Mode: {vad_aggressiveness}")
 
         try:
-            # webrtcvadインスタンスの初期化
-            vad = webrtcvad.Vad(vad_aggressiveness)
-
-            # スピーカーデバイスの取得
+            # スピーカーデバイスの取得（loopback=True）
+            speaker = None
             if device_name:
-                speaker = sc.get_microphone(id=str(device_name), include_loopback=True)
-            else:
-                # デフォルトのスピーカー（ループバック用）を取得
-                speaker = sc.default_speaker()
-                if speaker is None:
-                    print("[AudioCapturer Error] Default speaker not found.")
-                    return
                 try:
-                    speaker = sc.get_microphone(speaker.name, include_loopback=True)
-                except Exception:
-                    mics = sc.all_speakers(include_loopback=True)
-                    if mics:
-                        speaker = mics[0]
-                    else:
-                        raise RuntimeError("No loopback speaker device available.")
+                    speakers = sc.all_speakers(include_loopback=True)
+                    for s in speakers:
+                        if device_name.lower() in s.name.lower():
+                            speaker = s
+                            break
+                    if speaker is None:
+                        print(f"[AudioCapturer Warning] Speaker device '{device_name}' not found. Falling back to default loopback.")
+                except Exception as e:
+                    print(f"[AudioCapturer Warning] Failed to find speaker '{device_name}': {e}. Falling back to default.")
 
-            print(f"[AudioCapturer] Starting VAD recording from speaker: {speaker.name} (Sample Rate: {sample_rate}Hz, Frame: {vad_frame_ms}ms, Aggressiveness: {vad_aggressiveness})")
+            if speaker is None:
+                speaker = sc.default_speaker(include_loopback=True)
 
-            # セグメント管理用の変数
-            segment_frames = []  # float32の小フレーム配列のリスト
-            in_speech = False
-            silent_frames_count = 0
-            # 無音判定に必要な連続無音フレーム数
-            required_silent_frames = int(vad_silence_ms / vad_frame_ms)
-            if required_silent_frames < 1:
-                required_silent_frames = 1
+            # soundcardのレコーダーを開始
+            # blocksizeはframe_samplesに合わせるのが効率的
+            with speaker.recorder(samplerate=sample_rate, channels=1, blocksize=frame_samples) as recorder:
+                segment_frames = []
+                in_speech = False
+                silent_frames_count = 0
+                current_segment_duration = 0.0
 
-            current_segment_duration = 0.0
-
-            # soundcardのレコーダーを起動 (フレーム単位またはブロック単位で取得)
-            with speaker.recorder(samplerate=sample_rate) as recorder:
                 while self._running:
-                    # 1小フレーム分の音声データを取得 (float32, 2ch等の可能性があるため録音時はframe_samples分取得)
+                    # 録音ブロック取得 (float32, shape=(blocksize, 1))
                     data = recorder.record(numframes=frame_samples)
                     if data is None or len(data) == 0:
-                        time.sleep(0.005)
                         continue
 
-                    # ステレオ(またはマルチチャンネル)の場合はモノラルに変換（平均を取る）
-                    if data.ndim > 1 and data.shape[1] > 1:
-                        mono_data = np.mean(data, axis=1)
-                    else:
-                        mono_data = data.flatten()
+                    # モノラルに変換（既に1chだが念のためflatten）
+                    audio_float32 = data.flatten()
 
-                    # float32のnumpy配列として保証
-                    mono_data = mono_data.astype(np.float32)
+                    # webrtcvad用に対象フレームをint16 PCM (bytes) に変換
+                    # float32 (-1.0 ~ 1.0) -> int16 (-32768 ~ 32767)
+                    audio_int16 = np.clip(audio_float32 * 32768.0, -32768, 32767).astype(np.int16)
+                    pcm_data = audio_int16.tobytes()
 
-                    # webrtcvadに渡すためint16 PCMバイト列に変換
-                    # float32 (-1.0 ~ 1.0) を int16 (-32768 ~ 32767) にスケーリングしてクリップ
-                    audio_int16 = (mono_data * 32767.0).clip(-32768, 32767).astype(np.int16)
-                    frame_bytes = audio_int16.tobytes()
-
-                    # webrtcvadで発話判定
+                    # VAD判定
                     try:
-                        is_speech = vad.is_speech(frame_bytes, sample_rate)
+                        is_speech = vad.is_speech(pcm_data, sample_rate)
                     except Exception as e:
-                        # ま稀にフレームサイズ違反等のエラーが出た場合のフォールバック
-                        is_speech = False
+                        # 不正なフレーム長などの例外を防ぐ
+                        continue
 
                     frame_duration = vad_frame_ms / 1000.0
 
                     if is_speech:
                         if not in_speech:
-                            # 発話開始
                             in_speech = True
-                            segment_frames = []
-                            current_segment_duration = 0.0
-                        
-                        segment_frames.append(mono_data)
-                        current_segment_duration += frame_duration
+                            # 発話開始：先行バッファ（もし持たせるなら）等。今回は即座にセグメント追加開始
+                        segment_frames.append(audio_float32)
                         silent_frames_count = 0
-
-                        # (4) 発話が途切れず MAX_SEGMENT_SEC を超えた場合のフェイルセーフ
-                        if current_segment_duration >= max_segment_sec:
-                            if segment_frames:
-                                combined_segment = np.concatenate(segment_frames)
-                                if len(combined_segment) >= int(sample_rate * min_segment_sec):
-                                    if self.on_chunk is not None:
-                                        try:
-                                            self.on_chunk(combined_segment)
-                                        except Exception as e:
-                                            print(f"[AudioCapturer Error] Exception in on_chunk callback: {e}")
-                            # バッファ・状態のリセット
-                            segment_frames = []
-                            in_speech = False
-                            silent_frames_count = 0
-                            current_segment_duration = 0.0
-
+                        current_segment_duration += frame_duration
                     else:
-                        # 無音フレーム
                         if in_speech:
-                            segment_frames.append(mono_data)
-                            current_segment_duration += frame_duration
+                            segment_frames.append(audio_float32)
                             silent_frames_count += 1
+                            current_segment_duration += frame_duration
 
                             # (3) 連続無音が VAD_SILENCE_MS 以上続いたらセグメント確定
                             if silent_frames_count >= required_silent_frames:
@@ -221,9 +192,49 @@ class AudioCapturer:
                             # 非発話中かつ無音の場合は何もしない（あるいは無駄なバッファリングなし）
                             pass
 
+                    # (2) 最大秒数 MAX_SEGMENT_SEC を超えた場合のフェイルセーフ
+                    if in_speech and current_segment_duration >= max_segment_sec:
+                        print(f"[AudioCapturer] Max segment duration ({max_segment_sec}s) reached. Forcing chunk emission.")
+                        if segment_frames:
+                            combined_segment = np.concatenate(segment_frames)
+                            if len(combined_segment) >= int(sample_rate * min_segment_sec):
+                                if self.on_chunk is not None:
+                                    try:
+                                        self.on_chunk(combined_segment)
+                                    except Exception as e:
+                                        print(f"[AudioCapturer Error] Exception in on_chunk callback: {e}")
+                        segment_frames = []
+                        in_speech = False
+                        silent_frames_count = 0
+                        current_segment_duration = 0.0
+
         except Exception as e:
             print(f"[AudioCapturer Error] Exception in capture loop: {e}")
         finally:
             # 停止時に未処理のバッファがあれば必要に応じてフラッシュ（オプション、今回は破棄または処理）
             self._running = False
             print("[AudioCapturer] VAD recording stopped.")
+
+
+def list_speaker_devices() -> list[str]:
+    """
+    soundcardライブラリを使用してループバック可能なスピーカーデバイスの名前一覧を取得する。
+    soundcard未インストール環境や取得失敗時は例外を投げずに空リストを返す。
+
+    Returns:
+        list[str]: スピーカーデバイス名のリスト
+    """
+    if sc is None:
+        return []
+    try:
+        devices = sc.all_speakers(include_loopback=True)
+        names = []
+        for dev in devices:
+            if hasattr(dev, 'name') and dev.name:
+                names.append(dev.name)
+            elif isinstance(dev, str):
+                names.append(dev)
+        return names
+    except Exception as e:
+        print(f"[AudioCapturer Error] Failed to list speaker devices: {e}")
+        return []
