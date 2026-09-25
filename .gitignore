@@ -40,6 +40,9 @@ mimic_tui/mimic.log
 # Windows Zone.Identifier files (WSL downloads)
 *:Zone.Identifier
 
+# zoom_translator ランタイム生成物
+zoom_translator/settings.json
+
 # GCP service account credentials
 slides_design_tool/credentials.json
 customer-calendar-app/firebase-service-account.json

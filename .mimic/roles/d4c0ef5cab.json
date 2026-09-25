@@ -1,0 +1,8 @@
+{
+  "role": "視点: 設定永続化を担当するエンジニア。制約: zoom_translator/config.pyのConfig dataclassの定義は変更しない(フィールド追加・削除もしない)。他ファイルには触れない。zoom_translator/config.pyとは同一ディレクトリのフラットな`from config import Config, default_config`形式でインポートすること。完了基準: zoom_translator/settings_store.py を新規作成し、以下を実装すること。(1) SETTINGS_FILE_PATH = 実行ディレクトリ基準で\"settings.json\"のパス(os.path.join(os.path.dirname(os.path.abspath(__file__)), \"settings.json\"))を定数として定義。(2) save_settings(config: Config) -\u003e None: config.SOURCE_LANG, config.TARGET_LANG, config.SPEAKER_DEVICE_NAMEの3つの値をJSON形式でSETTINGS_FILE_PATHに書き出す(書き込み失敗時は例外を握りつぶしログ出力のみ、呼び出し元をクラッシュさせない)。(3) load_settings(config: Config) -\u003e None: SETTINGS_FILE_PATHが存在すればJSONを読み込み、含まれるキー(source_lang, target_lang, speaker_device_name)があればconfigオブジェクトの対応フィールド(SOURCE_LANG, TARGET_LANG, SPEAKER_DEVICE_NAME)にその場で代入する(configは呼び出し元と共有される同一インスタンスなので、新しいConfigを作って返すのではなく、渡されたconfigインスタンスのフィールドを直接書き換えること)。ファイルが存在しない場合や読み込み失敗時は何もせず静かに終了する(例外を投げない)。日本語コメントで各処理を説明すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T21:56:23+09:00"
+}
