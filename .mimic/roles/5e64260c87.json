@@ -1,0 +1,8 @@
+{
+  "role": "視点: 複数モジュールを統合するアプリケーション統合エンジニア。制約: 既存のzoom_translator/config.py(Config, default_config)、zoom_translator/audio_capturer.py(AudioCapturer)、zoom_translator/translator_engine.py(TranslatorEngine)、zoom_translator/gui.py(SubtitleWindow)の各クラスのインターフェースを一切変更せず、それらをフラットな`from config import ...`形式のインポートで組み合わせて呼び出すだけに専念すること。新しいロジック(音声処理や翻訳アルゴリズムの変更)は追加しない。完了基準: zoom_translator/main.pyが作成され、(1) queueモジュールでスレッド間受け渡し用のqueue.Queueを用意、(2) AudioCapturerのon_chunkコールバックで受け取った音声チャンクをTranslatorEngine.transcribe_and_translate()にかけてキューへ翻訳結果テキストを積むバックグラウンド処理(別スレッドまたはon_chunk内で直接処理でも可)、(3) SubtitleWindowをメインスレッドで生成し、tkinterのafter()で定期的にキューをポーリングしupdate_subtitle()を呼ぶ、(4) AudioCapturer.start()でアプリ開始、ウィンドウクローズ時にAudioCapturer.stop()を呼ぶ、(5) if __name__ == '__main__':でアプリを起動する、という構成になっていること。例外発生時にアプリ全体が落ちないよう主要箇所をtry/exceptで保護すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T19:32:50+09:00"
+}

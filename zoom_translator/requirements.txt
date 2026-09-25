@@ -1,0 +1,11 @@
+# システム音声(スピーカー出力)のループバック録音用
+soundcard
+
+# 音声認識(STT) - 完全ローカル実行、無料
+faster-whisper
+
+# 翻訳 - 完全オフライン実行、無料、APIキー不要
+argostranslate
+
+# 数値配列処理
+numpy
