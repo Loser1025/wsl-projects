@@ -7,9 +7,9 @@
   },
   "/home/loser/wsl-projects": {
     "cmd": "python3 -m py_compile zoom_translator/main.py",
-    "passes": 2,
+    "passes": 3,
     "fails": 0,
-    "last_used": "2026-09-25T19:37:42+09:00"
+    "last_used": "2026-09-25T20:02:20+09:00"
   },
   "/home/loser/wsl-projects/google-workspace-mcp": {
     "cmd": "node -e \"console.log('Full scan up to 10k rows ready')\"",

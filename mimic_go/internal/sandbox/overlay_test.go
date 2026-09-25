@@ -82,6 +82,55 @@ func TestWorkroom_CopyMode_NewModifiedDeletedRoundTrip(t *testing.T) {
 	}
 }
 
+func TestWorkroom_CopyMode_NoiseFilesExcludedFromChangedAndApply(t *testing.T) {
+	lower := t.TempDir()
+	if err := os.WriteFile(filepath.Join(lower, "a.txt"), []byte("keep me\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	w := newCopyModeWorkroom(t, lower)
+	ctx := context.Background()
+
+	// __pycache__配下の.pycと.DS_Storeを生成しつつ、本物の変更(real.txt)も混ぜる
+	res, err := w.Run(ctx, "mkdir -p __pycache__ && echo x > __pycache__/mod.cpython-314.pyc && "+
+		"echo x > stray.pyc && echo x > .DS_Store && echo hi > real.txt", 10*time.Second)
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if res.TimedOut || res.ExitCode != 0 {
+		t.Fatalf("Run結果が異常: %+v", res)
+	}
+
+	changed, err := w.ChangedFiles()
+	if err != nil {
+		t.Fatalf("ChangedFiles failed: %v", err)
+	}
+	for _, f := range changed {
+		if isNoisePath(f) {
+			t.Errorf("ノイズファイルがChangedFilesに含まれている: %s", f)
+		}
+	}
+	if len(changed) != 1 || changed[0] != "real.txt" {
+		t.Fatalf("changed = %v, want [real.txt]", changed)
+	}
+
+	if err := ApplyChanges(w, changed); err != nil {
+		t.Fatalf("ApplyChanges failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(lower, "__pycache__")); !os.IsNotExist(err) {
+		t.Errorf("__pycache__がホスト側に適用されてしまっている (err=%v)", err)
+	}
+	if _, err := os.Stat(filepath.Join(lower, "stray.pyc")); !os.IsNotExist(err) {
+		t.Errorf("stray.pycがホスト側に適用されてしまっている (err=%v)", err)
+	}
+	if _, err := os.Stat(filepath.Join(lower, ".DS_Store")); !os.IsNotExist(err) {
+		t.Errorf(".DS_Storeがホスト側に適用されてしまっている (err=%v)", err)
+	}
+	if _, err := os.Stat(filepath.Join(lower, "real.txt")); err != nil {
+		t.Errorf("real.txtが適用されていない: %v", err)
+	}
+}
+
 func TestWorkroom_ModeNote_CopyModeWarns(t *testing.T) {
 	lower := t.TempDir()
 	w := newCopyModeWorkroom(t, lower)

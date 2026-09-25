@@ -40,6 +40,46 @@ var applyExcludedPaths = map[string]bool{
 	".mimic/checkpoint.json": true,
 }
 
+// noiseDirNames はWorker実行時の副産物として生成されるが本質的に無価値な
+// ディレクトリ名。expected_filesの指定有無に関わらず常時、変更検出の時点で
+// 除外する（zoom_translator委任タスクで__pycache__がホストへ無差別適用され
+// 散乱した実運用上の問題を受けて追加）。
+var noiseDirNames = map[string]bool{
+	"__pycache__":   true,
+	".pytest_cache": true,
+	"node_modules":  true,
+	".mypy_cache":   true,
+	".ruff_cache":   true,
+}
+
+// noiseFileExts は拡張子のみで判定するノイズファイル（コンパイル済みキャッシュ等）。
+var noiseFileExts = map[string]bool{
+	".pyc": true,
+	".pyo": true,
+}
+
+// noiseFileNames はファイル名そのもので判定するノイズファイル。
+var noiseFileNames = map[string]bool{
+	".DS_Store": true,
+}
+
+// isNoisePath はrel（プロジェクトルートからの相対パス）がビルド/実行キャッシュ等の
+// ノイズかどうかを判定する。changedFiles/changedFilesCopyの走査時点で弾くため、
+// ApplyChangesにも一切渡らずホストを汚さない。
+func isNoisePath(rel string) bool {
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	for _, dir := range parts[:len(parts)-1] {
+		if noiseDirNames[dir] {
+			return true
+		}
+	}
+	base := parts[len(parts)-1]
+	if noiseFileNames[base] || noiseFileExts[filepath.Ext(base)] {
+		return true
+	}
+	return false
+}
+
 // Mode はサンドボックスの実行方式。
 type Mode string
 
@@ -381,6 +421,9 @@ func changedFilesCopy(lower, merged string) ([]string, error) {
 		if err != nil {
 			return nil
 		}
+		if isNoisePath(rel) {
+			return nil
+		}
 		mergedData, err := os.ReadFile(path)
 		if err != nil {
 			return nil
@@ -440,6 +483,9 @@ func changedFiles(upper string) ([]string, error) {
 		// 現れる。Go標準のos.FileInfoからは種別を判定しづらいため、
 		// サイズ0かつModeがchardeviceかで判定する簡易版とする。
 		if info.Mode()&os.ModeCharDevice != 0 {
+			return nil
+		}
+		if isNoisePath(rel) {
 			return nil
 		}
 		changed = append(changed, rel)

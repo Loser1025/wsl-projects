@@ -1,0 +1,8 @@
+{
+  "role": "視点: PyInstallerによるWindows向け配布パッケージングを専門とするビルドエンジニア。制約: アプリのソースコード(config.py, audio_capturer.py, translator_engine.py, gui.py, main.py)は一切変更しない。ビルド関連ファイルの新規追加のみに専念する。方針は「初回ダウンロード方式」: exe自体にはWhisper/argos-translateのモデルを同梱せず、初回起動時にアプリ側(translator_engine.py)が自動ダウンロードする既存の遅延初期化ロジックにそのまま任せる(exeを軽量に保つ)。完了基準: (1) zoom_translator/requirements-build.txtにpyinstallerを追記(ランタイム用requirements.txtとは分離)、(2) zoom_translator/build.batを作成し、pip install -r requirements.txt -r requirements-build.txt の実行、続けてpyinstaller --onefile --windowed --name ZoomTranslator --collect-all faster_whisper --collect-all ctranslate2 --collect-all av --collect-all argostranslate --collect-all soundcard --collect-all sounddevice main.py のような形でmain.pyから単一exeをビルドするコマンドを実行するバッチファイルになっていること(soundcardが依存する場合のみsounddeviceも考慮、不要なら含めなくてよい)。バッチ内は日本語コメントで各ステップを説明し、echoで進捗を表示すること。ビルド成果物はdist\\ZoomTranslator.exeに出力される想定。python3構文チェックは対象外(.batファイルのため)なので、verify_cmdの代わりにcat等でファイル内容が矛盾なく記述されていることを確認すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T19:37:42+09:00"
+}
