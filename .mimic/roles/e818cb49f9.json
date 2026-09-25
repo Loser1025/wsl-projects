@@ -1,0 +1,8 @@
+{
+  "role": "視点: 音声認識(STT)・翻訳パイプラインを保守するMLエンジニア。制約: faster-whisper/argos-translateの使用方針・モデルロード方式(遅延初期化)は変更しない。audio_capturer.py, gui.py, main.pyには一切触れない(このタスクではtranslator_engine.pyのみ変更する)。zoom_translator/config.pyとは同一ディレクトリのフラットな`from config import Config, default_config`形式でインポートすること。完了基準: zoom_translator/translator_engine.pyのTranslatorEngineクラスから既存のtranscribe_and_translate(audio_np)メソッドを削除し、代わりに以下の2メソッドに分割すること。(1) transcribe(self, audio_np: np.ndarray) -\u003e str: 音声認識のみを行い、認識結果テキスト(空/無音なら空文字)を返す。内部で_load_whisper()を呼び、faster-whisperのtranscribeを実行しsegmentsを結合したテキストを返す処理は既存ロジックを踏襲する。(2) translate(self, text: str) -\u003e str: 与えられたテキストをconfig.SOURCE_LANGからconfig.TARGET_LANGへargos-translateで翻訳したテキストを返す(空文字入力なら空文字を返す、翻訳失敗時は元のtextをそのまま返すフォールバックも既存同様に維持)。_load_whisper()と_ensure_argos_package()の遅延初期化ヘルパーはそのまま維持してよい。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T20:32:50+09:00"
+}
