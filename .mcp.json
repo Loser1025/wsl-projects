@@ -29,6 +29,15 @@
       ],
       "env": {}
     },
+    "mimic-go": {
+      "type": "stdio",
+      "command": "/home/loser/wsl-projects/mimic_go/mimic-go",
+      "args": [
+        "--mcp-server",
+        "--env",
+        "/home/loser/wsl-projects/mimic_go/.env"
+      ]
+    },
     "bigquery": {
       "command": "/home/loser/wsl-projects/Medicaldepartment/.venv/bin/python",
       "args": [

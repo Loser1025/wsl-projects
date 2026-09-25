@@ -1,0 +1,6 @@
+{
+  "role": "視点: ObsidianのVault構造とマークダウン編集の専門家。\n制約: \n1. `/home/loser/obsidian-vault/クリニックSNS運用/` 配下に「韓国SNS・プラットフォーム戦略.md」という新しいノートを作成する。\n2. 先ほどまとめた韓国SNSトレンド（X・Threads）、NAVER、江南オンニの活用戦略の内容を綺麗に記述する。\n3. `agents/mimic/` ではなく指示通り指定されたディレクトリ内に正しく書き込むこと。\n完了基準: `/home/loser/obsidian-vault/クリニックSNS運用/韓国SNS・プラットフォーム戦略.md` が作成され、適切なマークダウン内容が書き込まれていること。",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-09-25T18:47:58+09:00"
+}
