@@ -97,6 +97,29 @@ type Workroom struct {
 	Mode Mode // overlay/copyのいずれで動作するか（NewWorkroom時に一度だけ実地診断）
 
 	copyInitialized bool // copy-mode時、Merged初期化（Lowerの全コピー）を済ませたか
+	skippedSymlinks int  // copy-mode時、コピー対象外にしたsymlink数（ModeNote用）
+}
+
+// ModeNote はこのWorkroomの隔離レベルに関する注記を返す（overlay-modeで動作しており
+// symlink省略も無ければ空文字）。委任結果を鵜呑みにさせないための他の注記
+// （harnessNote、internal/delegate/worker.go）と同じ思想で、「隔離されている」という
+// 前提をDirectorに無条件で信じさせないための可視化。
+func (w *Workroom) ModeNote() string {
+	var notes []string
+	if w.Mode == ModeCopy {
+		notes = append(notes, "⚠ 隔離モード: このWorkerはcopy-modeで実行されました"+
+			"（unshare/overlayマウントが使えない環境のため、名前空間分離なしの通常プロセスとして実行）。")
+	}
+	if w.skippedSymlinks > 0 {
+		notes = append(notes, fmt.Sprintf(
+			"⚠ %d件のシンボリックリンクは隔離環境にコピーされていません"+
+				"（copy-modeはsymlinkをコピー対象外にするため、リンク先の内容はWorkerから見えていません）。",
+			w.skippedSymlinks))
+	}
+	if len(notes) == 0 {
+		return ""
+	}
+	return "\n" + strings.Join(notes, "\n")
 }
 
 // detectedMode はDetectMode()の実地診断結果をプロセス内でキャッシュする
@@ -257,9 +280,11 @@ func (w *Workroom) Run(ctx context.Context, command string, timeout time.Duratio
 // LowerをMergedへ丸ごとコピーし、以降はMerged上で直接コマンドを実行する。
 func (w *Workroom) runCopy(ctx context.Context, command string, timeout time.Duration) (RunResult, error) {
 	if !w.copyInitialized {
-		if err := copyTree(w.Lower, w.Merged); err != nil {
+		skipped, err := copyTree(w.Lower, w.Merged)
+		if err != nil {
 			return RunResult{}, fmt.Errorf("copy-modeの初期コピーに失敗しました: %w", err)
 		}
+		w.skippedSymlinks = skipped
 		w.copyInitialized = true
 	}
 
@@ -308,8 +333,10 @@ func (w *Workroom) runCopy(ctx context.Context, command string, timeout time.Dur
 }
 
 // copyTree はsrc配下をdstへ再帰コピーする（copy-modeの初期化用）。
-func copyTree(src, dst string) error {
-	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+// 戻り値はコピー対象外にしたシンボリックリンクの件数（Workroom.ModeNoteで警告表示に使う）。
+func copyTree(src, dst string) (int, error) {
+	skipped := 0
+	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -325,7 +352,10 @@ func copyTree(src, dst string) error {
 			return os.MkdirAll(target, info.Mode().Perm()|0o700)
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			return nil // シンボリックリンクは対象外（overlayモードとの挙動差だが実害は小さい）
+			// シンボリックリンクは対象外（overlayモードとの挙動差だが実害は小さい）。
+			// 件数はModeNoteでDirectorへ可視化する。
+			skipped++
+			return nil
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -336,6 +366,7 @@ func copyTree(src, dst string) error {
 		}
 		return os.WriteFile(target, data, info.Mode().Perm())
 	})
+	return skipped, err
 }
 
 // changedFilesCopy はMerged側を走査し、Lower側と内容が異なる/新規のファイルを

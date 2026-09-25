@@ -36,10 +36,19 @@ func setupSignalHandling() {
 }
 
 func main() {
+	// `mimic watch <trace_id> [project_dir]` はフラグではなく先頭の位置引数で
+	// 判定するサブコマンドのため、flag.Parse()より前に分岐する
+	// （cmd/mimic/watch.go::runWatch）。
+	if len(os.Args) > 1 && os.Args[1] == "watch" {
+		runWatch(os.Args[2:])
+		return
+	}
+
 	envPath := flag.String("env", "./.env", ".envファイルのパス")
 	promptFlag := flag.String("prompt", "", "非対話モード: 1ターンだけ実行して結果を標準出力に出して終了する")
 	autoPromptFlag := flag.String("auto-prompt", "", "自動実行モード: --promptと同様だが完了マーカー付きで出力する（Worker連携用、フェーズ3で本格活用予定）")
 	statusFlag := flag.Bool("status", false, "現在の設定（プロバイダ/モデル/キー数）を表示して終了する")
+	mcpServerFlag := flag.Bool("mcp-server", false, "mimicの委任ツール群をMCPサーバーとして標準入出力で公開する（Claude Code等から接続する用途）")
 	flag.Parse()
 
 	setupSignalHandling()
@@ -70,6 +79,11 @@ func main() {
 	absEnvPath, absErr := filepath.Abs(*envPath)
 	if absErr != nil {
 		absEnvPath = *envPath
+	}
+
+	if *mcpServerFlag {
+		runMCPServer(cfg, *envPath)
+		return
 	}
 
 	if *promptFlag != "" {

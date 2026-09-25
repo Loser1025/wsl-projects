@@ -1,4 +1,7 @@
-import { serviceAccountEmail } from "./auth.js";
+import { google } from "googleapis";
+import { getAuthorizedClient } from "./auth.js";
 
-console.log("Service account email (share your Slides/Sheets/Docs with this address as an editor):");
-console.log(serviceAccountEmail());
+const auth = await getAuthorizedClient();
+const drive = google.drive({ version: "v3", auth });
+const about = await drive.about.get({ fields: "user" });
+console.log("Authorized as:", about.data.user?.emailAddress);

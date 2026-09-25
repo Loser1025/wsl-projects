@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>슬림클리닉 진료 예약 신청서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --mint-50: #f0fbf6;
+    --mint-100: #dcf5e8;
+    --mint-500: #1fa97a;
+    --mint-600: #128a63;
+    --mint-700: #0d6b4d;
+    --ink-900: #10221c;
+    --ink-600: #4b6058;
+    --ink-400: #7c9089;
+    --line: #e2ede8;
+    --card: #ffffff;
+    --danger: #e2554a;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+    background: linear-gradient(180deg, var(--mint-50) 0%, #ffffff 320px);
+    color: var(--ink-900);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 20px 80px;
+  }
+  header.hero {
+    padding: 56px 0 28px;
+    text-align: center;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--mint-100);
+    color: var(--mint-700);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    letter-spacing: .02em;
+  }
+  .badge svg { width: 14px; height: 14px; }
+  header.hero h1 {
+    margin: 18px 0 10px;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  header.hero p {
+    margin: 0;
+    color: var(--ink-600);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  form {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px -18px rgba(16, 34, 28, 0.25);
+    padding: 8px;
+  }
+  fieldset {
+    border: none;
+    margin: 0;
+    padding: 22px 22px 6px;
+  }
+  fieldset + fieldset {
+    border-top: 1px solid var(--line);
+  }
+  label.q {
+    display: block;
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 10px;
+  }
+  label.q .req { color: var(--danger); margin-left: 4px; }
+  input[type="text"],
+  input[type="email"],
+  input[type="date"],
+  select {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-family: inherit;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    background: #fbfdfc;
+    color: var(--ink-900);
+    transition: border-color .15s, box-shadow .15s;
+    appearance: none;
+  }
+  select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%237c9089'><path fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 38px;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--mint-500);
+    box-shadow: 0 0 0 3px rgba(31, 169, 122, 0.15);
+  }
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .option {
+    position: relative;
+  }
+  .option input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    cursor: pointer;
+  }
+  .option span {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 16px;
+    border: 1.5px solid var(--line);
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-600);
+    background: #fbfdfc;
+    transition: all .15s;
+  }
+  .option input:checked + span {
+    border-color: var(--mint-500);
+    background: var(--mint-500);
+    color: #fff;
+  }
+  .hint {
+    margin-top: 8px;
+    font-size: 12.5px;
+    color: var(--ink-400);
+  }
+  .pref-slot {
+    padding: 13px;
+    background: #fbfdfc;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+  .pref-slot-label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink-600);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .pref-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--mint-500);
+  }
+  .pref-dot.optional {
+    background: var(--ink-400);
+  }
+  .pref-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  @media (max-width: 480px) {
+    .pref-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .menu-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .menu-card {
+    border: 1.5px solid var(--line);
+    border-radius: 14px;
+    background: #fbfdfc;
+    overflow: hidden;
+    transition: border-color .15s;
+  }
+  .menu-card:has(.detail-item-checkbox:checked) {
+    border-color: var(--mint-500);
+  }
+  .menu-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 14px;
+    gap: 10px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .menu-card-head:hover,
+  .menu-card-head:focus-visible {
+    background: var(--mint-50);
+  }
+  .menu-card-title {
+    font-weight: 700;
+    font-size: 14.5px;
+    flex: 1;
+    min-width: 0;
+  }
+  .price-row--counsel .price-name { color: var(--mint-700); }
+  .price-row--counsel .price-val { color: var(--ink-400); font-size: 12px; }
+  .menu-card-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    color: var(--ink-400);
+    transition: transform 0.2s ease, color 0.2s ease;
+  }
+  .menu-card-head:hover .menu-card-chevron { color: var(--mint-700); }
+  .menu-card-head[data-open="true"] .menu-card-chevron { transform: rotate(180deg); }
+  .price-preview {
+    display: none;
+    border-top: 1px solid var(--line);
+    background: #fff;
+    padding: 4px 14px 10px;
+  }
+  .price-preview.is-open { display: block; }
+  .price-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 2px;
+    border-bottom: 1px dashed var(--line);
+    font-size: 13.5px;
+    cursor: pointer;
+    border-radius: 8px;
+  }
+  .price-row:last-child { border-bottom: none; }
+  .price-row:hover { background: var(--mint-50); }
+  .price-row:has(.detail-item-checkbox:checked) { background: var(--mint-100); }
+  .price-name-wrap {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+  }
+  .price-name {
+    color: var(--ink-900);
+    font-weight: 500;
+  }
+  .price-val {
+    color: var(--mint-700);
+    font-weight: 700;
+    white-space: nowrap;
+    font-size: 13.5px;
+  }
+  .detail-item-checkbox {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--mint-500);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .mounjaro-banner {
+    margin: 4px -2px 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    color: #fff;
+  }
+  .mounjaro-banner-title { font-weight: 800; font-size: 14px; }
+  .mounjaro-banner-sub { font-size: 12px; opacity: .9; margin-top: 2px; }
+  .mounjaro-price-note {
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--ink-400);
+    font-weight: 600;
+    padding: 8px 0 2px;
+  }
+  .mounjaro-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding-bottom: 4px;
+  }
+  .mounjaro-col {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .mounjaro-col-head {
+    text-align: center;
+    padding: 6px 2px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .mounjaro-col-head.pink { background: #f43f5e; }
+  .mounjaro-col-head.blue { background: #0284c7; }
+  .mounjaro-col-head.teal { background: #0d9488; }
+  .mounjaro-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 6px;
+    font-size: 11px;
+    border-bottom: 1px dashed var(--line);
+    cursor: pointer;
+  }
+  .mounjaro-row:last-child { border-bottom: none; }
+  .mounjaro-row:hover { background: var(--mint-50); }
+  .mounjaro-row:has(.detail-item-checkbox:checked) { background: var(--mint-100); }
+  .mounjaro-row .detail-item-checkbox { width: 13px; height: 13px; }
+  .mounjaro-row-name { display: flex; align-items: center; gap: 4px; }
+  .mounjaro-row-val { font-weight: 700; color: var(--mint-700); white-space: nowrap; }
+  .submit-row {
+    padding: 22px;
+  }
+  button {
+    width: 100%;
+    padding: 15px 0;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: inherit;
+    color: #fff;
+    background: linear-gradient(180deg, var(--mint-500), var(--mint-600));
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    box-shadow: 0 10px 20px -8px rgba(18, 138, 99, 0.55);
+    transition: transform .1s, box-shadow .15s;
+  }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+  .footnote {
+    text-align: center;
+    color: var(--ink-400);
+    font-size: 12.5px;
+    margin-top: 18px;
+    line-height: 1.6;
+  }
+  #result {
+    display: none;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+  .panel {
+    border-radius: var(--radius);
+    padding: 40px 28px;
+    text-align: center;
+  }
+  .panel.ok {
+    background: var(--mint-50);
+    border: 1px solid var(--mint-100);
+  }
+  .panel.err {
+    background: #fdf1f0;
+    border: 1px solid #fbdcda;
+  }
+  .panel .icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+  }
+  .panel.ok .icon { background: var(--mint-500); }
+  .panel.err .icon { background: var(--danger); }
+  .panel .icon svg { width: 26px; height: 26px; stroke: #fff; }
+  .panel h2 { margin: 0 0 8px; font-size: 20px; font-weight: 800; }
+  .panel p { margin: 0; color: var(--ink-600); font-size: 14.5px; line-height: 1.6; }
+
+  @media (max-width: 520px) {
+    .wrap { padding: 0 14px 60px; }
+    header.hero { padding: 40px 0 22px; }
+    header.hero h1 { font-size: 22px; }
+    header.hero p { font-size: 13.5px; }
+    fieldset { padding: 18px 16px 4px; }
+    .menu-card-head { flex-wrap: wrap; row-gap: 8px; }
+    .menu-card-label { flex: 1 1 100%; font-size: 14px; }
+    .btn-view-price { margin-left: 29px; }
+    .price-row { font-size: 12.5px; }
+    .price-row { flex-wrap: wrap; row-gap: 4px; }
+    .price-name-wrap { flex: 1 1 100%; min-width: 0; }
+    .price-val { margin-left: auto; }
+    .mounjaro-grid { grid-template-columns: 1fr; gap: 8px; }
+    .mounjaro-row { font-size: 13px; padding: 7px 8px; }
+    .mounjaro-row .detail-item-checkbox { width: 15px; height: 15px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap" id="formWrap">
+    <header class="hero">
+      <span class="badge">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H3a1 1 0 110-2h6V3a1 1 0 011-1z"/></svg>
+        SLIM CLINIC
+      </span>
+      <h1>슬림클리닉 진료 예약 신청서</h1>
+      <p>온라인 진료 예약을 위해 희망하시는 날짜와 시간을 확인하는 설문지입니다.<br />담당자가 확인 후 안내드립니다.</p>
+    </header>
+
+    <form id="reserveForm">
+      <fieldset>
+        <label class="q" for="name">이름<span class="req">*</span></label>
+        <input type="text" id="name" name="name" required placeholder="홍길동" />
+      </fieldset>
+
+      <fieldset>
+        <label class="q" for="email">이메일 주소<span class="req">*</span></label>
+        <input type="email" id="email" name="email" required placeholder="example@email.com" />
+      </fieldset>
+
+      <fieldset>
+        <label class="q">희망하시는 진료 형식<span class="req">*</span></label>
+        <div class="options">
+          <label class="option">
+            <input type="radio" name="format" value="온라인 진료" required />
+            <span>온라인 진료</span>
+          </label>
+          <label class="option">
+            <input type="radio" name="format" value="대면 진료" />
+            <span>대면 진료</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <label class="q">희망하시는 메뉴<span class="req">*</span></label>
+        <div class="menu-cards" id="menuOptions">
+
+          <!-- 의료 다이어트 -->
+          <div class="menu-card">
+            <div class="menu-card-head" data-target="preview-diet">
+              <span class="menu-card-title">의료 다이어트(다이어트 약)</span>
+              <span class="menu-card-chevron" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </span>
+            </div>
+            <div class="price-preview" id="preview-diet">
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="리벨서스 3mg"><span class="price-name">리벨서스 3mg</span></span><span class="price-val">¥10,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="리벨서스 7mg"><span class="price-name">리벨서스 7mg</span></span><span class="price-val">¥20,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="리벨서스 14mg"><span class="price-name">리벨서스 14mg</span></span><span class="price-val">¥30,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="메트포르민 250mg"><span class="price-name">메트포르민 250mg</span></span><span class="price-val">¥10,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="메트포르민 500mg"><span class="price-name">메트포르민 500mg</span></span><span class="price-val">¥10,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="다파글리플로진 5mg"><span class="price-name">다파글리플로진 5mg</span></span><span class="price-val">¥15,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="다파글리플로진 10mg"><span class="price-name">다파글리플로진 10mg</span></span><span class="price-val">¥15,000</span></label>
+
+              <div class="mounjaro-banner">
+                <div class="mounjaro-banner-title">마운자로 처방 메뉴</div>
+                <div class="mounjaro-banner-sub">의사와 상담하며 무리 없는 치료 계획을</div>
+              </div>
+              <div class="mounjaro-price-note">각 코스의 세금 포함 가격 / 월</div>
+              <div class="mounjaro-grid">
+                <div class="mounjaro-col">
+                  <div class="mounjaro-col-head pink">6개월 처방</div>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 6개월 처방 2.5mg"><span>2.5mg</span></span><span class="mounjaro-row-val">¥7,180</span></label>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 6개월 처방 5mg"><span>5mg</span></span><span class="mounjaro-row-val">¥13,090</span></label>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 6개월 처방 7.5mg"><span>7.5mg</span></span><span class="mounjaro-row-val">¥20,220</span></label>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 6개월 처방 10mg"><span>10mg</span></span><span class="mounjaro-row-val">¥26,280</span></label>
+                </div>
+                <div class="mounjaro-col">
+                  <div class="mounjaro-col-head blue">2~5개월 처방</div>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 2~5개월 처방 2.5mg"><span>2.5mg</span></span><span class="mounjaro-row-val">¥8,880</span></label>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 2~5개월 처방 5mg"><span>5mg</span></span><span class="mounjaro-row-val">¥14,880</span></label>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 2~5개월 처방 7.5mg"><span>7.5mg</span></span><span class="mounjaro-row-val">¥22,880</span></label>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 2~5개월 처방 10mg"><span>10mg</span></span><span class="mounjaro-row-val">¥28,400</span></label>
+                </div>
+                <div class="mounjaro-col">
+                  <div class="mounjaro-col-head teal">1개월 처방</div>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 1개월 처방 2.5mg"><span>2.5mg</span></span><span class="mounjaro-row-val">¥9,880</span></label>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 1개월 처방 5mg"><span>5mg</span></span><span class="mounjaro-row-val">¥15,880</span></label>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 1개월 처방 7.5mg"><span>7.5mg</span></span><span class="mounjaro-row-val">¥23,880</span></label>
+                  <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="마운자로 1개월 처방 10mg"><span>10mg</span></span><span class="mounjaro-row-val">¥29,400</span></label>
+                </div>
+              </div>
+              <label class="price-row price-row--counsel"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="의료 다이어트(다이어트 약)" value="상담 시 결정하고 싶어요"><span class="price-name">상담 시 결정하고 싶어요</span></span><span class="price-val">—</span></label>
+            </div>
+          </div>
+
+          <!-- AGA -->
+          <div class="menu-card">
+            <div class="menu-card-head" data-target="preview-aga">
+              <span class="menu-card-title">AGA</span>
+              <span class="menu-card-chevron" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </span>
+            </div>
+            <div class="price-preview" id="preview-aga">
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="미녹시딜 5mg"><span class="price-name">미녹시딜 5mg</span></span><span class="price-val">¥3,080</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="피나스테리드 1mg"><span class="price-name">피나스테리드 1mg</span></span><span class="price-val">¥4,730</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="스피로놀락톤"><span class="price-name">스피로놀락톤</span></span><span class="price-val">¥4,730</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="두타스테리드 0.5mg"><span class="price-name">두타스테리드 0.5mg</span></span><span class="price-val">¥6,600</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="미녹시딜 5mg + 피나스테리드 1mg 복합제"><span class="price-name">미녹시딜 5mg + 피나스테리드 1mg 복합제</span></span><span class="price-val">¥7,700</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="미녹시딜 5mg + 두타스테리드 0.5mg 복합제"><span class="price-name">미녹시딜 5mg + 두타스테리드 0.5mg 복합제</span></span><span class="price-val">¥8,800</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="하에초루. 오리지널 주입액"><span class="price-name">하에초루. 오리지널 주입액</span></span><span class="price-val">¥37,400</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="하에초루. FRESH(부스터)"><span class="price-name">하에초루. FRESH(부스터)</span></span><span class="price-val">¥47,400</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="엑소좀(2cc/회): 지방 유래"><span class="price-name">엑소좀(2cc/회): 지방 유래</span></span><span class="price-val">¥25,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="프리미엄 엑소좀(2cc/회): 제대 유래"><span class="price-name">프리미엄 엑소좀(2cc/회): 제대 유래</span></span><span class="price-val">¥50,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="스킨메이크 30cm²"><span class="price-name">스킨메이크 30cm²</span></span><span class="price-val">¥60,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="스킨메이크 60cm²"><span class="price-name">스킨메이크 60cm²</span></span><span class="price-val">¥120,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="스킨메이크 90cm²"><span class="price-name">스킨메이크 90cm²</span></span><span class="price-val">¥180,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="하에초루. 오리지널 주입액(스탠다드 6회)"><span class="price-name">하에초루. 오리지널 주입액(스탠다드 6회)</span></span><span class="price-val">¥187,490</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="하에초루. 오리지널 주입액(프로그램 7회)"><span class="price-name">하에초루. 오리지널 주입액(프로그램 7회)</span></span><span class="price-val">¥299,890</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="하에초루. 오리지널 주입액(프리미엄 12회)"><span class="price-name">하에초루. 오리지널 주입액(프리미엄 12회)</span></span><span class="price-val">¥411,890</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="하에초루. FRESH(부스터) 스탠다드 6회"><span class="price-name">하에초루. FRESH(부스터) 스탠다드 6회</span></span><span class="price-val">¥244,990</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="하에초루. FRESH(부스터) 프로 9회"><span class="price-name">하에초루. FRESH(부스터) 프로 9회</span></span><span class="price-val">¥387,190</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="하에초루. FRESH(부스터) 프리미엄 12회"><span class="price-name">하에초루. FRESH(부스터) 프리미엄 12회</span></span><span class="price-val">¥529,390</span></label>
+              <label class="price-row price-row--counsel"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA" value="상담 시 결정하고 싶어요"><span class="price-name">상담 시 결정하고 싶어요</span></span><span class="price-val">—</span></label>
+            </div>
+          </div>
+
+          <!-- ED -->
+          <div class="menu-card">
+            <div class="menu-card-head" data-target="preview-ed">
+              <span class="menu-card-title">ED</span>
+              <span class="menu-card-chevron" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </span>
+            </div>
+            <div class="price-preview" id="preview-ed">
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="실데나필"><span class="price-name">실데나필</span></span><span class="price-val">¥1,650</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="바르데나필"><span class="price-name">바르데나필</span></span><span class="price-val">¥1,870</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="타다라필 20mg"><span class="price-name">타다라필 20mg</span></span><span class="price-val">¥1,540</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="자르티아 1개월분(30정)"><span class="price-name">자르티아 1개월분(30정)</span></span><span class="price-val">¥10,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="클로미드 1개월분(30정)"><span class="price-name">클로미드 1개월분(30정)</span></span><span class="price-val">¥10,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="다폭세틴(8정)"><span class="price-name">다폭세틴(8정)</span></span><span class="price-val">¥10,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="체험 3종 세트"><span class="price-name">체험 3종 세트</span></span><span class="price-val">¥3,980</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="오리플 세트"><span class="price-name">오리플 세트</span></span><span class="price-val">¥10,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="오리지널 주입액 50단위"><span class="price-name">오리지널 주입액 50단위</span></span><span class="price-val">¥34,900</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="테스토스테론 A"><span class="price-name">테스토스테론 A</span></span><span class="price-val">¥15,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="테스토스테론 A+"><span class="price-name">테스토스테론 A+</span></span><span class="price-val">¥25,000</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="서브스크라이트"><span class="price-name">서브스크라이트</span></span><span class="price-val">¥19,800</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="서브스크 스탠다드"><span class="price-name">서브스크 스탠다드</span></span><span class="price-val">¥29,800</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="서브스크 프리미엄"><span class="price-name">서브스크 프리미엄</span></span><span class="price-val">¥49,800</span></label>
+              <label class="price-row price-row--counsel"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED" value="상담 시 결정하고 싶어요"><span class="price-name">상담 시 결정하고 싶어요</span></span><span class="price-val">—</span></label>
+            </div>
+          </div>
+
+          <!-- 미용 내복약 -->
+          <div class="menu-card">
+            <div class="menu-card-head" data-target="preview-skin">
+              <span class="menu-card-title">미용 내복약</span>
+              <span class="menu-card-chevron" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </span>
+            </div>
+            <div class="price-preview" id="preview-skin">
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="미용 내복약" value="[미백세트] 기미 케어 내복 3종(피임약 복용자 NG)"><span class="price-name">[미백세트] 기미 케어 내복 3종(피임약 복용자 NG)</span></span><span class="price-val">¥3,795</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="미용 내복약" value="[미백세트] 기미 케어 내복 3종(피임약 복용자 OK)"><span class="price-name">[미백세트] 기미 케어 내복 3종(피임약 복용자 OK)</span></span><span class="price-val">¥3,135</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="미용 내복약" value="코페라(30일분)"><span class="price-name">코페라(30일분)</span></span><span class="price-val">¥1,210</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="미용 내복약" value="시피(30일분)"><span class="price-name">시피(30일분)</span></span><span class="price-val">¥1,210</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="미용 내복약" value="트라넥삼산(30일분)"><span class="price-name">트라넥삼산(30일분)</span></span><span class="price-val">¥1,870</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="미용 내복약" value="하이치올(30일분)"><span class="price-name">하이치올(30일분)</span></span><span class="price-val">¥1,210</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="미용 내복약" value="노이로비탄(30일분)"><span class="price-name">노이로비탄(30일분)</span></span><span class="price-val">¥1,100</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="미용 내복약" value="리보플라빈(30일분)"><span class="price-name">리보플라빈(30일분)</span></span><span class="price-val">¥1,210</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="미용 내복약" value="피독사르(30일분)"><span class="price-name">피독사르(30일분)</span></span><span class="price-val">¥1,210</span></label>
+              <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="미용 내복약" value="진정 마스크"><span class="price-name">진정 마스크</span></span><span class="price-val">¥1,500</span></label>
+              <label class="price-row price-row--counsel"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="미용 내복약" value="상담 시 결정하고 싶어요"><span class="price-name">상담 시 결정하고 싶어요</span></span><span class="price-val">—</span></label>
+            </div>
+          </div>
+
+        </div>
+        <p class="hint">각 카테고리의 "가격표 보기"에서 희망하시는 상품을 1개 이상 선택해 주세요（복수 선택 가능）. 결정하기 어려우시면 "상담 시 결정하고 싶어요"를 선택해 주세요.</p>
+      </fieldset>
+
+      <fieldset>
+        <label class="q"><span>희망 날짜 및 시간</span><span class="req">*</span></label>
+        <p class="hint" style="margin-top:-2px; margin-bottom:12px;">원활한 일정 조율을 위해 제1~제3희망을 모두 선택해 주세요.</p>
+
+        <div class="pref-slot">
+          <div class="pref-slot-label"><span class="pref-dot"></span>제1희망 (필수)</div>
+          <div class="pref-grid">
+            <input type="date" id="date1" name="date1" required />
+            <select id="time1" name="time1" required>
+              <option value="" disabled selected>시간을 선택해 주세요</option>
+            </select>
+          </div>
+        </div>
+        <div class="pref-slot">
+          <div class="pref-slot-label"><span class="pref-dot optional"></span>제2희망 (선택)</div>
+          <div class="pref-grid">
+            <input type="date" id="date2" name="date2" />
+            <select id="time2" name="time2">
+              <option value="" disabled selected>시간을 선택해 주세요</option>
+            </select>
+          </div>
+        </div>
+        <div class="pref-slot">
+          <div class="pref-slot-label"><span class="pref-dot optional"></span>제3희망 (선택)</div>
+          <div class="pref-grid">
+            <input type="date" id="date3" name="date3" />
+            <select id="time3" name="time3">
+              <option value="" disabled selected>시간을 선택해 주세요</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="submit-row">
+        <button type="submit" id="submitBtn">예약 신청하기</button>
+      </div>
+    </form>
+
+    <p class="footnote">입력하신 정보는 예약 확인 목적으로만 사용됩니다.</p>
+  </div>
+
+  <div id="result"></div>
+
+  <script>
+    const timeSelects = [document.getElementById('time1'), document.getElementById('time2'), document.getElementById('time3')];
+    timeSelects.forEach((timeSelect) => {
+      for (let h = 9; h <= 19; h++) {
+        for (const m of ['00', '30']) {
+          if (h === 19 && m === '30') continue;
+          const v = String(h).padStart(2, '0') + ':' + m;
+          const opt = document.createElement('option');
+          opt.value = v;
+          opt.textContent = v;
+          timeSelect.appendChild(opt);
+        }
+      }
+    });
+
+    const form = document.getElementById('reserveForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const formWrap = document.getElementById('formWrap');
+    const resultEl = document.getElementById('result');
+
+    // 카테고리 이름을 클릭하면 가격표를 열고 닫음
+    document.querySelectorAll('.menu-card-head[data-target]').forEach((head) => {
+      head.setAttribute('role', 'button');
+      head.setAttribute('tabindex', '0');
+      const toggle = () => {
+        const preview = document.getElementById(head.dataset.target);
+        const isOpen = preview.classList.toggle('is-open');
+        head.setAttribute('data-open', isOpen ? 'true' : 'false');
+      };
+      head.addEventListener('click', toggle);
+      head.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggle();
+        }
+      });
+    });
+
+    // 상세 상품(체크박스) 선택 시 상위 카테고리를 자동으로 체크
+    const detailItemCheckboxes = document.querySelectorAll('.detail-item-checkbox');
+
+    function getSelectedDetailItemsByCategory() {
+      const byCategory = {};
+      detailItemCheckboxes.forEach((cb) => {
+        if (cb.checked) {
+          (byCategory[cb.dataset.category] = byCategory[cb.dataset.category] || []).push(cb.value);
+        }
+      });
+      return byCategory;
+    }
+
+    function renderResult(ok, message) {
+      formWrap.style.display = 'none';
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = `
+        <div class="panel ${ok ? 'ok' : 'err'}">
+          <div class="icon">
+            ${ok
+              ? '<svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+              : '<svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5M12 16h.01M12 21a9 9 0 100-18 9 9 0 000 18z"/></svg>'}
+          </div>
+          <h2>${ok ? '예약 신청이 완료되었습니다' : '전송에 실패했습니다'}</h2>
+          <p>${message}</p>
+        </div>
+      `;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const detailByCategory = getSelectedDetailItemsByCategory();
+      if (Object.keys(detailByCategory).length === 0) {
+        alert('희망하시는 상품을 한 개 이상 선택해 주세요.');
+        return;
+      }
+      const menu = Object.entries(detailByCategory).map(([cat, details]) => `${cat}(${details.join('・')})`);
+      const payload = {
+        name: form.name.value.trim(),
+        email: form.email.value.trim(),
+        format: form.format.value,
+        menu,
+        date: form.date1.value,
+        time: form.time1.value,
+        date2: form.date2.value || '',
+        time2: form.time2.value || '',
+        date3: form.date3.value || '',
+        time3: form.time3.value || '',
+      };
+      submitBtn.disabled = true;
+      submitBtn.textContent = '전송 중...';
+      try {
+        const res = await fetch('/api/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error('server_error');
+        renderResult(true, '빠른 시일 내에 담당자가 이메일 또는 연락처로 안내드리겠습니다.');
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '예약 신청하기';
+        renderResult(false, '잠시 후 다시 시도해 주시거나, 클리닉으로 직접 문의해 주세요.');
+      }
+    });
+  </script>
+</body>
+</html>

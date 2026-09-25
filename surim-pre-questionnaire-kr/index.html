@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>사전 문진표</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --sky-50: #f0f9ff; --sky-100: #e0f2fe; --sky-500: #0ea5e9; --sky-600: #0284c7; --sky-700: #0369a1;
+    --ink-900: #0f2536; --ink-600: #45607a; --ink-400: #8aa2b8; --line: #dbe8f1; --card: #ffffff; --danger: #e0554a; --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; font-family: "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+    background: linear-gradient(180deg, var(--sky-50) 0%, #ffffff 340px); color: var(--ink-900); -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 0 18px 90px; }
+  header.hero { padding: 48px 0 26px; text-align: center; }
+  header.hero h1 { margin: 0 0 8px; font-size: 24px; font-weight: 800; letter-spacing: -0.01em; }
+  header.hero p { margin: 0; color: var(--ink-600); font-size: 14px; line-height: 1.6; max-width: 480px; margin-inline: auto; }
+
+  form { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 16px 36px -18px rgba(2,132,199,0.22); padding: 6px; }
+  fieldset { border: none; margin: 0; padding: 24px 22px 8px; }
+  fieldset + fieldset { border-top: 1px solid var(--line); }
+  .section-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--sky-600); margin: 0 0 14px; }
+  .field { margin-bottom: 16px; }
+  label.q { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; font-size: 14px; margin-bottom: 7px; gap: 8px; }
+  label.q .req { color: var(--danger); font-size: 11px; font-weight: 700; white-space: nowrap; }
+  label.q .opt { color: var(--ink-400); font-size: 11px; white-space: nowrap; }
+  .field-note { font-size: 12px; color: var(--ink-400); margin: -3px 0 8px; line-height: 1.5; }
+
+  input[type="text"], input[type="date"], textarea {
+    width: 100%; padding: 11px 13px; font-size: 14.5px; font-family: inherit;
+    border: 1.5px solid var(--line); border-radius: 10px; background: #fbfdff; color: var(--ink-900);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  textarea { resize: vertical; min-height: 68px; }
+  input:focus, textarea:focus { outline: none; border-color: var(--sky-500); box-shadow: 0 0 0 3px rgba(14,165,233,0.15); }
+
+  .options { display: flex; flex-wrap: wrap; gap: 8px; }
+  .option { position: relative; }
+  .option input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+  .option span {
+    display: inline-flex; align-items: center; padding: 9px 14px; border: 1.5px solid var(--line);
+    border-radius: 999px; font-size: 13.5px; font-weight: 500; color: var(--ink-600); background: #fbfdff; transition: all .15s;
+  }
+  .option input:checked + span { border-color: var(--sky-500); background: var(--sky-500); color: #fff; }
+
+  .conditional { margin-top: 10px; padding: 12px; background: var(--sky-50); border: 1px dashed var(--sky-100); border-radius: 10px; display: none; }
+  .conditional.is-visible { display: block; }
+
+  .submit-row { padding: 22px; }
+  button.submit-btn {
+    width: 100%; padding: 15px 0; font-size: 16px; font-weight: 700; font-family: inherit; color: #fff;
+    background: linear-gradient(180deg, var(--sky-500), var(--sky-600)); border: none; border-radius: 14px;
+    cursor: pointer; box-shadow: 0 10px 22px -10px rgba(2,132,199,0.55);
+  }
+  button.submit-btn:disabled { opacity: .6; cursor: not-allowed; }
+  .footnote { text-align: center; color: var(--ink-400); font-size: 12px; margin-top: 16px; line-height: 1.6; }
+
+  #result { display: none; }
+  .panel { border-radius: var(--radius); padding: 44px 26px; text-align: center; }
+  .panel.ok { background: var(--sky-50); border: 1px solid var(--sky-100); }
+  .panel.err { background: #fdf1f0; border: 1px solid #fbdcda; }
+  .panel .icon { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+  .panel.ok .icon { background: var(--sky-500); }
+  .panel.err .icon { background: var(--danger); }
+  .panel .icon svg { width: 26px; height: 26px; stroke: #fff; }
+  .panel h2 { margin: 0 0 8px; font-size: 19px; font-weight: 800; }
+  .panel p { margin: 0; color: var(--ink-600); font-size: 14px; line-height: 1.6; }
+
+  @media (max-width: 520px) {
+    header.hero { padding: 34px 0 20px; }
+    header.hero h1 { font-size: 20px; }
+    fieldset { padding: 18px 16px 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="formWrap">
+  <header class="hero">
+    <h1>사전 문진표</h1>
+    <p>내원 전에 작성해 주시는 사전 문진표입니다. 답변 내용은 진료 목적으로만 사용되며 철저히 관리됩니다.</p>
+  </header>
+
+  <form id="qForm">
+    <fieldset>
+      <div class="section-title">기본 정보</div>
+      <div class="field"><label class="q" for="postal"><span>우편번호</span><span class="req">필수</span></label><input type="text" id="postal" required /></div>
+      <div class="field"><label class="q" for="address"><span>주소</span><span class="req">필수</span></label><input type="text" id="address" required /></div>
+      <div class="field"><label class="q" for="name"><span>성명</span><span class="req">필수</span></label><input type="text" id="name" required /></div>
+      <div class="field"><label class="q" for="kana"><span>성명（여권 영문/로마자 표기）</span><span class="req">필수</span></label><input type="text" id="kana" required /></div>
+      <div class="field"><label class="q" for="dob"><span>생년월일</span><span class="req">필수</span></label><input type="date" id="dob" required /></div>
+      <div class="field">
+        <label class="q"><span>성별</span><span class="req">필수</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="gender" value="남성" required /><span>남성</span></label>
+          <label class="option"><input type="radio" name="gender" value="여성" /><span>여성</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label class="q"><span>혈액형</span><span class="req">필수</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="bloodType" value="A형" required /><span>A형</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="B형" /><span>B형</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="O형" /><span>O형</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="AB형" /><span>AB형</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="불명" /><span>불명</span></label>
+        </div>
+      </div>
+      <div class="field"><label class="q" for="height"><span>키(cm)</span><span class="req">필수</span></label><input type="text" id="height" required /></div>
+      <div class="field"><label class="q" for="weight"><span>체중(kg)</span><span class="req">필수</span></label><input type="text" id="weight" required /></div>
+    </fieldset>
+
+    <fieldset>
+      <div class="section-title">생활 습관・내원 관련</div>
+
+      <div class="field">
+        <label class="q"><span>저희 클리닉에 방문하신 적이 있으신가요? (다른 지점 포함)</span><span class="req">필수</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="visitHistory" value="이번이 처음" required /><span>이번이 처음</span></label>
+          <label class="option"><input type="radio" name="visitHistory" value="설명을 들은 적이 있음" /><span>설명을 들은 적이 있음</span></label>
+          <label class="option"><input type="radio" name="visitHistory" value="시술을 받은 적이 있음" /><span>시술을 받은 적이 있음</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>클리닉을 알게 된 계기는 무엇인가요?</span><span class="req">필수</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="referral" value="웹 광고" required /><span>웹 광고</span></label>
+          <label class="option"><input type="radio" name="referral" value="라디오" /><span>라디오</span></label>
+          <label class="option"><input type="radio" name="referral" value="흡연실 영상" /><span>흡연실 영상</span></label>
+          <label class="option"><input type="radio" name="referral" value="간판" /><span>간판</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>아래 치료에 관심이 있으신가요?</span><span class="req">필수（1개 이상）</span></label>
+        <div class="options">
+          <label class="option"><input type="checkbox" name="interest" value="다크서클 제거" /><span>다크서클 제거</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="쌍꺼풀 수술" /><span>쌍꺼풀 수술</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="AGA" /><span>AGA</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="의료 제모" /><span>의료 제모</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="다한증・액취증" /><span>다한증・액취증</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="테스토스테론" /><span>테스토스테론</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="꽃가루 알레르기" /><span>꽃가루 알레르기</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="ED" /><span>ED</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="의료 다이어트" /><span>의료 다이어트</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="특별히 없음" /><span>특별히 없음</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>희망하시는 결제 방법이 있으신가요?</span><span class="req">필수</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="payment" value="카드 결제" required /><span>카드 결제</span></label>
+          <label class="option"><input type="radio" name="payment" value="은행 송금" /><span>은행 송금</span></label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <div class="section-title">현재 증상・기존 병력</div>
+
+      <div class="field">
+        <label class="q"><span>현재 증상에 대해 불안한 점, 묻고 싶은 것, 걱정되는 것이 있으면 알려주세요.</span><span class="opt">선택</span></label>
+        <textarea id="symptomConcern"></textarea>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>과거에 큰 질병이나 부상, 수술(암, 교통사고 등) 경험이 있으면 알려주세요</span><span class="opt">선택</span></label>
+        <div class="field-note">（병명・치료 내용・나이・수술 여부를 기재해 주세요）</div>
+        <textarea id="majorHistory"></textarea>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>해당하는 기존 병력이 있으면 알려주세요.</span><span class="opt">선택</span></label>
+        <div class="options">
+          <label class="option"><input type="checkbox" name="medicalHistory" value="대두(콩) 알레르기" /><span>대두(콩) 알레르기</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="마취 알레르기" /><span>마취 알레르기</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="당뇨병" /><span>당뇨병</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="고혈압" /><span>고혈압</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="간기능 장애" /><span>간기능 장애</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="신장기능 장애" /><span>신장기능 장애</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="심장병" /><span>심장병</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="천식" /><span>천식</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="켈로이드 체질" /><span>켈로이드 체질</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="무호흡" /><span>무호흡</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="전립선 비대" /><span>전립선 비대</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="투석" /><span>투석</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="녹내장" /><span>녹내장</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="백내장" /><span>백내장</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="아토피성 피부염" /><span>아토피성 피부염</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="암" /><span>암</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="기타 기존 병력" /><span>기타 기존 병력</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>신고해주신 지병으로 현재 병원에 다니고 계신가요?</span><span class="opt">선택</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="chronicOngoing" value="예" /><span>예</span></label>
+          <label class="option"><input type="radio" name="chronicOngoing" value="아니요" /><span>아니요</span></label>
+        </div>
+      </div>
+
+      <div class="field"><label class="q" for="currentMeds"><span>현재 복용 중인 약이나 영양제가 있으면 알려주세요.</span><span class="opt">선택</span></label><input type="text" id="currentMeds" /></div>
+      <div class="field"><label class="q" for="allergies"><span>음식이나 약 알레르기가 있으면 알려주세요.</span><span class="opt">선택</span></label><input type="text" id="allergies" /></div>
+
+      <div class="field">
+        <label class="q"><span>페이스메이커나 금속(플레이트・철사)이 몸에 있으신가요?</span><span class="opt">선택</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="metalImplant" value="예" /><span>예</span></label>
+          <label class="option"><input type="radio" name="metalImplant" value="아니요" /><span>아니요</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>（「암」에 체크하신 분만）현재 치료 중이신가요?</span><span class="opt">선택</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="cancerStatus" value="치료 중" /><span>치료 중</span></label>
+          <label class="option"><input type="radio" name="cancerStatus" value="치료 종료" /><span>치료 종료</span></label>
+        </div>
+        <div class="conditional" data-show-if="cancerStatus=치료 종료">
+          <label class="q"><span>치료 후 경과 연수는 어느 정도인가요?</span><span class="opt">선택</span></label>
+          <input type="text" id="cancerYears" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>（「기타 기존 병력」에 체크하신 분만）병명을 알려주세요.</span><span class="opt">선택</span></label>
+        <input type="text" id="otherDiseaseName" />
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <div class="section-title">임신・수유</div>
+
+      <div class="field">
+        <label class="q"><span>현재 임신 중 또는 임신을 준비 중이신가요?</span><span class="req">필수</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="pregnancy" value="예" required /><span>예</span></label>
+          <label class="option"><input type="radio" name="pregnancy" value="아니요" /><span>아니요</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>현재 수유 중이신가요?</span><span class="req">필수</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="breastfeeding" value="예" required /><span>예</span></label>
+          <label class="option"><input type="radio" name="breastfeeding" value="아니요" /><span>아니요</span></label>
+        </div>
+      </div>
+
+      <div class="field"><label class="q" for="pillUse"><span>（여성만）현재 피임약을 복용 중이신가요? 복용 중이시면 약 이름을 알려주세요.</span><span class="opt">선택</span></label><input type="text" id="pillUse" /></div>
+
+      <div class="field">
+        <label class="q"><span>（여성만）출산 경험이 있으신가요?</span><span class="opt">선택</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="childbirth" value="예" /><span>예</span></label>
+          <label class="option"><input type="radio" name="childbirth" value="아니요" /><span>아니요</span></label>
+        </div>
+        <div class="conditional" data-show-if="childbirth=예">
+          <label class="q"><span>출산 시 연령과 방법(경질분만/제왕절개)을 알려주세요.</span><span class="opt">선택</span></label>
+          <input type="text" id="childbirthDetail" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>걱정되는 점, 복용 중인 약이 있으면 알려주세요.</span><span class="opt">선택</span></label>
+        <textarea id="finalConcern"></textarea>
+      </div>
+    </fieldset>
+
+    <div class="submit-row">
+      <button type="submit" class="submit-btn" id="submitBtn">제출하기</button>
+    </div>
+  </form>
+  <p class="footnote">입력하신 개인정보는 진료 목적으로만 사용되며 철저히 관리됩니다.</p>
+</div>
+
+<div id="result"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

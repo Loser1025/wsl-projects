@@ -11,6 +11,7 @@
 package delegate
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -58,7 +59,7 @@ func SetSessionsDir(dir string) {
 // 構造的に回避しているのに対し、Goバイナリには固定インストール先が無いため、
 // MIMIC_SESSIONS_DIRと同じ「Directorから明示的に渡す」方式で揃える。
 // MIMIC_PROVIDER/MIMIC_MODELの引き継ぎも同じくPython版 __main__.py の移植で、
-// Workerが.envの優先順位デフォルト（openrouter→gemini）に固定されず、
+// Workerが.envの優先順位デフォルト（gemini→openrouter）に固定されず、
 // Directorが実際に選択中のプロバイダー・モデルで動作するようにする。
 var (
 	launchEnvPath  string
@@ -83,6 +84,17 @@ func SetTeamAutoGit(a *vcs.AutoGit) {
 // セッションJSONLに記録されたsystem_eventからtrace_id紐付け・実行状況バッジを
 // 導出できるようにする。
 var teamReactLog *vcs.ReactLog
+
+// onDelegationStart は委任1回ごとにtrace_idが確定した直後に呼ばれるフック
+// （MCPサーバーモード[cmd/mimic/mcpserver.go]が、委任開始と同時に
+// `mimic watch <trace_id>`を別ターミナルで自動起動するために使う）。
+// 未登録時は何もしない。
+var onDelegationStart func(traceID, projectDir, task string)
+
+// SetOnDelegationStart は委任開始フックを登録する。nilを渡すと無効化する。
+func SetOnDelegationStart(fn func(traceID, projectDir, task string)) {
+	onDelegationStart = fn
+}
 
 // SetTeamReactLog はDirector（TUI/非対話モード）起動時に一度だけ呼び出す。
 func SetTeamReactLog(rl *vcs.ReactLog) {
@@ -113,15 +125,19 @@ const (
 	// MaxVerifyRetries はverify失敗時の修正再試行上限（Python版 MAX_VERIFY_RETRIES）。
 	MaxVerifyRetries = 3
 
-	// BestOfNFallbackAttempts は、同じOverlay上でのエラーフィードバック再試行
-	// （MaxVerifyRetries）を使い切ってもverify_cmdが通らなかった場合の最後の手段
-	// として、元のタスク（エラーフィードバック無し）を独立したOverlayで並行に
+	// BestOfNFallbackAttemptsDefault/Max は、同じOverlay上でのエラーフィードバック
+	// 再試行（MaxVerifyRetries）を使い切ってもverify_cmdが通らなかった場合の最後の
+	// 手段として、元のタスク（エラーフィードバック無し）を独立したOverlayで並行に
 	// やり直す試行数（Python版には存在しない拡張）。弱いモデルは同じ間違いを
 	// 言い回しを変えて繰り返すことが多く、直前の失敗を踏まえた修正よりも、
 	// 白紙から別アプローチを試みる方が別解に到達しやすいという判断による。
 	// 「生成は安い・検証だけ厳密にする」非対称戦略（verify_cmdが機械的に判定できる
 	// ため、複数候補から通過したものを選ぶコストは低い）。
-	BestOfNFallbackAttempts = 2
+	// このverify_cmdの学習実績（verifycmds.go、Fails>Passes=不安定）が悪いほど
+	// Maxまで引き上げる（bestOfNAttempts参照）——安定したverify_cmdで毎回Max件
+	// 並行起動するのはWorkerサブプロセスのコスト（起動・LLM呼び出し）に見合わない。
+	BestOfNFallbackAttemptsDefault = 2
+	BestOfNFallbackAttemptsMax     = 3
 
 	// MaxResumeAttempts はWorkerが完了マーカーなしで予期せず終了した場合に、
 	// 同じOverlay上で（チェックポイントが残っていれば）再起動を試みる上限
@@ -189,6 +205,9 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 	traceID := newTraceID()
 	registerInflight(traceID, w.Base, w.Lower, task, rolePrompt, verifyCmd, "worker", rolePrompt, applyChanges, extraWritePaths)
 	defer unregisterInflight(traceID)
+	if onDelegationStart != nil {
+		onDelegationStart(traceID, w.Lower, task)
+	}
 
 	mimicBin, err := os.Executable()
 	if err != nil {
@@ -293,7 +312,9 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 			break // 検証通過
 		}
 		if abortExitCodes[exitCode] {
-			ForgetLearnedVerifyCmd(w.Lower, verifyCmd)
+			// 単発の環境要因失敗で即座に学習を失わないよう、閾値判定を経由する
+			// （NoteVerifyCmdFailure、internal/delegate/verifycmds.go）。
+			NoteVerifyCmdFailure(w.Lower, verifyCmd)
 			break // Workerが修正できない種類の失敗 → リトライ中止
 		}
 		if attempt > MaxVerifyRetries {
@@ -317,8 +338,9 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 		if effectiveVerify == "" {
 			effectiveVerify = staticCmd
 		}
+		attempts := bestOfNAttempts(w.Lower, effectiveVerify)
 		if bestW, bestSummary, bestExit, bestOutput, ok := runBestOfNFallback(
-			ctx, w.Lower, task, rolePrompt, effectiveVerify, traceID, mimicBin, keepSession, extraWritePaths); ok {
+			ctx, w.Lower, task, rolePrompt, effectiveVerify, traceID, mimicBin, keepSession, extraWritePaths, attempts); ok {
 			w.Cleanup()
 			w = bestW
 			summary = bestSummary
@@ -354,10 +376,22 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 		if len(changed) > 0 {
 			// 委任実行中に本体側でも変更されたファイルを検出する（applyは
 			// last-writer-winsで上書きするため、警告として差分サマリに載せる。
-			// Python版 team.py:1132-1141 の移植）。
+			// Python版 team.py:1132-1141 の移植）。mtimeがtStart以降というだけでは
+			// touchコマンドや無害な再書き込みでも誤検知するため、Gitが使える場合は
+			// 直近バックアップコミット(HEAD)時点の内容と実際に食い違うかまで確認する
+			// （conflictContentDiffers、Go版独自の精度向上）。
 			for _, f := range changed {
 				dst := filepath.Join(w.Lower, f)
-				if info, statErr := os.Stat(dst); statErr == nil && info.ModTime().After(tStart) {
+				info, statErr := os.Stat(dst)
+				if statErr != nil || !info.ModTime().After(tStart) {
+					continue
+				}
+				current, readErr := os.ReadFile(dst)
+				if readErr != nil {
+					conflictFiles = append(conflictFiles, f) // 読めない場合は判定不能として安全側に倒す
+					continue
+				}
+				if conflictContentDiffers(w.Lower, f, current) {
 					conflictFiles = append(conflictFiles, f)
 				}
 			}
@@ -373,7 +407,7 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 		if verifyCmd != "" && verifyExit != nil && *verifyExit == 0 {
 			noteReadonlyDelegation()
 		} else {
-			noteWriteDelegation(changed)
+			noteWriteDelegation(changed, verifyExit)
 		}
 	} else {
 		if len(changed) > 0 && discardedNote == "" {
@@ -422,7 +456,9 @@ func runWorkerInWorkroom(ctx context.Context, w *sandbox.Workroom, task, verifyC
 
 	// ── ハーネスによる機械判定（Workerの自己申告に依存しない注記） ──
 	// Python版 team.py::_run_delegation_core_inner の該当ロジックの移植。
-	harnessNote := ""
+	// w.ModeNote()はGo版独自の拡張: copy-modeフォールバックやsymlink欠落を
+	// 無警告のままにしないための可視化（internal/sandbox/overlay.go参照）。
+	harnessNote := w.ModeNote()
 	if applyChanges && len(changed) == 0 {
 		harnessNote += "\n\n⚠ ハーネス判定: 書き込み権限（can_write）の委任ですが、変更ファイルは0件でした。" +
 			"Workerの完了報告と矛盾する場合、タスクは実施されていない可能性があります。" +
@@ -502,15 +538,33 @@ type bestOfNAttemptResult struct {
 	passed   bool
 }
 
-// runBestOfNFallback は元のタスク（エラーフィードバック無し）を独立したOverlーで
-// BestOfNFallbackAttempts回並行して試行し、verifyCmdが最初に通過したものを返す。
+// bestOfNAttempts はBest-of-Nフォールバックの並行試行数を、このverify_cmdの
+// 学習実績（verifycmds.go）に応じて動的に決める。学習が無い/情報が取れない場合は
+// 既定値を返す。学習済みでFailsがPassesを上回っている（慢性的に不安定）場合のみ
+// 上限まで引き上げる——安定しているverify_cmdでコストの高い並行試行を毎回
+// 最大件数走らせるのは弱いモデル前提でも割に合わないため、悪化時のみ増やす。
+func bestOfNAttempts(projectDir, verifyCmd string) int {
+	if verifyCmd == "" {
+		return BestOfNFallbackAttemptsDefault
+	}
+	verifyCmdsMu.Lock()
+	entry, ok := loadVerifyCmds()[verifyCmdKey(projectDir)]
+	verifyCmdsMu.Unlock()
+	if !ok || entry.Cmd != verifyCmd || entry.Fails <= entry.Passes {
+		return BestOfNFallbackAttemptsDefault
+	}
+	return BestOfNFallbackAttemptsMax
+}
+
+// runBestOfNFallback は元のタスク（エラーフィードバック無し）を独立したOverlayで
+// attempts回並行して試行し、verifyCmdが最初に通過したものを返す。
 // どれも通過しなければ ok=false を返す。勝者以外のWorkroomはここでCleanupする
 // （呼び出し元は勝者のWorkroomをそのまま使い続けるか、ok=falseなら元のWorkroomを
 // 変更せず使い続ける）。
-func runBestOfNFallback(ctx context.Context, projectDir, task, rolePrompt, verifyCmd, traceIDBase, mimicBin string, keepSession bool, extraWritePaths []string) (*sandbox.Workroom, string, int, string, bool) {
-	results := make([]bestOfNAttemptResult, BestOfNFallbackAttempts)
+func runBestOfNFallback(ctx context.Context, projectDir, task, rolePrompt, verifyCmd, traceIDBase, mimicBin string, keepSession bool, extraWritePaths []string, attempts int) (*sandbox.Workroom, string, int, string, bool) {
+	results := make([]bestOfNAttemptResult, attempts)
 	var wg sync.WaitGroup
-	for i := 0; i < BestOfNFallbackAttempts; i++ {
+	for i := 0; i < attempts; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -714,6 +768,21 @@ func findSkillUsagesInUpper(upperDir string, changedFiles []string) []string {
 		}
 	}
 	return names
+}
+
+// conflictContentDiffers はconflictFiles判定（mtimeがtStart以降）の誤検知を減らすため、
+// 実際の内容が直近バックアップコミット(HEAD)時点と食い違うかを確認する。
+// teamAutoGitが未設定・Gitリポジトリでない・HEADにそのパスが無い等、判定材料が
+// 無い場合はtrue（＝従来通りmtimeのみで警告）を返し、判定を後退させない。
+func conflictContentDiffers(lower, relPath string, current []byte) bool {
+	if teamAutoGit == nil {
+		return true
+	}
+	headContent, ok := teamAutoGit.ShowHeadFile(lower, relPath)
+	if !ok {
+		return true
+	}
+	return !bytes.Equal(headContent, current)
 }
 
 func dedupe(files []string) []string {

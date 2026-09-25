@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Surim Clinic｜看診預約表</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --blue-50: #eff6ff;
+    --blue-100: #dbeafe;
+    --blue-600: #2563eb;
+    --blue-700: #1d4ed8;
+    --indigo-700: #4338ca;
+    --ink-900: #0f172a;
+    --ink-600: #475569;
+    --ink-400: #94a3b8;
+    --line: #e2e8f0;
+    --card: #ffffff;
+    --danger: #e11d48;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: #f1f5f9;
+    color: var(--ink-900);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 660px;
+    margin: 0 auto;
+    padding: 24px 16px 70px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    box-shadow: 0 16px 36px -18px rgba(15, 23, 42, 0.25);
+    overflow: hidden;
+  }
+  header.hero {
+    background: linear-gradient(120deg, var(--blue-700), var(--indigo-700));
+    padding: 34px 24px;
+    text-align: center;
+    color: #fff;
+  }
+  header.hero .icon-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.25);
+    margin-bottom: 12px;
+  }
+  header.hero h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  header.hero p {
+    margin: 8px 0 0;
+    font-size: 13.5px;
+    color: #dbeafe;
+    max-width: 420px;
+    margin-inline: auto;
+    line-height: 1.6;
+  }
+  form { padding: 26px 24px 30px; }
+  fieldset {
+    border: none;
+    margin: 0 0 22px;
+    padding: 0;
+  }
+  .section-title {
+    font-size: 12.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--ink-400);
+    margin: 0 0 12px;
+  }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  label.q {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-weight: 600;
+    font-size: 13.5px;
+    margin-bottom: 6px;
+  }
+  label.q .req { color: var(--danger); font-size: 11.5px; font-weight: 700; }
+  label.q .opt { color: var(--ink-400); font-size: 11.5px; }
+  input[type="text"],
+  input[type="email"],
+  input[type="date"],
+  input[type="time"],
+  select,
+  textarea {
+    width: 100%;
+    padding: 11px 13px;
+    font-size: 14.5px;
+    font-family: inherit;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--ink-900);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  textarea { resize: vertical; min-height: 74px; }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--blue-600);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  .field { margin-bottom: 14px; }
+
+  .consult-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .consult-card {
+    position: relative;
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .consult-card input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+  .consult-card:has(input:checked) {
+    border-color: var(--blue-600);
+    background: var(--blue-50);
+  }
+  .consult-card .ci-title {
+    font-weight: 700;
+    font-size: 13.5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .consult-card .ci-sub {
+    font-size: 11.5px;
+    color: var(--ink-400);
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+
+  .menu-cards { display: flex; flex-direction: column; gap: 10px; }
+  .menu-card { border: 1.5px solid var(--line); border-radius: 14px; background: #fbfcfe; overflow: hidden; }
+  .menu-card:has(.detail-item-checkbox:checked) { border-color: var(--blue-600); }
+  .menu-card-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 13px; gap: 10px; cursor: pointer; transition: background .15s; }
+  .menu-card-head:hover, .menu-card-head:focus-visible { background: var(--blue-50); }
+  .menu-card-title { font-weight: 700; font-size: 13.5px; flex: 1; min-width: 0; }
+  .price-row--counsel .price-name { color: var(--blue-700); }
+  .price-row--counsel .price-val { color: var(--ink-400); font-size: 11.5px; }
+  .menu-card-chevron {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0; width: 22px; height: 22px;
+    color: var(--ink-400);
+    transition: transform 0.2s ease, color 0.2s ease;
+  }
+  .menu-card-head:hover .menu-card-chevron { color: var(--blue-700); }
+  .menu-card-head[data-open="true"] .menu-card-chevron { transform: rotate(180deg); }
+  .price-preview { display: none; border-top: 1px solid var(--line); background: #fff; padding: 4px 13px 8px; }
+  .price-preview.is-open { display: block; }
+  .price-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 2px; border-bottom: 1px dashed var(--line); font-size: 13px; cursor: pointer; border-radius: 8px;
+  }
+  .price-row:last-child { border-bottom: none; }
+  .price-row:hover { background: var(--blue-50); }
+  .price-row:has(.detail-item-checkbox:checked) { background: var(--blue-100); }
+  .price-name-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .price-name { color: var(--ink-900); font-weight: 500; }
+  .price-val { color: var(--blue-700); font-weight: 700; white-space: nowrap; font-size: 13px; }
+  .detail-item-checkbox { width: 15px; height: 15px; accent-color: var(--blue-600); flex-shrink: 0; cursor: pointer; }
+
+  .mounjaro-banner { margin: 4px -1px 0; padding: 11px 13px; border-radius: 12px; background: linear-gradient(120deg, var(--blue-700), var(--indigo-700)); color: #fff; }
+  .mounjaro-banner-title { font-weight: 800; font-size: 13.5px; }
+  .mounjaro-banner-sub { font-size: 11.5px; opacity: .9; margin-top: 2px; }
+  .mounjaro-price-note { text-align: center; font-size: 11px; color: var(--ink-400); font-weight: 600; padding: 8px 0 2px; }
+  .mounjaro-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-bottom: 4px; }
+  .mounjaro-col { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+  .mounjaro-col-head { text-align: center; padding: 6px 2px; color: #fff; font-size: 10.5px; font-weight: 800; }
+  .mounjaro-col-head.a { background: #4f46e5; }
+  .mounjaro-col-head.b { background: var(--blue-600); }
+  .mounjaro-col-head.c { background: #0d9488; }
+  .mounjaro-row { display: flex; justify-content: space-between; align-items: center; gap: 4px; padding: 5px 6px; font-size: 10.5px; border-bottom: 1px dashed var(--line); cursor: pointer; }
+  .mounjaro-row:last-child { border-bottom: none; }
+  .mounjaro-row:hover { background: var(--blue-50); }
+  .mounjaro-row:has(.detail-item-checkbox:checked) { background: var(--blue-100); }
+  .mounjaro-row .detail-item-checkbox { width: 12px; height: 12px; }
+  .mounjaro-row-name { display: flex; align-items: center; gap: 4px; }
+  .mounjaro-row-val { font-weight: 700; color: var(--blue-700); white-space: nowrap; }
+
+  .hint { margin-top: 8px; font-size: 12px; color: var(--ink-400); }
+
+  .pref-slot {
+    padding: 13px; background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px;
+  }
+  .pref-slot-label { font-size: 12px; font-weight: 700; color: var(--ink-600); display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .pref-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue-600); }
+  .pref-dot.optional { background: var(--ink-400); }
+
+  .submit-btn {
+    width: 100%;
+    padding: 15px 0;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: inherit;
+    color: #fff;
+    background: linear-gradient(120deg, var(--blue-600), var(--indigo-700));
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    box-shadow: 0 10px 24px -10px rgba(37, 99, 235, 0.6);
+  }
+  .submit-btn:disabled { opacity: .6; cursor: not-allowed; }
+  .footnote { text-align: center; color: var(--ink-400); font-size: 12px; margin-top: 14px; line-height: 1.6; }
+
+  #result { display: none; }
+  .panel { border-radius: var(--radius); padding: 40px 26px; text-align: center; }
+  .panel.ok { background: #ecfdf5; border: 1px solid #d1fae5; }
+  .panel.err { background: #fef2f2; border: 1px solid #fecaca; }
+  .panel .icon { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+  .panel.ok .icon { background: #059669; }
+  .panel.err .icon { background: var(--danger); }
+  .panel .icon svg { width: 26px; height: 26px; stroke: #fff; }
+  .panel h2 { margin: 0 0 8px; font-size: 19px; font-weight: 800; }
+  .panel p { margin: 0; color: var(--ink-600); font-size: 14px; line-height: 1.6; }
+
+  @media (max-width: 520px) {
+    .grid2 { grid-template-columns: 1fr; }
+    .consult-options { grid-template-columns: 1fr; }
+    form { padding: 20px 16px 26px; }
+    header.hero { padding: 28px 18px; }
+    header.hero h1 { font-size: 19px; }
+    .menu-card-head { flex-wrap: wrap; row-gap: 8px; }
+    .menu-card-label { flex: 1 1 100%; }
+    .btn-view-price { margin-left: 27px; }
+    .price-row { flex-wrap: wrap; row-gap: 4px; }
+    .price-name-wrap { flex: 1 1 100%; min-width: 0; }
+    .price-val { margin-left: auto; }
+    .mounjaro-grid { grid-template-columns: 1fr; gap: 8px; }
+    .mounjaro-row { font-size: 12.5px; padding: 7px 8px; }
+    .mounjaro-row .detail-item-checkbox { width: 14px; height: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="formWrap">
+  <div class="card">
+    <header class="hero">
+      <div class="icon-badge">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
+      </div>
+      <h1>Surim Clinic｜看診預約表</h1>
+      <p>請填寫以下資料，我們將依照您提供的時間與您聯繫，安排看診事宜。</p>
+    </header>
+
+    <form id="reserveForm">
+      <fieldset>
+        <div class="section-title">基本資料</div>
+        <div class="grid2">
+          <div class="field">
+            <label class="q" for="name"><span>您的姓名（中文）</span><span class="req">*必填</span></label>
+            <input type="text" id="name" name="name" required placeholder="例：王小明" />
+          </div>
+          <div class="field">
+            <label class="q" for="passportName"><span>護照英文姓名／拼音</span><span class="opt">建議填寫</span></label>
+            <input type="text" id="passportName" name="passportName" placeholder="例：WANG, XIAO-MING" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="q" for="email"><span>電子信箱</span><span class="req">*必填</span></label>
+          <input type="email" id="email" name="email" required placeholder="例：example@email.com" />
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <div class="section-title">看診方式與項目選擇</div>
+        <div class="field">
+          <label class="q"><span>看診方式（診察形式）</span><span class="req">*必填</span></label>
+          <div class="consult-options">
+            <label class="consult-card">
+              <input type="radio" name="consultType" value="線上看診" required checked />
+              <div>
+                <div class="ci-title">線上看診</div>
+                <div class="ci-sub">透過視訊／電話問診，免出門、隱私度高</div>
+              </div>
+            </label>
+            <label class="consult-card">
+              <input type="radio" name="consultType" value="到院看診" />
+              <div>
+                <div class="ci-title">到院看診（實體對面）</div>
+                <div class="ci-sub">親自至診所與醫師面對面諮詢</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="q"><span>看診項目</span><span class="req">*必填</span></label>
+          <div class="menu-cards" id="menuOptions">
+
+            <!-- 醫療瘦身（含猛健樂） -->
+            <div class="menu-card">
+              <div class="menu-card-head" data-target="preview-diet">
+                <span class="menu-card-title">醫療瘦身（口服減重藥）</span>
+                <span class="menu-card-chevron" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </span>
+              </div>
+              <div class="price-preview" id="preview-diet">
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="司美格魯肽（Rybelsus）3mg"><span class="price-name">司美格魯肽（Rybelsus）3mg</span></span><span class="price-val">¥10,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="司美格魯肽（Rybelsus）7mg"><span class="price-name">司美格魯肽（Rybelsus）7mg</span></span><span class="price-val">¥20,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="司美格魯肽（Rybelsus）14mg"><span class="price-name">司美格魯肽（Rybelsus）14mg</span></span><span class="price-val">¥30,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="二甲雙胍 250mg"><span class="price-name">二甲雙胍 250mg</span></span><span class="price-val">¥10,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="二甲雙胍 500mg"><span class="price-name">二甲雙胍 500mg</span></span><span class="price-val">¥10,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="達格列淨 5mg"><span class="price-name">達格列淨 5mg</span></span><span class="price-val">¥15,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="達格列淨 10mg"><span class="price-name">達格列淨 10mg</span></span><span class="price-val">¥15,000</span></label>
+
+                <div class="mounjaro-banner">
+                  <div class="mounjaro-banner-title">猛健樂（Mounjaro）處方方案</div>
+                  <div class="mounjaro-banner-sub">與醫師討論後，安排不勉強的治療計畫</div>
+                </div>
+                <div class="mounjaro-price-note">各方案為稅込價格／月</div>
+                <div class="mounjaro-grid">
+                  <div class="mounjaro-col">
+                    <div class="mounjaro-col-head a">6個月處方</div>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 6個月處方 2.5mg"><span>2.5mg</span></span><span class="mounjaro-row-val">¥7,180</span></label>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 6個月處方 5mg"><span>5mg</span></span><span class="mounjaro-row-val">¥13,090</span></label>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 6個月處方 7.5mg"><span>7.5mg</span></span><span class="mounjaro-row-val">¥20,220</span></label>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 6個月處方 10mg"><span>10mg</span></span><span class="mounjaro-row-val">¥26,280</span></label>
+                  </div>
+                  <div class="mounjaro-col">
+                    <div class="mounjaro-col-head b">2~5個月處方</div>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 2~5個月處方 2.5mg"><span>2.5mg</span></span><span class="mounjaro-row-val">¥8,880</span></label>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 2~5個月處方 5mg"><span>5mg</span></span><span class="mounjaro-row-val">¥14,880</span></label>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 2~5個月處方 7.5mg"><span>7.5mg</span></span><span class="mounjaro-row-val">¥22,880</span></label>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 2~5個月處方 10mg"><span>10mg</span></span><span class="mounjaro-row-val">¥28,400</span></label>
+                  </div>
+                  <div class="mounjaro-col">
+                    <div class="mounjaro-col-head c">1個月處方</div>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 1個月處方 2.5mg"><span>2.5mg</span></span><span class="mounjaro-row-val">¥9,880</span></label>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 1個月處方 5mg"><span>5mg</span></span><span class="mounjaro-row-val">¥15,880</span></label>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 1個月處方 7.5mg"><span>7.5mg</span></span><span class="mounjaro-row-val">¥23,880</span></label>
+                    <label class="mounjaro-row"><span class="mounjaro-row-name"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="猛健樂 1個月處方 10mg"><span>10mg</span></span><span class="mounjaro-row-val">¥29,400</span></label>
+                  </div>
+                </div>
+                <label class="price-row price-row--counsel"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="醫療瘦身（口服減重藥）" value="諮詢時再決定"><span class="price-name">諮詢時再決定</span></span><span class="price-val">—</span></label>
+              </div>
+            </div>
+
+            <!-- AGA 雄性禿治療 -->
+            <div class="menu-card">
+              <div class="menu-card-head" data-target="preview-aga">
+                <span class="menu-card-title">AGA 雄性禿治療</span>
+                <span class="menu-card-chevron" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </span>
+              </div>
+              <div class="price-preview" id="preview-aga">
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="米諾地爾 5mg"><span class="price-name">米諾地爾 5mg</span></span><span class="price-val">¥3,080</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="非那雄胺 1mg"><span class="price-name">非那雄胺 1mg</span></span><span class="price-val">¥4,730</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="螺內酯"><span class="price-name">螺內酯</span></span><span class="price-val">¥4,730</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="度他雄胺 0.5mg"><span class="price-name">度他雄胺 0.5mg</span></span><span class="price-val">¥6,600</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="米諾地爾5mg + 非那雄胺1mg 複方"><span class="price-name">米諾地爾5mg + 非那雄胺1mg 複方</span></span><span class="price-val">¥7,700</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="米諾地爾5mg + 度他雄胺0.5mg 複方"><span class="price-name">米諾地爾5mg + 度他雄胺0.5mg 複方</span></span><span class="price-val">¥8,800</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="Haechoru 原創注入液"><span class="price-name">Haechoru 原創注入液</span></span><span class="price-val">¥37,400</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="Haechoru FRESH（強化型）"><span class="price-name">Haechoru FRESH（強化型）</span></span><span class="price-val">¥47,400</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="外泌體（2cc/次）：脂肪來源"><span class="price-name">外泌體（2cc/次）：脂肪來源</span></span><span class="price-val">¥25,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="頂級外泌體（2cc/次）：臍帶來源"><span class="price-name">頂級外泌體（2cc/次）：臍帶來源</span></span><span class="price-val">¥50,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="肌膚修護填充 30cm²"><span class="price-name">肌膚修護填充 30cm²</span></span><span class="price-val">¥60,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="肌膚修護填充 60cm²"><span class="price-name">肌膚修護填充 60cm²</span></span><span class="price-val">¥120,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="肌膚修護填充 90cm²"><span class="price-name">肌膚修護填充 90cm²</span></span><span class="price-val">¥180,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="Haechoru 原創注入液（標準6次）"><span class="price-name">Haechoru 原創注入液（標準6次）</span></span><span class="price-val">¥187,490</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="Haechoru 原創注入液（進階7次）"><span class="price-name">Haechoru 原創注入液（進階7次）</span></span><span class="price-val">¥299,890</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="Haechoru 原創注入液（頂級12次）"><span class="price-name">Haechoru 原創注入液（頂級12次）</span></span><span class="price-val">¥411,890</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="Haechoru FRESH（強化型）標準6次"><span class="price-name">Haechoru FRESH（強化型）標準6次</span></span><span class="price-val">¥244,990</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="Haechoru FRESH（強化型）進階9次"><span class="price-name">Haechoru FRESH（強化型）進階9次</span></span><span class="price-val">¥387,190</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="Haechoru FRESH（強化型）頂級12次"><span class="price-name">Haechoru FRESH（強化型）頂級12次</span></span><span class="price-val">¥529,390</span></label>
+                <label class="price-row price-row--counsel"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA 雄性禿治療" value="諮詢時再決定"><span class="price-name">諮詢時再決定</span></span><span class="price-val">—</span></label>
+              </div>
+            </div>
+
+            <!-- ED治療藥物 -->
+            <div class="menu-card">
+              <div class="menu-card-head" data-target="preview-ed">
+                <span class="menu-card-title">ED 治療藥物</span>
+                <span class="menu-card-chevron" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </span>
+              </div>
+              <div class="price-preview" id="preview-ed">
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="西地那非"><span class="price-name">西地那非</span></span><span class="price-val">¥1,650</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="伐地那非"><span class="price-name">伐地那非</span></span><span class="price-val">¥1,870</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="他達拉非 20mg"><span class="price-name">他達拉非 20mg</span></span><span class="price-val">¥1,540</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="Zalutia 1個月份（30錠）"><span class="price-name">Zalutia 1個月份（30錠）</span></span><span class="price-val">¥10,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="可洛米分（Clomid）1個月份（30錠）"><span class="price-name">可洛米分（Clomid）1個月份（30錠）</span></span><span class="price-val">¥10,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="達泊西汀（8錠）"><span class="price-name">達泊西汀（8錠）</span></span><span class="price-val">¥10,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="體驗3種組合"><span class="price-name">體驗3種組合</span></span><span class="price-val">¥3,980</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="Oripl套組"><span class="price-name">Oripl套組</span></span><span class="price-val">¥10,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="原創注入液 50單位"><span class="price-name">原創注入液 50單位</span></span><span class="price-val">¥34,900</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="睪固酮 A"><span class="price-name">睪固酮 A</span></span><span class="price-val">¥15,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="睪固酮 A+"><span class="price-name">睪固酮 A+</span></span><span class="price-val">¥25,000</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="訂閱方案 Lite"><span class="price-name">訂閱方案 Lite</span></span><span class="price-val">¥19,800</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="訂閱方案 標準"><span class="price-name">訂閱方案 標準</span></span><span class="price-val">¥29,800</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="訂閱方案 頂級"><span class="price-name">訂閱方案 頂級</span></span><span class="price-val">¥49,800</span></label>
+                <label class="price-row price-row--counsel"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED 治療藥物" value="諮詢時再決定"><span class="price-name">諮詢時再決定</span></span><span class="price-val">—</span></label>
+              </div>
+            </div>
+
+            <!-- 美容口服藥 -->
+            <div class="menu-card">
+              <div class="menu-card-head" data-target="preview-skin">
+                <span class="menu-card-title">美容口服藥</span>
+                <span class="menu-card-chevron" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </span>
+              </div>
+              <div class="price-preview" id="preview-skin">
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容口服藥" value="【美白組合】淡斑內服3種（服用避孕藥者 NG）"><span class="price-name">【美白組合】淡斑內服3種（服用避孕藥者 NG）</span></span><span class="price-val">¥3,795</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容口服藥" value="【美白組合】淡斑內服3種（服用避孕藥者 OK）"><span class="price-name">【美白組合】淡斑內服3種（服用避孕藥者 OK）</span></span><span class="price-val">¥3,135</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容口服藥" value="Copela（30日份）"><span class="price-name">Copela（30日份）</span></span><span class="price-val">¥1,210</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容口服藥" value="維他命C CP（30日份）"><span class="price-name">維他命C CP（30日份）</span></span><span class="price-val">¥1,210</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容口服藥" value="傳明酸（30日份）"><span class="price-name">傳明酸（30日份）</span></span><span class="price-val">¥1,870</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容口服藥" value="Haichiol（30日份）"><span class="price-name">Haichiol（30日份）</span></span><span class="price-val">¥1,210</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容口服藥" value="Neurovitan（30日份）"><span class="price-name">Neurovitan（30日份）</span></span><span class="price-val">¥1,100</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容口服藥" value="核黃素 B2（30日份）"><span class="price-name">核黃素 B2（30日份）</span></span><span class="price-val">¥1,210</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容口服藥" value="吡多醛 B6（30日份）"><span class="price-name">吡多醛 B6（30日份）</span></span><span class="price-val">¥1,210</span></label>
+                <label class="price-row"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容口服藥" value="鎮靜面膜"><span class="price-name">鎮靜面膜</span></span><span class="price-val">¥1,500</span></label>
+                <label class="price-row price-row--counsel"><span class="price-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容口服藥" value="諮詢時再決定"><span class="price-name">諮詢時再決定</span></span><span class="price-val">—</span></label>
+              </div>
+            </div>
+
+          </div>
+          <p class="hint">請在各項目的「查看價目表」中選擇至少一項具體商品（可複選）。若尚未決定，請選擇「諮詢時再決定」。</p>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <div class="section-title">希望診療日期與時段</div>
+        <p class="hint" style="margin-top:-6px; margin-bottom: 12px;">為順利安排一對一諮詢，請盡量提供 2～3 個方便的時段。</p>
+
+        <div class="pref-slot">
+          <div class="pref-slot-label"><span class="pref-dot"></span>第一希望時段（必填）</div>
+          <div class="grid2">
+            <input type="date" id="date1" name="date1" required />
+            <input type="time" id="time1" name="time1" required value="18:00" />
+          </div>
+        </div>
+        <div class="pref-slot">
+          <div class="pref-slot-label"><span class="pref-dot optional"></span>第二希望時段（選填）</div>
+          <div class="grid2">
+            <input type="date" id="date2" name="date2" />
+            <input type="time" id="time2" name="time2" value="19:00" />
+          </div>
+        </div>
+        <div class="pref-slot">
+          <div class="pref-slot-label"><span class="pref-dot optional"></span>第三希望時段（選填）</div>
+          <div class="grid2">
+            <input type="date" id="date3" name="date3" />
+            <input type="time" id="time3" name="time3" value="20:00" />
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <div class="field">
+          <label class="q" for="notes"><span>提問或特殊需求</span><span class="opt">選填</span></label>
+          <textarea id="notes" name="notes" placeholder="若有任何疑問或想諮詢的具體藥品，歡迎於此填寫..."></textarea>
+        </div>
+      </fieldset>
+
+      <button type="submit" class="submit-btn" id="submitBtn">送出看診預約</button>
+      <p class="footnote">您的個人隱私與預約資料將受到加密保護</p>
+    </form>
+  </div>
+</div>
+
+<div id="result"></div>
+
+<script>
+  const form = document.getElementById('reserveForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const formWrap = document.getElementById('formWrap');
+  const resultEl = document.getElementById('result');
+
+  document.querySelectorAll('.menu-card-head[data-target]').forEach((head) => {
+    head.setAttribute('role', 'button');
+    head.setAttribute('tabindex', '0');
+    const toggle = () => {
+      const preview = document.getElementById(head.dataset.target);
+      const isOpen = preview.classList.toggle('is-open');
+      head.setAttribute('data-open', isOpen ? 'true' : 'false');
+    };
+    head.addEventListener('click', toggle);
+    head.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      }
+    });
+  });
+
+  const detailItemCheckboxes = document.querySelectorAll('.detail-item-checkbox');
+
+  function getSelectedDetailItemsByCategory() {
+    const byCategory = {};
+    detailItemCheckboxes.forEach((cb) => {
+      if (cb.checked) {
+        (byCategory[cb.dataset.category] = byCategory[cb.dataset.category] || []).push(cb.value);
+      }
+    });
+    return byCategory;
+  }
+
+  function renderResult(ok, message) {
+    formWrap.style.display = 'none';
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `
+      <div class="wrap"><div class="panel ${ok ? 'ok' : 'err'}">
+        <div class="icon">
+          ${ok
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5M12 16h.01M12 21a9 9 0 100-18 9 9 0 000 18z"/></svg>'}
+        </div>
+        <h2>${ok ? '預約資料已送出！' : '傳送時發生異常'}</h2>
+        <p>${message}</p>
+      </div></div>
+    `;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const detailByCategory = getSelectedDetailItemsByCategory();
+    if (Object.keys(detailByCategory).length === 0) {
+      alert('請至少選擇一項看診商品。');
+      return;
+    }
+    const menu = Object.entries(detailByCategory)
+      .map(([cat, details]) => `${cat}(${details.join('・')})`)
+      .join('、');
+
+    let scheduleParts = [];
+    if (form.date1.value) scheduleParts.push(`第1希望: ${form.date1.value} ${form.time1.value}`);
+    if (form.date2.value) scheduleParts.push(`第2希望: ${form.date2.value} ${form.time2.value}`);
+    if (form.date3.value) scheduleParts.push(`第3希望: ${form.date3.value} ${form.time3.value}`);
+
+    const payload = {
+      name: form.name.value.trim(),
+      passportName: form.passportName.value.trim() || '-',
+      email: form.email.value.trim(),
+      consultType: form.consultType.value,
+      menu,
+      preferredSchedule: scheduleParts.join(' / '),
+      notes: form.notes.value.trim() || '無',
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '正在送出預約中...';
+    try {
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('server_error');
+      renderResult(true, '資料已送達診所，我們將依照您填寫的時間與您聯繫。');
+    } catch (err) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '送出看診預約';
+      renderResult(false, '預約傳送時發生異常，請確認網路連線或稍後再試。');
+    }
+  });
+</script>
+</body>
+</html>

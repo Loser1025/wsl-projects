@@ -8,6 +8,7 @@ const auth = await getAuthorizedClient();
 const slides = google.slides({ version: "v1", auth });
 const sheets = google.sheets({ version: "v4", auth });
 const docs = google.docs({ version: "v1", auth });
+const forms = google.forms({ version: "v1", auth });
 
 const server = new McpServer({ name: "google-workspace-mcp", version: "1.0.0" });
 
@@ -209,6 +210,57 @@ server.registerTool(
       documentId,
       requestBody: { requests: [{ insertText: { text: insertText, location: { index } } }] },
     });
+    return text(res.data);
+  },
+);
+
+// ---------- Forms ----------
+
+server.registerTool(
+  "forms_get",
+  {
+    description: "Get the full structure (title, description, items/questions) of a Google Form.",
+    inputSchema: { formId: z.string() },
+  },
+  async ({ formId }) => {
+    const res = await forms.forms.get({ formId });
+    return text(res.data);
+  },
+);
+
+server.registerTool(
+  "forms_batch_update",
+  {
+    description:
+      "Apply a batchUpdate to a form using raw Google Forms API request objects (https://developers.google.com/forms/api/reference/rest/v1/forms/batchUpdate). Use for adding/editing/deleting/reordering questions, updating title/description, etc.",
+    inputSchema: { formId: z.string(), requests: z.array(z.record(z.any())) },
+  },
+  async ({ formId, requests }) => {
+    const res = await forms.forms.batchUpdate({ formId, requestBody: { requests } });
+    return text(res.data);
+  },
+);
+
+server.registerTool(
+  "forms_create",
+  {
+    description: "Create a new Google Form with the given title. Returns the new form's formId.",
+    inputSchema: { title: z.string() },
+  },
+  async ({ title }) => {
+    const res = await forms.forms.create({ requestBody: { info: { title } } });
+    return text(res.data);
+  },
+);
+
+server.registerTool(
+  "forms_list_responses",
+  {
+    description: "List submitted responses for a Google Form.",
+    inputSchema: { formId: z.string() },
+  },
+  async ({ formId }) => {
+    const res = await forms.forms.responses.list({ formId });
     return text(res.data);
   },
 );

@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "authorize": "tsx src/authorize.ts",
     "whoami": "tsx src/whoami.ts",
     "start": "node dist/server.js",
     "dev": "tsx src/server.ts"

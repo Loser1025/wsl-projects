@@ -1,0 +1,77 @@
+- generic [ref=f10e2]:
+  - banner [ref=f10e3]:
+    - generic [ref=f10e4]: SLIM CLINIC
+    - heading "슬림클리닉 진료 예약 신청서" [level=1] [ref=f10e7]
+    - paragraph [ref=f10e8]: 온라인 진료 예약을 위해 희망하시는 날짜와 시간을 확인하는 설문지입니다.담당자가 확인 후 안내드립니다.
+  - generic [ref=f10e9]:
+    - group [ref=f10e10]:
+      - generic [ref=f10e11]: 이름*
+      - textbox "이름*" [ref=f10e12]:
+        - /placeholder: 홍길동
+    - group [ref=f10e13]:
+      - generic [ref=f10e14]: 이메일 주소*
+      - textbox "이메일 주소*" [ref=f10e15]:
+        - /placeholder: example@email.com
+    - group [ref=f10e16]:
+      - generic [ref=f10e17]: 희망하시는 진료 형식*
+      - generic [ref=f10e18]:
+        - generic [ref=f10e19]:
+          - radio "온라인 진료" [ref=f10e20] [cursor=pointer]
+          - generic [ref=f10e21]: 온라인 진료
+        - generic [ref=f10e22]:
+          - radio "대면 진료" [ref=f10e23] [cursor=pointer]
+          - generic [ref=f10e24]: 대면 진료
+    - group [ref=f10e25]:
+      - generic [ref=f10e26]: 희망하시는 메뉴*
+      - generic [ref=f10e27]:
+        - generic [ref=f10e29]:
+          - generic [ref=f10e30] [cursor=pointer]:
+            - checkbox "의료 다이어트(다이어트 약)" [ref=f10e31]
+            - generic [ref=f10e32]: 의료 다이어트(다이어트 약)
+          - button "가격표 보기" [ref=f10e33] [cursor=pointer]
+        - generic [ref=f10e35]:
+          - generic [ref=f10e36] [cursor=pointer]:
+            - checkbox "AGA" [ref=f10e37]
+            - generic [ref=f10e38]: AGA
+          - button "가격표 보기" [ref=f10e39] [cursor=pointer]
+        - generic [ref=f10e41]:
+          - generic [ref=f10e42] [cursor=pointer]:
+            - checkbox "ED" [ref=f10e43]
+            - generic [ref=f10e44]: ED
+          - button "가격표 보기" [ref=f10e45] [cursor=pointer]
+        - generic [ref=f10e47]:
+          - generic [ref=f10e48] [cursor=pointer]:
+            - checkbox "미용 내복약" [ref=f10e49]
+            - generic [ref=f10e50]: 미용 내복약
+          - button "가격표 보기" [ref=f10e51] [cursor=pointer]
+      - paragraph [ref=f10e52]: 중복 선택 가능합니다. 각 카테고리의 "가격표 보기"를 눌러 원하시는 상품을 선택할 수 있습니다.
+    - group [ref=f10e53]:
+      - generic [ref=f10e54]: 희망 날짜*
+      - textbox "희망 날짜*" [ref=f10e55]
+    - group [ref=f10e56]:
+      - generic [ref=f10e57]: 희망 시간*
+      - combobox "희망 시간*" [ref=f10e58]:
+        - option "시간을 선택해 주세요" [disabled] [selected]
+        - option "09:00"
+        - option "09:30"
+        - option "10:00"
+        - option "10:30"
+        - option "11:00"
+        - option "11:30"
+        - option "12:00"
+        - option "12:30"
+        - option "13:00"
+        - option "13:30"
+        - option "14:00"
+        - option "14:30"
+        - option "15:00"
+        - option "15:30"
+        - option "16:00"
+        - option "16:30"
+        - option "17:00"
+        - option "17:30"
+        - option "18:00"
+        - option "18:30"
+        - option "19:00"
+    - button "예약 신청하기" [ref=f10e60] [cursor=pointer]
+  - paragraph [ref=f10e61]: 입력하신 정보는 예약 확인 목적으로만 사용됩니다.

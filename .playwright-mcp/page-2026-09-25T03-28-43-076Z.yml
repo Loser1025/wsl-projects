@@ -1,0 +1,417 @@
+- generic [ref=f5e2]:
+  - generic [ref=f5e3]:
+    - generic [ref=f5e6]:
+      - generic [ref=f5e8]:
+        - generic [ref=f5e10]:
+          - heading "事前問診票（医療ダイエット）" [level=1] [ref=f5e12]
+          - generic [ref=f5e13]: ご来院前にご記入いただく事前問診票です。ご回答内容は診療目的にのみ使用し、厳重に管理いたします。
+        - generic [ref=f5e15]:
+          - generic [ref=f5e17]:
+            - link "Google にログイン" [ref=f5e18] [cursor=pointer]:
+              - /url: https://accounts.google.com/Login?continue=https%3A%2F%2Fdocs.google.com%2Fforms%2Fd%2Fe%2F1FAIpQLScYS-J_QCo6FF-hjl3ATXV5FjQtn4-CBM9pb7g_rijLpDr47Q%2Fviewform%3Fentry.832136283%26entry.1972171989%26entry.1095312025%26entry.271432558%26entry.1817434144%26entry.101668590%26entry.494946271%26entry.1570703570%26entry.1992805984%26entry.1778269746%26entry.2090329508%26entry.417393609%26entry.1918947696%26entry.591502670%26entry.355581069%26entry.779406584%26entry.1995751154%26entry.919719970%26entry.1167749848%3D%25E6%25A4%259C%25E8%25A8%258E%25E3%2581%2597%25E3%2581%259F%25E3%2581%2593%25E3%2581%25A8%25E3%2581%25AF%25E3%2581%2582%25E3%2582%258B%25E3%2581%258C%25E3%2580%2581%25E5%25AE%259F%25E9%259A%259B%25E3%2581%25AB%25E3%2581%25AF%25E8%25A1%258C%25E3%2581%25A3%25E3%2581%25A6%25E3%2581%2584%25E3%2581%25AA%25E3%2581%2584%26fbzx%3D-260622352950594433
+            - text: すると作業内容を保存できます。
+            - button "詳細" [ref=f5e19] [cursor=pointer]
+          - generic [aria-hidden] [ref=f5e21]: "* 必須の質問です"
+      - list [ref=f5e22]:
+        - listitem [ref=f5e23]:
+          - generic [ref=f5e25]:
+            - heading "患者ID 必須の質問" [level=3] [ref=f5e28]:
+              - generic [ref=f5e29]: 患者ID
+              - generic "必須の質問" [ref=f5e30]: "*"
+            - generic [ref=f5e35]:
+              - textbox "患者ID 必須の質問" [ref=f5e36]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e38]:
+          - generic [ref=f5e40]:
+            - heading "郵便番号 必須の質問" [level=3] [ref=f5e43]:
+              - generic [ref=f5e44]: 郵便番号
+              - generic "必須の質問" [ref=f5e45]: "*"
+            - generic [ref=f5e50]:
+              - textbox "郵便番号 必須の質問" [ref=f5e51]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e53]:
+          - generic [ref=f5e55]:
+            - heading "住所 必須の質問" [level=3] [ref=f5e58]:
+              - generic [ref=f5e59]: 住所
+              - generic "必須の質問" [ref=f5e60]: "*"
+            - generic [ref=f5e65]:
+              - textbox "住所 必須の質問" [ref=f5e66]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e68]:
+          - generic [ref=f5e70]:
+            - heading "氏名 必須の質問" [level=3] [ref=f5e73]:
+              - generic [ref=f5e74]: 氏名
+              - generic "必須の質問" [ref=f5e75]: "*"
+            - generic [ref=f5e80]:
+              - textbox "氏名 必須の質問" [ref=f5e81]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e83]:
+          - generic [ref=f5e85]:
+            - heading "氏名（フリガナ） 必須の質問" [level=3] [ref=f5e88]:
+              - generic [ref=f5e89]: 氏名（フリガナ）
+              - generic "必須の質問" [ref=f5e90]: "*"
+            - generic [ref=f5e95]:
+              - textbox "氏名（フリガナ） 必須の質問" [ref=f5e96]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e98]:
+          - generic [ref=f5e100]:
+            - heading "電話番号 必須の質問" [level=3] [ref=f5e103]:
+              - generic [ref=f5e104]: 電話番号
+              - generic "必須の質問" [ref=f5e105]: "*"
+            - generic [ref=f5e110]:
+              - textbox "電話番号 必須の質問" [ref=f5e111]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e113]:
+          - generic [ref=f5e115]:
+            - heading "メールアドレス 必須の質問" [level=3] [ref=f5e118]:
+              - generic [ref=f5e119]: メールアドレス
+              - generic "必須の質問" [ref=f5e120]: "*"
+            - generic [ref=f5e125]:
+              - textbox "メールアドレス 必須の質問" [ref=f5e126]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e128]:
+          - generic [ref=f5e130]:
+            - heading "生年月日 必須の質問" [level=3] [ref=f5e133]:
+              - generic [ref=f5e134]: 生年月日
+              - generic "必須の質問" [ref=f5e135]: "*"
+            - generic "生年月日 必須の質問" [ref=f5e138]:
+              - generic [ref=f5e140]:
+                - generic [ref=f5e141]: MM
+                - combobox "月" [ref=f5e146]
+              - generic [ref=f5e148]: /
+              - generic [ref=f5e150]:
+                - generic [ref=f5e151]: DD
+                - combobox "日付" [ref=f5e156]
+        - listitem [ref=f5e158]:
+          - generic [ref=f5e160]:
+            - heading "性別 必須の質問" [level=3] [ref=f5e163]:
+              - generic [ref=f5e164]: 性別
+              - generic "必須の質問" [ref=f5e165]: "*"
+            - radiogroup "性別 必須の質問" [ref=f5e168]:
+              - generic [ref=f5e169]:
+                - generic [ref=f5e172]:
+                  - radio "男性" [ref=f5e830] [cursor=pointer]
+                  - generic [ref=f5e174]: 男性
+                - generic [ref=f5e179]:
+                  - radio "女性" [ref=f5e833] [cursor=pointer]
+                  - generic [ref=f5e181]: 女性
+        - listitem [ref=f5e184]:
+          - generic [ref=f5e186]:
+            - heading "ご職業 必須の質問" [level=3] [ref=f5e189]:
+              - generic [ref=f5e190]: ご職業
+              - generic "必須の質問" [ref=f5e191]: "*"
+            - generic [ref=f5e196]:
+              - textbox "ご職業 必須の質問" [ref=f5e197]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e199]:
+          - generic [ref=f5e201]:
+            - heading "お仕事内容 必須の質問" [level=3] [ref=f5e204]:
+              - generic [ref=f5e205]: お仕事内容
+              - generic "必須の質問" [ref=f5e206]: "*"
+            - generic [ref=f5e211]:
+              - textbox "お仕事内容 必須の質問" [ref=f5e212]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e214]:
+          - generic [ref=f5e216]:
+            - heading "身長(cm) 必須の質問" [level=3] [ref=f5e219]:
+              - generic [ref=f5e220]: 身長(cm)
+              - generic "必須の質問" [ref=f5e221]: "*"
+            - generic [ref=f5e226]:
+              - textbox "身長(cm) 必須の質問" [ref=f5e227]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e229]:
+          - generic [ref=f5e231]:
+            - heading "体重(kg) 必須の質問" [level=3] [ref=f5e234]:
+              - generic [ref=f5e235]: 体重(kg)
+              - generic "必須の質問" [ref=f5e236]: "*"
+            - generic [ref=f5e241]:
+              - textbox "体重(kg) 必須の質問" [ref=f5e242]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e244]:
+          - generic [ref=f5e246]:
+            - heading "現在のご家庭の状況を教えてください。 必須の質問" [level=3] [ref=f5e249]:
+              - generic [ref=f5e250]: 現在のご家庭の状況を教えてください。
+              - generic "必須の質問" [ref=f5e251]: "*"
+            - radiogroup "現在のご家庭の状況を教えてください。 必須の質問" [ref=f5e254]:
+              - generic [ref=f5e255]:
+                - generic [ref=f5e258]:
+                  - radio "独身(子あり)" [ref=f5e836] [cursor=pointer]
+                  - generic [ref=f5e260]: 独身(子あり)
+                - generic [ref=f5e265]:
+                  - radio "独身(子なし)" [ref=f5e839] [cursor=pointer]
+                  - generic [ref=f5e267]: 独身(子なし)
+                - generic [ref=f5e272]:
+                  - radio "既婚(子あり)" [ref=f5e842] [cursor=pointer]
+                  - generic [ref=f5e274]: 既婚(子あり)
+                - generic [ref=f5e279]:
+                  - radio "既婚(子なし)" [ref=f5e845] [cursor=pointer]
+                  - generic [ref=f5e281]: 既婚(子なし)
+                - generic [ref=f5e286]:
+                  - radio "学生" [ref=f5e848] [cursor=pointer]
+                  - generic [ref=f5e288]: 学生
+        - listitem [ref=f5e291]:
+          - generic [ref=f5e293]:
+            - heading "成人後に一番痩せていた時の体重と、その時期を教えてください（例：〇Kg 約●年●か月前） 必須の質問" [level=3] [ref=f5e296]:
+              - generic [ref=f5e297]: 成人後に一番痩せていた時の体重と、その時期を教えてください（例：〇Kg 約●年●か月前）
+              - generic "必須の質問" [ref=f5e298]: "*"
+            - generic [ref=f5e303]:
+              - textbox "成人後に一番痩せていた時の体重と、その時期を教えてください（例：〇Kg 約●年●か月前） 必須の質問" [ref=f5e304]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e306]:
+          - generic [ref=f5e308]:
+            - heading "成人後の最大体重と、その時期を教えてください（例：〇Kg 約●年●か月前） 必須の質問" [level=3] [ref=f5e311]:
+              - generic [ref=f5e312]: 成人後の最大体重と、その時期を教えてください（例：〇Kg 約●年●か月前）
+              - generic "必須の質問" [ref=f5e313]: "*"
+            - generic [ref=f5e318]:
+              - textbox "成人後の最大体重と、その時期を教えてください（例：〇Kg 約●年●か月前） 必須の質問" [ref=f5e319]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e321]:
+          - generic [ref=f5e323]:
+            - heading "いつまでに痩せたいですか？（例：〇ヶ月以内、〇月までなど） 必須の質問" [level=3] [ref=f5e326]:
+              - generic [ref=f5e327]: いつまでに痩せたいですか？（例：〇ヶ月以内、〇月までなど）
+              - generic "必須の質問" [ref=f5e328]: "*"
+            - generic [ref=f5e333]:
+              - textbox "いつまでに痩せたいですか？（例：〇ヶ月以内、〇月までなど） 必須の質問" [ref=f5e334]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e336]:
+          - generic [ref=f5e338]:
+            - heading "今までどのようなダイエットをされていましたか？（取り組み内容・時期） 必須の質問" [level=3] [ref=f5e341]:
+              - generic [ref=f5e342]: 今までどのようなダイエットをされていましたか？（取り組み内容・時期）
+              - generic "必須の質問" [ref=f5e343]: "*"
+            - generic [ref=f5e346]:
+              - generic [aria-hidden]: 回答を入力
+              - textbox "今までどのようなダイエットをされていましたか？（取り組み内容・時期） 必須の質問" [ref=f5e348]
+        - listitem [ref=f5e350]:
+          - generic [ref=f5e352]:
+            - heading "気になる体の部位はどこですか？ 必須の質問" [level=3] [ref=f5e355]:
+              - generic [ref=f5e356]: 気になる体の部位はどこですか？
+              - generic "必須の質問" [ref=f5e357]: "*"
+            - list "気になる体の部位はどこですか？ 必須の質問" [ref=f5e359]:
+              - listitem [ref=f5e360]:
+                - generic [ref=f5e362]:
+                  - checkbox "上腹部" [ref=f5e363] [cursor=pointer]
+                  - generic [ref=f5e366]: 上腹部
+              - listitem [ref=f5e369]:
+                - generic [ref=f5e371]:
+                  - checkbox "下腹部" [ref=f5e372] [cursor=pointer]
+                  - generic [ref=f5e375]: 下腹部
+              - listitem [ref=f5e378]:
+                - generic [ref=f5e380]:
+                  - checkbox "太もも" [ref=f5e381] [cursor=pointer]
+                  - generic [ref=f5e384]: 太もも
+              - listitem [ref=f5e387]:
+                - generic [ref=f5e389]:
+                  - checkbox "ひざ上" [ref=f5e390] [cursor=pointer]
+                  - generic [ref=f5e393]: ひざ上
+              - listitem [ref=f5e396]:
+                - generic [ref=f5e398]:
+                  - checkbox "ふくらはぎ" [ref=f5e399] [cursor=pointer]
+                  - generic [ref=f5e402]: ふくらはぎ
+              - listitem [ref=f5e405]:
+                - generic [ref=f5e407]:
+                  - checkbox "二の腕" [ref=f5e408] [cursor=pointer]
+                  - generic [ref=f5e411]: 二の腕
+              - listitem [ref=f5e414]:
+                - generic [ref=f5e416]:
+                  - checkbox "側腹部" [ref=f5e417] [cursor=pointer]
+                  - generic [ref=f5e420]: 側腹部
+              - listitem [ref=f5e423]:
+                - generic [ref=f5e425]:
+                  - checkbox "あご下" [ref=f5e426] [cursor=pointer]
+                  - generic [ref=f5e429]: あご下
+              - listitem [ref=f5e432]:
+                - generic [ref=f5e434]:
+                  - checkbox "その他" [ref=f5e435] [cursor=pointer]
+                  - generic [ref=f5e438]: その他
+        - listitem [ref=f5e441]:
+          - generic [ref=f5e443]:
+            - heading "タトゥーはありますか？ 必須の質問" [level=3] [ref=f5e446]:
+              - generic [ref=f5e447]: タトゥーはありますか？
+              - generic "必須の質問" [ref=f5e448]: "*"
+            - list "タトゥーはありますか？ 必須の質問" [ref=f5e450]:
+              - listitem [ref=f5e451]:
+                - generic [ref=f5e453]:
+                  - checkbox "なし" [ref=f5e454] [cursor=pointer]
+                  - generic [ref=f5e457]: なし
+              - listitem [ref=f5e460]:
+                - generic [ref=f5e462]:
+                  - checkbox "上腹部" [ref=f5e463] [cursor=pointer]
+                  - generic [ref=f5e466]: 上腹部
+              - listitem [ref=f5e469]:
+                - generic [ref=f5e471]:
+                  - checkbox "下腹部" [ref=f5e472] [cursor=pointer]
+                  - generic [ref=f5e475]: 下腹部
+        - listitem [ref=f5e478]:
+          - generic [ref=f5e480]:
+            - heading "現在お考えの治療方針に近いものをお選びください。 必須の質問" [level=3] [ref=f5e483]:
+              - generic [ref=f5e484]: 現在お考えの治療方針に近いものをお選びください。
+              - generic "必須の質問" [ref=f5e485]: "*"
+            - radiogroup "現在お考えの治療方針に近いものをお選びください。 必須の質問" [ref=f5e488]:
+              - generic [ref=f5e489]:
+                - generic [ref=f5e492]:
+                  - radio "体型をしっかり変え、長期的に維持できる身体づくりに本格的に取り組みたい" [ref=f5e851] [cursor=pointer]
+                  - generic [ref=f5e494]: 体型をしっかり変え、長期的に維持できる身体づくりに本格的に取り組みたい
+                - generic [ref=f5e499]:
+                  - radio "無理のない範囲で体重や見た目を改善し、徐々に変化を実感していきたい" [ref=f5e854] [cursor=pointer]
+                  - generic [ref=f5e501]: 無理のない範囲で体重や見た目を改善し、徐々に変化を実感していきたい
+                - generic [ref=f5e506]:
+                  - radio "今の体型を維持しつつ、リバウンド予防として取り組みたい" [ref=f5e857] [cursor=pointer]
+                  - generic [ref=f5e508]: 今の体型を維持しつつ、リバウンド予防として取り組みたい
+                - generic [ref=f5e513]:
+                  - radio "イベント前など、短期間でできる範囲の調整をしたい" [ref=f5e860] [cursor=pointer]
+                  - generic [ref=f5e515]: イベント前など、短期間でできる範囲の調整をしたい
+                - generic [ref=f5e520]:
+                  - radio "まずは自分に合うかどうか、気軽に試しながら検討したい" [ref=f5e863] [cursor=pointer]
+                  - generic [ref=f5e522]: まずは自分に合うかどうか、気軽に試しながら検討したい
+        - listitem [ref=f5e525]:
+          - generic [ref=f5e527]:
+            - heading "月にかけている美容代はいくらくらいですか？ 必須の質問" [level=3] [ref=f5e530]:
+              - generic [ref=f5e531]: 月にかけている美容代はいくらくらいですか？
+              - generic "必須の質問" [ref=f5e532]: "*"
+            - generic [ref=f5e537]:
+              - textbox "月にかけている美容代はいくらくらいですか？ 必須の質問" [ref=f5e538]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e540]:
+          - generic [ref=f5e542]:
+            - heading "月にかけているダイエット費用（例：ジム代やサプリ代など）はいくらくらいですか？ 必須の質問" [level=3] [ref=f5e545]:
+              - generic [ref=f5e546]: 月にかけているダイエット費用（例：ジム代やサプリ代など）はいくらくらいですか？
+              - generic "必須の質問" [ref=f5e547]: "*"
+            - generic [ref=f5e552]:
+              - textbox "月にかけているダイエット費用（例：ジム代やサプリ代など）はいくらくらいですか？ 必須の質問" [ref=f5e553]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f5e555]:
+          - generic [ref=f5e557]:
+            - heading "現在の仕事の忙しさについて、最も近いものをお選びください。 必須の質問" [level=3] [ref=f5e560]:
+              - generic [ref=f5e561]: 現在の仕事の忙しさについて、最も近いものをお選びください。
+              - generic "必須の質問" [ref=f5e562]: "*"
+            - radiogroup "現在の仕事の忙しさについて、最も近いものをお選びください。 必須の質問" [ref=f5e565]:
+              - generic [ref=f5e566]:
+                - generic [ref=f5e569]:
+                  - radio "非常に忙しい" [ref=f5e866] [cursor=pointer]
+                  - generic [ref=f5e571]: 非常に忙しい
+                - generic [ref=f5e576]:
+                  - radio "やや忙しい" [ref=f5e869] [cursor=pointer]
+                  - generic [ref=f5e578]: やや忙しい
+                - generic [ref=f5e583]:
+                  - radio "普通" [ref=f5e872] [cursor=pointer]
+                  - generic [ref=f5e585]: 普通
+                - generic [ref=f5e590]:
+                  - radio "あまり忙しくない" [ref=f5e875] [cursor=pointer]
+                  - generic [ref=f5e592]: あまり忙しくない
+                - generic [ref=f5e597]:
+                  - radio "仕事をしていない" [ref=f5e878] [cursor=pointer]
+                  - generic [ref=f5e599]: 仕事をしていない
+        - listitem [ref=f5e602]:
+          - generic [ref=f5e604]:
+            - heading "職場の人間関係について、ストレスを感じることはありますか？ 必須の質問" [level=3] [ref=f5e607]:
+              - generic [ref=f5e608]: 職場の人間関係について、ストレスを感じることはありますか？
+              - generic "必須の質問" [ref=f5e609]: "*"
+            - radiogroup "職場の人間関係について、ストレスを感じることはありますか？ 必須の質問" [ref=f5e612]:
+              - generic [ref=f5e613]:
+                - generic [ref=f5e616]:
+                  - radio "強く感じる" [ref=f5e881] [cursor=pointer]
+                  - generic [ref=f5e618]: 強く感じる
+                - generic [ref=f5e623]:
+                  - radio "少し感じる" [ref=f5e884] [cursor=pointer]
+                  - generic [ref=f5e625]: 少し感じる
+                - generic [ref=f5e630]:
+                  - radio "ほとんど感じない" [ref=f5e887] [cursor=pointer]
+                  - generic [ref=f5e632]: ほとんど感じない
+                - generic [ref=f5e637]:
+                  - radio "まったく感じない" [ref=f5e890] [cursor=pointer]
+                  - generic [ref=f5e639]: まったく感じない
+        - listitem [ref=f5e642]:
+          - generic [ref=f5e644]:
+            - heading "現在の労働環境について、最も近いものをお選びください。 必須の質問" [level=3] [ref=f5e647]:
+              - generic [ref=f5e648]: 現在の労働環境について、最も近いものをお選びください。
+              - generic "必須の質問" [ref=f5e649]: "*"
+            - radiogroup "現在の労働環境について、最も近いものをお選びください。 必須の質問" [ref=f5e652]:
+              - generic [ref=f5e653]:
+                - generic [ref=f5e656]:
+                  - radio "残業が多い" [ref=f5e893] [cursor=pointer]
+                  - generic [ref=f5e658]: 残業が多い
+                - generic [ref=f5e663]:
+                  - radio "サービス残業が多い" [ref=f5e896] [cursor=pointer]
+                  - generic [ref=f5e665]: サービス残業が多い
+                - generic [ref=f5e670]:
+                  - radio "残業はあるが過度ではない" [ref=f5e899] [cursor=pointer]
+                  - generic [ref=f5e672]: 残業はあるが過度ではない
+                - generic [ref=f5e677]:
+                  - radio "残業はほとんどない" [ref=f5e902] [cursor=pointer]
+                  - generic [ref=f5e679]: 残業はほとんどない
+        - listitem [ref=f5e682]:
+          - generic [ref=f5e684]:
+            - heading "仕事や職場環境によるストレスが強い時期に、食事量の増加や体重増加を感じることはありますか？ 必須の質問" [level=3] [ref=f5e687]:
+              - generic [ref=f5e688]: 仕事や職場環境によるストレスが強い時期に、食事量の増加や体重増加を感じることはありますか？
+              - generic "必須の質問" [ref=f5e689]: "*"
+            - radiogroup "仕事や職場環境によるストレスが強い時期に、食事量の増加や体重増加を感じることはありますか？ 必須の質問" [ref=f5e692]:
+              - generic [ref=f5e693]:
+                - generic [ref=f5e696]:
+                  - radio "よくある" [ref=f5e905] [cursor=pointer]
+                  - generic [ref=f5e698]: よくある
+                - generic [ref=f5e703]:
+                  - radio "ときどきある" [ref=f5e908] [cursor=pointer]
+                  - generic [ref=f5e705]: ときどきある
+                - generic [ref=f5e710]:
+                  - radio "あまりない" [ref=f5e911] [cursor=pointer]
+                  - generic [ref=f5e712]: あまりない
+                - generic [ref=f5e717]:
+                  - radio "まったくない" [ref=f5e914] [cursor=pointer]
+                  - generic [ref=f5e719]: まったくない
+        - listitem [ref=f5e722]:
+          - generic [ref=f5e724]:
+            - heading "現在、生活面や金銭面でのプレッシャーをどの程度感じていますか？(例：ローン・支払いの負担、将来への不安 など) 必須の質問" [level=3] [ref=f5e727]:
+              - generic [ref=f5e728]: 現在、生活面や金銭面でのプレッシャーをどの程度感じていますか？(例：ローン・支払いの負担、将来への不安 など)
+              - generic "必須の質問" [ref=f5e729]: "*"
+            - radiogroup "現在、生活面や金銭面でのプレッシャーをどの程度感じていますか？(例：ローン・支払いの負担、将来への不安 など) 必須の質問" [ref=f5e732]:
+              - generic [ref=f5e733]:
+                - generic [ref=f5e736]:
+                  - radio "強く感じている（日常生活や気分に影響が出ている）" [ref=f5e917] [cursor=pointer]
+                  - generic [ref=f5e738]: 強く感じている（日常生活や気分に影響が出ている）
+                - generic [ref=f5e743]:
+                  - radio "ある程度感じている（気になることはあるが生活は送れている）" [ref=f5e920] [cursor=pointer]
+                  - generic [ref=f5e745]: ある程度感じている（気になることはあるが生活は送れている）
+                - generic [ref=f5e750]:
+                  - radio "あまり感じていない" [ref=f5e923] [cursor=pointer]
+                  - generic [ref=f5e752]: あまり感じていない
+                - generic [ref=f5e757]:
+                  - radio "まったく感じていない" [ref=f5e926] [cursor=pointer]
+                  - generic [ref=f5e759]: まったく感じていない
+        - listitem [ref=f5e762]:
+          - generic [ref=f5e764]:
+            - heading "これまでに金銭的な理由で生活の見直しや立て直しを行ったご経験はありますか？ (例：債務整理・自己破産・返済計画の大幅な変更 など) 必須の質問" [level=3] [ref=f5e767]:
+              - generic [ref=f5e768]: これまでに金銭的な理由で生活の見直しや立て直しを行ったご経験はありますか？ (例：債務整理・自己破産・返済計画の大幅な変更 など)
+              - generic "必須の質問" [ref=f5e769]: "*"
+            - radiogroup "これまでに金銭的な理由で生活の見直しや立て直しを行ったご経験はありますか？ (例：債務整理・自己破産・返済計画の大幅な変更 など) 必須の質問" [ref=f5e772]:
+              - generic [ref=f5e773]:
+                - generic [ref=f5e776]:
+                  - radio "ある（現在も影響が続いている）" [ref=f5e929] [cursor=pointer]
+                  - generic [ref=f5e778]: ある（現在も影響が続いている）
+                - generic [ref=f5e783]:
+                  - radio "ある（すでに解決している）" [ref=f5e932] [cursor=pointer]
+                  - generic [ref=f5e785]: ある（すでに解決している）
+                - generic [ref=f5e790]:
+                  - radio "検討したことはあるが、実際には行っていない" [checked] [active] [ref=f5e935] [cursor=pointer]
+                  - generic [ref=f5e792]: 検討したことはあるが、実際には行っていない
+                - generic [ref=f5e797]:
+                  - radio "まったくない" [ref=f5e938] [cursor=pointer]
+                  - generic [ref=f5e799]: まったくない
+      - generic [ref=f5e802]:
+        - generic [ref=f5e803]:
+          - button "次へ" [ref=f5e805] [cursor=pointer]
+          - button "フォームをクリア" [ref=f5e810] [cursor=pointer]
+        - generic [ref=f5e814]: Google フォームでパスワードを送信しないでください。
+    - generic [ref=f5e815]:
+      - generic [ref=f5e816]:
+        - text: このフォームは 弁護士法人 響 内部で作成されました。
+        - paragraph [ref=f5e817]:
+          - text: このフォームが不審だと思われる場合
+          - link "報告" [ref=f5e818] [cursor=pointer]:
+            - /url: https://docs.google.com/forms/d/e/1FAIpQLScYS-J_QCo6FF-hjl3ATXV5FjQtn4-CBM9pb7g_rijLpDr47Q/abuse
+      - link [ref=f5e820] [cursor=pointer]:
+        - /url: //www.google.com/forms/about/?utm_source=product&utm_medium=forms_logo&utm_campaign=forms
+        - img "Google" [ref=f5e821]
+        - text: フォーム
+  - generic [ref=f5e825]:
+    - button "ヘルプとフィードバック" [ref=f5e826] [cursor=pointer]
+    - tooltip [aria-hidden] [ref=f5e829]: ヘルプとフィードバック

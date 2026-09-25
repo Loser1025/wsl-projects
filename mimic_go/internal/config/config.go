@@ -2,7 +2,7 @@
 // （Python版 config.py::load_config の移植。マルチプロバイダ(OpenRouter/Gemini)
 // 対応済み。モデル一覧取得・対話的セレクターUI(config.py内の
 // MULTI-PROVIDER MODEL SELECTOR)は未移植 — アクティブプロバイダは
-// OpenRouter→Geminiの優先順位で自動選択する簡略方式とする）。
+// Gemini→OpenRouterの優先順位で自動選択する簡略方式とする）。
 package config
 
 import (
@@ -76,7 +76,7 @@ const envTemplate = `# =====================================================
 # GEMINI_KEY_1=YOUR_GEMINI_KEY_1
 # GEMINI_KEY_2=YOUR_GEMINI_KEY_2
 # GEMINI_KEY_3=YOUR_GEMINI_KEY_3
-# GEMINI_MODEL=gemini-2.0-flash
+# GEMINI_MODEL=gemini-3.5-flash-lite
 # RPM_LIMIT_GEMINI=15
 
 # ── 共通設定 ──
@@ -137,7 +137,7 @@ func Load(envPath string) (*Config, error) {
 	if keys := collectKeys(raw, "GEMINI_KEY"); len(keys) > 0 {
 		model := raw["GEMINI_MODEL"]
 		if model == "" {
-			model = "gemini-2.0-flash"
+			model = "gemini-3.5-flash-lite"
 		}
 		rpm := defaultRPM
 		if v := raw["RPM_LIMIT_GEMINI"]; v != "" {
@@ -156,7 +156,7 @@ func Load(envPath string) (*Config, error) {
 	}
 
 	var active *ProviderConfig
-	for _, name := range []string{"openrouter", "gemini"} {
+	for _, name := range []string{"gemini", "openrouter"} {
 		if p, ok := providers[name]; ok {
 			active = p
 			break

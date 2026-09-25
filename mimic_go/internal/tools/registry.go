@@ -168,7 +168,8 @@ func argBool(args map[string]any, key string, def bool) bool {
 // delegate_*(委任)ツールはinternal/delegate.RegisterToolsが呼び出し側
 // （cmd/mimic, internal/tui）から別途このRegistryへ追加する
 // （tools→delegate→toolsの依存循環を避けるための構成）。
-// browser_*(フェーズ4=chromedp移植後)は未対応。
+// browser_*(chromedpベースの独自実装)はMCP経由のブラウザ操作と役割が重複するため
+// 撤去済み（ユーザー判断: ブラウザ操作はMCPサーバー側に任せる）。
 func NewDefaultRegistry() *Registry {
 	r := NewRegistry()
 	registerFileTools(r)
@@ -177,7 +178,6 @@ func NewDefaultRegistry() *Registry {
 	registerWebTools(r)
 	registerSkillTools(r)
 	registerOutputCacheTools(r)
-	registerBrowserTools(r)
 	registerSearchHistoryTools(r)
 	return r
 }

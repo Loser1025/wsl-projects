@@ -1,0 +1,417 @@
+- generic [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e8]:
+        - generic [ref=f1e10]:
+          - heading "術前問診表（醫療瘦身）" [level=1] [ref=f1e12]
+          - generic [ref=f1e13]: 這是您來院前需要填寫的術前問診表。您的回答僅用於診療目的，並將嚴密管理。
+        - generic [ref=f1e15]:
+          - generic [ref=f1e17]:
+            - link "Google にログイン" [ref=f1e18] [cursor=pointer]:
+              - /url: https://accounts.google.com/Login?continue=https%3A%2F%2Fdocs.google.com%2Fforms%2Fd%2Fe%2F1FAIpQLSfb_trSDyD8COGjqSQxZOSNTSN1oBOyJz812aIUuJGL54fPVg%2Fviewform%3Ffbzx%3D-311830476364237545
+            - text: すると作業内容を保存できます。
+            - button "詳細" [ref=f1e19] [cursor=pointer]
+          - generic [aria-hidden] [ref=f1e21]: "* 必須の質問です"
+      - list [ref=f1e22]:
+        - listitem [ref=f1e23]:
+          - generic [ref=f1e25]:
+            - heading "病患編號 必須の質問" [level=3] [ref=f1e28]:
+              - generic [ref=f1e29]: 病患編號
+              - generic "必須の質問" [ref=f1e30]: "*"
+            - generic [ref=f1e35]:
+              - textbox "病患編號 必須の質問" [ref=f1e36]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e38]:
+          - generic [ref=f1e40]:
+            - heading "郵遞區號 必須の質問" [level=3] [ref=f1e43]:
+              - generic [ref=f1e44]: 郵遞區號
+              - generic "必須の質問" [ref=f1e45]: "*"
+            - generic [ref=f1e50]:
+              - textbox "郵遞區號 必須の質問" [ref=f1e51]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e53]:
+          - generic [ref=f1e55]:
+            - heading "地址 必須の質問" [level=3] [ref=f1e58]:
+              - generic [ref=f1e59]: 地址
+              - generic "必須の質問" [ref=f1e60]: "*"
+            - generic [ref=f1e65]:
+              - textbox "地址 必須の質問" [ref=f1e66]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e68]:
+          - generic [ref=f1e70]:
+            - heading "姓名 必須の質問" [level=3] [ref=f1e73]:
+              - generic [ref=f1e74]: 姓名
+              - generic "必須の質問" [ref=f1e75]: "*"
+            - generic [ref=f1e80]:
+              - textbox "姓名 必須の質問" [ref=f1e81]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e83]:
+          - generic [ref=f1e85]:
+            - heading "姓名（護照英文/羅馬拼音） 必須の質問" [level=3] [ref=f1e88]:
+              - generic [ref=f1e89]: 姓名（護照英文/羅馬拼音）
+              - generic "必須の質問" [ref=f1e90]: "*"
+            - generic [ref=f1e95]:
+              - textbox "姓名（護照英文/羅馬拼音） 必須の質問" [ref=f1e96]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e98]:
+          - generic [ref=f1e100]:
+            - heading "電話號碼 必須の質問" [level=3] [ref=f1e103]:
+              - generic [ref=f1e104]: 電話號碼
+              - generic "必須の質問" [ref=f1e105]: "*"
+            - generic [ref=f1e110]:
+              - textbox "電話號碼 必須の質問" [ref=f1e111]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e113]:
+          - generic [ref=f1e115]:
+            - heading "電子信箱 必須の質問" [level=3] [ref=f1e118]:
+              - generic [ref=f1e119]: 電子信箱
+              - generic "必須の質問" [ref=f1e120]: "*"
+            - generic [ref=f1e125]:
+              - textbox "電子信箱 必須の質問" [ref=f1e126]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e128]:
+          - generic [ref=f1e130]:
+            - heading "出生日期 必須の質問" [level=3] [ref=f1e133]:
+              - generic [ref=f1e134]: 出生日期
+              - generic "必須の質問" [ref=f1e135]: "*"
+            - generic "出生日期 必須の質問" [ref=f1e138]:
+              - generic [ref=f1e140]:
+                - generic [ref=f1e141]: MM
+                - combobox "月" [ref=f1e146]
+              - generic [ref=f1e148]: /
+              - generic [ref=f1e150]:
+                - generic [ref=f1e151]: DD
+                - combobox "日付" [ref=f1e156]
+        - listitem [ref=f1e158]:
+          - generic [ref=f1e160]:
+            - heading "性別 必須の質問" [level=3] [ref=f1e163]:
+              - generic [ref=f1e164]: 性別
+              - generic "必須の質問" [ref=f1e165]: "*"
+            - radiogroup "性別 必須の質問" [ref=f1e168]:
+              - generic [ref=f1e169]:
+                - generic [ref=f1e172]:
+                  - radio "男性" [ref=f1e174] [cursor=pointer]
+                  - generic [ref=f1e177]: 男性
+                - generic [ref=f1e182]:
+                  - radio "女性" [ref=f1e184] [cursor=pointer]
+                  - generic [ref=f1e187]: 女性
+        - listitem [ref=f1e190]:
+          - generic [ref=f1e192]:
+            - heading "職業 必須の質問" [level=3] [ref=f1e195]:
+              - generic [ref=f1e196]: 職業
+              - generic "必須の質問" [ref=f1e197]: "*"
+            - generic [ref=f1e202]:
+              - textbox "職業 必須の質問" [ref=f1e203]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e205]:
+          - generic [ref=f1e207]:
+            - heading "工作內容 必須の質問" [level=3] [ref=f1e210]:
+              - generic [ref=f1e211]: 工作內容
+              - generic "必須の質問" [ref=f1e212]: "*"
+            - generic [ref=f1e217]:
+              - textbox "工作內容 必須の質問" [ref=f1e218]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e220]:
+          - generic [ref=f1e222]:
+            - heading "身高(cm) 必須の質問" [level=3] [ref=f1e225]:
+              - generic [ref=f1e226]: 身高(cm)
+              - generic "必須の質問" [ref=f1e227]: "*"
+            - generic [ref=f1e232]:
+              - textbox "身高(cm) 必須の質問" [ref=f1e233]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e235]:
+          - generic [ref=f1e237]:
+            - heading "體重(kg) 必須の質問" [level=3] [ref=f1e240]:
+              - generic [ref=f1e241]: 體重(kg)
+              - generic "必須の質問" [ref=f1e242]: "*"
+            - generic [ref=f1e247]:
+              - textbox "體重(kg) 必須の質問" [ref=f1e248]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e250]:
+          - generic [ref=f1e252]:
+            - heading "請告訴我們您目前的家庭狀況。 必須の質問" [level=3] [ref=f1e255]:
+              - generic [ref=f1e256]: 請告訴我們您目前的家庭狀況。
+              - generic "必須の質問" [ref=f1e257]: "*"
+            - radiogroup "請告訴我們您目前的家庭狀況。 必須の質問" [ref=f1e260]:
+              - generic [ref=f1e261]:
+                - generic [ref=f1e264]:
+                  - radio "單身(有子女)" [ref=f1e266] [cursor=pointer]
+                  - generic [ref=f1e269]: 單身(有子女)
+                - generic [ref=f1e274]:
+                  - radio "單身(無子女)" [ref=f1e276] [cursor=pointer]
+                  - generic [ref=f1e279]: 單身(無子女)
+                - generic [ref=f1e284]:
+                  - radio "已婚(有子女)" [ref=f1e286] [cursor=pointer]
+                  - generic [ref=f1e289]: 已婚(有子女)
+                - generic [ref=f1e294]:
+                  - radio "已婚(無子女)" [ref=f1e296] [cursor=pointer]
+                  - generic [ref=f1e299]: 已婚(無子女)
+                - generic [ref=f1e304]:
+                  - radio "學生" [ref=f1e306] [cursor=pointer]
+                  - generic [ref=f1e309]: 學生
+        - listitem [ref=f1e312]:
+          - generic [ref=f1e314]:
+            - heading "請告訴我們您成年後體重最輕時的體重與時期（例：〇kg 約●年●個月前） 必須の質問" [level=3] [ref=f1e317]:
+              - generic [ref=f1e318]: 請告訴我們您成年後體重最輕時的體重與時期（例：〇kg 約●年●個月前）
+              - generic "必須の質問" [ref=f1e319]: "*"
+            - generic [ref=f1e324]:
+              - textbox "請告訴我們您成年後體重最輕時的體重與時期（例：〇kg 約●年●個月前） 必須の質問" [ref=f1e325]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e327]:
+          - generic [ref=f1e329]:
+            - heading "請告訴我們您成年後的最大體重與時期（例：〇kg 約●年●個月前） 必須の質問" [level=3] [ref=f1e332]:
+              - generic [ref=f1e333]: 請告訴我們您成年後的最大體重與時期（例：〇kg 約●年●個月前）
+              - generic "必須の質問" [ref=f1e334]: "*"
+            - generic [ref=f1e339]:
+              - textbox "請告訴我們您成年後的最大體重與時期（例：〇kg 約●年●個月前） 必須の質問" [ref=f1e340]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e342]:
+          - generic [ref=f1e344]:
+            - heading "您希望在什麼時候之前瘦下來？（例：〇個月內、〇月之前等） 必須の質問" [level=3] [ref=f1e347]:
+              - generic [ref=f1e348]: 您希望在什麼時候之前瘦下來？（例：〇個月內、〇月之前等）
+              - generic "必須の質問" [ref=f1e349]: "*"
+            - generic [ref=f1e354]:
+              - textbox "您希望在什麼時候之前瘦下來？（例：〇個月內、〇月之前等） 必須の質問" [ref=f1e355]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e357]:
+          - generic [ref=f1e359]:
+            - heading "到目前為止您嘗試過哪些減重方法？（內容・時期） 必須の質問" [level=3] [ref=f1e362]:
+              - generic [ref=f1e363]: 到目前為止您嘗試過哪些減重方法？（內容・時期）
+              - generic "必須の質問" [ref=f1e364]: "*"
+            - generic [ref=f1e367]:
+              - generic [aria-hidden]: 回答を入力
+              - textbox "到目前為止您嘗試過哪些減重方法？（內容・時期） 必須の質問" [ref=f1e369]
+        - listitem [ref=f1e371]:
+          - generic [ref=f1e373]:
+            - heading "您在意的身體部位是哪裡？ 必須の質問" [level=3] [ref=f1e376]:
+              - generic [ref=f1e377]: 您在意的身體部位是哪裡？
+              - generic "必須の質問" [ref=f1e378]: "*"
+            - list "您在意的身體部位是哪裡？ 必須の質問" [ref=f1e380]:
+              - listitem [ref=f1e381]:
+                - generic [ref=f1e383]:
+                  - checkbox "上腹部" [ref=f1e384] [cursor=pointer]
+                  - generic [ref=f1e387]: 上腹部
+              - listitem [ref=f1e390]:
+                - generic [ref=f1e392]:
+                  - checkbox "下腹部" [ref=f1e393] [cursor=pointer]
+                  - generic [ref=f1e396]: 下腹部
+              - listitem [ref=f1e399]:
+                - generic [ref=f1e401]:
+                  - checkbox "大腿" [ref=f1e402] [cursor=pointer]
+                  - generic [ref=f1e405]: 大腿
+              - listitem [ref=f1e408]:
+                - generic [ref=f1e410]:
+                  - checkbox "膝蓋上方" [ref=f1e411] [cursor=pointer]
+                  - generic [ref=f1e414]: 膝蓋上方
+              - listitem [ref=f1e417]:
+                - generic [ref=f1e419]:
+                  - checkbox "小腿" [ref=f1e420] [cursor=pointer]
+                  - generic [ref=f1e423]: 小腿
+              - listitem [ref=f1e426]:
+                - generic [ref=f1e428]:
+                  - checkbox "上臂" [ref=f1e429] [cursor=pointer]
+                  - generic [ref=f1e432]: 上臂
+              - listitem [ref=f1e435]:
+                - generic [ref=f1e437]:
+                  - checkbox "側腰" [ref=f1e438] [cursor=pointer]
+                  - generic [ref=f1e441]: 側腰
+              - listitem [ref=f1e444]:
+                - generic [ref=f1e446]:
+                  - checkbox "下顎" [ref=f1e447] [cursor=pointer]
+                  - generic [ref=f1e450]: 下顎
+              - listitem [ref=f1e453]:
+                - generic [ref=f1e455]:
+                  - checkbox "其他" [ref=f1e456] [cursor=pointer]
+                  - generic [ref=f1e459]: 其他
+        - listitem [ref=f1e462]:
+          - generic [ref=f1e464]:
+            - heading "您有刺青嗎？ 必須の質問" [level=3] [ref=f1e467]:
+              - generic [ref=f1e468]: 您有刺青嗎？
+              - generic "必須の質問" [ref=f1e469]: "*"
+            - list "您有刺青嗎？ 必須の質問" [ref=f1e471]:
+              - listitem [ref=f1e472]:
+                - generic [ref=f1e474]:
+                  - checkbox "無" [ref=f1e475] [cursor=pointer]
+                  - generic [ref=f1e478]: 無
+              - listitem [ref=f1e481]:
+                - generic [ref=f1e483]:
+                  - checkbox "上腹部" [ref=f1e484] [cursor=pointer]
+                  - generic [ref=f1e487]: 上腹部
+              - listitem [ref=f1e490]:
+                - generic [ref=f1e492]:
+                  - checkbox "下腹部" [ref=f1e493] [cursor=pointer]
+                  - generic [ref=f1e496]: 下腹部
+        - listitem [ref=f1e499]:
+          - generic [ref=f1e501]:
+            - heading "請選擇最接近您目前治療方向的選項。 必須の質問" [level=3] [ref=f1e504]:
+              - generic [ref=f1e505]: 請選擇最接近您目前治療方向的選項。
+              - generic "必須の質問" [ref=f1e506]: "*"
+            - radiogroup "請選擇最接近您目前治療方向的選項。 必須の質問" [ref=f1e509]:
+              - generic [ref=f1e510]:
+                - generic [ref=f1e513]:
+                  - radio "想要確實改變體型，並認真投入可長期維持的身體管理" [ref=f1e515] [cursor=pointer]
+                  - generic [ref=f1e518]: 想要確實改變體型，並認真投入可長期維持的身體管理
+                - generic [ref=f1e523]:
+                  - radio "想在不勉強的範圍內改善體重或外觀，逐步感受變化" [ref=f1e525] [cursor=pointer]
+                  - generic [ref=f1e528]: 想在不勉強的範圍內改善體重或外觀，逐步感受變化
+                - generic [ref=f1e533]:
+                  - radio "想在維持現有體型的同時，作為復胖預防來管理" [ref=f1e535] [cursor=pointer]
+                  - generic [ref=f1e538]: 想在維持現有體型的同時，作為復胖預防來管理
+                - generic [ref=f1e543]:
+                  - radio "想在活動前等短期內做可行範圍的調整" [ref=f1e545] [cursor=pointer]
+                  - generic [ref=f1e548]: 想在活動前等短期內做可行範圍的調整
+                - generic [ref=f1e553]:
+                  - radio "想先輕鬆嘗試看看是否適合自己，再做考慮" [ref=f1e555] [cursor=pointer]
+                  - generic [ref=f1e558]: 想先輕鬆嘗試看看是否適合自己，再做考慮
+        - listitem [ref=f1e561]:
+          - generic [ref=f1e563]:
+            - heading "您每月花費在美容上的費用大約是多少？ 必須の質問" [level=3] [ref=f1e566]:
+              - generic [ref=f1e567]: 您每月花費在美容上的費用大約是多少？
+              - generic "必須の質問" [ref=f1e568]: "*"
+            - generic [ref=f1e573]:
+              - textbox "您每月花費在美容上的費用大約是多少？ 必須の質問" [ref=f1e574]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e576]:
+          - generic [ref=f1e578]:
+            - heading "您每月花費在減重上的費用（例如健身房費用、保健食品費用等）大約是多少？ 必須の質問" [level=3] [ref=f1e581]:
+              - generic [ref=f1e582]: 您每月花費在減重上的費用（例如健身房費用、保健食品費用等）大約是多少？
+              - generic "必須の質問" [ref=f1e583]: "*"
+            - generic [ref=f1e588]:
+              - textbox "您每月花費在減重上的費用（例如健身房費用、保健食品費用等）大約是多少？ 必須の質問" [ref=f1e589]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=f1e591]:
+          - generic [ref=f1e593]:
+            - heading "請選擇最接近您目前工作忙碌程度的選項。 必須の質問" [level=3] [ref=f1e596]:
+              - generic [ref=f1e597]: 請選擇最接近您目前工作忙碌程度的選項。
+              - generic "必須の質問" [ref=f1e598]: "*"
+            - radiogroup "請選擇最接近您目前工作忙碌程度的選項。 必須の質問" [ref=f1e601]:
+              - generic [ref=f1e602]:
+                - generic [ref=f1e605]:
+                  - radio "非常忙碌" [ref=f1e607] [cursor=pointer]
+                  - generic [ref=f1e610]: 非常忙碌
+                - generic [ref=f1e615]:
+                  - radio "有點忙碌" [ref=f1e617] [cursor=pointer]
+                  - generic [ref=f1e620]: 有點忙碌
+                - generic [ref=f1e625]:
+                  - radio "普通" [ref=f1e627] [cursor=pointer]
+                  - generic [ref=f1e630]: 普通
+                - generic [ref=f1e635]:
+                  - radio "不太忙碌" [ref=f1e637] [cursor=pointer]
+                  - generic [ref=f1e640]: 不太忙碌
+                - generic [ref=f1e645]:
+                  - radio "目前沒有工作" [ref=f1e647] [cursor=pointer]
+                  - generic [ref=f1e650]: 目前沒有工作
+        - listitem [ref=f1e653]:
+          - generic [ref=f1e655]:
+            - heading "您會因職場人際關係感到壓力嗎？ 必須の質問" [level=3] [ref=f1e658]:
+              - generic [ref=f1e659]: 您會因職場人際關係感到壓力嗎？
+              - generic "必須の質問" [ref=f1e660]: "*"
+            - radiogroup "您會因職場人際關係感到壓力嗎？ 必須の質問" [ref=f1e663]:
+              - generic [ref=f1e664]:
+                - generic [ref=f1e667]:
+                  - radio "感到強烈壓力" [ref=f1e669] [cursor=pointer]
+                  - generic [ref=f1e672]: 感到強烈壓力
+                - generic [ref=f1e677]:
+                  - radio "感到一些壓力" [ref=f1e679] [cursor=pointer]
+                  - generic [ref=f1e682]: 感到一些壓力
+                - generic [ref=f1e687]:
+                  - radio "幾乎不會感到壓力" [ref=f1e689] [cursor=pointer]
+                  - generic [ref=f1e692]: 幾乎不會感到壓力
+                - generic [ref=f1e697]:
+                  - radio "完全不會感到壓力" [ref=f1e699] [cursor=pointer]
+                  - generic [ref=f1e702]: 完全不會感到壓力
+        - listitem [ref=f1e705]:
+          - generic [ref=f1e707]:
+            - heading "請選擇最接近您目前工作環境的選項。 必須の質問" [level=3] [ref=f1e710]:
+              - generic [ref=f1e711]: 請選擇最接近您目前工作環境的選項。
+              - generic "必須の質問" [ref=f1e712]: "*"
+            - radiogroup "請選擇最接近您目前工作環境的選項。 必須の質問" [ref=f1e715]:
+              - generic [ref=f1e716]:
+                - generic [ref=f1e719]:
+                  - radio "加班很多" [ref=f1e721] [cursor=pointer]
+                  - generic [ref=f1e724]: 加班很多
+                - generic [ref=f1e729]:
+                  - radio "無薪加班很多" [ref=f1e731] [cursor=pointer]
+                  - generic [ref=f1e734]: 無薪加班很多
+                - generic [ref=f1e739]:
+                  - radio "有加班但不過度" [ref=f1e741] [cursor=pointer]
+                  - generic [ref=f1e744]: 有加班但不過度
+                - generic [ref=f1e749]:
+                  - radio "幾乎沒有加班" [ref=f1e751] [cursor=pointer]
+                  - generic [ref=f1e754]: 幾乎沒有加班
+        - listitem [ref=f1e757]:
+          - generic [ref=f1e759]:
+            - heading "當工作或職場環境壓力較大時，您會感覺食量增加或體重增加嗎？ 必須の質問" [level=3] [ref=f1e762]:
+              - generic [ref=f1e763]: 當工作或職場環境壓力較大時，您會感覺食量增加或體重增加嗎？
+              - generic "必須の質問" [ref=f1e764]: "*"
+            - radiogroup "當工作或職場環境壓力較大時，您會感覺食量增加或體重增加嗎？ 必須の質問" [ref=f1e767]:
+              - generic [ref=f1e768]:
+                - generic [ref=f1e771]:
+                  - radio "經常如此" [ref=f1e773] [cursor=pointer]
+                  - generic [ref=f1e776]: 經常如此
+                - generic [ref=f1e781]:
+                  - radio "有時如此" [ref=f1e783] [cursor=pointer]
+                  - generic [ref=f1e786]: 有時如此
+                - generic [ref=f1e791]:
+                  - radio "不太會" [ref=f1e793] [cursor=pointer]
+                  - generic [ref=f1e796]: 不太會
+                - generic [ref=f1e801]:
+                  - radio "完全不會" [ref=f1e803] [cursor=pointer]
+                  - generic [ref=f1e806]: 完全不會
+        - listitem [ref=f1e809]:
+          - generic [ref=f1e811]:
+            - heading "您目前在生活或金錢方面感受到的壓力程度為何？（例：貸款・還款負擔、對未來的不安等） 必須の質問" [level=3] [ref=f1e814]:
+              - generic [ref=f1e815]: 您目前在生活或金錢方面感受到的壓力程度為何？（例：貸款・還款負擔、對未來的不安等）
+              - generic "必須の質問" [ref=f1e816]: "*"
+            - radiogroup "您目前在生活或金錢方面感受到的壓力程度為何？（例：貸款・還款負擔、對未來的不安等） 必須の質問" [ref=f1e819]:
+              - generic [ref=f1e820]:
+                - generic [ref=f1e823]:
+                  - radio "感受強烈（已影響日常生活或心情）" [ref=f1e825] [cursor=pointer]
+                  - generic [ref=f1e828]: 感受強烈（已影響日常生活或心情）
+                - generic [ref=f1e833]:
+                  - radio "有一定程度的感受（會在意但仍能維持生活）" [ref=f1e835] [cursor=pointer]
+                  - generic [ref=f1e838]: 有一定程度的感受（會在意但仍能維持生活）
+                - generic [ref=f1e843]:
+                  - radio "不太有感受" [ref=f1e845] [cursor=pointer]
+                  - generic [ref=f1e848]: 不太有感受
+                - generic [ref=f1e853]:
+                  - radio "完全沒有感受" [ref=f1e855] [cursor=pointer]
+                  - generic [ref=f1e858]: 完全沒有感受
+        - listitem [ref=f1e861]:
+          - generic [ref=f1e863]:
+            - heading "過去是否曾因金錢因素而需要重新調整或重建生活？（例：債務整理・個人破產・大幅變更還款計畫等） 必須の質問" [level=3] [ref=f1e866]:
+              - generic [ref=f1e867]: 過去是否曾因金錢因素而需要重新調整或重建生活？（例：債務整理・個人破產・大幅變更還款計畫等）
+              - generic "必須の質問" [ref=f1e868]: "*"
+            - radiogroup "過去是否曾因金錢因素而需要重新調整或重建生活？（例：債務整理・個人破產・大幅變更還款計畫等） 必須の質問" [ref=f1e871]:
+              - generic [ref=f1e872]:
+                - generic [ref=f1e875]:
+                  - radio "有（目前仍持續受到影響）" [ref=f1e877] [cursor=pointer]
+                  - generic [ref=f1e880]: 有（目前仍持續受到影響）
+                - generic [ref=f1e885]:
+                  - radio "有（已經解決）" [ref=f1e887] [cursor=pointer]
+                  - generic [ref=f1e890]: 有（已經解決）
+                - generic [ref=f1e895]:
+                  - radio "曾考慮過但實際上沒有進行" [ref=f1e897] [cursor=pointer]
+                  - generic [ref=f1e900]: 曾考慮過但實際上沒有進行
+                - generic [ref=f1e905]:
+                  - radio "完全沒有" [ref=f1e907] [cursor=pointer]
+                  - generic [ref=f1e910]: 完全沒有
+      - generic [ref=f1e913]:
+        - generic [ref=f1e914]:
+          - button "次へ" [ref=f1e916] [cursor=pointer]
+          - button "フォームをクリア" [ref=f1e921] [cursor=pointer]
+        - generic [ref=f1e925]: Google フォームでパスワードを送信しないでください。
+    - generic [ref=f1e926]:
+      - generic [ref=f1e927]:
+        - text: このフォームは 弁護士法人 響 内部で作成されました。
+        - paragraph [ref=f1e928]:
+          - text: このフォームが不審だと思われる場合
+          - link "報告" [ref=f1e929] [cursor=pointer]:
+            - /url: https://docs.google.com/forms/d/e/1FAIpQLSfb_trSDyD8COGjqSQxZOSNTSN1oBOyJz812aIUuJGL54fPVg/abuse
+      - link [ref=f1e931] [cursor=pointer]:
+        - /url: //www.google.com/forms/about/?utm_source=product&utm_medium=forms_logo&utm_campaign=forms
+        - img "Google" [ref=f1e932]
+        - text: フォーム
+  - generic [ref=f1e936]:
+    - button "ヘルプとフィードバック" [ref=f1e937] [cursor=pointer]
+    - tooltip [aria-hidden] [ref=f1e940]: ヘルプとフィードバック

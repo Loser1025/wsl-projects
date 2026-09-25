@@ -1,0 +1,105 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - img [ref=e5]:
+      - generic [ref=e30]: calling
+      - generic [ref=e67]:
+        - generic [ref=e68]: オンライン診療
+        - generic [ref=e69]: 自宅で完結。全国対応。
+  - main [ref=e70]:
+    - generic [ref=e71]:
+      - generic [ref=e72]:
+        - generic [ref=e73]:
+          - generic [ref=e74]: お名前（漢字）
+          - generic [ref=e75]: 必須
+        - textbox "お名前（漢字）" [ref=e76]:
+          - /placeholder: 例）銀座 花子
+      - generic [ref=e77]:
+        - generic [ref=e78]:
+          - generic [ref=e79]: フリガナ
+          - generic [ref=e80]: 必須
+        - textbox "フリガナ" [ref=e81]:
+          - /placeholder: 例）ギンザ ハナコ
+      - generic [ref=e82]:
+        - generic [ref=e83]:
+          - generic [ref=e84]: お電話番号
+          - generic [ref=e85]: 必須
+        - textbox "お電話番号" [ref=e86]:
+          - /placeholder: 例）090-1234-5678
+      - generic [ref=e87]:
+        - generic [ref=e88]:
+          - generic [ref=e89]: メールアドレス
+          - generic [ref=e90]: 必須
+        - textbox "メールアドレス" [ref=e91]:
+          - /placeholder: 例）counseling@example.com
+      - generic [ref=e92]:
+        - generic [ref=e93]:
+          - generic [ref=e94]: ご希望の診察形式
+          - generic [ref=e95]: 必須
+        - generic [ref=e96]:
+          - generic [ref=e97] [cursor=pointer]:
+            - radio "オンライン診察（ご自宅等から受診）" [ref=e98]
+            - generic [ref=e99]: オンライン診察（ご自宅等から受診）
+          - generic [ref=e100] [cursor=pointer]:
+            - radio "対面診察（クリニックへ来院）" [ref=e101]
+            - generic [ref=e102]: 対面診察（クリニックへ来院）
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - generic [ref=e105]: ご希望メニュー
+          - generic [ref=e106]: 必須
+        - generic [ref=e107]: ご希望のメニューをお選びください（1つ以上選択・複数選択可）
+        - generic [ref=e108]:
+          - generic [ref=e110]:
+            - generic [ref=e111] [cursor=pointer]:
+              - checkbox "医療ダイエット" [ref=e112]
+              - generic [ref=e113]: 医療ダイエット
+            - button "料金表を見る" [ref=e114] [cursor=pointer]
+          - generic [ref=e120]:
+            - generic [ref=e121] [cursor=pointer]:
+              - checkbox "ED・男性ホルモン" [ref=e122]
+              - generic [ref=e123]: ED・男性ホルモン
+            - button "料金表を見る" [ref=e124] [cursor=pointer]
+          - generic [ref=e130]:
+            - generic [ref=e131] [cursor=pointer]:
+              - checkbox "AGA・頭皮ケア" [ref=e132]
+              - generic [ref=e133]: AGA・頭皮ケア
+            - button "料金表を見る" [ref=e134] [cursor=pointer]
+          - generic [ref=e140]:
+            - generic [ref=e141] [cursor=pointer]:
+              - checkbox "美容内服" [ref=e142]
+              - generic [ref=e143]: 美容内服
+            - button "料金表を見る" [ref=e144] [cursor=pointer]
+          - generic [ref=e150]:
+            - generic [ref=e151] [cursor=pointer]:
+              - checkbox "マンジャロ" [ref=e152]
+              - generic [ref=e153]: マンジャロ
+            - button "料金表を見る" [ref=e154] [cursor=pointer]
+      - generic [ref=e159]:
+        - generic [ref=e160]:
+          - generic [ref=e161]: ご希望日時
+          - generic [ref=e162]: 必須
+        - generic [ref=e163]: スムーズな日程調整のため、第1〜第3ご希望日時をすべてご選択ください。
+        - generic [ref=e164]:
+          - generic [ref=e165]:
+            - generic [ref=e166]:
+              - generic [ref=e167]: 第1ご希望日時
+              - generic [ref=e168]: 必須
+            - textbox [ref=e169]
+          - generic [ref=e170]:
+            - generic [ref=e171]:
+              - generic [ref=e172]: 第2ご希望日時
+              - generic [ref=e173]: 必須
+            - textbox [ref=e174]
+          - generic [ref=e175]:
+            - generic [ref=e176]:
+              - generic [ref=e177]: 第3ご希望日時
+              - generic [ref=e178]: 必須
+            - textbox [ref=e179]
+      - generic [ref=e180]:
+        - generic [ref=e181]:
+          - generic [ref=e182]: ご質問・ご不安な点
+          - generic [ref=e183]: 任意
+        - textbox "ご質問・ご不安な点" [ref=e184]:
+          - /placeholder: アレルギーの有無やダウンタイムのご希望など、気になる点がございましたらご自由にご記入ください。
+      - generic [ref=e185]:
+        - button "診察を予約する" [ref=e186] [cursor=pointer]
+        - paragraph [ref=e190]: ※ ご入力いただいた個人情報は予約管理のみに使用し、厳重に管理いたします。

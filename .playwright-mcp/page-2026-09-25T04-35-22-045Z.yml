@@ -1,0 +1,550 @@
+- generic [ref=f4e2]:
+  - banner [ref=f4e3]:
+    - generic [ref=f4e4]: スルリムクリニック
+    - heading "事前問診票（医療ダイエット）" [level=1] [ref=f4e7]
+    - paragraph [ref=f4e8]: ご来院前にご記入いただく事前問診票です。ご回答内容は診療目的にのみ使用し、厳重に管理いたします。
+  - generic [ref=f4e9]:
+    - group [ref=f4e10]:
+      - generic [ref=f4e11]: 基本情報
+      - generic [ref=f4e12]:
+        - generic [ref=f4e13]:
+          - generic [ref=f4e14]: 郵便番号
+          - generic [ref=f4e15]: 必須
+        - textbox "郵便番号 必須" [ref=f4e16]
+      - generic [ref=f4e17]:
+        - generic [ref=f4e18]:
+          - generic [ref=f4e19]: 住所
+          - generic [ref=f4e20]: 必須
+        - textbox "住所 必須" [ref=f4e21]
+      - generic [ref=f4e22]:
+        - generic [ref=f4e23]:
+          - generic [ref=f4e24]: 氏名
+          - generic [ref=f4e25]: 必須
+        - textbox "氏名 必須" [ref=f4e26]
+      - generic [ref=f4e27]:
+        - generic [ref=f4e28]:
+          - generic [ref=f4e29]: 氏名（フリガナ）
+          - generic [ref=f4e30]: 必須
+        - textbox "氏名（フリガナ） 必須" [ref=f4e31]
+      - generic [ref=f4e32]:
+        - generic [ref=f4e33]:
+          - generic [ref=f4e34]: 生年月日
+          - generic [ref=f4e35]: 必須
+        - textbox "生年月日 必須" [ref=f4e36]
+      - generic [ref=f4e37]:
+        - generic [ref=f4e38]:
+          - generic [ref=f4e39]: 性別
+          - generic [ref=f4e40]: 必須
+        - generic [ref=f4e41]:
+          - generic [ref=f4e42]:
+            - radio "男性" [ref=f4e43] [cursor=pointer]
+            - generic [ref=f4e44]: 男性
+          - generic [ref=f4e45]:
+            - radio "女性" [ref=f4e46] [cursor=pointer]
+            - generic [ref=f4e47]: 女性
+      - generic [ref=f4e48]:
+        - generic [ref=f4e49]:
+          - generic [ref=f4e50]: 血液型
+          - generic [ref=f4e51]: 必須
+        - generic [ref=f4e52]:
+          - generic [ref=f4e53]:
+            - radio "A型" [ref=f4e54] [cursor=pointer]
+            - generic [ref=f4e55]: A型
+          - generic [ref=f4e56]:
+            - radio "B型" [ref=f4e57] [cursor=pointer]
+            - generic [ref=f4e58]: B型
+          - generic [ref=f4e59]:
+            - radio "O型" [ref=f4e60] [cursor=pointer]
+            - generic [ref=f4e61]: O型
+          - generic [ref=f4e62]:
+            - radio "AB型" [ref=f4e63] [cursor=pointer]
+            - generic [ref=f4e64]: AB型
+          - generic [ref=f4e65]:
+            - radio "不明" [ref=f4e66] [cursor=pointer]
+            - generic [ref=f4e67]: 不明
+      - generic [ref=f4e68]:
+        - generic [ref=f4e69]:
+          - generic [ref=f4e70]: 身長(cm)
+          - generic [ref=f4e71]: 必須
+        - textbox "身長(cm) 必須" [ref=f4e72]
+      - generic [ref=f4e73]:
+        - generic [ref=f4e74]:
+          - generic [ref=f4e75]: 体重(kg)
+          - generic [ref=f4e76]: 必須
+        - textbox "体重(kg) 必須" [ref=f4e77]
+    - group [ref=f4e78]:
+      - generic [ref=f4e79]: 生活習慣・ご来院について
+      - generic [ref=f4e80]:
+        - generic [ref=f4e81]:
+          - generic [ref=f4e82]: 当クリニックにご来店されたことはございますか？（別店舗も含む）
+          - generic [ref=f4e83]: 必須
+        - generic [ref=f4e84]:
+          - generic [ref=f4e85]:
+            - radio "今回がはじめて" [ref=f4e86] [cursor=pointer]
+            - generic [ref=f4e87]: 今回がはじめて
+          - generic [ref=f4e88]:
+            - radio "説明を受けたことがある" [ref=f4e89] [cursor=pointer]
+            - generic [ref=f4e90]: 説明を受けたことがある
+          - generic [ref=f4e91]:
+            - radio "施術をしたことがある" [ref=f4e92] [cursor=pointer]
+            - generic [ref=f4e93]: 施術をしたことがある
+      - generic [ref=f4e94]:
+        - generic [ref=f4e95]:
+          - generic [ref=f4e96]: クリニックを知ったきっかけは何ですか？
+          - generic [ref=f4e97]: 必須
+        - generic [ref=f4e98]:
+          - generic [ref=f4e99]:
+            - radio "Web広告" [ref=f4e100] [cursor=pointer]
+            - generic [ref=f4e101]: Web広告
+          - generic [ref=f4e102]:
+            - radio "ラジオ" [ref=f4e103] [cursor=pointer]
+            - generic [ref=f4e104]: ラジオ
+          - generic [ref=f4e105]:
+            - radio "喫煙所の動画" [ref=f4e106] [cursor=pointer]
+            - generic [ref=f4e107]: 喫煙所の動画
+          - generic [ref=f4e108]:
+            - radio "看板" [ref=f4e109] [cursor=pointer]
+            - generic [ref=f4e110]: 看板
+      - generic [ref=f4e111]:
+        - generic [ref=f4e112]:
+          - generic [ref=f4e113]: 下記の治療にご興味はございますか？
+          - generic [ref=f4e114]: 必須（1つ以上）
+        - generic [ref=f4e115]:
+          - generic [ref=f4e116]:
+            - checkbox "クマ取り" [ref=f4e117] [cursor=pointer]
+            - generic [ref=f4e118]: クマ取り
+          - generic [ref=f4e119]:
+            - checkbox "二重手術" [ref=f4e120] [cursor=pointer]
+            - generic [ref=f4e121]: 二重手術
+          - generic [ref=f4e122]:
+            - checkbox "AGA" [ref=f4e123] [cursor=pointer]
+            - generic [ref=f4e124]: AGA
+          - generic [ref=f4e125]:
+            - checkbox "医療脱毛" [ref=f4e126] [cursor=pointer]
+            - generic [ref=f4e127]: 医療脱毛
+          - generic [ref=f4e128]:
+            - checkbox "多汗症・ワキガ" [ref=f4e129] [cursor=pointer]
+            - generic [ref=f4e130]: 多汗症・ワキガ
+          - generic [ref=f4e131]:
+            - checkbox "テストステロン" [ref=f4e132] [cursor=pointer]
+            - generic [ref=f4e133]: テストステロン
+          - generic [ref=f4e134]:
+            - checkbox "花粉症" [ref=f4e135] [cursor=pointer]
+            - generic [ref=f4e136]: 花粉症
+          - generic [ref=f4e137]:
+            - checkbox "ED" [ref=f4e138] [cursor=pointer]
+            - generic [ref=f4e139]: ED
+          - generic [ref=f4e140]:
+            - checkbox "医療ダイエット" [ref=f4e141] [cursor=pointer]
+            - generic [ref=f4e142]: 医療ダイエット
+          - generic [ref=f4e143]:
+            - checkbox "特になし" [ref=f4e144] [cursor=pointer]
+            - generic [ref=f4e145]: 特になし
+      - generic [ref=f4e146]:
+        - generic [ref=f4e147]:
+          - generic [ref=f4e148]: お酒をどのくらいの頻度で飲みますか？
+          - generic [ref=f4e149]: 必須
+        - generic [ref=f4e150]:
+          - generic [ref=f4e151]:
+            - radio "飲まない" [ref=f4e152] [cursor=pointer]
+            - generic [ref=f4e153]: 飲まない
+          - generic [ref=f4e154]:
+            - radio "１回/週" [ref=f4e155] [cursor=pointer]
+            - generic [ref=f4e156]: １回/週
+          - generic [ref=f4e157]:
+            - radio "２～３回/週" [ref=f4e158] [cursor=pointer]
+            - generic [ref=f4e159]: ２～３回/週
+          - generic [ref=f4e160]:
+            - radio "４～５回/週" [ref=f4e161] [cursor=pointer]
+            - generic [ref=f4e162]: ４～５回/週
+          - generic [ref=f4e163]:
+            - radio "６～７回/週" [ref=f4e164] [cursor=pointer]
+            - generic [ref=f4e165]: ６～７回/週
+      - generic [ref=f4e166]:
+        - generic [ref=f4e167]:
+          - generic [ref=f4e168]: タバコをどのくらいの頻度で吸いますか？
+          - generic [ref=f4e169]: 必須
+        - generic [ref=f4e170]:
+          - generic [ref=f4e171]:
+            - radio "吸わない" [ref=f4e172] [cursor=pointer]
+            - generic [ref=f4e173]: 吸わない
+          - generic [ref=f4e174]:
+            - radio "０～５本/日" [ref=f4e175] [cursor=pointer]
+            - generic [ref=f4e176]: ０～５本/日
+          - generic [ref=f4e177]:
+            - radio "６～１０本/日" [ref=f4e178] [cursor=pointer]
+            - generic [ref=f4e179]: ６～１０本/日
+          - generic [ref=f4e180]:
+            - radio "１箱/日" [ref=f4e181] [cursor=pointer]
+            - generic [ref=f4e182]: １箱/日
+          - generic [ref=f4e183]:
+            - radio "それ以上" [ref=f4e184] [cursor=pointer]
+            - generic [ref=f4e185]: それ以上
+      - generic [ref=f4e186]:
+        - generic [ref=f4e187]:
+          - generic [ref=f4e188]: 旅行にどのくらいの頻度で行きますか？
+          - generic [ref=f4e189]: 必須
+        - generic [ref=f4e190]:
+          - generic [ref=f4e191]:
+            - radio "０～１回/年" [ref=f4e192] [cursor=pointer]
+            - generic [ref=f4e193]: ０～１回/年
+          - generic [ref=f4e194]:
+            - radio "２～３回/年" [ref=f4e195] [cursor=pointer]
+            - generic [ref=f4e196]: ２～３回/年
+          - generic [ref=f4e197]:
+            - radio "４～５回/年" [ref=f4e198] [cursor=pointer]
+            - generic [ref=f4e199]: ４～５回/年
+          - generic [ref=f4e200]:
+            - radio "６～８回/年" [ref=f4e201] [cursor=pointer]
+            - generic [ref=f4e202]: ６～８回/年
+          - generic [ref=f4e203]:
+            - radio "それ以上" [ref=f4e204] [cursor=pointer]
+            - generic [ref=f4e205]: それ以上
+      - generic [ref=f4e206]:
+        - generic [ref=f4e207]:
+          - generic [ref=f4e208]: ご年収はいくらですか？
+          - generic [ref=f4e209]: 必須
+        - generic [ref=f4e210]:
+          - generic [ref=f4e211]:
+            - radio "２００万未満" [ref=f4e212] [cursor=pointer]
+            - generic [ref=f4e213]: ２００万未満
+          - generic [ref=f4e214]:
+            - radio "２００～４００万" [ref=f4e215] [cursor=pointer]
+            - generic [ref=f4e216]: ２００～４００万
+          - generic [ref=f4e217]:
+            - radio "４００～６００万" [ref=f4e218] [cursor=pointer]
+            - generic [ref=f4e219]: ４００～６００万
+          - generic [ref=f4e220]:
+            - radio "６００～８００万" [ref=f4e221] [cursor=pointer]
+            - generic [ref=f4e222]: ６００～８００万
+          - generic [ref=f4e223]:
+            - radio "８００～１０００万" [ref=f4e224] [cursor=pointer]
+            - generic [ref=f4e225]: ８００～１０００万
+          - generic [ref=f4e226]:
+            - radio "それ以上" [ref=f4e227] [cursor=pointer]
+            - generic [ref=f4e228]: それ以上
+      - generic [ref=f4e229]:
+        - generic [ref=f4e230]:
+          - generic [ref=f4e231]: 保険証の種別を教えてください
+          - generic [ref=f4e232]: 必須
+        - generic [ref=f4e233]:
+          - generic [ref=f4e234]:
+            - radio "社会保険" [ref=f4e235] [cursor=pointer]
+            - generic [ref=f4e236]: 社会保険
+          - generic [ref=f4e237]:
+            - radio "国民健康保険" [ref=f4e238] [cursor=pointer]
+            - generic [ref=f4e239]: 国民健康保険
+      - generic [ref=f4e240]:
+        - generic [ref=f4e241]:
+          - generic [ref=f4e242]: 平均の睡眠時間を教えてください。
+          - generic [ref=f4e243]: 必須
+        - textbox "平均の睡眠時間を教えてください。 必須" [ref=f4e244]
+      - generic [ref=f4e245]:
+        - generic [ref=f4e246]:
+          - generic [ref=f4e247]: ストレスについて教えてください。
+          - generic [ref=f4e248]: 必須
+        - generic [ref=f4e249]:
+          - generic [ref=f4e250]:
+            - radio "少ない" [ref=f4e251] [cursor=pointer]
+            - generic [ref=f4e252]: 少ない
+          - generic [ref=f4e253]:
+            - radio "普通" [ref=f4e254] [cursor=pointer]
+            - generic [ref=f4e255]: 普通
+          - generic [ref=f4e256]:
+            - radio "多い" [ref=f4e257] [cursor=pointer]
+            - generic [ref=f4e258]: 多い
+      - generic [ref=f4e259]:
+        - generic [ref=f4e260]:
+          - generic [ref=f4e261]: お支払い方法のご希望はありますか？
+          - generic [ref=f4e262]: 必須
+        - generic [ref=f4e263]:
+          - generic [ref=f4e264]:
+            - radio "現金" [ref=f4e265] [cursor=pointer]
+            - generic [ref=f4e266]: 現金
+          - generic [ref=f4e267]:
+            - radio "カード" [ref=f4e268] [cursor=pointer]
+            - generic [ref=f4e269]: カード
+          - generic [ref=f4e270]:
+            - radio "デビットカード" [ref=f4e271] [cursor=pointer]
+            - generic [ref=f4e272]: デビットカード
+          - generic [ref=f4e273]:
+            - radio "分割払い" [ref=f4e274] [cursor=pointer]
+            - generic [ref=f4e275]: 分割払い
+          - generic [ref=f4e276]:
+            - radio "引き落とし" [ref=f4e277] [cursor=pointer]
+            - generic [ref=f4e278]: 引き落とし
+      - generic [ref=f4e279]:
+        - generic [ref=f4e280]:
+          - generic [ref=f4e281]: 当院における診療はすべて自由診療である（保険適用がない）ことはご存じですか？
+          - generic [ref=f4e282]: 必須
+        - generic [ref=f4e283]:
+          - generic [ref=f4e284]:
+            - radio "はい" [ref=f4e285] [cursor=pointer]
+            - generic [ref=f4e286]: はい
+          - generic [ref=f4e287]:
+            - radio "いいえ" [ref=f4e288] [cursor=pointer]
+            - generic [ref=f4e289]: いいえ
+      - generic [ref=f4e290]:
+        - generic [ref=f4e291]:
+          - generic [ref=f4e292]: 施術写真を院内及びHPで学術的症例としての使用にご協力いただけますでしょうか？
+          - generic [ref=f4e293]: 必須
+        - generic [ref=f4e294]: ※個人を特定されるような顔写真、名前、カルテNOなどは使用しません
+        - generic [ref=f4e295]:
+          - generic [ref=f4e296]:
+            - radio "はい" [ref=f4e297] [cursor=pointer]
+            - generic [ref=f4e298]: はい
+          - generic [ref=f4e299]:
+            - radio "いいえ" [ref=f4e300] [cursor=pointer]
+            - generic [ref=f4e301]: いいえ
+    - group [ref=f4e302]:
+      - generic [ref=f4e303]: 現在の症状・既往歴
+      - generic [ref=f4e304]:
+        - generic [ref=f4e305]:
+          - generic [ref=f4e306]: 現在の症状について不安なこと、聞きたいこと、心配なことなどがあれば教えてください。
+          - generic [ref=f4e307]: 任意
+        - textbox [ref=f4e308]
+      - generic [ref=f4e309]:
+        - generic [ref=f4e310]:
+          - generic [ref=f4e311]: 過去に大きな病気や怪我、手術（癌・交通事故など）のご経験があれば教えてください
+          - generic [ref=f4e312]: 任意
+        - generic [ref=f4e313]: （病名・治療内容・何歳ごろか・手術歴の有無をご記載ください）
+        - textbox [ref=f4e314]
+      - generic [ref=f4e315]:
+        - generic [ref=f4e316]:
+          - generic [ref=f4e317]: 該当する既往歴があれば教えてください。
+          - generic [ref=f4e318]: 任意
+        - generic [ref=f4e319]:
+          - generic [ref=f4e320]:
+            - checkbox "大豆アレルギー" [ref=f4e321] [cursor=pointer]
+            - generic [ref=f4e322]: 大豆アレルギー
+          - generic [ref=f4e323]:
+            - checkbox "麻酔アレルギー" [ref=f4e324] [cursor=pointer]
+            - generic [ref=f4e325]: 麻酔アレルギー
+          - generic [ref=f4e326]:
+            - checkbox "糖尿病" [ref=f4e327] [cursor=pointer]
+            - generic [ref=f4e328]: 糖尿病
+          - generic [ref=f4e329]:
+            - checkbox "高血圧" [ref=f4e330] [cursor=pointer]
+            - generic [ref=f4e331]: 高血圧
+          - generic [ref=f4e332]:
+            - checkbox "肝機能障害" [ref=f4e333] [cursor=pointer]
+            - generic [ref=f4e334]: 肝機能障害
+          - generic [ref=f4e335]:
+            - checkbox "腎機能障害" [ref=f4e336] [cursor=pointer]
+            - generic [ref=f4e337]: 腎機能障害
+          - generic [ref=f4e338]:
+            - checkbox "心臓病" [ref=f4e339] [cursor=pointer]
+            - generic [ref=f4e340]: 心臓病
+          - generic [ref=f4e341]:
+            - checkbox "喘息" [ref=f4e342] [cursor=pointer]
+            - generic [ref=f4e343]: 喘息
+          - generic [ref=f4e344]:
+            - checkbox "ケロイド体質" [ref=f4e345] [cursor=pointer]
+            - generic [ref=f4e346]: ケロイド体質
+          - generic [ref=f4e347]:
+            - checkbox "無呼吸" [ref=f4e348] [cursor=pointer]
+            - generic [ref=f4e349]: 無呼吸
+          - generic [ref=f4e350]:
+            - checkbox "前立腺肥大" [ref=f4e351] [cursor=pointer]
+            - generic [ref=f4e352]: 前立腺肥大
+          - generic [ref=f4e353]:
+            - checkbox "透析" [ref=f4e354] [cursor=pointer]
+            - generic [ref=f4e355]: 透析
+          - generic [ref=f4e356]:
+            - checkbox "緑内障" [ref=f4e357] [cursor=pointer]
+            - generic [ref=f4e358]: 緑内障
+          - generic [ref=f4e359]:
+            - checkbox "白内障" [ref=f4e360] [cursor=pointer]
+            - generic [ref=f4e361]: 白内障
+          - generic [ref=f4e362]:
+            - checkbox "アトピー性皮膚炎" [ref=f4e363] [cursor=pointer]
+            - generic [ref=f4e364]: アトピー性皮膚炎
+          - generic [ref=f4e365]:
+            - checkbox "がん" [ref=f4e366] [cursor=pointer]
+            - generic [ref=f4e367]: がん
+          - generic [ref=f4e368]:
+            - checkbox "その他既往歴" [ref=f4e369] [cursor=pointer]
+            - generic [ref=f4e370]: その他既往歴
+      - generic [ref=f4e371]:
+        - generic [ref=f4e372]:
+          - generic [ref=f4e373]: 申告いただいた持病に関して現在病院に通われていますか？
+          - generic [ref=f4e374]: 任意
+        - generic [ref=f4e375]:
+          - generic [ref=f4e376]:
+            - radio "はい" [ref=f4e377] [cursor=pointer]
+            - generic [ref=f4e378]: はい
+          - generic [ref=f4e379]:
+            - radio "いいえ" [ref=f4e380] [cursor=pointer]
+            - generic [ref=f4e381]: いいえ
+      - generic [ref=f4e382]:
+        - generic [ref=f4e383]:
+          - generic [ref=f4e384]: 服用中のお薬やサプリがあれば教えてください。
+          - generic [ref=f4e385]: 任意
+        - textbox "服用中のお薬やサプリがあれば教えてください。 任意" [ref=f4e386]
+      - generic [ref=f4e387]:
+        - generic [ref=f4e388]:
+          - generic [ref=f4e389]: アレルギーの食べ物や薬があれば教えてください。
+          - generic [ref=f4e390]: 任意
+        - textbox "アレルギーの食べ物や薬があれば教えてください。 任意" [ref=f4e391]
+      - generic [ref=f4e392]:
+        - generic [ref=f4e393]:
+          - generic [ref=f4e394]: 局所麻酔の経験はありますか？
+          - generic [ref=f4e395]: 任意
+        - generic [ref=f4e396]:
+          - generic [ref=f4e397]:
+            - radio "はい" [ref=f4e398] [cursor=pointer]
+            - generic [ref=f4e399]: はい
+          - generic [ref=f4e400]:
+            - radio "いいえ" [ref=f4e401] [cursor=pointer]
+            - generic [ref=f4e402]: いいえ
+      - generic [ref=f4e403]:
+        - generic [ref=f4e404]:
+          - generic [ref=f4e405]: 今まで採血や点滴などをして具合が悪くなったことはありますか？
+          - generic [ref=f4e406]: 任意
+        - generic [ref=f4e407]:
+          - generic [ref=f4e408]:
+            - radio "はい" [ref=f4e409] [cursor=pointer]
+            - generic [ref=f4e410]: はい
+          - generic [ref=f4e411]:
+            - radio "いいえ" [ref=f4e412] [cursor=pointer]
+            - generic [ref=f4e413]: いいえ
+      - generic [ref=f4e414]:
+        - generic [ref=f4e415]:
+          - generic [ref=f4e416]: 血が止まりにくいと言われたことはありますか？
+          - generic [ref=f4e417]: 任意
+        - generic [ref=f4e418]:
+          - generic [ref=f4e419]:
+            - radio "はい" [ref=f4e420] [cursor=pointer]
+            - generic [ref=f4e421]: はい
+          - generic [ref=f4e422]:
+            - radio "いいえ" [ref=f4e423] [cursor=pointer]
+            - generic [ref=f4e424]: いいえ
+      - generic [ref=f4e425]:
+        - generic [ref=f4e426]:
+          - generic [ref=f4e427]: ペースメーカーや金属（プレート・糸）は入っていますか？
+          - generic [ref=f4e428]: 任意
+        - generic [ref=f4e429]:
+          - generic [ref=f4e430]:
+            - radio "はい" [ref=f4e431] [cursor=pointer]
+            - generic [ref=f4e432]: はい
+          - generic [ref=f4e433]:
+            - radio "いいえ" [ref=f4e434] [cursor=pointer]
+            - generic [ref=f4e435]: いいえ
+      - generic [ref=f4e436]:
+        - generic [ref=f4e437]:
+          - generic [ref=f4e438]: 現在、歯科矯正・インプラントをしていますか？
+          - generic [ref=f4e439]: 任意
+        - generic [ref=f4e440]:
+          - generic [ref=f4e441]:
+            - radio "はい" [ref=f4e442] [cursor=pointer]
+            - generic [ref=f4e443]: はい
+          - generic [ref=f4e444]:
+            - radio "いいえ" [ref=f4e445] [cursor=pointer]
+            - generic [ref=f4e446]: いいえ
+      - generic [ref=f4e447]:
+        - generic [ref=f4e448]:
+          - generic [ref=f4e449]: 1年以内に献血をされた経験はございますか？
+          - generic [ref=f4e450]: 任意
+        - generic [ref=f4e451]:
+          - generic [ref=f4e452]:
+            - radio "はい" [ref=f4e453] [cursor=pointer]
+            - generic [ref=f4e454]: はい
+          - generic [ref=f4e455]:
+            - radio "いいえ" [ref=f4e456] [cursor=pointer]
+            - generic [ref=f4e457]: いいえ
+      - generic [ref=f4e458]:
+        - generic [ref=f4e459]:
+          - generic [ref=f4e460]: 輸血経験はありますか？
+          - generic [ref=f4e461]: 任意
+        - generic [ref=f4e462]:
+          - generic [ref=f4e463]:
+            - radio "はい" [ref=f4e464] [cursor=pointer]
+            - generic [ref=f4e465]: はい
+          - generic [ref=f4e466]:
+            - radio "いいえ" [ref=f4e467] [cursor=pointer]
+            - generic [ref=f4e468]: いいえ
+      - generic [ref=f4e469]:
+        - generic [ref=f4e470]:
+          - generic [ref=f4e471]: インフルエンザ等のワクチンを１週間以内に接種しましたか？
+          - generic [ref=f4e472]: 任意
+        - generic [ref=f4e473]:
+          - generic [ref=f4e474]:
+            - radio "はい" [ref=f4e475] [cursor=pointer]
+            - generic [ref=f4e476]: はい
+          - generic [ref=f4e477]:
+            - radio "いいえ" [ref=f4e478] [cursor=pointer]
+            - generic [ref=f4e479]: いいえ
+      - generic [ref=f4e480]:
+        - generic [ref=f4e481]:
+          - generic [ref=f4e482]: インフルエンザ等のワクチンをこれから接種する予定はございますか？
+          - generic [ref=f4e483]: 任意
+        - generic [ref=f4e484]:
+          - generic [ref=f4e485]:
+            - radio "はい" [ref=f4e486] [cursor=pointer]
+            - generic [ref=f4e487]: はい
+          - generic [ref=f4e488]:
+            - radio "いいえ" [ref=f4e489] [cursor=pointer]
+            - generic [ref=f4e490]: いいえ
+      - generic [ref=f4e491]:
+        - generic [ref=f4e492]:
+          - generic [ref=f4e493]: （「がん」にチェックした方のみ）現在治療中ですか？
+          - generic [ref=f4e494]: 任意
+        - generic [ref=f4e495]:
+          - generic [ref=f4e496]:
+            - radio "治療中" [ref=f4e497] [cursor=pointer]
+            - generic [ref=f4e498]: 治療中
+          - generic [ref=f4e499]:
+            - radio "治療終了" [ref=f4e500] [cursor=pointer]
+            - generic [ref=f4e501]: 治療終了
+      - generic [ref=f4e502]:
+        - generic [ref=f4e503]:
+          - generic [ref=f4e504]: （「その他既往歴」にチェックした方のみ）病名を教えてください。
+          - generic [ref=f4e505]: 任意
+        - textbox [ref=f4e506]
+    - group [ref=f4e507]:
+      - generic [ref=f4e508]: 妊娠・授乳
+      - generic [ref=f4e509]:
+        - generic [ref=f4e510]:
+          - generic [ref=f4e511]: 現在、妊娠中または妊活中ですか？
+          - generic [ref=f4e512]: 必須
+        - generic [ref=f4e513]:
+          - generic [ref=f4e514]:
+            - radio "はい" [ref=f4e515] [cursor=pointer]
+            - generic [ref=f4e516]: はい
+          - generic [ref=f4e517]:
+            - radio "いいえ" [ref=f4e518] [cursor=pointer]
+            - generic [ref=f4e519]: いいえ
+      - generic [ref=f4e520]:
+        - generic [ref=f4e521]:
+          - generic [ref=f4e522]: 現在、授乳中ですか？
+          - generic [ref=f4e523]: 必須
+        - generic [ref=f4e524]:
+          - generic [ref=f4e525]:
+            - radio "はい" [ref=f4e526] [cursor=pointer]
+            - generic [ref=f4e527]: はい
+          - generic [ref=f4e528]:
+            - radio "いいえ" [ref=f4e529] [cursor=pointer]
+            - generic [ref=f4e530]: いいえ
+      - generic [ref=f4e531]:
+        - generic [ref=f4e532]:
+          - generic [ref=f4e533]: （女性の方のみ）現在、ピル服用中ですか？服用中の場合はお薬名を教えてください。
+          - generic [ref=f4e534]: 任意
+        - textbox "（女性の方のみ）現在、ピル服用中ですか？服用中の場合はお薬名を教えてください。 任意" [ref=f4e535]
+      - generic [ref=f4e536]:
+        - generic [ref=f4e537]:
+          - generic [ref=f4e538]: （女性の方のみ）出産のご経験はありますか？
+          - generic [ref=f4e539]: 任意
+        - generic [ref=f4e540]:
+          - generic [ref=f4e541]:
+            - radio "はい" [ref=f4e542] [cursor=pointer]
+            - generic [ref=f4e543]: はい
+          - generic [ref=f4e544]:
+            - radio "いいえ" [ref=f4e545] [cursor=pointer]
+            - generic [ref=f4e546]: いいえ
+      - generic [ref=f4e547]:
+        - generic [ref=f4e548]:
+          - generic [ref=f4e549]: 心配なこと、飲んでいるお薬があれば教えてください。
+          - generic [ref=f4e550]: 任意
+        - textbox [ref=f4e551]
+    - button "送信する" [ref=f4e553] [cursor=pointer]
+  - paragraph [ref=f4e554]: ご入力いただいた個人情報は診療目的のみに使用し、厳重に管理いたします。

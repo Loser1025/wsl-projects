@@ -5,6 +5,7 @@
 package vcs
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -213,6 +214,26 @@ func (g *AutoGit) Diff(cwd string) string {
 		return out
 	}
 	return fmt.Sprintf("diff 取得失敗: %s", err)
+}
+
+// ShowHeadFile はcwd配下のGitリポジトリのHEAD時点でのrelPathの内容を返す。
+// Gitリポジトリでない・HEADにそのパスが存在しない等の場合はok=falseを返す
+// （呼び出し元は「判定不能」として安全側に倒すこと）。委任の競合検出
+// （internal/delegate/worker.go::conflictContentDiffers）が、mtime変化だけでは
+// 判別できない「実際に内容が変わったか」を確認するために使う。
+func (g *AutoGit) ShowHeadFile(cwd, relPath string) ([]byte, bool) {
+	if !g.isGitRepo(cwd) {
+		return nil, false
+	}
+	cmd := exec.Command("git", "show", "HEAD:"+relPath)
+	cmd.Dir = cwd
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, false
+	}
+	return stdout.Bytes(), true
 }
 
 // WriteTools はチェックポイント対象となる書き込み系ツール名の集合

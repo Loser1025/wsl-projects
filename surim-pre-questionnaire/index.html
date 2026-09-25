@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>事前問診票</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --sky-50: #f0f9ff;
+    --sky-100: #e0f2fe;
+    --sky-500: #0ea5e9;
+    --sky-600: #0284c7;
+    --sky-700: #0369a1;
+    --ink-900: #0f2536;
+    --ink-600: #45607a;
+    --ink-400: #8aa2b8;
+    --line: #dbe8f1;
+    --card: #ffffff;
+    --danger: #e0554a;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: "Noto Sans JP", "Hiragino Sans", sans-serif;
+    background: linear-gradient(180deg, var(--sky-50) 0%, #ffffff 340px);
+    color: var(--ink-900);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 0 18px 90px; }
+  header.hero { padding: 48px 0 26px; text-align: center; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--sky-100); color: var(--sky-700);
+    font-weight: 700; font-size: 12.5px; padding: 6px 14px;
+    border-radius: 999px; letter-spacing: .02em;
+  }
+  header.hero h1 { margin: 16px 0 8px; font-size: 24px; font-weight: 800; letter-spacing: -0.01em; }
+  header.hero p { margin: 0; color: var(--ink-600); font-size: 14px; line-height: 1.6; max-width: 480px; margin-inline: auto; }
+
+  form { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 16px 36px -18px rgba(2,132,199,0.22); padding: 6px; }
+  fieldset { border: none; margin: 0; padding: 24px 22px 8px; }
+  fieldset + fieldset { border-top: 1px solid var(--line); }
+  .section-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--sky-600); margin: 0 0 14px; }
+  .field { margin-bottom: 16px; }
+  label.q { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; font-size: 14px; margin-bottom: 7px; gap: 8px; }
+  label.q .req { color: var(--danger); font-size: 11px; font-weight: 700; white-space: nowrap; }
+  label.q .opt { color: var(--ink-400); font-size: 11px; white-space: nowrap; }
+  .field-note { font-size: 12px; color: var(--ink-400); margin: -3px 0 8px; line-height: 1.5; }
+
+  input[type="text"], input[type="date"], input[type="number"], textarea, select {
+    width: 100%; padding: 11px 13px; font-size: 14.5px; font-family: inherit;
+    border: 1.5px solid var(--line); border-radius: 10px; background: #fbfdff; color: var(--ink-900);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  textarea { resize: vertical; min-height: 68px; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--sky-500); box-shadow: 0 0 0 3px rgba(14,165,233,0.15); }
+
+  .options { display: flex; flex-wrap: wrap; gap: 8px; }
+  .option { position: relative; }
+  .option input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+  .option span {
+    display: inline-flex; align-items: center; padding: 9px 14px; border: 1.5px solid var(--line);
+    border-radius: 999px; font-size: 13.5px; font-weight: 500; color: var(--ink-600); background: #fbfdff;
+    transition: all .15s;
+  }
+  .option input:checked + span { border-color: var(--sky-500); background: var(--sky-500); color: #fff; }
+
+  .conditional { margin-top: 10px; padding: 12px; background: var(--sky-50); border: 1px dashed var(--sky-100); border-radius: 10px; display: none; }
+  .conditional.is-visible { display: block; }
+
+  .submit-row { padding: 22px; }
+  button.submit-btn {
+    width: 100%; padding: 15px 0; font-size: 16px; font-weight: 700; font-family: inherit; color: #fff;
+    background: linear-gradient(180deg, var(--sky-500), var(--sky-600)); border: none; border-radius: 14px;
+    cursor: pointer; box-shadow: 0 10px 22px -10px rgba(2,132,199,0.55);
+  }
+  button.submit-btn:disabled { opacity: .6; cursor: not-allowed; }
+  .footnote { text-align: center; color: var(--ink-400); font-size: 12px; margin-top: 16px; line-height: 1.6; }
+
+  #result { display: none; }
+  .panel { border-radius: var(--radius); padding: 44px 26px; text-align: center; }
+  .panel.ok { background: var(--sky-50); border: 1px solid var(--sky-100); }
+  .panel.err { background: #fdf1f0; border: 1px solid #fbdcda; }
+  .panel .icon { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+  .panel.ok .icon { background: var(--sky-500); }
+  .panel.err .icon { background: var(--danger); }
+  .panel .icon svg { width: 26px; height: 26px; stroke: #fff; }
+  .panel h2 { margin: 0 0 8px; font-size: 19px; font-weight: 800; }
+  .panel p { margin: 0; color: var(--ink-600); font-size: 14px; line-height: 1.6; }
+
+  @media (max-width: 520px) {
+    header.hero { padding: 34px 0 20px; }
+    header.hero h1 { font-size: 20px; }
+    fieldset { padding: 18px 16px 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="formWrap">
+  <header class="hero">
+    <h1>事前問診票</h1>
+    <p>ご来院前にご記入いただく事前問診票です。ご回答内容は診療目的にのみ使用し、厳重に管理いたします。</p>
+  </header>
+
+  <form id="qForm">
+    <!-- 基本情報 -->
+    <fieldset>
+      <div class="section-title">基本情報</div>
+      <div class="field"><label class="q" for="postal"><span>郵便番号</span><span class="req">必須</span></label><input type="text" id="postal" required /></div>
+      <div class="field"><label class="q" for="address"><span>住所</span><span class="req">必須</span></label><input type="text" id="address" required /></div>
+      <div class="field"><label class="q" for="name"><span>氏名</span><span class="req">必須</span></label><input type="text" id="name" required /></div>
+      <div class="field"><label class="q" for="kana"><span>氏名（フリガナ）</span><span class="req">必須</span></label><input type="text" id="kana" required /></div>
+      <div class="field"><label class="q" for="dob"><span>生年月日</span><span class="req">必須</span></label><input type="date" id="dob" required /></div>
+      <div class="field">
+        <label class="q"><span>性別</span><span class="req">必須</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="gender" value="男性" required /><span>男性</span></label>
+          <label class="option"><input type="radio" name="gender" value="女性" /><span>女性</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label class="q"><span>血液型</span><span class="req">必須</span></label>
+        <div class="options" id="bloodTypeOptions">
+          <label class="option"><input type="radio" name="bloodType" value="A型" required /><span>A型</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="B型" /><span>B型</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="O型" /><span>O型</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="AB型" /><span>AB型</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="不明" /><span>不明</span></label>
+        </div>
+      </div>
+      <div class="field"><label class="q" for="height"><span>身長(cm)</span><span class="req">必須</span></label><input type="text" id="height" required /></div>
+      <div class="field"><label class="q" for="weight"><span>体重(kg)</span><span class="req">必須</span></label><input type="text" id="weight" required /></div>
+    </fieldset>
+
+    <!-- 生活習慣・ご来院について -->
+    <fieldset>
+      <div class="section-title">生活習慣・ご来院について</div>
+
+      <div class="field">
+        <label class="q"><span>当クリニックにご来店されたことはございますか？（別店舗も含む）</span><span class="req">必須</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="visitHistory" value="今回がはじめて" required /><span>今回がはじめて</span></label>
+          <label class="option"><input type="radio" name="visitHistory" value="説明を受けたことがある" /><span>説明を受けたことがある</span></label>
+          <label class="option"><input type="radio" name="visitHistory" value="施術をしたことがある" /><span>施術をしたことがある</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>クリニックを知ったきっかけは何ですか？</span><span class="req">必須</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="referral" value="Web広告" required /><span>Web広告</span></label>
+          <label class="option"><input type="radio" name="referral" value="ラジオ" /><span>ラジオ</span></label>
+          <label class="option"><input type="radio" name="referral" value="喫煙所の動画" /><span>喫煙所の動画</span></label>
+          <label class="option"><input type="radio" name="referral" value="看板" /><span>看板</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>下記の治療にご興味はございますか？</span><span class="req">必須（1つ以上）</span></label>
+        <div class="options" id="interestOptions">
+          <label class="option"><input type="checkbox" name="interest" value="クマ取り" /><span>クマ取り</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="二重手術" /><span>二重手術</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="AGA" /><span>AGA</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="医療脱毛" /><span>医療脱毛</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="多汗症・ワキガ" /><span>多汗症・ワキガ</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="テストステロン" /><span>テストステロン</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="花粉症" /><span>花粉症</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="ED" /><span>ED</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="医療ダイエット" /><span>医療ダイエット</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="特になし" /><span>特になし</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>お支払い方法のご希望はありますか？</span><span class="req">必須</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="payment" value="カード決済" required /><span>カード決済</span></label>
+          <label class="option"><input type="radio" name="payment" value="銀行振込" /><span>銀行振込</span></label>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- 現在の症状・既往歴 -->
+    <fieldset>
+      <div class="section-title">現在の症状・既往歴</div>
+
+      <div class="field">
+        <label class="q"><span>現在の症状について不安なこと、聞きたいこと、心配なことなどがあれば教えてください。</span><span class="opt">任意</span></label>
+        <textarea id="symptomConcern"></textarea>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>過去に大きな病気や怪我、手術（癌・交通事故など）のご経験があれば教えてください</span><span class="opt">任意</span></label>
+        <div class="field-note">（病名・治療内容・何歳ごろか・手術歴の有無をご記載ください）</div>
+        <textarea id="majorHistory"></textarea>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>該当する既往歴があれば教えてください。</span><span class="opt">任意</span></label>
+        <div class="options" id="medicalHistoryOptions">
+          <label class="option"><input type="checkbox" name="medicalHistory" value="大豆アレルギー" /><span>大豆アレルギー</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="麻酔アレルギー" /><span>麻酔アレルギー</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="糖尿病" /><span>糖尿病</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="高血圧" /><span>高血圧</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="肝機能障害" /><span>肝機能障害</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="腎機能障害" /><span>腎機能障害</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="心臓病" /><span>心臓病</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="喘息" /><span>喘息</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="ケロイド体質" /><span>ケロイド体質</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="無呼吸" /><span>無呼吸</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="前立腺肥大" /><span>前立腺肥大</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="透析" /><span>透析</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="緑内障" /><span>緑内障</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="白内障" /><span>白内障</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="アトピー性皮膚炎" /><span>アトピー性皮膚炎</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="がん" /><span>がん</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="その他既往歴" /><span>その他既往歴</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>申告いただいた持病に関して現在病院に通われていますか？</span><span class="opt">任意</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="chronicOngoing" value="はい" /><span>はい</span></label>
+          <label class="option"><input type="radio" name="chronicOngoing" value="いいえ" /><span>いいえ</span></label>
+        </div>
+      </div>
+
+      <div class="field"><label class="q" for="currentMeds"><span>服用中のお薬やサプリがあれば教えてください。</span><span class="opt">任意</span></label><input type="text" id="currentMeds" /></div>
+      <div class="field"><label class="q" for="allergies"><span>アレルギーの食べ物や薬があれば教えてください。</span><span class="opt">任意</span></label><input type="text" id="allergies" /></div>
+
+      <div class="field">
+        <label class="q"><span>ペースメーカーや金属（プレート・糸）は入っていますか？</span><span class="opt">任意</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="metalImplant" value="はい" /><span>はい</span></label>
+          <label class="option"><input type="radio" name="metalImplant" value="いいえ" /><span>いいえ</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>（「がん」にチェックした方のみ）現在治療中ですか？</span><span class="opt">任意</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="cancerStatus" value="治療中" /><span>治療中</span></label>
+          <label class="option"><input type="radio" name="cancerStatus" value="治療終了" /><span>治療終了</span></label>
+        </div>
+        <div class="conditional" data-show-if="cancerStatus=治療終了">
+          <label class="q"><span>治療後の経過年数はどのくらいですか？</span><span class="opt">任意</span></label>
+          <input type="text" id="cancerYears" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>（「その他既往歴」にチェックした方のみ）病名を教えてください。</span><span class="opt">任意</span></label>
+        <input type="text" id="otherDiseaseName" />
+      </div>
+    </fieldset>
+
+    <!-- 妊娠・授乳 -->
+    <fieldset>
+      <div class="section-title">妊娠・授乳</div>
+
+      <div class="field">
+        <label class="q"><span>現在、妊娠中または妊活中ですか？</span><span class="req">必須</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="pregnancy" value="はい" required /><span>はい</span></label>
+          <label class="option"><input type="radio" name="pregnancy" value="いいえ" /><span>いいえ</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>現在、授乳中ですか？</span><span class="req">必須</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="breastfeeding" value="はい" required /><span>はい</span></label>
+          <label class="option"><input type="radio" name="breastfeeding" value="いいえ" /><span>いいえ</span></label>
+        </div>
+      </div>
+
+      <div class="field"><label class="q" for="pillUse"><span>（女性の方のみ）現在、ピル服用中ですか？服用中の場合はお薬名を教えてください。</span><span class="opt">任意</span></label><input type="text" id="pillUse" /></div>
+
+      <div class="field">
+        <label class="q"><span>（女性の方のみ）出産のご経験はありますか？</span><span class="opt">任意</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="childbirth" value="はい" /><span>はい</span></label>
+          <label class="option"><input type="radio" name="childbirth" value="いいえ" /><span>いいえ</span></label>
+        </div>
+        <div class="conditional" data-show-if="childbirth=はい">
+          <label class="q"><span>出産時のご年齢と方法（経腟／帝王切開）を教えてください。</span><span class="opt">任意</span></label>
+          <input type="text" id="childbirthDetail" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>心配なこと、飲んでいるお薬があれば教えてください。</span><span class="opt">任意</span></label>
+        <textarea id="finalConcern"></textarea>
+      </div>
+    </fieldset>
+
+    <div class="submit-row">
+      <button type="submit" class="submit-btn" id="submitBtn">送信する</button>
+    </div>
+  </form>
+  <p class="footnote">ご入力いただいた個人情報は診療目的のみに使用し、厳重に管理いたします。</p>
+</div>
+
+<div id="result"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,417 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - generic [ref=e10]:
+          - heading "사전 문진표(의료 다이어트)" [level=1] [ref=e12]
+          - generic [ref=e13]: 내원 전에 작성해 주시는 사전 문진표입니다. 답변 내용은 진료 목적으로만 사용되며 철저히 관리됩니다.
+        - generic [ref=e15]:
+          - generic [ref=e17]:
+            - link "Google にログイン" [ref=e18] [cursor=pointer]:
+              - /url: https://accounts.google.com/Login?continue=https%3A%2F%2Fdocs.google.com%2Fforms%2Fd%2Fe%2F1FAIpQLSf0GmL09Sem0SVr0bYgXVyeEIeEfjKazvYicqrM8jLMHKHS8g%2Fviewform%3Ffbzx%3D-2029968475320773196
+            - text: すると作業内容を保存できます。
+            - button "詳細" [ref=e19] [cursor=pointer]
+          - generic [aria-hidden] [ref=e21]: "* 必須の質問です"
+      - list [ref=e22]:
+        - listitem [ref=e23]:
+          - generic [ref=e25]:
+            - heading "환자 ID 必須の質問" [level=3] [ref=e28]:
+              - generic [ref=e29]: 환자 ID
+              - generic "必須の質問" [ref=e30]: "*"
+            - generic [ref=e35]:
+              - textbox "환자 ID 必須の質問" [ref=e36]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e38]:
+          - generic [ref=e40]:
+            - heading "우편번호 必須の質問" [level=3] [ref=e43]:
+              - generic [ref=e44]: 우편번호
+              - generic "必須の質問" [ref=e45]: "*"
+            - generic [ref=e50]:
+              - textbox "우편번호 必須の質問" [ref=e51]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e53]:
+          - generic [ref=e55]:
+            - heading "주소 必須の質問" [level=3] [ref=e58]:
+              - generic [ref=e59]: 주소
+              - generic "必須の質問" [ref=e60]: "*"
+            - generic [ref=e65]:
+              - textbox "주소 必須の質問" [ref=e66]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e68]:
+          - generic [ref=e70]:
+            - heading "성명 必須の質問" [level=3] [ref=e73]:
+              - generic [ref=e74]: 성명
+              - generic "必須の質問" [ref=e75]: "*"
+            - generic [ref=e80]:
+              - textbox "성명 必須の質問" [ref=e81]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e83]:
+          - generic [ref=e85]:
+            - heading "성명(여권 영문/로마자 표기) 必須の質問" [level=3] [ref=e88]:
+              - generic [ref=e89]: 성명(여권 영문/로마자 표기)
+              - generic "必須の質問" [ref=e90]: "*"
+            - generic [ref=e95]:
+              - textbox "성명(여권 영문/로마자 표기) 必須の質問" [ref=e96]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e98]:
+          - generic [ref=e100]:
+            - heading "전화번호 必須の質問" [level=3] [ref=e103]:
+              - generic [ref=e104]: 전화번호
+              - generic "必須の質問" [ref=e105]: "*"
+            - generic [ref=e110]:
+              - textbox "전화번호 必須の質問" [ref=e111]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e113]:
+          - generic [ref=e115]:
+            - heading "이메일 주소 必須の質問" [level=3] [ref=e118]:
+              - generic [ref=e119]: 이메일 주소
+              - generic "必須の質問" [ref=e120]: "*"
+            - generic [ref=e125]:
+              - textbox "이메일 주소 必須の質問" [ref=e126]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e128]:
+          - generic [ref=e130]:
+            - heading "생년월일 必須の質問" [level=3] [ref=e133]:
+              - generic [ref=e134]: 생년월일
+              - generic "必須の質問" [ref=e135]: "*"
+            - generic "생년월일 必須の質問" [ref=e138]:
+              - generic [ref=e140]:
+                - generic [ref=e141]: MM
+                - combobox "月" [ref=e146]
+              - generic [ref=e148]: /
+              - generic [ref=e150]:
+                - generic [ref=e151]: DD
+                - combobox "日付" [ref=e156]
+        - listitem [ref=e158]:
+          - generic [ref=e160]:
+            - heading "성별 必須の質問" [level=3] [ref=e163]:
+              - generic [ref=e164]: 성별
+              - generic "必須の質問" [ref=e165]: "*"
+            - radiogroup "성별 必須の質問" [ref=e168]:
+              - generic [ref=e169]:
+                - generic [ref=e172]:
+                  - radio "남성" [ref=e174] [cursor=pointer]
+                  - generic [ref=e177]: 남성
+                - generic [ref=e182]:
+                  - radio "여성" [ref=e184] [cursor=pointer]
+                  - generic [ref=e187]: 여성
+        - listitem [ref=e190]:
+          - generic [ref=e192]:
+            - heading "직업 必須の質問" [level=3] [ref=e195]:
+              - generic [ref=e196]: 직업
+              - generic "必須の質問" [ref=e197]: "*"
+            - generic [ref=e202]:
+              - textbox "직업 必須の質問" [ref=e203]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e205]:
+          - generic [ref=e207]:
+            - heading "업무 내용 必須の質問" [level=3] [ref=e210]:
+              - generic [ref=e211]: 업무 내용
+              - generic "必須の質問" [ref=e212]: "*"
+            - generic [ref=e217]:
+              - textbox "업무 내용 必須の質問" [ref=e218]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e220]:
+          - generic [ref=e222]:
+            - heading "키(cm) 必須の質問" [level=3] [ref=e225]:
+              - generic [ref=e226]: 키(cm)
+              - generic "必須の質問" [ref=e227]: "*"
+            - generic [ref=e232]:
+              - textbox "키(cm) 必須の質問" [ref=e233]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e235]:
+          - generic [ref=e237]:
+            - heading "체중(kg) 必須の質問" [level=3] [ref=e240]:
+              - generic [ref=e241]: 체중(kg)
+              - generic "必須の質問" [ref=e242]: "*"
+            - generic [ref=e247]:
+              - textbox "체중(kg) 必須の質問" [ref=e248]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e250]:
+          - generic [ref=e252]:
+            - heading "현재 가정 상황을 알려주세요. 必須の質問" [level=3] [ref=e255]:
+              - generic [ref=e256]: 현재 가정 상황을 알려주세요.
+              - generic "必須の質問" [ref=e257]: "*"
+            - radiogroup "현재 가정 상황을 알려주세요. 必須の質問" [ref=e260]:
+              - generic [ref=e261]:
+                - generic [ref=e264]:
+                  - radio "미혼(자녀 있음)" [ref=e266] [cursor=pointer]
+                  - generic [ref=e269]: 미혼(자녀 있음)
+                - generic [ref=e274]:
+                  - radio "미혼(자녀 없음)" [ref=e276] [cursor=pointer]
+                  - generic [ref=e279]: 미혼(자녀 없음)
+                - generic [ref=e284]:
+                  - radio "기혼(자녀 있음)" [ref=e286] [cursor=pointer]
+                  - generic [ref=e289]: 기혼(자녀 있음)
+                - generic [ref=e294]:
+                  - radio "기혼(자녀 없음)" [ref=e296] [cursor=pointer]
+                  - generic [ref=e299]: 기혼(자녀 없음)
+                - generic [ref=e304]:
+                  - radio "학생" [ref=e306] [cursor=pointer]
+                  - generic [ref=e309]: 학생
+        - listitem [ref=e312]:
+          - generic [ref=e314]:
+            - 'heading "성인 후 가장 가벼웠을 때의 체중과 그 시기를 알려주세요（예: 〇kg 약 ●년 ●개월 전） 必須の質問" [level=3] [ref=e317]':
+              - generic [ref=e318]: "성인 후 가장 가벼웠을 때의 체중과 그 시기를 알려주세요（예: 〇kg 약 ●년 ●개월 전）"
+              - generic "必須の質問" [ref=e319]: "*"
+            - generic [ref=e324]:
+              - 'textbox "성인 후 가장 가벼웠을 때의 체중과 그 시기를 알려주세요（예: 〇kg 약 ●년 ●개월 전） 必須の質問" [ref=e325]'
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e327]:
+          - generic [ref=e329]:
+            - 'heading "성인 후 최대 체중과 그 시기를 알려주세요（예: 〇kg 약 ●년 ●개월 전） 必須の質問" [level=3] [ref=e332]':
+              - generic [ref=e333]: "성인 후 최대 체중과 그 시기를 알려주세요（예: 〇kg 약 ●년 ●개월 전）"
+              - generic "必須の質問" [ref=e334]: "*"
+            - generic [ref=e339]:
+              - 'textbox "성인 후 최대 체중과 그 시기를 알려주세요（예: 〇kg 약 ●년 ●개월 전） 必須の質問" [ref=e340]'
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e342]:
+          - generic [ref=e344]:
+            - 'heading "언제까지 살을 빼고 싶으신가요?（예: 〇개월 이내, 〇월까지 등） 必須の質問" [level=3] [ref=e347]':
+              - generic [ref=e348]: "언제까지 살을 빼고 싶으신가요?（예: 〇개월 이내, 〇월까지 등）"
+              - generic "必須の質問" [ref=e349]: "*"
+            - generic [ref=e354]:
+              - 'textbox "언제까지 살을 빼고 싶으신가요?（예: 〇개월 이내, 〇월까지 등） 必須の質問" [ref=e355]'
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e357]:
+          - generic [ref=e359]:
+            - heading "지금까지 어떤 다이어트를 하셨나요?（방법・시기） 必須の質問" [level=3] [ref=e362]:
+              - generic [ref=e363]: 지금까지 어떤 다이어트를 하셨나요?（방법・시기）
+              - generic "必須の質問" [ref=e364]: "*"
+            - generic [ref=e367]:
+              - generic [aria-hidden]: 回答を入力
+              - textbox "지금까지 어떤 다이어트를 하셨나요?（방법・시기） 必須の質問" [ref=e369]
+        - listitem [ref=e371]:
+          - generic [ref=e373]:
+            - heading "신경 쓰이는 신체 부위는 어디인가요? 必須の質問" [level=3] [ref=e376]:
+              - generic [ref=e377]: 신경 쓰이는 신체 부위는 어디인가요?
+              - generic "必須の質問" [ref=e378]: "*"
+            - list "신경 쓰이는 신체 부위는 어디인가요? 必須の質問" [ref=e380]:
+              - listitem [ref=e381]:
+                - generic [ref=e383]:
+                  - checkbox "윗배" [ref=e384] [cursor=pointer]
+                  - generic [ref=e387]: 윗배
+              - listitem [ref=e390]:
+                - generic [ref=e392]:
+                  - checkbox "아랫배" [ref=e393] [cursor=pointer]
+                  - generic [ref=e396]: 아랫배
+              - listitem [ref=e399]:
+                - generic [ref=e401]:
+                  - checkbox "허벅지" [ref=e402] [cursor=pointer]
+                  - generic [ref=e405]: 허벅지
+              - listitem [ref=e408]:
+                - generic [ref=e410]:
+                  - checkbox "무릎 위" [ref=e411] [cursor=pointer]
+                  - generic [ref=e414]: 무릎 위
+              - listitem [ref=e417]:
+                - generic [ref=e419]:
+                  - checkbox "종아리" [ref=e420] [cursor=pointer]
+                  - generic [ref=e423]: 종아리
+              - listitem [ref=e426]:
+                - generic [ref=e428]:
+                  - checkbox "팔뚝" [ref=e429] [cursor=pointer]
+                  - generic [ref=e432]: 팔뚝
+              - listitem [ref=e435]:
+                - generic [ref=e437]:
+                  - checkbox "옆구리" [ref=e438] [cursor=pointer]
+                  - generic [ref=e441]: 옆구리
+              - listitem [ref=e444]:
+                - generic [ref=e446]:
+                  - checkbox "턱 아래" [ref=e447] [cursor=pointer]
+                  - generic [ref=e450]: 턱 아래
+              - listitem [ref=e453]:
+                - generic [ref=e455]:
+                  - checkbox "기타" [ref=e456] [cursor=pointer]
+                  - generic [ref=e459]: 기타
+        - listitem [ref=e462]:
+          - generic [ref=e464]:
+            - heading "문신이 있으신가요? 必須の質問" [level=3] [ref=e467]:
+              - generic [ref=e468]: 문신이 있으신가요?
+              - generic "必須の質問" [ref=e469]: "*"
+            - list "문신이 있으신가요? 必須の質問" [ref=e471]:
+              - listitem [ref=e472]:
+                - generic [ref=e474]:
+                  - checkbox "없음" [ref=e475] [cursor=pointer]
+                  - generic [ref=e478]: 없음
+              - listitem [ref=e481]:
+                - generic [ref=e483]:
+                  - checkbox "윗배" [ref=e484] [cursor=pointer]
+                  - generic [ref=e487]: 윗배
+              - listitem [ref=e490]:
+                - generic [ref=e492]:
+                  - checkbox "아랫배" [ref=e493] [cursor=pointer]
+                  - generic [ref=e496]: 아랫배
+        - listitem [ref=e499]:
+          - generic [ref=e501]:
+            - heading "현재 생각하고 계신 치료 방향에 가까운 것을 선택해 주세요. 必須の質問" [level=3] [ref=e504]:
+              - generic [ref=e505]: 현재 생각하고 계신 치료 방향에 가까운 것을 선택해 주세요.
+              - generic "必須の質問" [ref=e506]: "*"
+            - radiogroup "현재 생각하고 계신 치료 방향에 가까운 것을 선택해 주세요. 必須の質問" [ref=e509]:
+              - generic [ref=e510]:
+                - generic [ref=e513]:
+                  - radio "체형을 확실히 바꾸고 장기적으로 유지할 수 있는 몸을 만들고 싶다" [ref=e515] [cursor=pointer]
+                  - generic [ref=e518]: 체형을 확실히 바꾸고 장기적으로 유지할 수 있는 몸을 만들고 싶다
+                - generic [ref=e523]:
+                  - radio "무리하지 않는 범위에서 체중이나 외형을 개선하고 점차 변화를 느끼고 싶다" [ref=e525] [cursor=pointer]
+                  - generic [ref=e528]: 무리하지 않는 범위에서 체중이나 외형을 개선하고 점차 변화를 느끼고 싶다
+                - generic [ref=e533]:
+                  - radio "지금의 체형을 유지하면서 요요 방지를 위해 관리하고 싶다" [ref=e535] [cursor=pointer]
+                  - generic [ref=e538]: 지금의 체형을 유지하면서 요요 방지를 위해 관리하고 싶다
+                - generic [ref=e543]:
+                  - radio "행사 전 등 짧은 기간에 가능한 범위에서 조절하고 싶다" [ref=e545] [cursor=pointer]
+                  - generic [ref=e548]: 행사 전 등 짧은 기간에 가능한 범위에서 조절하고 싶다
+                - generic [ref=e553]:
+                  - radio "우선 나에게 맞는지 가볍게 시도해보며 검토하고 싶다" [ref=e555] [cursor=pointer]
+                  - generic [ref=e558]: 우선 나에게 맞는지 가볍게 시도해보며 검토하고 싶다
+        - listitem [ref=e561]:
+          - generic [ref=e563]:
+            - heading "한 달에 미용비로 쓰는 비용은 얼마 정도인가요? 必須の質問" [level=3] [ref=e566]:
+              - generic [ref=e567]: 한 달에 미용비로 쓰는 비용은 얼마 정도인가요?
+              - generic "必須の質問" [ref=e568]: "*"
+            - generic [ref=e573]:
+              - textbox "한 달에 미용비로 쓰는 비용은 얼마 정도인가요? 必須の質問" [ref=e574]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e576]:
+          - generic [ref=e578]:
+            - 'heading "한 달에 다이어트 비용(예: 헬스장, 보조제 등)으로 쓰는 비용은 얼마 정도인가요? 必須の質問" [level=3] [ref=e581]':
+              - generic [ref=e582]: "한 달에 다이어트 비용(예: 헬스장, 보조제 등)으로 쓰는 비용은 얼마 정도인가요?"
+              - generic "必須の質問" [ref=e583]: "*"
+            - generic [ref=e588]:
+              - 'textbox "한 달에 다이어트 비용(예: 헬스장, 보조제 등)으로 쓰는 비용은 얼마 정도인가요? 必須の質問" [ref=e589]'
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e591]:
+          - generic [ref=e593]:
+            - heading "현재 업무의 바쁜 정도에 대해 가장 가까운 것을 선택해 주세요. 必須の質問" [level=3] [ref=e596]:
+              - generic [ref=e597]: 현재 업무의 바쁜 정도에 대해 가장 가까운 것을 선택해 주세요.
+              - generic "必須の質問" [ref=e598]: "*"
+            - radiogroup "현재 업무의 바쁜 정도에 대해 가장 가까운 것을 선택해 주세요. 必須の質問" [ref=e601]:
+              - generic [ref=e602]:
+                - generic [ref=e605]:
+                  - radio "매우 바쁘다" [ref=e607] [cursor=pointer]
+                  - generic [ref=e610]: 매우 바쁘다
+                - generic [ref=e615]:
+                  - radio "조금 바쁘다" [ref=e617] [cursor=pointer]
+                  - generic [ref=e620]: 조금 바쁘다
+                - generic [ref=e625]:
+                  - radio "보통" [ref=e627] [cursor=pointer]
+                  - generic [ref=e630]: 보통
+                - generic [ref=e635]:
+                  - radio "별로 바쁘지 않다" [ref=e637] [cursor=pointer]
+                  - generic [ref=e640]: 별로 바쁘지 않다
+                - generic [ref=e645]:
+                  - radio "일을 하지 않는다" [ref=e647] [cursor=pointer]
+                  - generic [ref=e650]: 일을 하지 않는다
+        - listitem [ref=e653]:
+          - generic [ref=e655]:
+            - heading "직장 내 인간관계에 대해 스트레스를 느끼시나요? 必須の質問" [level=3] [ref=e658]:
+              - generic [ref=e659]: 직장 내 인간관계에 대해 스트레스를 느끼시나요?
+              - generic "必須の質問" [ref=e660]: "*"
+            - radiogroup "직장 내 인간관계에 대해 스트레스를 느끼시나요? 必須の質問" [ref=e663]:
+              - generic [ref=e664]:
+                - generic [ref=e667]:
+                  - radio "강하게 느낀다" [ref=e669] [cursor=pointer]
+                  - generic [ref=e672]: 강하게 느낀다
+                - generic [ref=e677]:
+                  - radio "조금 느낀다" [ref=e679] [cursor=pointer]
+                  - generic [ref=e682]: 조금 느낀다
+                - generic [ref=e687]:
+                  - radio "거의 느끼지 않는다" [ref=e689] [cursor=pointer]
+                  - generic [ref=e692]: 거의 느끼지 않는다
+                - generic [ref=e697]:
+                  - radio "전혀 느끼지 않는다" [ref=e699] [cursor=pointer]
+                  - generic [ref=e702]: 전혀 느끼지 않는다
+        - listitem [ref=e705]:
+          - generic [ref=e707]:
+            - heading "현재 근무 환경에 대해 가장 가까운 것을 선택해 주세요. 必須の質問" [level=3] [ref=e710]:
+              - generic [ref=e711]: 현재 근무 환경에 대해 가장 가까운 것을 선택해 주세요.
+              - generic "必須の質問" [ref=e712]: "*"
+            - radiogroup "현재 근무 환경에 대해 가장 가까운 것을 선택해 주세요. 必須の質問" [ref=e715]:
+              - generic [ref=e716]:
+                - generic [ref=e719]:
+                  - radio "야근이 많다" [ref=e721] [cursor=pointer]
+                  - generic [ref=e724]: 야근이 많다
+                - generic [ref=e729]:
+                  - radio "무급 야근이 많다" [ref=e731] [cursor=pointer]
+                  - generic [ref=e734]: 무급 야근이 많다
+                - generic [ref=e739]:
+                  - radio "야근은 있지만 과도하지 않다" [ref=e741] [cursor=pointer]
+                  - generic [ref=e744]: 야근은 있지만 과도하지 않다
+                - generic [ref=e749]:
+                  - radio "야근이 거의 없다" [ref=e751] [cursor=pointer]
+                  - generic [ref=e754]: 야근이 거의 없다
+        - listitem [ref=e757]:
+          - generic [ref=e759]:
+            - heading "업무나 직장 환경으로 인한 스트레스가 강한 시기에 식사량 증가나 체중 증가를 느끼시나요? 必須の質問" [level=3] [ref=e762]:
+              - generic [ref=e763]: 업무나 직장 환경으로 인한 스트레스가 강한 시기에 식사량 증가나 체중 증가를 느끼시나요?
+              - generic "必須の質問" [ref=e764]: "*"
+            - radiogroup "업무나 직장 환경으로 인한 스트레스가 강한 시기에 식사량 증가나 체중 증가를 느끼시나요? 必須の質問" [ref=e767]:
+              - generic [ref=e768]:
+                - generic [ref=e771]:
+                  - radio "자주 있다" [ref=e773] [cursor=pointer]
+                  - generic [ref=e776]: 자주 있다
+                - generic [ref=e781]:
+                  - radio "때때로 있다" [ref=e783] [cursor=pointer]
+                  - generic [ref=e786]: 때때로 있다
+                - generic [ref=e791]:
+                  - radio "별로 없다" [ref=e793] [cursor=pointer]
+                  - generic [ref=e796]: 별로 없다
+                - generic [ref=e801]:
+                  - radio "전혀 없다" [ref=e803] [cursor=pointer]
+                  - generic [ref=e806]: 전혀 없다
+        - listitem [ref=e809]:
+          - generic [ref=e811]:
+            - 'heading "현재 생활면이나 금전면에서 느끼는 부담은 어느 정도인가요?（예: 대출・상환 부담, 미래에 대한 불안 등） 必須の質問" [level=3] [ref=e814]':
+              - generic [ref=e815]: "현재 생활면이나 금전면에서 느끼는 부담은 어느 정도인가요?（예: 대출・상환 부담, 미래에 대한 불안 등）"
+              - generic "必須の質問" [ref=e816]: "*"
+            - 'radiogroup "현재 생활면이나 금전면에서 느끼는 부담은 어느 정도인가요?（예: 대출・상환 부담, 미래에 대한 불안 등） 必須の質問" [ref=e819]':
+              - generic [ref=e820]:
+                - generic [ref=e823]:
+                  - radio "강하게 느끼고 있다(일상생활이나 기분에 영향이 있다)" [ref=e825] [cursor=pointer]
+                  - generic [ref=e828]: 강하게 느끼고 있다(일상생활이나 기분에 영향이 있다)
+                - generic [ref=e833]:
+                  - radio "어느 정도 느끼고 있다(신경 쓰이지만 생활은 가능하다)" [ref=e835] [cursor=pointer]
+                  - generic [ref=e838]: 어느 정도 느끼고 있다(신경 쓰이지만 생활은 가능하다)
+                - generic [ref=e843]:
+                  - radio "별로 느끼지 않는다" [ref=e845] [cursor=pointer]
+                  - generic [ref=e848]: 별로 느끼지 않는다
+                - generic [ref=e853]:
+                  - radio "전혀 느끼지 않는다" [ref=e855] [cursor=pointer]
+                  - generic [ref=e858]: 전혀 느끼지 않는다
+        - listitem [ref=e861]:
+          - generic [ref=e863]:
+            - 'heading "지금까지 금전적인 이유로 생활을 재정비하거나 다시 세운 경험이 있으신가요?（예: 채무 정리・개인 파산・상환 계획의 큰 변경 등） 必須の質問" [level=3] [ref=e866]':
+              - generic [ref=e867]: "지금까지 금전적인 이유로 생활을 재정비하거나 다시 세운 경험이 있으신가요?（예: 채무 정리・개인 파산・상환 계획의 큰 변경 등）"
+              - generic "必須の質問" [ref=e868]: "*"
+            - 'radiogroup "지금까지 금전적인 이유로 생활을 재정비하거나 다시 세운 경험이 있으신가요?（예: 채무 정리・개인 파산・상환 계획의 큰 변경 등） 必須の質問" [ref=e871]':
+              - generic [ref=e872]:
+                - generic [ref=e875]:
+                  - radio "있다(현재도 영향이 계속되고 있다)" [ref=e877] [cursor=pointer]
+                  - generic [ref=e880]: 있다(현재도 영향이 계속되고 있다)
+                - generic [ref=e885]:
+                  - radio "있다(이미 해결했다)" [ref=e887] [cursor=pointer]
+                  - generic [ref=e890]: 있다(이미 해결했다)
+                - generic [ref=e895]:
+                  - radio "검토한 적은 있지만 실제로 하지는 않았다" [ref=e897] [cursor=pointer]
+                  - generic [ref=e900]: 검토한 적은 있지만 실제로 하지는 않았다
+                - generic [ref=e905]:
+                  - radio "전혀 없다" [ref=e907] [cursor=pointer]
+                  - generic [ref=e910]: 전혀 없다
+      - generic [ref=e913]:
+        - generic [ref=e914]:
+          - button "次へ" [ref=e916] [cursor=pointer]
+          - button "フォームをクリア" [ref=e921] [cursor=pointer]
+        - generic [ref=e925]: Google フォームでパスワードを送信しないでください。
+    - generic [ref=e926]:
+      - generic [ref=e927]:
+        - text: このフォームは 弁護士法人 響 内部で作成されました。
+        - paragraph [ref=e928]:
+          - text: このフォームが不審だと思われる場合
+          - link "報告" [ref=e929] [cursor=pointer]:
+            - /url: https://docs.google.com/forms/d/e/1FAIpQLSf0GmL09Sem0SVr0bYgXVyeEIeEfjKazvYicqrM8jLMHKHS8g/abuse
+      - link [ref=e931] [cursor=pointer]:
+        - /url: //www.google.com/forms/about/?utm_source=product&utm_medium=forms_logo&utm_campaign=forms
+        - img "Google" [ref=e932]
+        - text: フォーム
+  - generic [ref=e936]:
+    - button "ヘルプとフィードバック" [ref=e937] [cursor=pointer]
+    - tooltip [aria-hidden] [ref=e940]: ヘルプとフィードバック

@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>術前問診表</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --sky-50: #f0f9ff; --sky-100: #e0f2fe; --sky-500: #0ea5e9; --sky-600: #0284c7; --sky-700: #0369a1;
+    --ink-900: #0f2536; --ink-600: #45607a; --ink-400: #8aa2b8; --line: #dbe8f1; --card: #ffffff; --danger: #e0554a; --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; font-family: "Noto Sans TC", "PingFang TC", sans-serif;
+    background: linear-gradient(180deg, var(--sky-50) 0%, #ffffff 340px); color: var(--ink-900); -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 0 18px 90px; }
+  header.hero { padding: 48px 0 26px; text-align: center; }
+  header.hero h1 { margin: 0 0 8px; font-size: 24px; font-weight: 800; letter-spacing: -0.01em; }
+  header.hero p { margin: 0; color: var(--ink-600); font-size: 14px; line-height: 1.6; max-width: 480px; margin-inline: auto; }
+
+  form { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 16px 36px -18px rgba(2,132,199,0.22); padding: 6px; }
+  fieldset { border: none; margin: 0; padding: 24px 22px 8px; }
+  fieldset + fieldset { border-top: 1px solid var(--line); }
+  .section-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--sky-600); margin: 0 0 14px; }
+  .field { margin-bottom: 16px; }
+  label.q { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; font-size: 14px; margin-bottom: 7px; gap: 8px; }
+  label.q .req { color: var(--danger); font-size: 11px; font-weight: 700; white-space: nowrap; }
+  label.q .opt { color: var(--ink-400); font-size: 11px; white-space: nowrap; }
+  .field-note { font-size: 12px; color: var(--ink-400); margin: -3px 0 8px; line-height: 1.5; }
+
+  input[type="text"], input[type="date"], textarea {
+    width: 100%; padding: 11px 13px; font-size: 14.5px; font-family: inherit;
+    border: 1.5px solid var(--line); border-radius: 10px; background: #fbfdff; color: var(--ink-900);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  textarea { resize: vertical; min-height: 68px; }
+  input:focus, textarea:focus { outline: none; border-color: var(--sky-500); box-shadow: 0 0 0 3px rgba(14,165,233,0.15); }
+
+  .options { display: flex; flex-wrap: wrap; gap: 8px; }
+  .option { position: relative; }
+  .option input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+  .option span {
+    display: inline-flex; align-items: center; padding: 9px 14px; border: 1.5px solid var(--line);
+    border-radius: 999px; font-size: 13.5px; font-weight: 500; color: var(--ink-600); background: #fbfdff; transition: all .15s;
+  }
+  .option input:checked + span { border-color: var(--sky-500); background: var(--sky-500); color: #fff; }
+
+  .conditional { margin-top: 10px; padding: 12px; background: var(--sky-50); border: 1px dashed var(--sky-100); border-radius: 10px; display: none; }
+  .conditional.is-visible { display: block; }
+
+  .submit-row { padding: 22px; }
+  button.submit-btn {
+    width: 100%; padding: 15px 0; font-size: 16px; font-weight: 700; font-family: inherit; color: #fff;
+    background: linear-gradient(180deg, var(--sky-500), var(--sky-600)); border: none; border-radius: 14px;
+    cursor: pointer; box-shadow: 0 10px 22px -10px rgba(2,132,199,0.55);
+  }
+  button.submit-btn:disabled { opacity: .6; cursor: not-allowed; }
+  .footnote { text-align: center; color: var(--ink-400); font-size: 12px; margin-top: 16px; line-height: 1.6; }
+
+  #result { display: none; }
+  .panel { border-radius: var(--radius); padding: 44px 26px; text-align: center; }
+  .panel.ok { background: var(--sky-50); border: 1px solid var(--sky-100); }
+  .panel.err { background: #fdf1f0; border: 1px solid #fbdcda; }
+  .panel .icon { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+  .panel.ok .icon { background: var(--sky-500); }
+  .panel.err .icon { background: var(--danger); }
+  .panel .icon svg { width: 26px; height: 26px; stroke: #fff; }
+  .panel h2 { margin: 0 0 8px; font-size: 19px; font-weight: 800; }
+  .panel p { margin: 0; color: var(--ink-600); font-size: 14px; line-height: 1.6; }
+
+  @media (max-width: 520px) {
+    header.hero { padding: 34px 0 20px; }
+    header.hero h1 { font-size: 20px; }
+    fieldset { padding: 18px 16px 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="formWrap">
+  <header class="hero">
+    <h1>術前問診表</h1>
+    <p>這是您來院前需要填寫的術前問診表。您的回答僅用於診療目的，並將嚴密管理。</p>
+  </header>
+
+  <form id="qForm">
+    <fieldset>
+      <div class="section-title">基本資料</div>
+      <div class="field"><label class="q" for="postal"><span>郵遞區號</span><span class="req">必填</span></label><input type="text" id="postal" required /></div>
+      <div class="field"><label class="q" for="address"><span>地址</span><span class="req">必填</span></label><input type="text" id="address" required /></div>
+      <div class="field"><label class="q" for="name"><span>姓名</span><span class="req">必填</span></label><input type="text" id="name" required /></div>
+      <div class="field"><label class="q" for="kana"><span>姓名（護照英文/羅馬拼音）</span><span class="req">必填</span></label><input type="text" id="kana" required /></div>
+      <div class="field"><label class="q" for="dob"><span>出生日期</span><span class="req">必填</span></label><input type="date" id="dob" required /></div>
+      <div class="field">
+        <label class="q"><span>性別</span><span class="req">必填</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="gender" value="男性" required /><span>男性</span></label>
+          <label class="option"><input type="radio" name="gender" value="女性" /><span>女性</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label class="q"><span>血型</span><span class="req">必填</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="bloodType" value="A型" required /><span>A型</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="B型" /><span>B型</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="O型" /><span>O型</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="AB型" /><span>AB型</span></label>
+          <label class="option"><input type="radio" name="bloodType" value="不明" /><span>不明</span></label>
+        </div>
+      </div>
+      <div class="field"><label class="q" for="height"><span>身高(cm)</span><span class="req">必填</span></label><input type="text" id="height" required /></div>
+      <div class="field"><label class="q" for="weight"><span>體重(kg)</span><span class="req">必填</span></label><input type="text" id="weight" required /></div>
+    </fieldset>
+
+    <fieldset>
+      <div class="section-title">生活習慣・來院相關</div>
+
+      <div class="field">
+        <label class="q"><span>您是否曾經來過本診所？（含其他分店）</span><span class="req">必填</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="visitHistory" value="這是第一次" required /><span>這是第一次</span></label>
+          <label class="option"><input type="radio" name="visitHistory" value="曾接受過說明" /><span>曾接受過說明</span></label>
+          <label class="option"><input type="radio" name="visitHistory" value="曾接受過療程" /><span>曾接受過療程</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>您是透過什麼方式了解本診所的？</span><span class="req">必填</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="referral" value="網路廣告" required /><span>網路廣告</span></label>
+          <label class="option"><input type="radio" name="referral" value="廣播" /><span>廣播</span></label>
+          <label class="option"><input type="radio" name="referral" value="吸菸區影片" /><span>吸菸區影片</span></label>
+          <label class="option"><input type="radio" name="referral" value="招牌" /><span>招牌</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>您對下列療程感興趣嗎？</span><span class="req">必填（1項以上）</span></label>
+        <div class="options">
+          <label class="option"><input type="checkbox" name="interest" value="消除黑眼圈" /><span>消除黑眼圈</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="雙眼皮手術" /><span>雙眼皮手術</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="AGA" /><span>AGA</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="醫療脫毛" /><span>醫療脫毛</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="多汗症・狐臭" /><span>多汗症・狐臭</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="睪固酮" /><span>睪固酮</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="花粉症" /><span>花粉症</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="ED" /><span>ED</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="醫療瘦身" /><span>醫療瘦身</span></label>
+          <label class="option"><input type="checkbox" name="interest" value="沒有特別感興趣的" /><span>沒有特別感興趣的</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>您有希望的付款方式嗎？</span><span class="req">必填</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="payment" value="刷卡" required /><span>刷卡</span></label>
+          <label class="option"><input type="radio" name="payment" value="銀行轉帳" /><span>銀行轉帳</span></label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <div class="section-title">目前症狀・既往病史</div>
+
+      <div class="field">
+        <label class="q"><span>如果您對目前的症狀有任何不安、想詢問或擔心的事情，請告訴我們。</span><span class="opt">選填</span></label>
+        <textarea id="symptomConcern"></textarea>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>過去是否有重大疾病、受傷或手術（癌症、交通事故等）的經驗？請告訴我們</span><span class="opt">選填</span></label>
+        <div class="field-note">（請記載病名・治療內容・大約年齡・是否有手術經驗）</div>
+        <textarea id="majorHistory"></textarea>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>如有符合的既往病史，請告訴我們。</span><span class="opt">選填</span></label>
+        <div class="options">
+          <label class="option"><input type="checkbox" name="medicalHistory" value="黃豆過敏" /><span>黃豆過敏</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="麻醉過敏" /><span>麻醉過敏</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="糖尿病" /><span>糖尿病</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="高血壓" /><span>高血壓</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="肝功能障礙" /><span>肝功能障礙</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="腎功能障礙" /><span>腎功能障礙</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="心臟病" /><span>心臟病</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="氣喘" /><span>氣喘</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="蟹足腫體質" /><span>蟹足腫體質</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="睡眠呼吸中止" /><span>睡眠呼吸中止</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="前列腺肥大" /><span>前列腺肥大</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="透析" /><span>透析</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="青光眼" /><span>青光眼</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="白內障" /><span>白內障</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="異位性皮膚炎" /><span>異位性皮膚炎</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="癌症" /><span>癌症</span></label>
+          <label class="option"><input type="checkbox" name="medicalHistory" value="其他既往病史" /><span>其他既往病史</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>針對您申報的慢性病，目前是否有在醫院就診？</span><span class="opt">選填</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="chronicOngoing" value="是" /><span>是</span></label>
+          <label class="option"><input type="radio" name="chronicOngoing" value="否" /><span>否</span></label>
+        </div>
+      </div>
+
+      <div class="field"><label class="q" for="currentMeds"><span>如有正在服用的藥物或保健食品，請告訴我們。</span><span class="opt">選填</span></label><input type="text" id="currentMeds" /></div>
+      <div class="field"><label class="q" for="allergies"><span>如有食物或藥物過敏，請告訴我們。</span><span class="opt">選填</span></label><input type="text" id="allergies" /></div>
+
+      <div class="field">
+        <label class="q"><span>您體內是否裝有心律調節器或金屬（鋼板・鋼絲）？</span><span class="opt">選填</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="metalImplant" value="是" /><span>是</span></label>
+          <label class="option"><input type="radio" name="metalImplant" value="否" /><span>否</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>（僅勾選「癌症」的人）目前是否正在治療中？</span><span class="opt">選填</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="cancerStatus" value="治療中" /><span>治療中</span></label>
+          <label class="option"><input type="radio" name="cancerStatus" value="治療已結束" /><span>治療已結束</span></label>
+        </div>
+        <div class="conditional" data-show-if="cancerStatus=治療已結束">
+          <label class="q"><span>治療後經過了多久？</span><span class="opt">選填</span></label>
+          <input type="text" id="cancerYears" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>（僅勾選「其他既往病史」的人）請告訴我們病名。</span><span class="opt">選填</span></label>
+        <input type="text" id="otherDiseaseName" />
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <div class="section-title">懷孕・哺乳</div>
+
+      <div class="field">
+        <label class="q"><span>您目前是否懷孕中或正在備孕？</span><span class="req">必填</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="pregnancy" value="是" required /><span>是</span></label>
+          <label class="option"><input type="radio" name="pregnancy" value="否" /><span>否</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>您目前是否在哺乳？</span><span class="req">必填</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="breastfeeding" value="是" required /><span>是</span></label>
+          <label class="option"><input type="radio" name="breastfeeding" value="否" /><span>否</span></label>
+        </div>
+      </div>
+
+      <div class="field"><label class="q" for="pillUse"><span>（僅女性）您目前是否在服用避孕藥？如在服用，請告訴我們藥名。</span><span class="opt">選填</span></label><input type="text" id="pillUse" /></div>
+
+      <div class="field">
+        <label class="q"><span>（僅女性）您是否有生產經驗？</span><span class="opt">選填</span></label>
+        <div class="options">
+          <label class="option"><input type="radio" name="childbirth" value="是" /><span>是</span></label>
+          <label class="option"><input type="radio" name="childbirth" value="否" /><span>否</span></label>
+        </div>
+        <div class="conditional" data-show-if="childbirth=是">
+          <label class="q"><span>請告訴我們生產時的年齡與方式（自然產／剖腹產）。</span><span class="opt">選填</span></label>
+          <input type="text" id="childbirthDetail" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="q"><span>如有擔心的事情或正在服用的藥物，請告訴我們。</span><span class="opt">選填</span></label>
+        <textarea id="finalConcern"></textarea>
+      </div>
+    </fieldset>
+
+    <div class="submit-row">
+      <button type="submit" class="submit-btn" id="submitBtn">送出</button>
+    </div>
+  </form>
+  <p class="footnote">您填寫的個人資料僅用於診療目的，並將嚴密管理。</p>
+</div>
+
+<div id="result"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

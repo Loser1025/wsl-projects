@@ -1,0 +1,6 @@
+{
+  "role": "視点: Google Workspace MCP および Google Sheets 連携の専門家。\n制約: \n1. 利用可能な Google Workspace MCP ツールを活用して、指定されたスプレッドシート（ID: 1aFB2O37w-Dh0RmN_W2CultjS1X4Vb7LqxbKMb99UVp4、gid: 2119386543）に合算データを書き込む。\n2. MCPツールが利用可能であれば、それ経由でスプレッドシートへの書き込みを実行する。\n完了基準: Google Workspace MCP（または関連ツール）を使用して、合算データがスプレッドシートの指定シートに正確に書き込まれていること。",
+  "uses": 1,
+  "mode": "write",
+  "last_used": "2026-09-23T12:44:53+09:00"
+}

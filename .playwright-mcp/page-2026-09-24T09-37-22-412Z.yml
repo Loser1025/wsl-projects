@@ -1,0 +1,100 @@
+- generic [ref=f14e2]:
+  - banner [ref=f14e3]:
+    - img [ref=f14e5]:
+      - generic [ref=f14e30]: calling
+      - generic [ref=f14e67]:
+        - generic [ref=f14e68]: オンライン診療
+        - generic [ref=f14e69]: 自宅で完結。全国対応。
+  - main [ref=f14e70]:
+    - generic [ref=f14e71]:
+      - generic [ref=f14e72]:
+        - generic [ref=f14e73]:
+          - generic [ref=f14e74]: お名前（漢字）
+          - generic [ref=f14e75]: 必須
+        - textbox "お名前（漢字）" [ref=f14e76]:
+          - /placeholder: 例）銀座 花子
+      - generic [ref=f14e77]:
+        - generic [ref=f14e78]:
+          - generic [ref=f14e79]: フリガナ
+          - generic [ref=f14e80]: 必須
+        - textbox "フリガナ" [ref=f14e81]:
+          - /placeholder: 例）ギンザ ハナコ
+      - generic [ref=f14e82]:
+        - generic [ref=f14e83]:
+          - generic [ref=f14e84]: お電話番号
+          - generic [ref=f14e85]: 必須
+        - textbox "お電話番号" [ref=f14e86]:
+          - /placeholder: 例）090-1234-5678
+      - generic [ref=f14e87]:
+        - generic [ref=f14e88]:
+          - generic [ref=f14e89]: メールアドレス
+          - generic [ref=f14e90]: 必須
+        - textbox "メールアドレス" [ref=f14e91]:
+          - /placeholder: 例）counseling@example.com
+      - generic [ref=f14e92]:
+        - generic [ref=f14e93]:
+          - generic [ref=f14e94]: ご希望の診察形式
+          - generic [ref=f14e95]: 必須
+        - generic [ref=f14e96]:
+          - generic [ref=f14e97] [cursor=pointer]:
+            - radio "オンライン診察（ご自宅等から受診）" [ref=f14e98]
+            - generic [ref=f14e99]: オンライン診察（ご自宅等から受診）
+          - generic [ref=f14e100] [cursor=pointer]:
+            - radio "対面診察（クリニックへ来院）" [ref=f14e101]
+            - generic [ref=f14e102]: 対面診察（クリニックへ来院）
+      - generic [ref=f14e103]:
+        - generic [ref=f14e104]:
+          - generic [ref=f14e105]: ご希望メニュー
+          - generic [ref=f14e106]: 必須
+        - generic [ref=f14e107]: ご希望のメニューをお選びください（1つ以上選択・複数選択可）
+        - generic [ref=f14e108]:
+          - generic [ref=f14e110]:
+            - generic [ref=f14e111] [cursor=pointer]:
+              - checkbox "医療ダイエット" [ref=f14e112]
+              - generic [ref=f14e113]: 医療ダイエット
+            - button "料金表を見る" [ref=f14e114] [cursor=pointer]
+          - generic [ref=f14e120]:
+            - generic [ref=f14e121] [cursor=pointer]:
+              - checkbox "ED・男性ホルモン" [ref=f14e122]
+              - generic [ref=f14e123]: ED・男性ホルモン
+            - button "料金表を見る" [ref=f14e124] [cursor=pointer]
+          - generic [ref=f14e130]:
+            - generic [ref=f14e131] [cursor=pointer]:
+              - checkbox "AGA・頭皮ケア" [ref=f14e132]
+              - generic [ref=f14e133]: AGA・頭皮ケア
+            - button "料金表を見る" [ref=f14e134] [cursor=pointer]
+          - generic [ref=f14e140]:
+            - generic [ref=f14e141] [cursor=pointer]:
+              - checkbox "美容内服" [ref=f14e142]
+              - generic [ref=f14e143]: 美容内服
+            - button "料金表を見る" [ref=f14e144] [cursor=pointer]
+      - generic [ref=f14e149]:
+        - generic [ref=f14e150]:
+          - generic [ref=f14e151]: ご希望日時
+          - generic [ref=f14e152]: 必須
+        - generic [ref=f14e153]: スムーズな日程調整のため、第1〜第3ご希望日時をすべてご選択ください。
+        - generic [ref=f14e154]:
+          - generic [ref=f14e155]:
+            - generic [ref=f14e156]:
+              - generic [ref=f14e157]: 第1ご希望日時
+              - generic [ref=f14e158]: 必須
+            - textbox [ref=f14e159]
+          - generic [ref=f14e160]:
+            - generic [ref=f14e161]:
+              - generic [ref=f14e162]: 第2ご希望日時
+              - generic [ref=f14e163]: 必須
+            - textbox [ref=f14e164]
+          - generic [ref=f14e165]:
+            - generic [ref=f14e166]:
+              - generic [ref=f14e167]: 第3ご希望日時
+              - generic [ref=f14e168]: 必須
+            - textbox [ref=f14e169]
+      - generic [ref=f14e170]:
+        - generic [ref=f14e171]:
+          - generic [ref=f14e172]: ご質問・ご不安な点
+          - generic [ref=f14e173]: 任意
+        - textbox "ご質問・ご不安な点" [ref=f14e174]:
+          - /placeholder: アレルギーの有無やダウンタイムのご希望など、気になる点がございましたらご自由にご記入ください。
+      - generic [ref=f14e175]:
+        - button "診察を予約する" [ref=f14e176] [cursor=pointer]
+        - paragraph [ref=f14e180]: ※ ご入力いただいた個人情報は予約管理のみに使用し、厳重に管理いたします。

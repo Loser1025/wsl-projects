@@ -1,0 +1,96 @@
+- generic [ref=f17e3]:
+  - banner [ref=f17e4]:
+    - heading "Surim Clinic｜看診預約表" [level=1] [ref=f17e11]
+    - paragraph [ref=f17e12]: 請填寫以下資料，我們將依照您提供的時間與您聯繫，安排看診事宜。
+  - generic [ref=f17e13]:
+    - group [ref=f17e14]:
+      - generic [ref=f17e15]: 基本資料
+      - generic [ref=f17e16]:
+        - generic [ref=f17e17]:
+          - generic [ref=f17e18]:
+            - generic [ref=f17e19]: 您的姓名（中文）
+            - generic [ref=f17e20]: "*必填"
+          - textbox "您的姓名（中文） *必填" [ref=f17e21]:
+            - /placeholder: 例：王小明
+        - generic [ref=f17e22]:
+          - generic [ref=f17e23]:
+            - generic [ref=f17e24]: 護照英文姓名／拼音
+            - generic [ref=f17e25]: 建議填寫
+          - textbox "護照英文姓名／拼音 建議填寫" [ref=f17e26]:
+            - /placeholder: 例：WANG, XIAO-MING
+      - generic [ref=f17e27]:
+        - generic [ref=f17e28]:
+          - generic [ref=f17e29]: 電子信箱
+          - generic [ref=f17e30]: "*必填"
+        - textbox "電子信箱 *必填" [ref=f17e31]:
+          - /placeholder: 例：example@email.com
+    - group [ref=f17e32]:
+      - generic [ref=f17e33]: 看診方式與項目選擇
+      - generic [ref=f17e34]:
+        - generic [ref=f17e35]:
+          - generic [ref=f17e36]: 看診方式（診察形式）
+          - generic [ref=f17e37]: "*必填"
+        - generic [ref=f17e38]:
+          - generic [ref=f17e39] [cursor=pointer]:
+            - radio "線上看診 透過視訊／電話問診，免出門、隱私度高" [checked] [ref=f17e40]
+            - generic [ref=f17e41]:
+              - generic [ref=f17e42]: 線上看診
+              - generic [ref=f17e43]: 透過視訊／電話問診，免出門、隱私度高
+          - generic [ref=f17e44] [cursor=pointer]:
+            - radio "到院看診（實體對面） 親自至診所與醫師面對面諮詢" [ref=f17e45]
+            - generic [ref=f17e46]:
+              - generic [ref=f17e47]: 到院看診（實體對面）
+              - generic [ref=f17e48]: 親自至診所與醫師面對面諮詢
+      - generic [ref=f17e49]:
+        - generic [ref=f17e50]:
+          - generic [ref=f17e51]: 看診項目
+          - generic [ref=f17e52]: "*必填"
+        - generic [ref=f17e53]:
+          - generic [ref=f17e55]:
+            - generic [ref=f17e56] [cursor=pointer]:
+              - checkbox "醫療瘦身（口服減重藥）" [ref=f17e57]
+              - generic [ref=f17e58]: 醫療瘦身（口服減重藥）
+            - button "查看價目表" [ref=f17e59] [cursor=pointer]
+          - generic [ref=f17e61]:
+            - generic [ref=f17e62] [cursor=pointer]:
+              - checkbox "AGA 雄性禿治療" [ref=f17e63]
+              - generic [ref=f17e64]: AGA 雄性禿治療
+            - button "查看價目表" [ref=f17e65] [cursor=pointer]
+          - generic [ref=f17e67]:
+            - generic [ref=f17e68] [cursor=pointer]:
+              - checkbox "ED 治療藥物" [ref=f17e69]
+              - generic [ref=f17e70]: ED 治療藥物
+            - button "查看價目表" [ref=f17e71] [cursor=pointer]
+          - generic [ref=f17e73]:
+            - generic [ref=f17e74] [cursor=pointer]:
+              - checkbox "美容口服藥" [ref=f17e75]
+              - generic [ref=f17e76]: 美容口服藥
+            - button "查看價目表" [ref=f17e77] [cursor=pointer]
+        - paragraph [ref=f17e78]: 可複選。點選各項目的「查看價目表」即可選擇具體想諮詢的商品。
+    - group [ref=f17e79]:
+      - generic [ref=f17e80]: 希望診療日期與時段
+      - paragraph [ref=f17e81]: 為順利安排一對一諮詢，請盡量提供 2～3 個方便的時段。
+      - generic [ref=f17e82]:
+        - generic [ref=f17e83]: 第一希望時段（必填）
+        - generic [ref=f17e85]:
+          - textbox [ref=f17e86]
+          - textbox [ref=f17e87]: 18:00
+      - generic [ref=f17e88]:
+        - generic [ref=f17e89]: 第二希望時段（選填）
+        - generic [ref=f17e91]:
+          - textbox [ref=f17e92]
+          - textbox [ref=f17e93]: 19:00
+      - generic [ref=f17e94]:
+        - generic [ref=f17e95]: 第三希望時段（選填）
+        - generic [ref=f17e97]:
+          - textbox [ref=f17e98]
+          - textbox [ref=f17e99]: 20:00
+    - group [ref=f17e100]:
+      - generic [ref=f17e101]:
+        - generic [ref=f17e102]:
+          - generic [ref=f17e103]: 提問或特殊需求
+          - generic [ref=f17e104]: 選填
+        - textbox "提問或特殊需求 選填" [ref=f17e105]:
+          - /placeholder: 若有任何疑問或想諮詢的具體藥品，歡迎於此填寫...
+    - button "送出看診預約" [ref=f17e106] [cursor=pointer]
+    - paragraph [ref=f17e107]: 您的個人隱私與預約資料將受到加密保護

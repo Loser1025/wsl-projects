@@ -8,7 +8,10 @@ var CONFIG = {
   SUMMARY_SPREADSHEET_ID: '1aFB2O37w-Dh0RmN_W2CultjS1X4Vb7LqxbKMb99UVp4',
 
   // 「全体」シート：契約日ベースと反響日ベースを1枚に統合したもの（スナップショットなし、常に現時点の実績）。
-  // B列=項目ラベル、C〜N列=1〜12月。契約日ベースが上段(4〜11行目)、反響日ベースが下段(14〜21行目)。
+  // B列=項目ラベル、C〜N列=1〜12月。契約日ベースが上段(4〜11行目)、反響日ベースが下段(18〜25行目)。
+  // 反響日ベース直前の12〜15行目（キャンセル数・コネクト数・阻止件数・阻止金額）は2026-09-23に
+  // 手動で挿入された行で、このスクリプトの管理対象外（挿入により反響日ベース側が4行分ずれたため
+  // 行番号を14〜21から18〜25へ補正した）。
   // 各ベースの末尾2行(サンキュー架電数・対応率)はサンキュー架電シートとの突合結果。
   OVERALL_SHEET_NAME: '全体',
   OVERALL_ROWS: {
@@ -23,14 +26,14 @@ var CONFIG = {
       sankyuRate: 11           // サンキュー対応率
     },
     hankyoubi: {
-      count: 14,
-      amount: 15,
-      kaiyakuCount: 16,
-      kaiyakuAmount: 17,
-      kaiyakuRateAmount: 18,
-      kaiyakuRateCount: 19,
-      sankyuCount: 20,
-      sankyuRate: 21
+      count: 18,
+      amount: 19,
+      kaiyakuCount: 20,
+      kaiyakuAmount: 21,
+      kaiyakuRateAmount: 22,
+      kaiyakuRateCount: 23,
+      sankyuCount: 24,
+      sankyuRate: 25
     }
   },
 

@@ -22,9 +22,18 @@ const (
 	maxPipelineLines       = 50000
 )
 
-// outsideWriteTargetRe はWorker実行時、リダイレクト・tee・cp/mv等で作業ディレクトリ外の
-// 絶対パスへ書き込むコマンドを検出するパターン（Python版 tools_linux.py::_OUTSIDE_WRITE_TARGET_RE の移植）。
-var outsideWriteTargetRe = regexp.MustCompile(`(?:>>?\s*|\btee\s+(?:-a\s+)?|\b(?:cp|mv)\s+(?:-\S+\s+)*\S+\s+)(/[^\s;|&'"<>]+)`)
+// outsideWriteTargetRe はWorker実行時、リダイレクト・tee・cp/mv/install/rsync・dd・sed -i等で
+// 作業ディレクトリ外の絶対パスへ書き込むコマンドを検出するパターン
+// （Python版 tools_linux.py::_OUTSIDE_WRITE_TARGET_RE をベースに、Go版で
+// dd/install/rsync/sed -iのパターンを追加拡張——シェルコマンドを確実にブロックすることは
+// できないため検出範囲を広げるだけで、警告に留める方針(workerOutsideWriteWarning)は変えない）。
+var outsideWriteTargetRe = regexp.MustCompile(
+	`(?:>>?\s*` +
+		`|\btee\s+(?:-a\s+)?` +
+		`|\b(?:cp|mv|install|rsync)\s+(?:-\S+\s+)*\S+\s+` +
+		`|\bdd\s+(?:\S+\s+)*of=` +
+		`|\bsed\s+-i\S*\s+(?:'[^']*'|"[^"]*"|\S+)\s+` +
+		`)(/[^\s;|&'"<>]+)`)
 
 // terminalCtrlRe はDECプライベートモード（代替画面・マウストラッキング・
 // カーソルキーモード等の端末状態変更シーケンス）を検出するパターン
@@ -83,14 +92,16 @@ func workerOutsideWriteWarning(command string) string {
 // Python版 tools_linux.py::_SUDO_PROMPT_RE の移植）。
 var sudoPromptRe = regexp.MustCompile(`\[sudo\] password for [^:]+|[Pp]assword:|パスワードを入力してください`)
 
-// sudoPassword は環境変数SUDO_PASSWORDからパスワードを取得する
-// （Python版 tools_linux.py::_sudo_password の移植。デフォルト値も同一）。
-func sudoPassword() []byte {
-	pw := os.Getenv("SUDO_PASSWORD")
-	if pw == "" {
-		pw = "1025"
+// sudoPassword は環境変数SUDO_PASSWORDからパスワードを取得する。
+// 未設定の場合はok=falseを返す——以前はソースコードにハードコードされた
+// 固定文字列へフォールバックしていたが、ソース中に既定パスワードを持つべき
+// ではないため撤去した。呼び出し元はok=falseならsudoへの自動入力を行わないこと。
+func sudoPassword() (pw []byte, ok bool) {
+	raw := os.Getenv("SUDO_PASSWORD")
+	if raw == "" {
+		return nil, false
 	}
-	return []byte(pw + "\n")
+	return []byte(raw + "\n"), true
 }
 
 // registerShellTools は run_bash / run_pipeline を登録する。
@@ -195,6 +206,7 @@ func toolRunBash(args map[string]any) (string, error) {
 	var outBuf bytes.Buffer
 	sudoSent := 0
 	timedOut := false
+	sudoUnavailable := false
 	readErrCh := make(chan error, 1)
 	chunkCh := make(chan []byte, 16)
 
@@ -225,7 +237,12 @@ readLoop:
 		case chunk := <-chunkCh:
 			outBuf.Write(chunk)
 			if sudoSent < 3 && sudoPromptRe.Match(chunk) {
-				ptmx.Write(sudoPassword())
+				pw, ok := sudoPassword()
+				if !ok {
+					sudoUnavailable = true
+					break readLoop
+				}
+				ptmx.Write(pw)
 				sudoSent++
 			}
 		case <-readErrCh:
@@ -236,7 +253,7 @@ readLoop:
 		}
 	}
 
-	if timedOut || cmd.ProcessState == nil {
+	if timedOut || sudoUnavailable || cmd.ProcessState == nil {
 		killProcessGroup(cmd)
 	}
 	waitErr := cmd.Wait()
@@ -270,6 +287,17 @@ readLoop:
 			"[TIMEOUT] %d秒経過でプロセスを強制終了しました。\n作業フォルダ: %s\n"+
 				"⚠ タイムアウトですが、途中出力を分析して作業を継続してください。%s",
 			timeoutSec, effectiveCwd(cwd), partial), nil
+	}
+
+	if sudoUnavailable {
+		partial := "\n(出力なし)"
+		if output != "" {
+			partial = "\n途中出力:\n" + output
+		}
+		return fmt.Sprintf(
+			"[FAILURE] sudoのパスワード入力を求められましたが、SUDO_PASSWORD環境変数が未設定のため"+
+				"自動入力できず、プロセスを強制終了しました。\n作業フォルダ: %s%s",
+			effectiveCwd(cwd), partial), nil
 	}
 
 	rc := 0

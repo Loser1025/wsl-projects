@@ -25,10 +25,12 @@ const (
 var rolesMu sync.Mutex
 
 type roleRecord struct {
-	Role     string `json:"role"`
-	Uses     int    `json:"uses"`
-	Mode     string `json:"mode"`
-	LastUsed string `json:"last_used"`
+	Role      string `json:"role"`
+	Uses      int    `json:"uses"`
+	PassCount int    `json:"pass_count"`
+	FailCount int    `json:"fail_count"`
+	Mode      string `json:"mode"`
+	LastUsed  string `json:"last_used"`
 }
 
 func rolesDir() string {
@@ -41,9 +43,13 @@ func rolesDir() string {
 	return p
 }
 
-// SaveSpecialistRole は成功した委任のロール定義を保存する（同一ロールは
-// 使用回数を加算する）。失敗は無視する（Python版と同じくベストエフォート）。
-func SaveSpecialistRole(role, mode string) {
+// SaveSpecialistRole は委任のロール定義を保存する（同一ロールは使用回数を加算する）。
+// verifyPassedで今回の委任がverify_cmd等の機械検証を通過したかを記録し、
+// PassCount/FailCountに積み上げる（internal/tools/skilltrust.goのRecordSkillOutcomeと
+// 対称の設計。以前は成功時しか呼ばれずFailCountが常に0だったため、
+// LoadSavedRolesSectionの「実績あるロール」判定が使用回数だけに依存していた）。
+// ファイルI/O失敗は無視する（Python版と同じくベストエフォート）。
+func SaveSpecialistRole(role, mode string, verifyPassed bool) {
 	rolesMu.Lock()
 	defer rolesMu.Unlock()
 
@@ -61,6 +67,11 @@ func SaveSpecialistRole(role, mode string) {
 		_ = json.Unmarshal(data, &rec)
 	}
 	rec.Uses++
+	if verifyPassed {
+		rec.PassCount++
+	} else {
+		rec.FailCount++
+	}
 	rec.Mode = mode
 	rec.LastUsed = time.Now().Format(time.RFC3339)
 
@@ -127,18 +138,24 @@ func LoadSavedRolesSection(limit int) string {
 		files = append(files, fileMTime{e.Name(), info.ModTime()})
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].mtime.After(files[j].mtime) })
-	if len(files) > limit {
-		files = files[:limit]
-	}
 
 	var lines []string
 	for _, f := range files {
+		if len(lines) >= limit {
+			break
+		}
 		data, err := os.ReadFile(filepath.Join(dir, f.name))
 		if err != nil {
 			continue
 		}
 		var rec roleRecord
 		if err := json.Unmarshal(data, &rec); err != nil {
+			continue
+		}
+		if rec.FailCount > rec.PassCount {
+			// 失敗の方が多いロールは「実績あるロール」として注入しない
+			// （腐敗した実績の恒久化防止。以前は使用回数だけで判定していたため、
+			// 使われるたびに失敗し続けるロールでも延々と再注入されていた）。
 			continue
 		}
 		role := strings.ReplaceAll(strings.TrimSpace(rec.Role), "\n", " ")
@@ -148,7 +165,7 @@ func LoadSavedRolesSection(limit int) string {
 		if len(role) > 180 {
 			role = role[:180]
 		}
-		lines = append(lines, fmt.Sprintf("- %s（使用%d回）", role, rec.Uses))
+		lines = append(lines, fmt.Sprintf("- %s（使用%d回・検証成功%d/失敗%d）", role, rec.Uses, rec.PassCount, rec.FailCount))
 	}
 	if len(lines) == 0 {
 		return ""

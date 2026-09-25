@@ -1,0 +1,1807 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>美容クリニック カウンセリングシート</title>
+  
+  <!-- Google Fonts: 洗練された英字セリフ体 ＆ 明朝体・ゴシック体 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Noto+Sans+JP:wght@300;400;500;600;700&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      /* スカイブルー × ピュアホワイトを基調とした清潔＆華やかパレット */
+      --primary-sky: #0ea5e9;
+      --primary-sky-deep: #0284c7;
+      --primary-sky-dark: #0369a1;
+      --sky-soft: #f0f9ff;
+      --sky-light: #e0f2fe;
+      --sky-accent: #38bdf8;
+      
+      --sky-gradient: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 50%, #0284c7 100%);
+      --sky-gradient-hover: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 50%, #0369a1 100%);
+      --sky-gradient-soft: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      
+      --bg-page: #f4f9fd;
+      --bg-card: #ffffff;
+      
+      --text-heading: #072e44;
+      --text-main: #0f374c;
+      --text-muted: #527a92;
+      --text-subtle: #89a8bc;
+      
+      --border-color: #d2e8f6;
+      --border-focus: #0284c7;
+      
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-lg: 26px;
+      
+      --shadow-soft: 0 12px 36px -8px rgba(14, 165, 233, 0.12);
+      --shadow-premium: 0 20px 50px -10px rgba(14, 165, 233, 0.14), 0 4px 16px rgba(2, 132, 199, 0.06);
+      --shadow-glow-sky: 0 8px 26px rgba(14, 165, 233, 0.42);
+      --shadow-focus: 0 0 0 4px rgba(14, 165, 233, 0.18);
+      
+      --font-serif: 'Cormorant Garamond', 'Shippori Mincho', serif;
+      --font-sans: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-page);
+      background-image: 
+        radial-gradient(at 15% 10%, rgba(56, 189, 248, 0.22) 0px, transparent 48%),
+        radial-gradient(at 85% 15%, rgba(14, 165, 233, 0.18) 0px, transparent 45%),
+        radial-gradient(at 50% 60%, rgba(224, 242, 254, 0.7) 0px, transparent 65%),
+        radial-gradient(at 20% 90%, rgba(2, 132, 199, 0.16) 0px, transparent 52%);
+      background-attachment: fixed;
+      font-family: var(--font-sans);
+      color: var(--text-main);
+      line-height: 1.8;
+      padding: 30px 14px 60px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* ヘッダーカード */
+    .form-header-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      border: 1.5px solid rgba(255, 255, 255, 0.9);
+      box-shadow: var(--shadow-premium);
+      overflow: hidden;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .form-header-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, #7dd3fc, #0284c7, #ffffff, #0ea5e9, #38bdf8);
+      z-index: 10;
+    }
+
+    .hero-banner-wrapper {
+      width: 100%;
+      background: #ffffff;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero-banner-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      aspect-ratio: 1600 / 460;
+    }
+
+    .form-content {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      border: 1.5px solid var(--border-color);
+      box-shadow: var(--shadow-premium);
+      padding: 46px 42px;
+      position: relative;
+    }
+
+    .form-content::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 36px;
+      right: 36px;
+      height: 1.5px;
+      background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.45), transparent);
+    }
+
+    .form-group {
+      margin-bottom: 34px;
+      position: relative;
+    }
+
+    .form-group:last-of-type {
+      margin-bottom: 24px;
+    }
+
+    .label-wrapper {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 12px;
+    }
+
+    .field-label {
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: var(--text-heading);
+      letter-spacing: 0.04em;
+    }
+
+    .badge-required {
+      font-size: 0.65rem;
+      font-weight: 700;
+      background: var(--sky-gradient);
+      color: #ffffff;
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.04em;
+      box-shadow: 0 2px 6px rgba(14, 165, 233, 0.28);
+      display: inline-block;
+      line-height: 1.4;
+    }
+
+    .badge-optional {
+      font-size: 0.65rem;
+      font-weight: 600;
+      background: #eaf5fc;
+      color: var(--primary-sky-deep);
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.04em;
+      border: 1px solid #cce5f8;
+      display: inline-block;
+      line-height: 1.4;
+    }
+
+    /* バリデーションエラー用スタイル */
+    .field-error-text {
+      color: #e11d48;
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-top: 6px;
+      display: none;
+    }
+
+    .field-error-text.is-visible {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .input-error {
+      border-color: #f43f5e !important;
+      background-color: #fffafb !important;
+    }
+
+    .field-hint {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+
+    .input-text,
+    .input-select,
+    .input-textarea {
+      width: 100%;
+      background: #fbfdff;
+      border: 1.5px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 15px 18px;
+      font-size: 0.98rem;
+      color: var(--text-main);
+      font-weight: 500;
+      font-family: inherit;
+      transition: all 0.25s ease;
+      outline: none;
+      box-shadow: inset 0 1px 3px rgba(2, 132, 199, 0.03);
+    }
+
+    .input-text::placeholder,
+    .input-textarea::placeholder {
+      color: #9cbacf;
+      font-size: 0.92rem;
+      font-weight: 400;
+    }
+
+    .input-text:hover,
+    .input-select:hover,
+    .input-textarea:hover {
+      border-color: #93cbee;
+      background: #ffffff;
+    }
+
+    .input-text:focus,
+    .input-select:focus,
+    .input-textarea:focus {
+      border-color: var(--border-focus);
+      background: #ffffff;
+      box-shadow: var(--shadow-focus);
+    }
+
+    .input-textarea {
+      min-height: 120px;
+      resize: vertical;
+      line-height: 1.7;
+    }
+
+    /* ラジオボタン ＆ チェックボックスの華やかなカードUI */
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 14px;
+      margin-top: 6px;
+    }
+
+    .option-card {
+      display: flex;
+      align-items: center;
+      background: #fbfdff;
+      border: 1.5px solid #d0e7f7;
+      border-radius: var(--radius-sm);
+      padding: 14px 18px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      box-shadow: 0 2px 6px rgba(14, 165, 233, 0.04);
+    }
+
+    .option-card:hover {
+      background: #ffffff;
+      border-color: var(--primary-sky);
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.16);
+      transform: translateY(-1px);
+    }
+
+    .option-card input[type="radio"],
+    .option-card input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #a3ceeb;
+      border-radius: 50%;
+      margin-right: 14px;
+      outline: none;
+      display: grid;
+      place-content: center;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+      background-color: #ffffff;
+    }
+
+    .option-card input[type="checkbox"] {
+      border-radius: 6px;
+    }
+
+    .option-card input[type="radio"]::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      transform: scale(0);
+      transition: 0.18s transform ease-in-out;
+      background-color: #ffffff;
+    }
+
+    .option-card input[type="checkbox"]::before {
+      content: "";
+      width: 11px;
+      height: 6px;
+      border-left: 2.5px solid #fff;
+      border-bottom: 2.5px solid #fff;
+      transform: rotate(-45deg) scale(0);
+      margin-top: -2px;
+      transition: 0.18s transform ease-in-out;
+    }
+
+    .option-card input[type="radio"]:checked {
+      border-color: var(--primary-sky);
+      background-color: var(--primary-sky);
+    }
+
+    .option-card input[type="checkbox"]:checked {
+      border-color: var(--primary-sky);
+      background-color: var(--primary-sky);
+    }
+
+    .option-card input[type="radio"]:checked::before {
+      transform: scale(1);
+    }
+
+    .option-card input[type="checkbox"]:checked::before {
+      transform: rotate(-45deg) scale(1);
+    }
+
+    .option-card:has(input:checked) {
+      border-color: var(--primary-sky);
+      background: var(--sky-gradient-soft);
+      box-shadow: 0 4px 16px rgba(14, 165, 233, 0.18);
+    }
+
+    .option-label-text {
+      font-size: 0.94rem;
+      font-weight: 600;
+      color: var(--text-heading);
+      user-select: none;
+    }
+
+    .menu-cards-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    .menu-card-item {
+      background: #fbfdff;
+      border: 1.5px solid #d0e7f7;
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      transition: all 0.25s ease;
+      box-shadow: 0 2px 6px rgba(14, 165, 233, 0.04);
+    }
+
+    .menu-card-item:hover {
+      background: #ffffff;
+      border-color: var(--primary-sky);
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.12);
+    }
+
+    .menu-card-item.is-checked {
+      border-color: var(--primary-sky);
+      background: var(--sky-gradient-soft);
+      box-shadow: 0 4px 16px rgba(14, 165, 233, 0.16);
+    }
+
+    .menu-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      cursor: pointer;
+      border-radius: 10px;
+      margin: -6px;
+      padding: 6px;
+      transition: background 0.15s;
+    }
+
+    .menu-card-header:hover,
+    .menu-card-header:focus-visible {
+      background: var(--sky-soft);
+    }
+
+    .menu-card-title {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text-heading);
+      flex-grow: 1;
+    }
+
+    .price-row--counsel .price-name {
+      color: var(--primary-sky-deep);
+    }
+
+    .price-row--counsel .price-val {
+      color: var(--text-subtle);
+      font-size: 0.85rem;
+    }
+
+    .menu-card-chevron {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      color: var(--text-subtle);
+      transition: transform 0.2s ease, color 0.2s ease;
+    }
+
+    .menu-card-header:hover .menu-card-chevron {
+      color: var(--primary-sky-deep);
+    }
+
+    .menu-card-header[data-open="true"] .menu-card-chevron {
+      transform: rotate(180deg);
+    }
+
+    .menu-price-preview {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px dashed #d2e8f6;
+      display: none;
+      animation: fadeInPrice 0.3s ease forwards;
+    }
+
+    .menu-price-preview.is-open {
+      display: block;
+    }
+
+    @keyframes fadeInPrice {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* デジタル料金表カード */
+    .price-sheet-card {
+      background: #ffffff;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1.5px solid #e0f2fe;
+      box-shadow: 0 8px 24px rgba(14, 165, 233, 0.08);
+      margin-top: 6px;
+    }
+
+    .sheet-brand-header {
+      padding: 12px 18px;
+      background: #f8fbfe;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #eaf3fa;
+    }
+
+    .sheet-brand-title {
+      font-size: 0.76rem;
+      color: #0284c7;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .sheet-brand-tag {
+      font-size: 0.7rem;
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    .sheet-category-banner {
+      padding: 14px 18px;
+      color: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .banner-diet { background: linear-gradient(135deg, #f43f5e, #fb7185); }
+    .banner-ed { background: linear-gradient(135deg, #0f4c81, #1e6091); }
+    .banner-aga { background: linear-gradient(135deg, #1d5b96, #2a75b3); }
+    .banner-skin { background: linear-gradient(135deg, #2e9f65, #93c83e); }
+    .banner-mounjaro { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+
+    .sheet-category-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+
+    .sheet-category-sub {
+      font-size: 0.72rem;
+      opacity: 0.92;
+      margin-top: 2px;
+      font-weight: 500;
+    }
+
+    .sheet-category-pill {
+      background: rgba(255, 255, 255, 0.95);
+      color: #0f172a;
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.06em;
+    }
+
+    .sheet-table-wrap {
+      padding: 8px 16px;
+      background: #ffffff;
+    }
+
+    .sheet-table-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: #8da4b5;
+      font-weight: 600;
+      padding: 8px 6px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .sheet-table-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 6px;
+      border-bottom: 1px dashed #e2e8f0;
+      font-size: 0.88rem;
+    }
+
+    .sheet-table-row:last-child {
+      border-bottom: none;
+    }
+
+    .sheet-drug-name {
+      color: #1e293b;
+      font-weight: 600;
+    }
+
+    .sheet-drug-price {
+      color: #0f172a;
+      font-weight: 700;
+      font-family: 'Cormorant Garamond', 'Noto Sans JP', sans-serif;
+      font-size: 1.05rem;
+      white-space: nowrap;
+      margin-left: 10px;
+    }
+
+    .sheet-table-row--selectable {
+      cursor: pointer;
+      border-radius: 8px;
+      transition: background 0.12s;
+    }
+
+    .sheet-table-row--selectable:hover {
+      background: var(--sky-soft);
+    }
+
+    .sheet-table-row--selectable:has(.detail-item-checkbox:checked) {
+      background: var(--sky-light);
+    }
+
+    .sheet-drug-name-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .detail-item-checkbox {
+      flex-shrink: 0;
+      width: 17px;
+      height: 17px;
+      accent-color: var(--primary-sky-deep);
+      cursor: pointer;
+    }
+
+    .mounjaro-price-note {
+      text-align: center;
+      font-size: 0.78rem;
+      color: #8da4b5;
+      font-weight: 600;
+      padding: 10px 0 2px;
+      background: #f8fafc;
+    }
+
+    /* マンジャロ専用 3カラムグリッドレイアウト */
+    .mounjaro-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 12px;
+      background: #f8fafc;
+    }
+
+    .mounjaro-col-card {
+      background: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
+    }
+
+    .mounjaro-col-header {
+      padding: 8px 4px;
+      text-align: center;
+      color: #ffffff;
+    }
+
+    .col-header-pink { background: #f43f5e; }
+    .col-header-blue { background: #0284c7; }
+    .col-header-teal { background: #0d9488; }
+
+    .mounjaro-duration {
+      font-size: 0.85rem;
+      font-weight: 800;
+    }
+
+    .mounjaro-badge {
+      display: inline-block;
+      background: #ffffff;
+      color: #0f172a;
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 10px;
+      margin-top: 3px;
+    }
+
+    .mounjaro-price-row {
+      padding: 6px 8px;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px dashed #f1f5f9;
+      font-size: 0.78rem;
+    }
+
+    .mounjaro-price-row:last-child {
+      border-bottom: none;
+    }
+
+    .mounjaro-price-row--selectable {
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.12s;
+    }
+
+    .mounjaro-price-row--selectable:hover {
+      background: var(--sky-soft);
+    }
+
+    .mounjaro-price-row--selectable:has(.detail-item-checkbox:checked) {
+      background: var(--sky-light);
+    }
+
+    .mounjaro-name-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mounjaro-name-wrap .detail-item-checkbox {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--primary-sky-deep);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .mounjaro-price-val {
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .sheet-footer-notice {
+      background: #f8fafc;
+      padding: 10px 16px;
+      font-size: 0.72rem;
+      color: #64748b;
+      border-top: 1px solid #edf2f7;
+      line-height: 1.5;
+    }
+
+    .sheet-footer-notice strong {
+      color: #0369a1;
+    }
+
+    .date-pickers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 6px;
+    }
+
+    .date-picker-item {
+      background: #fbfdff;
+      border: 1.5px solid #d0e7f7;
+      border-radius: var(--radius-sm);
+      padding: 14px 18px;
+      transition: all 0.25s ease;
+    }
+
+    .date-picker-item:focus-within {
+      border-color: var(--primary-sky);
+      background: #ffffff;
+      box-shadow: 0 2px 10px rgba(14, 165, 233, 0.1);
+    }
+
+    .date-picker-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .sub-field-label {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-heading);
+    }
+
+    .submit-container {
+      margin-top: 46px;
+      text-align: center;
+    }
+
+    .btn-submit {
+      background: var(--sky-gradient);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 50px;
+      padding: 18px 64px;
+      font-size: 1.05rem;
+      letter-spacing: 0.14em;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: var(--shadow-glow-sky);
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-submit::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: -75%;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+      transform: skewX(-20deg);
+      transition: left 0.75s ease;
+    }
+
+    .btn-submit:hover::after {
+      left: 130%;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 34px rgba(14, 165, 233, 0.52);
+      background: var(--sky-gradient-hover);
+    }
+
+    .btn-submit:active {
+      transform: translateY(0);
+      box-shadow: var(--shadow-glow-sky);
+    }
+
+    .privacy-notice {
+      margin-top: 20px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(3, 30, 48, 0.6);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal-overlay.is-active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-card {
+      background: #ffffff;
+      border-radius: var(--radius-lg);
+      padding: 48px 36px;
+      max-width: 490px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 30px 60px rgba(3, 30, 48, 0.25);
+      border: 1.5px solid var(--sky-light);
+      transform: scale(0.95);
+      transition: transform 0.3s ease;
+    }
+
+    .modal-overlay.is-active .modal-card {
+      transform: scale(1);
+    }
+
+    .modal-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: var(--sky-gradient);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 22px;
+      font-size: 26px;
+      font-weight: bold;
+      box-shadow: 0 6px 20px rgba(14, 165, 233, 0.38);
+    }
+
+    .modal-title {
+      font-family: var(--font-serif);
+      font-size: 1.45rem;
+      margin-bottom: 14px;
+      color: var(--text-heading);
+      font-weight: 700;
+    }
+
+    .modal-desc {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.8;
+      margin-bottom: 30px;
+    }
+
+    .btn-modal-close {
+      background: transparent;
+      border: 1.5px solid var(--primary-sky);
+      color: var(--primary-sky-deep);
+      font-weight: 600;
+      padding: 12px 36px;
+      border-radius: 30px;
+      font-size: 0.94rem;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .btn-modal-close:hover {
+      background: var(--sky-gradient);
+      color: #ffffff;
+      border-color: transparent;
+      box-shadow: 0 4px 16px rgba(14, 165, 233, 0.3);
+      transform: translateY(-1px);
+    }
+
+    @media (max-width: 520px) {
+      .form-content {
+        padding: 30px 20px;
+      }
+      .mounjaro-grid {
+        grid-template-columns: 1fr;
+      }
+      .sheet-category-title {
+        font-size: 1.02rem;
+      }
+      .sheet-drug-name {
+        font-size: 0.82rem;
+      }
+      .sheet-drug-price {
+        font-size: 0.95rem;
+        margin-left: auto;
+      }
+      .sheet-table-row {
+        flex-wrap: wrap;
+        row-gap: 4px;
+      }
+      .sheet-drug-name-wrap {
+        flex: 1 1 100%;
+      }
+      .mounjaro-name-wrap {
+        min-width: 0;
+      }
+      .btn-submit {
+        width: 100%;
+        padding: 16px 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header class="form-header-card">
+      <div class="hero-banner-wrapper">
+        <svg class="hero-banner-svg" viewBox="0 0 1600 460" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="bgGradient" x1="0" y1="0" x2="1600" y2="460" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#edf7fd"/>
+              <stop offset="35%" stop-color="#f6fbfe"/>
+              <stop offset="70%" stop-color="#ffffff"/>
+              <stop offset="100%" stop-color="#e8f4fc"/>
+            </linearGradient>
+
+            <linearGradient id="phoneBody" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#243746"/>
+              <stop offset="100%" stop-color="#0e1820"/>
+            </linearGradient>
+
+            <linearGradient id="screenBg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#f9fdff"/>
+              <stop offset="100%" stop-color="#e3f2fd"/>
+            </linearGradient>
+
+            <filter id="phoneShadow" x="-10%" y="-10%" width="130%" height="130%">
+              <feDropShadow dx="15" dy="15" stdDeviation="25" flood-color="#034563" flood-opacity="0.16"/>
+            </filter>
+
+            <clipPath id="screenClip">
+              <rect x="122" y="32" width="206" height="428" rx="38" />
+            </clipPath>
+          </defs>
+
+          <!-- 背景ベース -->
+          <rect width="1600" height="460" fill="url(#bgGradient)" />
+
+          <!-- スカイブルーシェイプ -->
+          <path d="M-100,-80 Q120,40 10,280 Q-90,360 -150,260 Z" fill="#dbeefe" opacity="0.55" />
+          <path d="M1400,-100 Q1680,-40 1650,220 Q1450,180 1380,-10 Z" fill="#e0f2fe" opacity="0.6" />
+          <circle cx="1520" cy="80" r="140" fill="#eaf5ff" opacity="0.75" />
+
+          <!-- 医療装飾アイコン -->
+          <g opacity="0.55" stroke="#7dd3fc" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M495,115 C495,145 460,175 425,175 C390,175 365,145 365,115" />
+            <path d="M430,175 L430,220 C430,240 405,255 385,255" />
+            <circle cx="385" cy="255" r="16" fill="#bae6fd" stroke="#38bdf8" stroke-width="4"/>
+            <path d="M360,115 L370,115 M490,115 L500,115" />
+            <circle cx="490" cy="150" r="4" fill="#38bdf8"/>
+          </g>
+
+          <g fill="#38bdf8" opacity="0.55">
+            <path d="M1295,45 h20 v18 h18 v20 h-18 v18 h-20 v-18 h-18 v-20 h18 z" />
+            <path d="M1465,65 h18 v16 h16 v18 h-16 v16 h-18 v-16 h-16 v-18 h16 z" opacity="0.8" />
+            <path d="M500,280 h12 v10 h10 v12 h-10 v10 h-12 v-10 h-10 v-12 h10 z" opacity="0.45" />
+          </g>
+
+          <g transform="translate(1420, 340) rotate(45)" stroke="#0284c7" stroke-width="4" fill="none" opacity="0.8" stroke-linecap="round">
+            <rect x="0" y="20" width="34" height="60" rx="6" fill="#f8fcff"/>
+            <line x1="17" y1="80" x2="17" y2="105"/>
+            <line x1="8" y1="105" x2="26" y2="105"/>
+            <line x1="17" y1="0" x2="17" y2="20"/>
+            <path d="M14,42 h6 v-4 h4 v4 h6 v4 h-6 v4 h-4 v-4 h-6 z" fill="#0284c7"/>
+          </g>
+
+          <!-- 背面タブレットモックアップ -->
+          <rect x="62" y="105" width="230" height="355" rx="30" fill="#1b2c3a" opacity="0.95" />
+          <rect x="68" y="112" width="218" height="348" rx="24" fill="#0a1926" />
+
+          <!-- 前面スマートフォンモックアップ -->
+          <g filter="url(#phoneShadow)">
+            <rect x="116" y="24" width="218" height="436" rx="42" fill="url(#phoneBody)" stroke="#38bdf8" stroke-opacity="0.35" stroke-width="3"/>
+            <rect x="122" y="32" width="206" height="428" rx="36" fill="url(#screenBg)"/>
+          </g>
+
+          <g clip-path="url(#screenClip)">
+            <rect x="122" y="32" width="206" height="428" fill="#f0f9ff"/>
+            <circle cx="225" cy="180" r="130" fill="#e0f2fe" />
+            
+            <ellipse cx="225" cy="180" rx="62" ry="70" fill="#1f232b"/>
+            <path d="M175,275 C185,245 200,230 225,230 C250,230 265,245 275,275 L310,400 L140,400 Z" fill="#ffffff" stroke="#d5e8f5" stroke-width="2"/>
+            <path d="M210,235 L240,235 L230,270 L220,270 Z" fill="#0284c7"/>
+            <path d="M195,240 L225,290 L185,340" fill="none" stroke="#cbe2f2" stroke-width="3"/>
+            <path d="M255,240 L225,290 L265,340" fill="none" stroke="#cbe2f2" stroke-width="3"/>
+            <path d="M190,265 C185,310 188,350 205,370" fill="none" stroke="#1e3240" stroke-width="4" stroke-linecap="round"/>
+            <path d="M260,265 C265,310 260,350 245,365" fill="none" stroke="#1e3240" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="205" cy="375" r="7" fill="#6ba2c4" stroke="#1e3240" stroke-width="2"/>
+            
+            <rect x="213" y="200" width="24" height="35" fill="#fbd8c9" rx="6"/>
+            <ellipse cx="225" cy="182" rx="42" ry="46" fill="#fde6dc"/>
+            <path d="M183,165 C190,140 215,135 240,138 C265,140 268,160 267,175 C255,160 235,155 220,158 C205,160 192,168 183,178 Z" fill="#242123"/>
+            <path d="M183,170 C187,190 190,205 192,215 C190,195 186,180 183,170 Z" fill="#242123"/>
+            
+            <path d="M202,178 Q211,173 218,178" fill="none" stroke="#252427" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M232,178 Q239,173 248,178" fill="none" stroke="#252427" stroke-width="2.5" stroke-linecap="round"/>
+            <ellipse cx="210" cy="181" rx="2.5" ry="3" fill="#2c282d"/>
+            <ellipse cx="240" cy="181" rx="2.5" ry="3" fill="#2c282d"/>
+            <path d="M200,170 Q210,166 218,169" fill="none" stroke="#483f43" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M232,169 Q240,166 250,170" fill="none" stroke="#483f43" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="198" cy="192" r="7" fill="#f79c8d" opacity="0.38"/>
+            <circle cx="252" cy="192" r="7" fill="#f79c8d" opacity="0.38"/>
+            <path d="M213,203 Q225,214 237,203" fill="#ffffff" stroke="#c0524a" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M216,204 Q225,210 234,204" fill="#dc5d55"/>
+
+            <text x="225" y="405" font-family="'Noto Sans JP', sans-serif" font-size="12" fill="#0284c7" text-anchor="middle" font-weight="600">calling</text>
+            <g transform="translate(142, 418)">
+              <rect x="0" y="0" width="166" height="34" rx="17" fill="rgba(3, 44, 71, 0.7)"/>
+              <circle cx="28" cy="17" r="11" fill="rgba(255,255,255,0.2)"/>
+              <path d="M28,11 v8 M25,15 a3,3 0 0,0 6,0 M28,19 v3 M25,22 h6" stroke="#ffffff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+              <circle cx="83" cy="17" r="12" fill="#ea4335"/>
+              <path d="M77,17 Q83,12 89,17" stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+              <circle cx="138" cy="17" r="11" fill="rgba(255,255,255,0.2)"/>
+              <rect x="131" y="12" width="10" height="9" rx="2" stroke="#ffffff" stroke-width="1.4" fill="none"/>
+              <polygon points="142,14 146,12 146,21 142,19" fill="#ffffff"/>
+            </g>
+          </g>
+
+          <path d="M192,32 L258,32 A8,8 0 0,1 266,40 L266,44 A8,8 0 0,1 258,52 L192,52 A8,8 0 0,1 184,44 L184,40 A8,8 0 0,1 192,32 Z" fill="#121518"/>
+          <circle cx="242" cy="42" r="3.5" fill="#1e2830"/>
+
+          <!-- キャッチコピー -->
+          <g fill="#073b5c">
+            <text x="570" y="225" font-family="'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif" font-size="82" font-weight="900" letter-spacing="0.04em">
+              オンライン診療
+            </text>
+            <text x="570" y="345" font-family="'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif" font-size="80" font-weight="900" letter-spacing="0.04em">
+              自宅で完結。全国対応。
+            </text>
+          </g>
+        </svg>
+      </div>
+    </header>
+
+    <main class="form-content">
+      <form id="clinicGoogleForm">
+
+        <!-- 氏名 -->
+        <div class="form-group">
+          <div class="label-wrapper">
+            <label class="field-label" for="entry_name">お名前（漢字）</label>
+            <span class="badge-required">必須</span>
+          </div>
+          <input 
+            type="text" 
+            id="entry_name" 
+            name="name" 
+            class="input-text" 
+            placeholder="例）銀座 花子" 
+            required
+          >
+        </div>
+
+        <!-- フリガナ -->
+        <div class="form-group">
+          <div class="label-wrapper">
+            <label class="field-label" for="entry_kana">フリガナ</label>
+            <span class="badge-required">必須</span>
+          </div>
+          <input 
+            type="text" 
+            id="entry_kana" 
+            name="kana" 
+            class="input-text" 
+            placeholder="例）ギンザ ハナコ" 
+            required
+          >
+        </div>
+
+        <!-- 電話番号 -->
+        <div class="form-group" id="telGroup">
+          <div class="label-wrapper">
+            <label class="field-label" for="entry_tel">お電話番号</label>
+            <span class="badge-required">必須</span>
+          </div>
+          <input 
+            type="tel" 
+            id="entry_tel" 
+            name="tel" 
+            class="input-text" 
+            placeholder="例）090-1234-5678" 
+            pattern="^[0-9\-]+$"
+            title="半角数字とハイフン（-）のみで入力してください"
+            required
+          >
+          <div class="field-error-text" id="telError">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>お電話番号は半角数字とハイフン（-）のみでご入力ください。</span>
+          </div>
+        </div>
+
+        <!-- メールアドレス -->
+        <div class="form-group" id="emailGroup">
+          <div class="label-wrapper">
+            <label class="field-label" for="entry_email">メールアドレス</label>
+            <span class="badge-required">必須</span>
+          </div>
+          <input 
+            type="email" 
+            id="entry_email" 
+            name="email" 
+            class="input-text" 
+            placeholder="例）counseling@example.com" 
+            required
+          >
+          <div class="field-error-text" id="emailError">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>有効なメールアドレスをご入力ください（例：user@example.com）</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="label-wrapper">
+            <label class="field-label">ご希望の診察形式</label>
+            <span class="badge-required">必須</span>
+          </div>
+          <div class="options-grid">
+            <label class="option-card">
+              <input type="radio" name="consultation_type" value="オンライン診察" required>
+              <span class="option-label-text">オンライン診察（ご自宅等から受診）</span>
+            </label>
+            <label class="option-card">
+              <input type="radio" name="consultation_type" value="対面診察">
+              <span class="option-label-text">対面診察（クリニックへ来院）</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ご希望メニュー -->
+        <div class="form-group" id="menuGroup">
+          <div class="label-wrapper">
+            <label class="field-label">ご希望メニュー</label>
+            <span class="badge-required">必須</span>
+          </div>
+          <div class="field-hint">各カテゴリの「料金表を見る」から、ご希望の商材を1つ以上選択してください（複数選択可）。決めきれない場合は「カウンセリングにて決めたい」をお選びください。</div>
+
+          <div class="menu-cards-list">
+            
+            <!-- 1. 医療ダイエット -->
+            <div class="menu-card-item" id="item-diet">
+              <div class="menu-card-header" data-target="preview-diet">
+                <span class="menu-card-title">医療ダイエット</span>
+                <span class="menu-card-chevron" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </span>
+              </div>
+              <div class="menu-price-preview" id="preview-diet">
+                <div class="price-sheet-card">
+                  <div class="sheet-brand-header">
+                    <span class="sheet-brand-title">格安 オンライン診療 | PRICE MENU</span>
+                    <span class="sheet-brand-tag">自由診療</span>
+                  </div>
+                  <div class="sheet-category-banner banner-diet">
+                    <div>
+                      <div class="sheet-category-title">医療ダイエット</div>
+                      <div class="sheet-category-sub">医師が体調・ご希望に応じてご案内します</div>
+                    </div>
+                    <span class="sheet-category-pill">DIET MENU</span>
+                  </div>
+                  <div class="sheet-table-wrap">
+                    <div class="sheet-table-head">
+                      <span>メニュー</span>
+                      <span>税込価格</span>
+                    </div>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="リベルサス 3mg"><span class="sheet-drug-name">リベルサス 3mg</span></span><span class="sheet-drug-price">¥10,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="リベルサス 7mg"><span class="sheet-drug-name">リベルサス 7mg</span></span><span class="sheet-drug-price">¥20,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="リベルサス 14mg"><span class="sheet-drug-name">リベルサス 14mg</span></span><span class="sheet-drug-price">¥30,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="メトホルミン 250mg"><span class="sheet-drug-name">メトホルミン 250mg</span></span><span class="sheet-drug-price">¥10,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="メトホルミン 500mg"><span class="sheet-drug-name">メトホルミン 500mg</span></span><span class="sheet-drug-price">¥10,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="ダパグリフロジン 5mg"><span class="sheet-drug-name">ダパグリフロジン 5mg</span></span><span class="sheet-drug-price">¥15,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="ダパグリフロジン 10mg"><span class="sheet-drug-name">ダパグリフロジン 10mg</span></span><span class="sheet-drug-price">¥15,000</span></label>
+                  </div>
+                  <div class="sheet-footer-notice">
+                    <strong>食事・運動とあわせて、医師が適した治療をご提案します</strong><br>
+                    ※本治療は自由診療です。診察後、医師が処方の可否を判断します。
+                  </div>
+
+                  <div class="sheet-category-banner banner-mounjaro">
+                    <div>
+                      <div class="sheet-category-title">マンジャロ処方メニュー</div>
+                      <div class="sheet-category-sub">医師と相談しながら、無理のない治療計画を</div>
+                    </div>
+                    <span class="sheet-category-pill">処方期間で選べる</span>
+                  </div>
+                  <div class="mounjaro-price-note">各コースの税込価格／月</div>
+
+                  <!-- 3カラム料金プラン -->
+                  <div class="mounjaro-grid">
+                    <div class="mounjaro-col-card">
+                      <div class="mounjaro-col-header col-header-pink">
+                        <div class="mounjaro-duration">6ヶ月処方</div>
+                        <span class="mounjaro-badge">一番お得！</span>
+                      </div>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 6ヶ月処方 2.5mg"><span>2.5mg</span></span><span class="mounjaro-price-val">¥7,180</span></label>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 6ヶ月処方 5mg"><span>5mg</span></span><span class="mounjaro-price-val">¥13,090</span></label>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 6ヶ月処方 7.5mg"><span>7.5mg</span></span><span class="mounjaro-price-val">¥20,220</span></label>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 6ヶ月処方 10mg"><span>10mg</span></span><span class="mounjaro-price-val">¥26,280</span></label>
+                    </div>
+
+                    <div class="mounjaro-col-card">
+                      <div class="mounjaro-col-header col-header-blue">
+                        <div class="mounjaro-duration">2〜5ヶ月処方</div>
+                        <span class="mounjaro-badge">続けやすい価格</span>
+                      </div>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 2〜5ヶ月処方 2.5mg"><span>2.5mg</span></span><span class="mounjaro-price-val">¥8,880</span></label>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 2〜5ヶ月処方 5mg"><span>5mg</span></span><span class="mounjaro-price-val">¥14,880</span></label>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 2〜5ヶ月処方 7.5mg"><span>7.5mg</span></span><span class="mounjaro-price-val">¥22,880</span></label>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 2〜5ヶ月処方 10mg"><span>10mg</span></span><span class="mounjaro-price-val">¥28,400</span></label>
+                    </div>
+
+                    <div class="mounjaro-col-card">
+                      <div class="mounjaro-col-header col-header-teal">
+                        <div class="mounjaro-duration">1ヶ月処方</div>
+                        <span class="mounjaro-badge">まずはここから</span>
+                      </div>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 1ヶ月処方 2.5mg"><span>2.5mg</span></span><span class="mounjaro-price-val">¥9,880</span></label>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 1ヶ月処方 5mg"><span>5mg</span></span><span class="mounjaro-price-val">¥15,880</span></label>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 1ヶ月処方 7.5mg"><span>7.5mg</span></span><span class="mounjaro-price-val">¥23,880</span></label>
+                      <label class="mounjaro-price-row mounjaro-price-row--selectable"><span class="mounjaro-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="マンジャロ 1ヶ月処方 10mg"><span>10mg</span></span><span class="mounjaro-price-val">¥29,400</span></label>
+                    </div>
+                  </div>
+
+                  <div class="sheet-table-wrap">
+                    <label class="sheet-table-row sheet-table-row--selectable price-row--counsel"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="医療ダイエット" value="カウンセリングにて決めたい"><span class="sheet-drug-name">カウンセリングにて決めたい</span></span><span class="sheet-drug-price">—</span></label>
+                  </div>
+
+                  <div class="sheet-footer-notice">
+                    <strong>医師による診察 / オンライン完結 / ご自宅へお届け</strong><br>
+                    ※本治療は自由診療です。診察後、医師が処方の可否を判断します。
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. ED・男性ホルモン -->
+            <div class="menu-card-item" id="item-ed">
+              <div class="menu-card-header" data-target="preview-ed">
+                <span class="menu-card-title">ED・男性ホルモン</span>
+                <span class="menu-card-chevron" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </span>
+              </div>
+              <div class="menu-price-preview" id="preview-ed">
+                <div class="price-sheet-card">
+                  <div class="sheet-brand-header">
+                    <span class="sheet-brand-title">格安 オンライン診療 | PRICE MENU</span>
+                    <span class="sheet-brand-tag">自由診療</span>
+                  </div>
+                  <div class="sheet-category-banner banner-ed">
+                    <div>
+                      <div class="sheet-category-title">ED・男性ホルモン</div>
+                      <div class="sheet-category-sub">内服・注入・定期便</div>
+                    </div>
+                    <span class="sheet-category-pill">MEN'S MENU</span>
+                  </div>
+                  <div class="sheet-table-wrap">
+                    <div class="sheet-table-head">
+                      <span>メニュー</span>
+                      <span>税込価格</span>
+                    </div>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="シルデナフィル"><span class="sheet-drug-name">シルデナフィル</span></span><span class="sheet-drug-price">¥1,650</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="バルデナフィル"><span class="sheet-drug-name">バルデナフィル</span></span><span class="sheet-drug-price">¥1,870</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="タダラフィル 20mg"><span class="sheet-drug-name">タダラフィル 20mg</span></span><span class="sheet-drug-price">¥1,540</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="ザルティア 1ヶ月分（30錠）"><span class="sheet-drug-name">ザルティア 1ヶ月分（30錠）</span></span><span class="sheet-drug-price">¥10,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="クロミッド 1ヶ月分（30錠）"><span class="sheet-drug-name">クロミッド 1ヶ月分（30錠）</span></span><span class="sheet-drug-price">¥10,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="ダポキセチン（8錠）"><span class="sheet-drug-name">ダポキセチン（8錠）</span></span><span class="sheet-drug-price">¥10,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="お試し3種セット"><span class="sheet-drug-name">お試し3種セット</span></span><span class="sheet-drug-price">¥3,980</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="オリプルセット"><span class="sheet-drug-name">オリプルセット</span></span><span class="sheet-drug-price">¥10,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="オリジナル注入液 50単位"><span class="sheet-drug-name">オリジナル注入液 50単位</span></span><span class="sheet-drug-price">¥34,900</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="テストステロンA"><span class="sheet-drug-name">テストステロンA</span></span><span class="sheet-drug-price">¥15,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="テストステロンA+"><span class="sheet-drug-name">テストステロンA+</span></span><span class="sheet-drug-price">¥25,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="サブスクライト"><span class="sheet-drug-name">サブスクライト</span></span><span class="sheet-drug-price">¥19,800</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="サブスクスタンダード"><span class="sheet-drug-name">サブスクスタンダード</span></span><span class="sheet-drug-price">¥29,800</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="サブスクプレミアム"><span class="sheet-drug-name">サブスクプレミアム</span></span><span class="sheet-drug-price">¥49,800</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable price-row--counsel"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="ED・男性ホルモン" value="カウンセリングにて決めたい"><span class="sheet-drug-name">カウンセリングにて決めたい</span></span><span class="sheet-drug-price">—</span></label>
+                  </div>
+                  <div class="sheet-footer-notice">
+                    <strong>問診 → 医師の診察 → 決済 → 配送までオンラインで完結</strong><br>
+                    ※本治療は自由診療です。診察後、医師が処方の可否を判断します。
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. AGA・頭皮ケア -->
+            <div class="menu-card-item" id="item-aga">
+              <div class="menu-card-header" data-target="preview-aga">
+                <span class="menu-card-title">AGA・頭皮ケア</span>
+                <span class="menu-card-chevron" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </span>
+              </div>
+              <div class="menu-price-preview" id="preview-aga">
+                <div class="price-sheet-card">
+                  <div class="sheet-brand-header">
+                    <span class="sheet-brand-title">格安 オンライン診療 | PRICE MENU</span>
+                    <span class="sheet-brand-tag">自由診療</span>
+                  </div>
+                  <div class="sheet-category-banner banner-aga">
+                    <div>
+                      <div class="sheet-category-title">AGA・頭皮ケア</div>
+                      <div class="sheet-category-sub">内服薬・注入系メニュー</div>
+                    </div>
+                    <span class="sheet-category-pill">AGA MENU</span>
+                  </div>
+                  <div class="sheet-table-wrap">
+                    <div class="sheet-table-head">
+                      <span>メニュー</span>
+                      <span>税込価格</span>
+                    </div>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="ミノキシジル 5mg"><span class="sheet-drug-name">ミノキシジル 5mg</span></span><span class="sheet-drug-price">¥3,080</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="フィナステリド 1mg"><span class="sheet-drug-name">フィナステリド 1mg</span></span><span class="sheet-drug-price">¥4,730</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="スピロノラクトン"><span class="sheet-drug-name">スピロノラクトン</span></span><span class="sheet-drug-price">¥4,730</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="デュタステリド 0.5mg"><span class="sheet-drug-name">デュタステリド 0.5mg</span></span><span class="sheet-drug-price">¥6,600</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="ミノキ5mg + フィナス1mg 合剤"><span class="sheet-drug-name">ミノキ5mg + フィナス1mg 合剤</span></span><span class="sheet-drug-price">¥7,700</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="ミノキ5mg + デュタス0.5mg 合剤"><span class="sheet-drug-name">ミノキ5mg + デュタス0.5mg 合剤</span></span><span class="sheet-drug-price">¥8,800</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="はえちょる。オリジナル注入液"><span class="sheet-drug-name">はえちょる。オリジナル注入液</span></span><span class="sheet-drug-price">¥37,400</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="はえちょる。FRESH（ブースター）"><span class="sheet-drug-name">はえちょる。FRESH（ブースター）</span></span><span class="sheet-drug-price">¥47,400</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="エクソソーム（2cc/回）：脂肪由来"><span class="sheet-drug-name">エクソソーム（2cc/回）：脂肪由来</span></span><span class="sheet-drug-price">¥25,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="プレミアムエクソソーム（2cc/回）：臍帯由来"><span class="sheet-drug-name">プレミアムエクソソーム（2cc/回）：臍帯由来</span></span><span class="sheet-drug-price">¥50,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="スキンメイク 30c㎡"><span class="sheet-drug-name">スキンメイク 30c㎡</span></span><span class="sheet-drug-price">¥60,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="スキンメイク 60c㎡"><span class="sheet-drug-name">スキンメイク 60c㎡</span></span><span class="sheet-drug-price">¥120,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="スキンメイク 90c㎡"><span class="sheet-drug-name">スキンメイク 90c㎡</span></span><span class="sheet-drug-price">¥180,000</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="はえちょる。オリジナル注入液（スタンダード6回）"><span class="sheet-drug-name">はえちょる。オリジナル注入液（スタンダード6回）</span></span><span class="sheet-drug-price">¥187,490</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="はえちょる。オリジナル注入液（プログラム7回）"><span class="sheet-drug-name">はえちょる。オリジナル注入液（プログラム7回）</span></span><span class="sheet-drug-price">¥299,890</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="はえちょる。オリジナル注入液（プレミアム12回）"><span class="sheet-drug-name">はえちょる。オリジナル注入液（プレミアム12回）</span></span><span class="sheet-drug-price">¥411,890</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="はえちょる。FRESH（ブースター）スタンダード6回"><span class="sheet-drug-name">はえちょる。FRESH（ブースター）スタンダード6回</span></span><span class="sheet-drug-price">¥244,990</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="はえちょる。FRESH（ブースター）プロ 9回"><span class="sheet-drug-name">はえちょる。FRESH（ブースター）プロ 9回</span></span><span class="sheet-drug-price">¥387,190</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="はえちょる。FRESH（ブースター）プレミアム12回"><span class="sheet-drug-name">はえちょる。FRESH（ブースター）プレミアム12回</span></span><span class="sheet-drug-price">¥529,390</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable price-row--counsel"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="AGA・頭皮ケア" value="カウンセリングにて決めたい"><span class="sheet-drug-name">カウンセリングにて決めたい</span></span><span class="sheet-drug-price">—</span></label>
+                  </div>
+                  <div class="sheet-footer-notice">
+                    <strong>状態を確認のうえ、医師が治療プランをご提案します</strong><br>
+                    ※本治療は自由診療です。診察後、医師が処方の可否を判断します。
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. 美容内服 -->
+            <div class="menu-card-item" id="item-skin">
+              <div class="menu-card-header" data-target="preview-skin">
+                <span class="menu-card-title">美容内服</span>
+                <span class="menu-card-chevron" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </span>
+              </div>
+              <div class="menu-price-preview" id="preview-skin">
+                <div class="price-sheet-card">
+                  <div class="sheet-brand-header">
+                    <span class="sheet-brand-title">格安 オンライン診療 | PRICE MENU</span>
+                    <span class="sheet-brand-tag">自由診療</span>
+                  </div>
+                  <div class="sheet-category-banner banner-skin">
+                    <div>
+                      <div class="sheet-category-title">美容内服</div>
+                      <div class="sheet-category-sub">美白・肌ケアサポート</div>
+                    </div>
+                    <span class="sheet-category-pill">BEAUTY MENU</span>
+                  </div>
+                  <div class="sheet-table-wrap">
+                    <div class="sheet-table-head">
+                      <span>メニュー</span>
+                      <span>税込価格</span>
+                    </div>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容内服" value="【美白セット】シミ撃退 内服3種（ピル服用者NG）"><span class="sheet-drug-name">【美白セット】シミ撃退 内服3種（ピル服用者NG）</span></span><span class="sheet-drug-price">¥3,795</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容内服" value="【美白セット】シミ撃退 内服3種（ピル服用者OK）"><span class="sheet-drug-name">【美白セット】シミ撃退 内服3種（ピル服用者OK）</span></span><span class="sheet-drug-price">¥3,135</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容内服" value="コペラ（30日分）"><span class="sheet-drug-name">コペラ（30日分）</span></span><span class="sheet-drug-price">¥1,210</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容内服" value="シーピー（30日分）"><span class="sheet-drug-name">シーピー（30日分）</span></span><span class="sheet-drug-price">¥1,210</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容内服" value="トラネキサム酸（30日分）"><span class="sheet-drug-name">トラネキサム酸（30日分）</span></span><span class="sheet-drug-price">¥1,870</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容内服" value="ハイチオール（30日分）"><span class="sheet-drug-name">ハイチオール（30日分）</span></span><span class="sheet-drug-price">¥1,210</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容内服" value="ノイロビタン（30日分）"><span class="sheet-drug-name">ノイロビタン（30日分）</span></span><span class="sheet-drug-price">¥1,100</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容内服" value="リボフラビン（30日分）"><span class="sheet-drug-name">リボフラビン（30日分）</span></span><span class="sheet-drug-price">¥1,210</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容内服" value="ピドキサール（30日分）"><span class="sheet-drug-name">ピドキサール（30日分）</span></span><span class="sheet-drug-price">¥1,210</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容内服" value="鎮静マスク"><span class="sheet-drug-name">鎮静マスク</span></span><span class="sheet-drug-price">¥1,500</span></label>
+                    <label class="sheet-table-row sheet-table-row--selectable price-row--counsel"><span class="sheet-drug-name-wrap"><input type="checkbox" class="detail-item-checkbox" data-category="美容内服" value="カウンセリングにて決めたい"><span class="sheet-drug-name">カウンセリングにて決めたい</span></span><span class="sheet-drug-price">—</span></label>
+                  </div>
+                  <div class="sheet-footer-notice">
+                    <strong>肌状態や服用中のお薬について、事前にご相談ください</strong><br>
+                    ※本治療は自由診療です。診察後、医師が処方の可否を判断します。
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="field-error-text" id="menuError">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>ご希望メニューを1つ以上選択してください。</span>
+          </div>
+        </div>
+
+        <div class="form-group" id="dateGroup">
+          <div class="label-wrapper">
+            <label class="field-label">ご希望日時</label>
+            <span class="badge-required">必須</span>
+          </div>
+          <div class="field-hint">スムーズな日程調整のため、第1〜第3ご希望日時をすべてご選択ください。</div>
+
+          <div class="date-pickers-list">
+            <!-- 第1ご希望日時（必須） -->
+            <div class="date-picker-item">
+              <div class="date-picker-label-row">
+                <span class="sub-field-label">第1ご希望日時</span>
+                <span class="badge-required">必須</span>
+              </div>
+              <input 
+                type="datetime-local" 
+                id="entry_date_1" 
+                name="preferred_date_1" 
+                class="input-text date-input"
+                required
+              >
+              <div class="field-error-text" id="dateError1">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <span>第1ご希望日時をご選択ください（現在時刻より後の日時）。</span>
+              </div>
+            </div>
+
+            <!-- 第2ご希望日時（必須） -->
+            <div class="date-picker-item">
+              <div class="date-picker-label-row">
+                <span class="sub-field-label">第2ご希望日時</span>
+                <span class="badge-required">必須</span>
+              </div>
+              <input 
+                type="datetime-local" 
+                id="entry_date_2" 
+                name="preferred_date_2" 
+                class="input-text date-input"
+                required
+              >
+              <div class="field-error-text" id="dateError2">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <span>第2ご希望日時をご選択ください（現在時刻より後の日時）。</span>
+              </div>
+            </div>
+
+            <!-- 第3ご希望日時（必須） -->
+            <div class="date-picker-item">
+              <div class="date-picker-label-row">
+                <span class="sub-field-label">第3ご希望日時</span>
+                <span class="badge-required">必須</span>
+              </div>
+              <input 
+                type="datetime-local" 
+                id="entry_date_3" 
+                name="preferred_date_3" 
+                class="input-text date-input"
+                required
+              >
+              <div class="field-error-text" id="dateError3">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <span>第3ご希望日時をご選択ください（現在時刻より後の日時）。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ご質問・ご要望 -->
+        <div class="form-group">
+          <div class="label-wrapper">
+            <label class="field-label" for="entry_message">ご質問・ご不安な点</label>
+            <span class="badge-optional">任意</span>
+          </div>
+          <textarea 
+            id="entry_message" 
+            name="message" 
+            class="input-textarea" 
+            placeholder="アレルギーの有無やダウンタイムのご希望など、気になる点がございましたらご自由にご記入ください。"
+          ></textarea>
+        </div>
+
+        <!-- 送信ボタン -->
+        <div class="submit-container">
+          <button type="submit" class="btn-submit" id="submitBtn">
+            <span>診察を予約する</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+          </button>
+          <p class="privacy-notice">※ ご入力いただいた個人情報は予約管理のみに使用し、厳重に管理いたします。</p>
+        </div>
+
+      </form>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="successModal">
+    <div class="modal-card">
+      <div class="modal-icon">✓</div>
+      <h2 class="modal-title">送信が完了いたしました</h2>
+      <p class="modal-desc">
+        ご予約の受付が完了いたしました。<br>
+        担当者より内容確認のご連絡を差し上げます。今しばらくお待ちくださいませ。
+      </p>
+      <button type="button" class="btn-modal-close" onclick="closeModal()">閉じる</button>
+    </div>
+  </div>
+
+  <script>
+    // =======================================================================
+    // 【設定】Google Apps ScriptのウェブアプリURL
+    // =======================================================================
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxn3Z_O4LTY7awKQ_xeiWpNWDCqx7spqs3djeqgGenUPPnkI3FXK94AUAJQIj-AvoQ/exec";
+
+    const form = document.getElementById('clinicGoogleForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const modal = document.getElementById('successModal');
+
+    const telInput = document.getElementById('entry_tel');
+    const telError = document.getElementById('telError');
+    const telGroup = document.getElementById('telGroup');
+
+    const emailInput = document.getElementById('entry_email');
+    const emailError = document.getElementById('emailError');
+    const emailGroup = document.getElementById('emailGroup');
+
+    const menuError = document.getElementById('menuError');
+    const menuGroup = document.getElementById('menuGroup');
+
+    const dateInput1 = document.getElementById('entry_date_1');
+    const dateInput2 = document.getElementById('entry_date_2');
+    const dateInput3 = document.getElementById('entry_date_3');
+    const dateError1 = document.getElementById('dateError1');
+    const dateError2 = document.getElementById('dateError2');
+    const dateError3 = document.getElementById('dateError3');
+    const dateGroup = document.getElementById('dateGroup');
+
+    // 料金表プレビューの開閉トグル
+    function togglePricePreview(previewId, headerElement) {
+      const preview = document.getElementById(previewId);
+      if (!preview) return;
+      const isOpen = preview.classList.toggle('is-open');
+      headerElement.setAttribute('data-open', isOpen ? 'true' : 'false');
+    }
+
+    // カテゴリ見出し（商材名の部分）をクリックしたら料金表を開閉
+    document.querySelectorAll('.menu-card-header[data-target]').forEach(header => {
+      header.setAttribute('role', 'button');
+      header.setAttribute('tabindex', '0');
+      header.addEventListener('click', () => togglePricePreview(header.dataset.target, header));
+      header.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          togglePricePreview(header.dataset.target, header);
+        }
+      });
+    });
+
+    // 詳細商材選択時のカードハイライト制御 ＆ エラー解除
+    const detailItemCheckboxes = document.querySelectorAll('.detail-item-checkbox');
+    detailItemCheckboxes.forEach(cb => {
+      cb.addEventListener('change', () => {
+        const parentCard = cb.closest('.menu-card-item');
+        if (parentCard) {
+          const anyCheckedInCard = Array.from(parentCard.querySelectorAll('.detail-item-checkbox')).some(item => item.checked);
+          parentCard.classList.toggle('is-checked', anyCheckedInCard);
+        }
+        const isAnyChecked = Array.from(detailItemCheckboxes).some(item => item.checked);
+        if (isAnyChecked) {
+          menuError.classList.remove('is-visible');
+        }
+      });
+    });
+
+    function getSelectedDetailItemsByCategory() {
+      const byCategory = {};
+      detailItemCheckboxes.forEach(cb => {
+        if (cb.checked) {
+          (byCategory[cb.dataset.category] = byCategory[cb.dataset.category] || []).push(cb.value);
+        }
+      });
+      return byCategory;
+    }
+
+    function updateMinDateTime() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const minVal = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+      [dateInput1, dateInput2, dateInput3].forEach(input => {
+        if (input) input.min = minVal;
+      });
+    }
+
+    updateMinDateTime();
+    [dateInput1, dateInput2, dateInput3].forEach(input => {
+      input.addEventListener('focus', updateMinDateTime);
+    });
+
+    function validateDateInput(input, errorElement, fieldLabelName = "ご希望日時") {
+      if (!input.value) {
+        errorElement.querySelector('span').textContent = `${fieldLabelName}をご選択ください。`;
+        errorElement.classList.add('is-visible');
+        input.classList.add('input-error');
+        return false;
+      }
+
+      const selected = new Date(input.value);
+      if (selected < new Date()) {
+        errorElement.querySelector('span').textContent = `${fieldLabelName}は現在時刻より後の日時をご選択ください。`;
+        errorElement.classList.add('is-visible');
+        input.classList.add('input-error');
+        return false;
+      } else {
+        errorElement.classList.remove('is-visible');
+        input.classList.remove('input-error');
+        return true;
+      }
+    }
+
+    dateInput1.addEventListener('input', () => validateDateInput(dateInput1, dateError1, "第1ご希望日時"));
+    dateInput2.addEventListener('input', () => validateDateInput(dateInput2, dateError2, "第2ご希望日時"));
+    dateInput3.addEventListener('input', () => validateDateInput(dateInput3, dateError3, "第3ご希望日時"));
+
+    const emailPattern = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+
+    // 電話番号の入力監視（全角自動半角化）
+    telInput.addEventListener('input', () => {
+      telInput.value = telInput.value
+        .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+        .replace(/[ー−―ー]/g, '-');
+
+      const telPattern = /^[0-9\-]+$/;
+      if (telInput.value.length > 0 && !telPattern.test(telInput.value)) {
+        telError.classList.add('is-visible');
+        telInput.classList.add('input-error');
+      } else {
+        telError.classList.remove('is-visible');
+        telInput.classList.remove('input-error');
+      }
+    });
+
+    // メールアドレスの入力監視（全角自動半角化）
+    emailInput.addEventListener('input', () => {
+      emailInput.value = emailInput.value
+        .replace(/[！-～]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+        .replace(/　/g, '')
+        .trim();
+
+      if (emailInput.value.length > 0 && !emailPattern.test(emailInput.value)) {
+        emailError.classList.add('is-visible');
+        emailInput.classList.add('input-error');
+      } else {
+        emailError.classList.remove('is-visible');
+        emailInput.classList.remove('input-error');
+      }
+    });
+
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const telPattern = /^[0-9\-]+$/;
+      if (!telPattern.test(telInput.value.trim())) {
+        telError.classList.add('is-visible');
+        telInput.classList.add('input-error');
+        telGroup.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        telInput.focus();
+        return;
+      } else {
+        telError.classList.remove('is-visible');
+        telInput.classList.remove('input-error');
+      }
+
+      const emailValue = emailInput.value.trim();
+      if (!emailValue || !emailPattern.test(emailValue)) {
+        emailError.classList.add('is-visible');
+        emailInput.classList.add('input-error');
+        emailGroup.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        emailInput.focus();
+        return;
+      } else {
+        emailError.classList.remove('is-visible');
+        emailInput.classList.remove('input-error');
+      }
+
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const detailByCategoryPre = getSelectedDetailItemsByCategory();
+      if (Object.keys(detailByCategoryPre).length === 0) {
+        menuError.classList.add('is-visible');
+        menuGroup.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      const isDate1Valid = validateDateInput(dateInput1, dateError1, "第1ご希望日時");
+      const isDate2Valid = validateDateInput(dateInput2, dateError2, "第2ご希望日時");
+      const isDate3Valid = validateDateInput(dateInput3, dateError3, "第3ご希望日時");
+
+      if (!isDate1Valid || !isDate2Valid || !isDate3Valid) {
+        dateGroup.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (!isDate1Valid) dateInput1.focus();
+        else if (!isDate2Valid) dateInput2.focus();
+        else if (!isDate3Valid) dateInput3.focus();
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.style.opacity = '0.7';
+      submitBtn.innerHTML = '<span>送信中...</span>';
+
+      const formatDT = (dtVal) => dtVal ? dtVal.replace('T', ' ') : '';
+      const d1 = formatDT(dateInput1.value);
+      const d2 = formatDT(dateInput2.value);
+      const d3 = formatDT(dateInput3.value);
+
+      let dateSummary = `第1希望: ${d1}`;
+      if (d2) dateSummary += ` / 第2希望: ${d2}`;
+      if (d3) dateSummary += ` / 第3希望: ${d3}`;
+
+      const detailByCategory = getSelectedDetailItemsByCategory();
+      const menuSummary = Object.entries(detailByCategory)
+        .map(([cat, details]) => `${cat}（${details.join('・')}）`)
+        .join('、');
+
+      const payload = {
+        name: document.getElementById('entry_name').value,
+        kana: document.getElementById('entry_kana').value,
+        tel: telInput.value.trim(),
+        email: emailValue,
+        consultation_type: form.querySelector('input[name="consultation_type"]:checked')?.value || '',
+        menu: menuSummary,
+        preferred_date: dateSummary,
+        preferred_date_1: d1,
+        preferred_date_2: d2,
+        preferred_date_3: d3,
+        message: document.getElementById('entry_message').value
+      };
+
+      try {
+        if (GAS_WEB_APP_URL && !GAS_WEB_APP_URL.includes("YOUR_GAS_DEPLOYMENT_ID")) {
+          await fetch(GAS_WEB_APP_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify(payload),
+            mode: 'no-cors'
+          });
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+
+        showSuccessModal();
+      } catch (err) {
+        console.error('送信エラー:', err);
+        showSuccessModal();
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+        submitBtn.innerHTML = '<span>診察を予約する</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>';
+      }
+    });
+
+    function showSuccessModal() {
+      modal.classList.add('is-active');
+      form.reset();
+      updateMinDateTime();
+      menuError.classList.remove('is-visible');
+      telError.classList.remove('is-visible');
+      telInput.classList.remove('input-error');
+      emailError.classList.remove('is-visible');
+      emailInput.classList.remove('input-error');
+      [dateError1, dateError2, dateError3].forEach(el => el.classList.remove('is-visible'));
+      [dateInput1, dateInput2, dateInput3].forEach(el => el.classList.remove('input-error'));
+      document.querySelectorAll('.menu-card-item').forEach(el => el.classList.remove('is-checked'));
+    }
+
+    function closeModal() {
+      modal.classList.remove('is-active');
+    }
+  </script>
+</body>
+</html>

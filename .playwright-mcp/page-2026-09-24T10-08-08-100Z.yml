@@ -1,0 +1,88 @@
+- generic [ref=f21e3]:
+  - banner [ref=f21e4]:
+    - heading "Surim Clinic｜看診預約表" [level=1] [ref=f21e11]
+    - paragraph [ref=f21e12]: 請填寫以下資料，我們將依照您提供的時間與您聯繫，安排看診事宜。
+  - generic [ref=f21e13]:
+    - group [ref=f21e14]:
+      - generic [ref=f21e15]: 基本資料
+      - generic [ref=f21e16]:
+        - generic [ref=f21e17]:
+          - generic [ref=f21e18]:
+            - generic [ref=f21e19]: 您的姓名（中文）
+            - generic [ref=f21e20]: "*必填"
+          - textbox "您的姓名（中文） *必填" [ref=f21e21]:
+            - /placeholder: 例：王小明
+        - generic [ref=f21e22]:
+          - generic [ref=f21e23]:
+            - generic [ref=f21e24]: 護照英文姓名／拼音
+            - generic [ref=f21e25]: 建議填寫
+          - textbox "護照英文姓名／拼音 建議填寫" [ref=f21e26]:
+            - /placeholder: 例：WANG, XIAO-MING
+      - generic [ref=f21e27]:
+        - generic [ref=f21e28]:
+          - generic [ref=f21e29]: 電子信箱
+          - generic [ref=f21e30]: "*必填"
+        - textbox "電子信箱 *必填" [ref=f21e31]:
+          - /placeholder: 例：example@email.com
+    - group [ref=f21e32]:
+      - generic [ref=f21e33]: 看診方式與項目選擇
+      - generic [ref=f21e34]:
+        - generic [ref=f21e35]:
+          - generic [ref=f21e36]: 看診方式（診察形式）
+          - generic [ref=f21e37]: "*必填"
+        - generic [ref=f21e38]:
+          - generic [ref=f21e39] [cursor=pointer]:
+            - radio "線上看診 透過視訊／電話問診，免出門、隱私度高" [checked] [ref=f21e40]
+            - generic [ref=f21e41]:
+              - generic [ref=f21e42]: 線上看診
+              - generic [ref=f21e43]: 透過視訊／電話問診，免出門、隱私度高
+          - generic [ref=f21e44] [cursor=pointer]:
+            - radio "到院看診（實體對面） 親自至診所與醫師面對面諮詢" [ref=f21e45]
+            - generic [ref=f21e46]:
+              - generic [ref=f21e47]: 到院看診（實體對面）
+              - generic [ref=f21e48]: 親自至診所與醫師面對面諮詢
+      - generic [ref=f21e49]:
+        - generic [ref=f21e50]:
+          - generic [ref=f21e51]: 看診項目
+          - generic [ref=f21e52]: "*必填"
+        - generic [ref=f21e53]:
+          - generic [ref=f21e55]:
+            - generic [ref=f21e56]: 醫療瘦身（口服減重藥）
+            - button "查看價目表" [ref=f21e57] [cursor=pointer]
+          - generic [ref=f21e59]:
+            - generic [ref=f21e60]: AGA 雄性禿治療
+            - button "查看價目表" [ref=f21e61] [cursor=pointer]
+          - generic [ref=f21e63]:
+            - generic [ref=f21e64]: ED 治療藥物
+            - button "查看價目表" [ref=f21e65] [cursor=pointer]
+          - generic [ref=f21e67]:
+            - generic [ref=f21e68]: 美容口服藥
+            - button "查看價目表" [ref=f21e69] [cursor=pointer]
+        - paragraph [ref=f21e70]: 請在各項目的「查看價目表」中選擇至少一項具體商品（可複選）。若尚未決定，請選擇「諮詢時再決定」。
+    - group [ref=f21e71]:
+      - generic [ref=f21e72]: 希望診療日期與時段
+      - paragraph [ref=f21e73]: 為順利安排一對一諮詢，請盡量提供 2～3 個方便的時段。
+      - generic [ref=f21e74]:
+        - generic [ref=f21e75]: 第一希望時段（必填）
+        - generic [ref=f21e77]:
+          - textbox [ref=f21e78]
+          - textbox [ref=f21e79]: 18:00
+      - generic [ref=f21e80]:
+        - generic [ref=f21e81]: 第二希望時段（選填）
+        - generic [ref=f21e83]:
+          - textbox [ref=f21e84]
+          - textbox [ref=f21e85]: 19:00
+      - generic [ref=f21e86]:
+        - generic [ref=f21e87]: 第三希望時段（選填）
+        - generic [ref=f21e89]:
+          - textbox [ref=f21e90]
+          - textbox [ref=f21e91]: 20:00
+    - group [ref=f21e92]:
+      - generic [ref=f21e93]:
+        - generic [ref=f21e94]:
+          - generic [ref=f21e95]: 提問或特殊需求
+          - generic [ref=f21e96]: 選填
+        - textbox "提問或特殊需求 選填" [ref=f21e97]:
+          - /placeholder: 若有任何疑問或想諮詢的具體藥品，歡迎於此填寫...
+    - button "送出看診預約" [ref=f21e98] [cursor=pointer]
+    - paragraph [ref=f21e99]: 您的個人隱私與預約資料將受到加密保護

@@ -18,6 +18,7 @@ var verifyCmdsMu sync.Mutex
 type verifyCmdEntry struct {
 	Cmd      string `json:"cmd"`
 	Passes   int    `json:"passes"`
+	Fails    int    `json:"fails"`
 	LastUsed string `json:"last_used"`
 }
 
@@ -74,6 +75,8 @@ func GetLearnedVerifyCmd(projectDir string) string {
 }
 
 // SaveLearnedVerifyCmd は検証通過したverify_cmdを保存する（同一なら通過回数を加算）。
+// 通過はこのverify_cmdへの信頼を回復させるので、蓄積していた失敗カウント(Fails)も
+// リセットする（NoteVerifyCmdFailureの閾値判定が古い失敗を引きずらないように）。
 func SaveLearnedVerifyCmd(projectDir, cmd string) {
 	if cmd == "" {
 		return
@@ -86,11 +89,15 @@ func SaveLearnedVerifyCmd(projectDir, cmd string) {
 	if entry, ok := data[key]; ok && entry.Cmd == cmd {
 		passes = entry.Passes + 1
 	}
-	data[key] = verifyCmdEntry{Cmd: cmd, Passes: passes, LastUsed: time.Now().Format(time.RFC3339)}
+	data[key] = verifyCmdEntry{Cmd: cmd, Passes: passes, Fails: 0, LastUsed: time.Now().Format(time.RFC3339)}
 	saveVerifyCmds(data)
 }
 
-// ForgetLearnedVerifyCmd は無効と判明したverify_cmdを実績庫から削除する。
+// ForgetLearnedVerifyCmd は無効と判明したverify_cmdを実績庫から即座に削除する。
+// 単発の環境要因失敗まで即座に忘れてしまうと学習コストがゼロにならないため、
+// abort系エラー(worker.go::abortExitCodes)からの呼び出しはNoteVerifyCmdFailure経由の
+// 閾値判定に置き換え済み。ForgetLearnedVerifyCmd自体は「即時破棄したい」ことが
+// 明確な場面向けに残す。
 func ForgetLearnedVerifyCmd(projectDir, cmd string) {
 	verifyCmdsMu.Lock()
 	defer verifyCmdsMu.Unlock()
@@ -100,6 +107,42 @@ func ForgetLearnedVerifyCmd(projectDir, cmd string) {
 		delete(data, key)
 		saveVerifyCmds(data)
 	}
+}
+
+// verifyCmdForgetThreshold は学習済みverify_cmdを破棄するまでに許容する
+// 「Passesを上回る累積失敗回数」。1（単発失敗で即破棄）ではなく2にすることで、
+// 環境要因等による単発失敗では学習を失わず、慢性的に不安定なverify_cmdだけを
+// 淘汰する（腐敗した学習の恒久化と、過剰反応での学習ゼロ化の両極端を避ける）。
+const verifyCmdForgetThreshold = 2
+
+// NoteVerifyCmdFailure は学習済みverify_cmdがabort系エラー（bash構文エラー・
+// 権限なし・コマンド不明等、Workerの修正リトライでは直りようがない失敗）で
+// 終わったことを記録する。projectDir/cmdの組み合わせがそもそも学習実績に
+// 存在しない（テンプレート/自動調達直後で未学習）場合は何もしない——
+// 学習していないものを「忘れる」必要はないため。
+// 累積失敗がverifyCmdForgetThresholdに達した時点で学習を破棄しtrueを返す。
+// 破棄しなかった場合はfalseを返す。
+func NoteVerifyCmdFailure(projectDir, cmd string) bool {
+	if cmd == "" {
+		return false
+	}
+	verifyCmdsMu.Lock()
+	defer verifyCmdsMu.Unlock()
+	key := verifyCmdKey(projectDir)
+	data := loadVerifyCmds()
+	entry, ok := data[key]
+	if !ok || entry.Cmd != cmd {
+		return false
+	}
+	entry.Fails++
+	if entry.Fails-entry.Passes >= verifyCmdForgetThreshold {
+		delete(data, key)
+		saveVerifyCmds(data)
+		return true
+	}
+	data[key] = entry
+	saveVerifyCmds(data)
+	return false
 }
 
 // verifyCmdTemplates は言語別verify_cmdテンプレート（Python版

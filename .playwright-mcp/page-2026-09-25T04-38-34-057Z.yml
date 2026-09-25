@@ -1,0 +1,316 @@
+- generic [ref=f6e2]:
+  - banner [ref=f6e3]:
+    - heading "事前問診票" [level=1] [ref=f6e4]
+    - paragraph [ref=f6e5]: ご来院前にご記入いただく事前問診票です。ご回答内容は診療目的にのみ使用し、厳重に管理いたします。
+  - generic [ref=f6e6]:
+    - group [ref=f6e7]:
+      - generic [ref=f6e8]: 基本情報
+      - generic [ref=f6e9]:
+        - generic [ref=f6e10]:
+          - generic [ref=f6e11]: 郵便番号
+          - generic [ref=f6e12]: 必須
+        - textbox "郵便番号 必須" [ref=f6e13]
+      - generic [ref=f6e14]:
+        - generic [ref=f6e15]:
+          - generic [ref=f6e16]: 住所
+          - generic [ref=f6e17]: 必須
+        - textbox "住所 必須" [ref=f6e18]
+      - generic [ref=f6e19]:
+        - generic [ref=f6e20]:
+          - generic [ref=f6e21]: 氏名
+          - generic [ref=f6e22]: 必須
+        - textbox "氏名 必須" [ref=f6e23]
+      - generic [ref=f6e24]:
+        - generic [ref=f6e25]:
+          - generic [ref=f6e26]: 氏名（フリガナ）
+          - generic [ref=f6e27]: 必須
+        - textbox "氏名（フリガナ） 必須" [ref=f6e28]
+      - generic [ref=f6e29]:
+        - generic [ref=f6e30]:
+          - generic [ref=f6e31]: 生年月日
+          - generic [ref=f6e32]: 必須
+        - textbox "生年月日 必須" [ref=f6e33]
+      - generic [ref=f6e34]:
+        - generic [ref=f6e35]:
+          - generic [ref=f6e36]: 性別
+          - generic [ref=f6e37]: 必須
+        - generic [ref=f6e38]:
+          - generic [ref=f6e39]:
+            - radio "男性" [ref=f6e40] [cursor=pointer]
+            - generic [ref=f6e41]: 男性
+          - generic [ref=f6e42]:
+            - radio "女性" [ref=f6e43] [cursor=pointer]
+            - generic [ref=f6e44]: 女性
+      - generic [ref=f6e45]:
+        - generic [ref=f6e46]:
+          - generic [ref=f6e47]: 血液型
+          - generic [ref=f6e48]: 必須
+        - generic [ref=f6e49]:
+          - generic [ref=f6e50]:
+            - radio "A型" [ref=f6e51] [cursor=pointer]
+            - generic [ref=f6e52]: A型
+          - generic [ref=f6e53]:
+            - radio "B型" [ref=f6e54] [cursor=pointer]
+            - generic [ref=f6e55]: B型
+          - generic [ref=f6e56]:
+            - radio "O型" [ref=f6e57] [cursor=pointer]
+            - generic [ref=f6e58]: O型
+          - generic [ref=f6e59]:
+            - radio "AB型" [ref=f6e60] [cursor=pointer]
+            - generic [ref=f6e61]: AB型
+          - generic [ref=f6e62]:
+            - radio "不明" [ref=f6e63] [cursor=pointer]
+            - generic [ref=f6e64]: 不明
+      - generic [ref=f6e65]:
+        - generic [ref=f6e66]:
+          - generic [ref=f6e67]: 身長(cm)
+          - generic [ref=f6e68]: 必須
+        - textbox "身長(cm) 必須" [ref=f6e69]
+      - generic [ref=f6e70]:
+        - generic [ref=f6e71]:
+          - generic [ref=f6e72]: 体重(kg)
+          - generic [ref=f6e73]: 必須
+        - textbox "体重(kg) 必須" [ref=f6e74]
+    - group [ref=f6e75]:
+      - generic [ref=f6e76]: 生活習慣・ご来院について
+      - generic [ref=f6e77]:
+        - generic [ref=f6e78]:
+          - generic [ref=f6e79]: 当クリニックにご来店されたことはございますか？（別店舗も含む）
+          - generic [ref=f6e80]: 必須
+        - generic [ref=f6e81]:
+          - generic [ref=f6e82]:
+            - radio "今回がはじめて" [ref=f6e83] [cursor=pointer]
+            - generic [ref=f6e84]: 今回がはじめて
+          - generic [ref=f6e85]:
+            - radio "説明を受けたことがある" [ref=f6e86] [cursor=pointer]
+            - generic [ref=f6e87]: 説明を受けたことがある
+          - generic [ref=f6e88]:
+            - radio "施術をしたことがある" [ref=f6e89] [cursor=pointer]
+            - generic [ref=f6e90]: 施術をしたことがある
+      - generic [ref=f6e91]:
+        - generic [ref=f6e92]:
+          - generic [ref=f6e93]: クリニックを知ったきっかけは何ですか？
+          - generic [ref=f6e94]: 必須
+        - generic [ref=f6e95]:
+          - generic [ref=f6e96]:
+            - radio "Web広告" [ref=f6e97] [cursor=pointer]
+            - generic [ref=f6e98]: Web広告
+          - generic [ref=f6e99]:
+            - radio "ラジオ" [ref=f6e100] [cursor=pointer]
+            - generic [ref=f6e101]: ラジオ
+          - generic [ref=f6e102]:
+            - radio "喫煙所の動画" [ref=f6e103] [cursor=pointer]
+            - generic [ref=f6e104]: 喫煙所の動画
+          - generic [ref=f6e105]:
+            - radio "看板" [ref=f6e106] [cursor=pointer]
+            - generic [ref=f6e107]: 看板
+      - generic [ref=f6e108]:
+        - generic [ref=f6e109]:
+          - generic [ref=f6e110]: 下記の治療にご興味はございますか？
+          - generic [ref=f6e111]: 必須（1つ以上）
+        - generic [ref=f6e112]:
+          - generic [ref=f6e113]:
+            - checkbox "クマ取り" [ref=f6e114] [cursor=pointer]
+            - generic [ref=f6e115]: クマ取り
+          - generic [ref=f6e116]:
+            - checkbox "二重手術" [ref=f6e117] [cursor=pointer]
+            - generic [ref=f6e118]: 二重手術
+          - generic [ref=f6e119]:
+            - checkbox "AGA" [ref=f6e120] [cursor=pointer]
+            - generic [ref=f6e121]: AGA
+          - generic [ref=f6e122]:
+            - checkbox "医療脱毛" [ref=f6e123] [cursor=pointer]
+            - generic [ref=f6e124]: 医療脱毛
+          - generic [ref=f6e125]:
+            - checkbox "多汗症・ワキガ" [ref=f6e126] [cursor=pointer]
+            - generic [ref=f6e127]: 多汗症・ワキガ
+          - generic [ref=f6e128]:
+            - checkbox "テストステロン" [ref=f6e129] [cursor=pointer]
+            - generic [ref=f6e130]: テストステロン
+          - generic [ref=f6e131]:
+            - checkbox "花粉症" [ref=f6e132] [cursor=pointer]
+            - generic [ref=f6e133]: 花粉症
+          - generic [ref=f6e134]:
+            - checkbox "ED" [ref=f6e135] [cursor=pointer]
+            - generic [ref=f6e136]: ED
+          - generic [ref=f6e137]:
+            - checkbox "医療ダイエット" [ref=f6e138] [cursor=pointer]
+            - generic [ref=f6e139]: 医療ダイエット
+          - generic [ref=f6e140]:
+            - checkbox "特になし" [ref=f6e141] [cursor=pointer]
+            - generic [ref=f6e142]: 特になし
+      - generic [ref=f6e143]:
+        - generic [ref=f6e144]:
+          - generic [ref=f6e145]: お支払い方法のご希望はありますか？
+          - generic [ref=f6e146]: 必須
+        - generic [ref=f6e147]:
+          - generic [ref=f6e148]:
+            - radio "カード決済" [ref=f6e149] [cursor=pointer]
+            - generic [ref=f6e150]: カード決済
+          - generic [ref=f6e151]:
+            - radio "銀行振込" [ref=f6e152] [cursor=pointer]
+            - generic [ref=f6e153]: 銀行振込
+    - group [ref=f6e154]:
+      - generic [ref=f6e155]: 現在の症状・既往歴
+      - generic [ref=f6e156]:
+        - generic [ref=f6e157]:
+          - generic [ref=f6e158]: 現在の症状について不安なこと、聞きたいこと、心配なことなどがあれば教えてください。
+          - generic [ref=f6e159]: 任意
+        - textbox [ref=f6e160]
+      - generic [ref=f6e161]:
+        - generic [ref=f6e162]:
+          - generic [ref=f6e163]: 過去に大きな病気や怪我、手術（癌・交通事故など）のご経験があれば教えてください
+          - generic [ref=f6e164]: 任意
+        - generic [ref=f6e165]: （病名・治療内容・何歳ごろか・手術歴の有無をご記載ください）
+        - textbox [ref=f6e166]
+      - generic [ref=f6e167]:
+        - generic [ref=f6e168]:
+          - generic [ref=f6e169]: 該当する既往歴があれば教えてください。
+          - generic [ref=f6e170]: 任意
+        - generic [ref=f6e171]:
+          - generic [ref=f6e172]:
+            - checkbox "大豆アレルギー" [ref=f6e173] [cursor=pointer]
+            - generic [ref=f6e174]: 大豆アレルギー
+          - generic [ref=f6e175]:
+            - checkbox "麻酔アレルギー" [ref=f6e176] [cursor=pointer]
+            - generic [ref=f6e177]: 麻酔アレルギー
+          - generic [ref=f6e178]:
+            - checkbox "糖尿病" [ref=f6e179] [cursor=pointer]
+            - generic [ref=f6e180]: 糖尿病
+          - generic [ref=f6e181]:
+            - checkbox "高血圧" [ref=f6e182] [cursor=pointer]
+            - generic [ref=f6e183]: 高血圧
+          - generic [ref=f6e184]:
+            - checkbox "肝機能障害" [ref=f6e185] [cursor=pointer]
+            - generic [ref=f6e186]: 肝機能障害
+          - generic [ref=f6e187]:
+            - checkbox "腎機能障害" [ref=f6e188] [cursor=pointer]
+            - generic [ref=f6e189]: 腎機能障害
+          - generic [ref=f6e190]:
+            - checkbox "心臓病" [ref=f6e191] [cursor=pointer]
+            - generic [ref=f6e192]: 心臓病
+          - generic [ref=f6e193]:
+            - checkbox "喘息" [ref=f6e194] [cursor=pointer]
+            - generic [ref=f6e195]: 喘息
+          - generic [ref=f6e196]:
+            - checkbox "ケロイド体質" [ref=f6e197] [cursor=pointer]
+            - generic [ref=f6e198]: ケロイド体質
+          - generic [ref=f6e199]:
+            - checkbox "無呼吸" [ref=f6e200] [cursor=pointer]
+            - generic [ref=f6e201]: 無呼吸
+          - generic [ref=f6e202]:
+            - checkbox "前立腺肥大" [ref=f6e203] [cursor=pointer]
+            - generic [ref=f6e204]: 前立腺肥大
+          - generic [ref=f6e205]:
+            - checkbox "透析" [ref=f6e206] [cursor=pointer]
+            - generic [ref=f6e207]: 透析
+          - generic [ref=f6e208]:
+            - checkbox "緑内障" [ref=f6e209] [cursor=pointer]
+            - generic [ref=f6e210]: 緑内障
+          - generic [ref=f6e211]:
+            - checkbox "白内障" [ref=f6e212] [cursor=pointer]
+            - generic [ref=f6e213]: 白内障
+          - generic [ref=f6e214]:
+            - checkbox "アトピー性皮膚炎" [ref=f6e215] [cursor=pointer]
+            - generic [ref=f6e216]: アトピー性皮膚炎
+          - generic [ref=f6e217]:
+            - checkbox "がん" [ref=f6e218] [cursor=pointer]
+            - generic [ref=f6e219]: がん
+          - generic [ref=f6e220]:
+            - checkbox "その他既往歴" [ref=f6e221] [cursor=pointer]
+            - generic [ref=f6e222]: その他既往歴
+      - generic [ref=f6e223]:
+        - generic [ref=f6e224]:
+          - generic [ref=f6e225]: 申告いただいた持病に関して現在病院に通われていますか？
+          - generic [ref=f6e226]: 任意
+        - generic [ref=f6e227]:
+          - generic [ref=f6e228]:
+            - radio "はい" [ref=f6e229] [cursor=pointer]
+            - generic [ref=f6e230]: はい
+          - generic [ref=f6e231]:
+            - radio "いいえ" [ref=f6e232] [cursor=pointer]
+            - generic [ref=f6e233]: いいえ
+      - generic [ref=f6e234]:
+        - generic [ref=f6e235]:
+          - generic [ref=f6e236]: 服用中のお薬やサプリがあれば教えてください。
+          - generic [ref=f6e237]: 任意
+        - textbox "服用中のお薬やサプリがあれば教えてください。 任意" [ref=f6e238]
+      - generic [ref=f6e239]:
+        - generic [ref=f6e240]:
+          - generic [ref=f6e241]: アレルギーの食べ物や薬があれば教えてください。
+          - generic [ref=f6e242]: 任意
+        - textbox "アレルギーの食べ物や薬があれば教えてください。 任意" [ref=f6e243]
+      - generic [ref=f6e244]:
+        - generic [ref=f6e245]:
+          - generic [ref=f6e246]: ペースメーカーや金属（プレート・糸）は入っていますか？
+          - generic [ref=f6e247]: 任意
+        - generic [ref=f6e248]:
+          - generic [ref=f6e249]:
+            - radio "はい" [ref=f6e250] [cursor=pointer]
+            - generic [ref=f6e251]: はい
+          - generic [ref=f6e252]:
+            - radio "いいえ" [ref=f6e253] [cursor=pointer]
+            - generic [ref=f6e254]: いいえ
+      - generic [ref=f6e255]:
+        - generic [ref=f6e256]:
+          - generic [ref=f6e257]: （「がん」にチェックした方のみ）現在治療中ですか？
+          - generic [ref=f6e258]: 任意
+        - generic [ref=f6e259]:
+          - generic [ref=f6e260]:
+            - radio "治療中" [ref=f6e261] [cursor=pointer]
+            - generic [ref=f6e262]: 治療中
+          - generic [ref=f6e263]:
+            - radio "治療終了" [ref=f6e264] [cursor=pointer]
+            - generic [ref=f6e265]: 治療終了
+      - generic [ref=f6e266]:
+        - generic [ref=f6e267]:
+          - generic [ref=f6e268]: （「その他既往歴」にチェックした方のみ）病名を教えてください。
+          - generic [ref=f6e269]: 任意
+        - textbox [ref=f6e270]
+    - group [ref=f6e271]:
+      - generic [ref=f6e272]: 妊娠・授乳
+      - generic [ref=f6e273]:
+        - generic [ref=f6e274]:
+          - generic [ref=f6e275]: 現在、妊娠中または妊活中ですか？
+          - generic [ref=f6e276]: 必須
+        - generic [ref=f6e277]:
+          - generic [ref=f6e278]:
+            - radio "はい" [ref=f6e279] [cursor=pointer]
+            - generic [ref=f6e280]: はい
+          - generic [ref=f6e281]:
+            - radio "いいえ" [ref=f6e282] [cursor=pointer]
+            - generic [ref=f6e283]: いいえ
+      - generic [ref=f6e284]:
+        - generic [ref=f6e285]:
+          - generic [ref=f6e286]: 現在、授乳中ですか？
+          - generic [ref=f6e287]: 必須
+        - generic [ref=f6e288]:
+          - generic [ref=f6e289]:
+            - radio "はい" [ref=f6e290] [cursor=pointer]
+            - generic [ref=f6e291]: はい
+          - generic [ref=f6e292]:
+            - radio "いいえ" [ref=f6e293] [cursor=pointer]
+            - generic [ref=f6e294]: いいえ
+      - generic [ref=f6e295]:
+        - generic [ref=f6e296]:
+          - generic [ref=f6e297]: （女性の方のみ）現在、ピル服用中ですか？服用中の場合はお薬名を教えてください。
+          - generic [ref=f6e298]: 任意
+        - textbox "（女性の方のみ）現在、ピル服用中ですか？服用中の場合はお薬名を教えてください。 任意" [ref=f6e299]
+      - generic [ref=f6e300]:
+        - generic [ref=f6e301]:
+          - generic [ref=f6e302]: （女性の方のみ）出産のご経験はありますか？
+          - generic [ref=f6e303]: 任意
+        - generic [ref=f6e304]:
+          - generic [ref=f6e305]:
+            - radio "はい" [ref=f6e306] [cursor=pointer]
+            - generic [ref=f6e307]: はい
+          - generic [ref=f6e308]:
+            - radio "いいえ" [ref=f6e309] [cursor=pointer]
+            - generic [ref=f6e310]: いいえ
+      - generic [ref=f6e311]:
+        - generic [ref=f6e312]:
+          - generic [ref=f6e313]: 心配なこと、飲んでいるお薬があれば教えてください。
+          - generic [ref=f6e314]: 任意
+        - textbox [ref=f6e315]
+    - button "送信する" [ref=f6e317] [cursor=pointer]
+  - paragraph [ref=f6e318]: ご入力いただいた個人情報は診療目的のみに使用し、厳重に管理いたします。

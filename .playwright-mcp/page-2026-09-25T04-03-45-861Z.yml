@@ -1,0 +1,132 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - generic [ref=e10]:
+          - heading "事前問診票（医療ダイエット）" [level=1] [ref=e12]
+          - generic [ref=e13]: ご来院前にご記入いただく事前問診票です。ご回答内容は診療目的にのみ使用し、厳重に管理いたします。
+        - generic [ref=e15]:
+          - generic [ref=e17]:
+            - link "Google にログイン" [ref=e18] [cursor=pointer]:
+              - /url: https://accounts.google.com/AccountChooser?continue=https://docs.google.com/forms/d/e/1FAIpQLScYS-J_QCo6FF-hjl3ATXV5FjQtn4-CBM9pb7g_rijLpDr47Q/viewform&service=wise
+            - text: すると作業内容を保存できます。
+            - button "詳細" [ref=e19] [cursor=pointer]
+          - generic [aria-hidden] [ref=e21]: "* 必須の質問です"
+      - list [ref=e22]:
+        - listitem [ref=e23]:
+          - generic [ref=e25]:
+            - heading "郵便番号 必須の質問" [level=3] [ref=e28]:
+              - generic [ref=e29]: 郵便番号
+              - generic "必須の質問" [ref=e30]: "*"
+            - generic [ref=e35]:
+              - textbox "郵便番号 必須の質問" [disabled] [ref=e36]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e38]:
+          - generic [ref=e40]:
+            - heading "住所 必須の質問" [level=3] [ref=e43]:
+              - generic [ref=e44]: 住所
+              - generic "必須の質問" [ref=e45]: "*"
+            - generic [ref=e50]:
+              - textbox "住所 必須の質問" [disabled] [ref=e51]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e53]:
+          - generic [ref=e55]:
+            - heading "氏名 必須の質問" [level=3] [ref=e58]:
+              - generic [ref=e59]: 氏名
+              - generic "必須の質問" [ref=e60]: "*"
+            - generic [ref=e65]:
+              - textbox "氏名 必須の質問" [disabled] [ref=e66]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e68]:
+          - generic [ref=e70]:
+            - heading "氏名（フリガナ） 必須の質問" [level=3] [ref=e73]:
+              - generic [ref=e74]: 氏名（フリガナ）
+              - generic "必須の質問" [ref=e75]: "*"
+            - generic [ref=e80]:
+              - textbox "氏名（フリガナ） 必須の質問" [disabled] [ref=e81]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e83]:
+          - generic [ref=e85]:
+            - heading "生年月日 必須の質問" [level=3] [ref=e88]:
+              - generic [ref=e89]: 生年月日
+              - generic "必須の質問" [ref=e90]: "*"
+            - generic "生年月日 必須の質問" [ref=e93]:
+              - generic [ref=e94]: 日付
+              - textbox "日付" [disabled] [ref=e99]
+        - listitem [ref=e101]:
+          - generic [ref=e103]:
+            - heading "性別 必須の質問" [level=3] [ref=e106]:
+              - generic [ref=e107]: 性別
+              - generic "必須の質問" [ref=e108]: "*"
+            - radiogroup "性別 必須の質問" [ref=e111]:
+              - generic [ref=e112]:
+                - generic [ref=e115]:
+                  - generic [ref=e116]:
+                    - radio "男性" [disabled]
+                  - generic [ref=e117]: 男性
+                - generic [ref=e122]:
+                  - generic [ref=e123]:
+                    - radio "女性" [disabled]
+                  - generic [ref=e124]: 女性
+        - listitem [ref=e127]:
+          - generic [ref=e129]:
+            - heading "血液型 必須の質問" [level=3] [ref=e132]:
+              - generic [ref=e133]: 血液型
+              - generic "必須の質問" [ref=e134]: "*"
+            - radiogroup "血液型 必須の質問" [ref=e137]:
+              - generic [ref=e138]:
+                - generic [ref=e141]:
+                  - generic [ref=e142]:
+                    - radio "A型" [disabled]
+                  - generic [ref=e143]: A型
+                - generic [ref=e148]:
+                  - generic [ref=e149]:
+                    - radio "B型" [disabled]
+                  - generic [ref=e150]: B型
+                - generic [ref=e155]:
+                  - generic [ref=e156]:
+                    - radio "O型" [disabled]
+                  - generic [ref=e157]: O型
+                - generic [ref=e162]:
+                  - generic [ref=e163]:
+                    - radio "AB型" [disabled]
+                  - generic [ref=e164]: AB型
+                - generic [ref=e169]:
+                  - generic [ref=e170]:
+                    - radio "不明" [disabled]
+                  - generic [ref=e171]: 不明
+        - listitem [ref=e174]:
+          - generic [ref=e176]:
+            - heading "身長(cm) 必須の質問" [level=3] [ref=e179]:
+              - generic [ref=e180]: 身長(cm)
+              - generic "必須の質問" [ref=e181]: "*"
+            - generic [ref=e186]:
+              - textbox "身長(cm) 必須の質問" [disabled] [ref=e187]
+              - generic [aria-hidden]: 回答を入力
+        - listitem [ref=e189]:
+          - generic [ref=e191]:
+            - heading "体重(kg) 必須の質問" [level=3] [ref=e194]:
+              - generic [ref=e195]: 体重(kg)
+              - generic "必須の質問" [ref=e196]: "*"
+            - generic [ref=e201]:
+              - textbox "体重(kg) 必須の質問" [disabled] [ref=e202]
+              - generic [aria-hidden]: 回答を入力
+      - generic [ref=e204]:
+        - generic [ref=e205]:
+          - button "次へ" [ref=e207] [cursor=pointer]
+          - button "フォームをクリア" [ref=e212] [cursor=pointer]
+        - generic [ref=e216]: Google フォームでパスワードを送信しないでください。
+    - generic [ref=e217]:
+      - generic [ref=e218]:
+        - text: このフォームは 弁護士法人 響 内部で作成されました。
+        - paragraph [ref=e219]:
+          - text: このフォームが不審だと思われる場合
+          - link "報告" [ref=e220] [cursor=pointer]:
+            - /url: https://docs.google.com/forms/d/e/1FAIpQLScYS-J_QCo6FF-hjl3ATXV5FjQtn4-CBM9pb7g_rijLpDr47Q/abuse
+      - link [ref=e222] [cursor=pointer]:
+        - /url: //www.google.com/forms/about/?utm_source=product&utm_medium=forms_logo&utm_campaign=forms
+        - img "Google" [ref=e223]
+        - text: フォーム
+  - generic [ref=e227]:
+    - button "ヘルプとフィードバック" [ref=e228] [cursor=pointer]
+    - tooltip [aria-hidden] [ref=e231]: ヘルプとフィードバック

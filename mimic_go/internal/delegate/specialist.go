@@ -28,6 +28,22 @@ func roleRequireForbidden() bool {
 	return strings.TrimSpace(os.Getenv("MIMIC_ROLE_REQUIRE_FORBIDDEN")) == "1"
 }
 
+// verifyOutcomeFromResult はRunWorkerOnce/runWorkerInWorkroomが組み立てる結果文字列
+// （worker.goのverifySection、"[検証] ✓ 通過しました。"/"[検証] ✗ 失敗(exit=..."）から
+// 「verify_cmdが実際に走ったか」「通過したか」を読み取る。verifyCmd未指定で
+// 検証セクション自体が無い場合はverified=falseを返す——検証されていない実行を
+// SaveSpecialistRoleのPass/Fail記録に混ぜないため。
+func verifyOutcomeFromResult(result string) (verified, passed bool) {
+	switch {
+	case strings.Contains(result, "✓ 通過しました"):
+		return true, true
+	case strings.Contains(result, "✗ 失敗(exit="):
+		return true, false
+	default:
+		return false, false
+	}
+}
+
 // validateSpecialistRole はdelegate_to_specialistのroleを検証する。
 // 問題があればエラー文字列を、問題なければ空文字を返す
 // （Python版 team.py::validate_specialist_role の移植）。
@@ -125,9 +141,11 @@ func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *to
 		for _, skillName := range tools.PopUsedSkills() {
 			tools.RecordSkillOutcome(projectDir, skillName, completed)
 		}
-		// ロール保存は完了した委任のみ（Python版 run_specialist_task の読み取り専用分岐の移植）。
+		// ロール保存はcompletedをverify結果代わりに使う（read-onlyには機械verify_cmdが
+		// 無いため）。以前は成功時のみ保存していたが、失敗も記録することでroles.goの
+		// PassCount/FailCountが機能し、腐敗したロールの再注入を防げるようにする。
+		SaveSpecialistRole(role, "read", completed)
 		if completed {
-			SaveSpecialistRole(role, "read")
 			// 読み取り専用委任の完了で書き込みストリークをリセットする
 			// （Python版 team.py:987 `_note_readonly_delegation()` の移植）。
 			noteReadonlyDelegation()
@@ -142,9 +160,11 @@ func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *to
 		if err != nil {
 			return "", err
 		}
-		// ロール保存は機械検証を通過した委任のみ（自己申告の「完了」では保存しない）。
-		if strings.Contains(result, "✓ 通過しました") {
-			SaveSpecialistRole(role, "execute")
+		// verify_cmdが実際に走った（結果に[検証]セクションがある）場合のみロールを保存する。
+		// verify_cmd未指定で一切検証されていない実行は、成功・失敗どちらの判定材料にも
+		// ならないため対象外（自己申告のみを根拠にPass/Failを記録しない）。
+		if verified, passed := verifyOutcomeFromResult(result); verified {
+			SaveSpecialistRole(role, "execute", passed)
 		}
 		return "[Specialist:実行専用] " + result, nil
 	}
@@ -159,8 +179,8 @@ func RunSpecialistTask(ctx context.Context, client *llm.Client, baseRegistry *to
 		return "", err
 	}
 	setSessionWorker(w, dynamicPrompt, projectDir, verifyCmd, extraWritePaths)
-	if strings.Contains(result, "✓ 通過しました") {
-		SaveSpecialistRole(role, "write")
+	if verified, passed := verifyOutcomeFromResult(result); verified {
+		SaveSpecialistRole(role, "write", passed)
 	}
 	return "[Specialist:実装] " + result + "\n\n(continue_specialistで同じセッションに追加指示を出せます)", nil
 }

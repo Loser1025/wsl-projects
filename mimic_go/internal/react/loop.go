@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -62,6 +63,12 @@ const MaxEmptyRetries = 2
 // （Python版 _MAX_XML_TOOL_RETRIES = 3 を踏襲）。
 const MaxXMLToolRetries = 3
 
+// MaxGateRetries は最終回答ゲートA/B/C（gates.go）が1ターン内で差し戻せる上限回数。
+// 弱いモデルは1回差し戻されても同じ失敗パターンを言い回しを変えて繰り返すことが
+// 多いため、Python版の「1回だけ」より1段階増やし、繰り返しに対する猶予を持たせる
+// （Go版独自の拡張。無限ループ防止のため上限自体は残す）。
+const MaxGateRetries = 2
+
 // ToolActivity はツール呼び出し発生時にUI側へ通知するためのイベント。
 type ToolActivity struct {
 	Name        string
@@ -108,7 +115,7 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 	// （Python版 agent.py::_compact_if_needed の移植。ターン開始時に1回のみ実行。
 	// system_prompt/context_headerのオーバーヘッド分を差し引いた実効しきい値を使う
 	// —— Python版 _effective_threshold の移植）。
-	compactIfNeeded(history, client.ContextLength(), len(systemPrompt), client.SessionCacheKey())
+	compactIfNeeded(history, client.ContextLength(), len(systemPrompt))
 
 	if autoGit != nil {
 		autoGit.Backup(cwd)
@@ -131,9 +138,9 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 
 	repeatFailCounts := make(map[string]int)
 	refusals := 0
-	offloadRetryDone := false
-	unverifiedRetryDone := false
-	verifyGateRetryDone := false
+	offloadRetryCount := 0
+	unverifiedRetryCount := 0
+	verifyGateRetryCount := 0
 	turnHadUnverified := false
 	// directWriteSinceVerify: 直接書き込み（write_file/edit_file/patch_file）成功後、
 	// 検証コマンド（run_bash等）が[SUCCESS]で返るまでtrueのまま保持する（Gate C用）。
@@ -195,9 +202,9 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 			}
 
 			// 最終回答ゲートA: 実行手段を持つのにユーザーへ丸投げしていないか検査する
-			// （1ターンにつき1回だけ差し戻す）。
-			if !offloadRetryDone && detectCommandOffload(result.Text, toolNames) {
-				offloadRetryDone = true
+			// （1ターンにつきMaxGateRetries回まで差し戻す）。
+			if offloadRetryCount < MaxGateRetries && detectCommandOffload(result.Text, toolNames) {
+				offloadRetryCount++
 				*history = append(*history,
 					llm.Message{Role: "assistant", Content: result.Text, SkipSave: true},
 					llm.Message{Role: "user", Content: "[システム] 回答内でユーザーにコマンド実行や手動修正を依頼していますが、" +
@@ -208,9 +215,9 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 			}
 
 			// 最終回答ゲートB: このターン内に「※未検証」の委任結果があったのに
-			// 「完了/解決」と断言していないか検査する（1ターンにつき1回だけ差し戻す）。
-			if !unverifiedRetryDone && detectUnverifiedClaim(result.Text, turnHadUnverified) {
-				unverifiedRetryDone = true
+			// 「完了/解決」と断言していないか検査する（1ターンにつきMaxGateRetries回まで差し戻す）。
+			if unverifiedRetryCount < MaxGateRetries && detectUnverifiedClaim(result.Text, turnHadUnverified) {
+				unverifiedRetryCount++
 				*history = append(*history,
 					llm.Message{Role: "assistant", Content: result.Text, SkipSave: true},
 					llm.Message{Role: "user", Content: "[システム] このターンには「※未検証」の委任結果が含まれていますが、" +
@@ -222,9 +229,9 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 
 			// 最終回答ゲートC: 直接書き込み後に検証コマンドの成功を確認せず
 			// 「完了/解決」と断言していないか検査する（Gate Bの委任専用版を
-			// Director自身の直接編集経路にも適用する。1ターンにつき1回だけ差し戻す）。
-			if !verifyGateRetryDone && detectUnverifiedDirectWrite(result.Text, directWriteSinceVerify) {
-				verifyGateRetryDone = true
+			// Director自身の直接編集経路にも適用する。1ターンにつきMaxGateRetries回まで差し戻す）。
+			if verifyGateRetryCount < MaxGateRetries && detectUnverifiedDirectWrite(result.Text, directWriteSinceVerify) {
+				verifyGateRetryCount++
 				*history = append(*history,
 					llm.Message{Role: "assistant", Content: result.Text, SkipSave: true},
 					llm.Message{Role: "user", Content: "[システム] write_file/edit_file/patch_fileで直接編集を行いましたが、" +
@@ -287,7 +294,7 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 			if vcs.WriteTools[tc.Function.Name] {
 				hasWriteCall = true
 			}
-			if repeatFailCounts[tc.Function.Name+"|"+tc.Function.Arguments] >= MaxRepeatedFailures {
+			if repeatFailCounts[normalizeToolCallKey(tc.Function.Name, tc.Function.Arguments)] >= MaxRepeatedFailures {
 				hasRefusalCandidate = true
 			}
 		}
@@ -340,7 +347,7 @@ func RunTurn(ctx context.Context, client *llm.Client, systemPrompt string,
 		// 各ツールの結果を順序通りに履歴へ反映する（ループブレーカー拒否判定・
 		// stale observation無効化・チェックポイント発火は逐次で行う）。
 		for i, tc := range result.ToolCalls {
-			key := tc.Function.Name + "|" + tc.Function.Arguments
+			key := normalizeToolCallKey(tc.Function.Name, tc.Function.Arguments)
 
 			// ループブレーカー: 同一引数の呼び出しが規定回数失敗済みなら実行せず拒否する
 			// （Python版 _execute_with_intervention の同ロジックを移植）。
@@ -486,6 +493,32 @@ func filterSkipSave(history []llm.Message) []llm.Message {
 		}
 	}
 	return out
+}
+
+// normalizeToolCallKey はループブレーカー(repeatFailCounts)の同一呼び出し判定キーを
+// 生成する。引数JSON中のpath/working_directory/project_dirを絶対パスに正規化してから
+// 再marshalする（encoding/jsonはmapキーをソート済みで出力するため引数順の揺れも
+// 同時に吸収される）。弱いモデルはパス末尾の"/"を付け外ししたり、引数を書く順番を
+// 変えたりするだけで同一の呼び出しを繰り返すことがあり、生JSON文字列の完全一致では
+// ループブレーカーが機能しないケースへの対策。パースに失敗した場合は従来通り
+// 生文字列をキーにフォールバックする。
+func normalizeToolCallKey(name, argsJSON string) string {
+	var args map[string]any
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return name + "|" + argsJSON
+	}
+	for _, k := range []string{"path", "working_directory", "project_dir"} {
+		if s, ok := args[k].(string); ok && s != "" {
+			if abs, err := filepath.Abs(filepath.Clean(s)); err == nil {
+				args[k] = abs
+			}
+		}
+	}
+	normalized, err := json.Marshal(args)
+	if err != nil {
+		return name + "|" + argsJSON
+	}
+	return name + "|" + string(normalized)
 }
 
 // isFailure はツール実行結果が Registry.Call のエラー整形文字列かどうかを判定する

@@ -1,0 +1,316 @@
+- generic [ref=f7e2]:
+  - banner [ref=f7e3]:
+    - heading "사전 문진표" [level=1] [ref=f7e4]
+    - paragraph [ref=f7e5]: 내원 전에 작성해 주시는 사전 문진표입니다. 답변 내용은 진료 목적으로만 사용되며 철저히 관리됩니다.
+  - generic [ref=f7e6]:
+    - group [ref=f7e7]:
+      - generic [ref=f7e8]: 기본 정보
+      - generic [ref=f7e9]:
+        - generic [ref=f7e10]:
+          - generic [ref=f7e11]: 우편번호
+          - generic [ref=f7e12]: 필수
+        - textbox "우편번호 필수" [ref=f7e13]
+      - generic [ref=f7e14]:
+        - generic [ref=f7e15]:
+          - generic [ref=f7e16]: 주소
+          - generic [ref=f7e17]: 필수
+        - textbox "주소 필수" [ref=f7e18]
+      - generic [ref=f7e19]:
+        - generic [ref=f7e20]:
+          - generic [ref=f7e21]: 성명
+          - generic [ref=f7e22]: 필수
+        - textbox "성명 필수" [ref=f7e23]
+      - generic [ref=f7e24]:
+        - generic [ref=f7e25]:
+          - generic [ref=f7e26]: 성명（여권 영문/로마자 표기）
+          - generic [ref=f7e27]: 필수
+        - textbox "성명（여권 영문/로마자 표기） 필수" [ref=f7e28]
+      - generic [ref=f7e29]:
+        - generic [ref=f7e30]:
+          - generic [ref=f7e31]: 생년월일
+          - generic [ref=f7e32]: 필수
+        - textbox "생년월일 필수" [ref=f7e33]
+      - generic [ref=f7e34]:
+        - generic [ref=f7e35]:
+          - generic [ref=f7e36]: 성별
+          - generic [ref=f7e37]: 필수
+        - generic [ref=f7e38]:
+          - generic [ref=f7e39]:
+            - radio "남성" [ref=f7e40] [cursor=pointer]
+            - generic [ref=f7e41]: 남성
+          - generic [ref=f7e42]:
+            - radio "여성" [ref=f7e43] [cursor=pointer]
+            - generic [ref=f7e44]: 여성
+      - generic [ref=f7e45]:
+        - generic [ref=f7e46]:
+          - generic [ref=f7e47]: 혈액형
+          - generic [ref=f7e48]: 필수
+        - generic [ref=f7e49]:
+          - generic [ref=f7e50]:
+            - radio "A형" [ref=f7e51] [cursor=pointer]
+            - generic [ref=f7e52]: A형
+          - generic [ref=f7e53]:
+            - radio "B형" [ref=f7e54] [cursor=pointer]
+            - generic [ref=f7e55]: B형
+          - generic [ref=f7e56]:
+            - radio "O형" [ref=f7e57] [cursor=pointer]
+            - generic [ref=f7e58]: O형
+          - generic [ref=f7e59]:
+            - radio "AB형" [ref=f7e60] [cursor=pointer]
+            - generic [ref=f7e61]: AB형
+          - generic [ref=f7e62]:
+            - radio "불명" [ref=f7e63] [cursor=pointer]
+            - generic [ref=f7e64]: 불명
+      - generic [ref=f7e65]:
+        - generic [ref=f7e66]:
+          - generic [ref=f7e67]: 키(cm)
+          - generic [ref=f7e68]: 필수
+        - textbox "키(cm) 필수" [ref=f7e69]
+      - generic [ref=f7e70]:
+        - generic [ref=f7e71]:
+          - generic [ref=f7e72]: 체중(kg)
+          - generic [ref=f7e73]: 필수
+        - textbox "체중(kg) 필수" [ref=f7e74]
+    - group [ref=f7e75]:
+      - generic [ref=f7e76]: 생활 습관・내원 관련
+      - generic [ref=f7e77]:
+        - generic [ref=f7e78]:
+          - generic [ref=f7e79]: 저희 클리닉에 방문하신 적이 있으신가요? (다른 지점 포함)
+          - generic [ref=f7e80]: 필수
+        - generic [ref=f7e81]:
+          - generic [ref=f7e82]:
+            - radio "이번이 처음" [ref=f7e83] [cursor=pointer]
+            - generic [ref=f7e84]: 이번이 처음
+          - generic [ref=f7e85]:
+            - radio "설명을 들은 적이 있음" [ref=f7e86] [cursor=pointer]
+            - generic [ref=f7e87]: 설명을 들은 적이 있음
+          - generic [ref=f7e88]:
+            - radio "시술을 받은 적이 있음" [ref=f7e89] [cursor=pointer]
+            - generic [ref=f7e90]: 시술을 받은 적이 있음
+      - generic [ref=f7e91]:
+        - generic [ref=f7e92]:
+          - generic [ref=f7e93]: 클리닉을 알게 된 계기는 무엇인가요?
+          - generic [ref=f7e94]: 필수
+        - generic [ref=f7e95]:
+          - generic [ref=f7e96]:
+            - radio "웹 광고" [ref=f7e97] [cursor=pointer]
+            - generic [ref=f7e98]: 웹 광고
+          - generic [ref=f7e99]:
+            - radio "라디오" [ref=f7e100] [cursor=pointer]
+            - generic [ref=f7e101]: 라디오
+          - generic [ref=f7e102]:
+            - radio "흡연실 영상" [ref=f7e103] [cursor=pointer]
+            - generic [ref=f7e104]: 흡연실 영상
+          - generic [ref=f7e105]:
+            - radio "간판" [ref=f7e106] [cursor=pointer]
+            - generic [ref=f7e107]: 간판
+      - generic [ref=f7e108]:
+        - generic [ref=f7e109]:
+          - generic [ref=f7e110]: 아래 치료에 관심이 있으신가요?
+          - generic [ref=f7e111]: 필수（1개 이상）
+        - generic [ref=f7e112]:
+          - generic [ref=f7e113]:
+            - checkbox "다크서클 제거" [ref=f7e114] [cursor=pointer]
+            - generic [ref=f7e115]: 다크서클 제거
+          - generic [ref=f7e116]:
+            - checkbox "쌍꺼풀 수술" [ref=f7e117] [cursor=pointer]
+            - generic [ref=f7e118]: 쌍꺼풀 수술
+          - generic [ref=f7e119]:
+            - checkbox "AGA" [ref=f7e120] [cursor=pointer]
+            - generic [ref=f7e121]: AGA
+          - generic [ref=f7e122]:
+            - checkbox "의료 제모" [ref=f7e123] [cursor=pointer]
+            - generic [ref=f7e124]: 의료 제모
+          - generic [ref=f7e125]:
+            - checkbox "다한증・액취증" [ref=f7e126] [cursor=pointer]
+            - generic [ref=f7e127]: 다한증・액취증
+          - generic [ref=f7e128]:
+            - checkbox "테스토스테론" [ref=f7e129] [cursor=pointer]
+            - generic [ref=f7e130]: 테스토스테론
+          - generic [ref=f7e131]:
+            - checkbox "꽃가루 알레르기" [ref=f7e132] [cursor=pointer]
+            - generic [ref=f7e133]: 꽃가루 알레르기
+          - generic [ref=f7e134]:
+            - checkbox "ED" [ref=f7e135] [cursor=pointer]
+            - generic [ref=f7e136]: ED
+          - generic [ref=f7e137]:
+            - checkbox "의료 다이어트" [ref=f7e138] [cursor=pointer]
+            - generic [ref=f7e139]: 의료 다이어트
+          - generic [ref=f7e140]:
+            - checkbox "특별히 없음" [ref=f7e141] [cursor=pointer]
+            - generic [ref=f7e142]: 특별히 없음
+      - generic [ref=f7e143]:
+        - generic [ref=f7e144]:
+          - generic [ref=f7e145]: 희망하시는 결제 방법이 있으신가요?
+          - generic [ref=f7e146]: 필수
+        - generic [ref=f7e147]:
+          - generic [ref=f7e148]:
+            - radio "카드 결제" [ref=f7e149] [cursor=pointer]
+            - generic [ref=f7e150]: 카드 결제
+          - generic [ref=f7e151]:
+            - radio "은행 송금" [ref=f7e152] [cursor=pointer]
+            - generic [ref=f7e153]: 은행 송금
+    - group [ref=f7e154]:
+      - generic [ref=f7e155]: 현재 증상・기존 병력
+      - generic [ref=f7e156]:
+        - generic [ref=f7e157]:
+          - generic [ref=f7e158]: 현재 증상에 대해 불안한 점, 묻고 싶은 것, 걱정되는 것이 있으면 알려주세요.
+          - generic [ref=f7e159]: 선택
+        - textbox [ref=f7e160]
+      - generic [ref=f7e161]:
+        - generic [ref=f7e162]:
+          - generic [ref=f7e163]: 과거에 큰 질병이나 부상, 수술(암, 교통사고 등) 경험이 있으면 알려주세요
+          - generic [ref=f7e164]: 선택
+        - generic [ref=f7e165]: （병명・치료 내용・나이・수술 여부를 기재해 주세요）
+        - textbox [ref=f7e166]
+      - generic [ref=f7e167]:
+        - generic [ref=f7e168]:
+          - generic [ref=f7e169]: 해당하는 기존 병력이 있으면 알려주세요.
+          - generic [ref=f7e170]: 선택
+        - generic [ref=f7e171]:
+          - generic [ref=f7e172]:
+            - checkbox "대두(콩) 알레르기" [ref=f7e173] [cursor=pointer]
+            - generic [ref=f7e174]: 대두(콩) 알레르기
+          - generic [ref=f7e175]:
+            - checkbox "마취 알레르기" [ref=f7e176] [cursor=pointer]
+            - generic [ref=f7e177]: 마취 알레르기
+          - generic [ref=f7e178]:
+            - checkbox "당뇨병" [ref=f7e179] [cursor=pointer]
+            - generic [ref=f7e180]: 당뇨병
+          - generic [ref=f7e181]:
+            - checkbox "고혈압" [ref=f7e182] [cursor=pointer]
+            - generic [ref=f7e183]: 고혈압
+          - generic [ref=f7e184]:
+            - checkbox "간기능 장애" [ref=f7e185] [cursor=pointer]
+            - generic [ref=f7e186]: 간기능 장애
+          - generic [ref=f7e187]:
+            - checkbox "신장기능 장애" [ref=f7e188] [cursor=pointer]
+            - generic [ref=f7e189]: 신장기능 장애
+          - generic [ref=f7e190]:
+            - checkbox "심장병" [ref=f7e191] [cursor=pointer]
+            - generic [ref=f7e192]: 심장병
+          - generic [ref=f7e193]:
+            - checkbox "천식" [ref=f7e194] [cursor=pointer]
+            - generic [ref=f7e195]: 천식
+          - generic [ref=f7e196]:
+            - checkbox "켈로이드 체질" [ref=f7e197] [cursor=pointer]
+            - generic [ref=f7e198]: 켈로이드 체질
+          - generic [ref=f7e199]:
+            - checkbox "무호흡" [ref=f7e200] [cursor=pointer]
+            - generic [ref=f7e201]: 무호흡
+          - generic [ref=f7e202]:
+            - checkbox "전립선 비대" [ref=f7e203] [cursor=pointer]
+            - generic [ref=f7e204]: 전립선 비대
+          - generic [ref=f7e205]:
+            - checkbox "투석" [ref=f7e206] [cursor=pointer]
+            - generic [ref=f7e207]: 투석
+          - generic [ref=f7e208]:
+            - checkbox "녹내장" [ref=f7e209] [cursor=pointer]
+            - generic [ref=f7e210]: 녹내장
+          - generic [ref=f7e211]:
+            - checkbox "백내장" [ref=f7e212] [cursor=pointer]
+            - generic [ref=f7e213]: 백내장
+          - generic [ref=f7e214]:
+            - checkbox "아토피성 피부염" [ref=f7e215] [cursor=pointer]
+            - generic [ref=f7e216]: 아토피성 피부염
+          - generic [ref=f7e217]:
+            - checkbox "암" [ref=f7e218] [cursor=pointer]
+            - generic [ref=f7e219]: 암
+          - generic [ref=f7e220]:
+            - checkbox "기타 기존 병력" [ref=f7e221] [cursor=pointer]
+            - generic [ref=f7e222]: 기타 기존 병력
+      - generic [ref=f7e223]:
+        - generic [ref=f7e224]:
+          - generic [ref=f7e225]: 신고해주신 지병으로 현재 병원에 다니고 계신가요?
+          - generic [ref=f7e226]: 선택
+        - generic [ref=f7e227]:
+          - generic [ref=f7e228]:
+            - radio "예" [ref=f7e229] [cursor=pointer]
+            - generic [ref=f7e230]: 예
+          - generic [ref=f7e231]:
+            - radio "아니요" [ref=f7e232] [cursor=pointer]
+            - generic [ref=f7e233]: 아니요
+      - generic [ref=f7e234]:
+        - generic [ref=f7e235]:
+          - generic [ref=f7e236]: 현재 복용 중인 약이나 영양제가 있으면 알려주세요.
+          - generic [ref=f7e237]: 선택
+        - textbox "현재 복용 중인 약이나 영양제가 있으면 알려주세요. 선택" [ref=f7e238]
+      - generic [ref=f7e239]:
+        - generic [ref=f7e240]:
+          - generic [ref=f7e241]: 음식이나 약 알레르기가 있으면 알려주세요.
+          - generic [ref=f7e242]: 선택
+        - textbox "음식이나 약 알레르기가 있으면 알려주세요. 선택" [ref=f7e243]
+      - generic [ref=f7e244]:
+        - generic [ref=f7e245]:
+          - generic [ref=f7e246]: 페이스메이커나 금속(플레이트・철사)이 몸에 있으신가요?
+          - generic [ref=f7e247]: 선택
+        - generic [ref=f7e248]:
+          - generic [ref=f7e249]:
+            - radio "예" [ref=f7e250] [cursor=pointer]
+            - generic [ref=f7e251]: 예
+          - generic [ref=f7e252]:
+            - radio "아니요" [ref=f7e253] [cursor=pointer]
+            - generic [ref=f7e254]: 아니요
+      - generic [ref=f7e255]:
+        - generic [ref=f7e256]:
+          - generic [ref=f7e257]: （「암」에 체크하신 분만）현재 치료 중이신가요?
+          - generic [ref=f7e258]: 선택
+        - generic [ref=f7e259]:
+          - generic [ref=f7e260]:
+            - radio "치료 중" [ref=f7e261] [cursor=pointer]
+            - generic [ref=f7e262]: 치료 중
+          - generic [ref=f7e263]:
+            - radio "치료 종료" [ref=f7e264] [cursor=pointer]
+            - generic [ref=f7e265]: 치료 종료
+      - generic [ref=f7e266]:
+        - generic [ref=f7e267]:
+          - generic [ref=f7e268]: （「기타 기존 병력」에 체크하신 분만）병명을 알려주세요.
+          - generic [ref=f7e269]: 선택
+        - textbox [ref=f7e270]
+    - group [ref=f7e271]:
+      - generic [ref=f7e272]: 임신・수유
+      - generic [ref=f7e273]:
+        - generic [ref=f7e274]:
+          - generic [ref=f7e275]: 현재 임신 중 또는 임신을 준비 중이신가요?
+          - generic [ref=f7e276]: 필수
+        - generic [ref=f7e277]:
+          - generic [ref=f7e278]:
+            - radio "예" [ref=f7e279] [cursor=pointer]
+            - generic [ref=f7e280]: 예
+          - generic [ref=f7e281]:
+            - radio "아니요" [ref=f7e282] [cursor=pointer]
+            - generic [ref=f7e283]: 아니요
+      - generic [ref=f7e284]:
+        - generic [ref=f7e285]:
+          - generic [ref=f7e286]: 현재 수유 중이신가요?
+          - generic [ref=f7e287]: 필수
+        - generic [ref=f7e288]:
+          - generic [ref=f7e289]:
+            - radio "예" [ref=f7e290] [cursor=pointer]
+            - generic [ref=f7e291]: 예
+          - generic [ref=f7e292]:
+            - radio "아니요" [ref=f7e293] [cursor=pointer]
+            - generic [ref=f7e294]: 아니요
+      - generic [ref=f7e295]:
+        - generic [ref=f7e296]:
+          - generic [ref=f7e297]: （여성만）현재 피임약을 복용 중이신가요? 복용 중이시면 약 이름을 알려주세요.
+          - generic [ref=f7e298]: 선택
+        - textbox "（여성만）현재 피임약을 복용 중이신가요? 복용 중이시면 약 이름을 알려주세요. 선택" [ref=f7e299]
+      - generic [ref=f7e300]:
+        - generic [ref=f7e301]:
+          - generic [ref=f7e302]: （여성만）출산 경험이 있으신가요?
+          - generic [ref=f7e303]: 선택
+        - generic [ref=f7e304]:
+          - generic [ref=f7e305]:
+            - radio "예" [ref=f7e306] [cursor=pointer]
+            - generic [ref=f7e307]: 예
+          - generic [ref=f7e308]:
+            - radio "아니요" [ref=f7e309] [cursor=pointer]
+            - generic [ref=f7e310]: 아니요
+      - generic [ref=f7e311]:
+        - generic [ref=f7e312]:
+          - generic [ref=f7e313]: 걱정되는 점, 복용 중인 약이 있으면 알려주세요.
+          - generic [ref=f7e314]: 선택
+        - textbox [ref=f7e315]
+    - button "제출하기" [ref=f7e317] [cursor=pointer]
+  - paragraph [ref=f7e318]: 입력하신 개인정보는 진료 목적으로만 사용되며 철저히 관리됩니다.
