@@ -1,0 +1,8 @@
+{
+  "role": "視点: リアルタイム音声認識テキストの後処理を担当するエンジニア。制約: 他のファイル(config.py, audio_capturer.py, translator_engine.py, gui.py, main.py)には一切触れず、新規モジュールzoom_translator/sentence_buffer.pyの作成のみに専念する。zoom_translator/config.pyとは同一ディレクトリのフラットな`from config import Config, default_config`形式でインポートすること。完了基準: zoom_translator/sentence_buffer.pyにSentenceBufferクラスが定義され、(1) __init__(self, config=default_config)で内部バッファ(文字列)と最初のフラグメントを受け取った時刻(time.monotonic())をNoneで初期化、(2) add_fragment(self, text: str) -\u003e Optional[str] メソッドを持ち、textが空文字なら何もせずNoneを返す、テキストをバッファに(既存内容があれば半角スペース区切りで)追加し、初回追加時刻を記録する、その後バッファの末尾がconfig.SENTENCE_END_CHARSに含まれる文字で終わっている場合、またはtime.monotonic()-初回追加時刻がconfig.SENTENCE_MAX_WAIT_SECを超えた場合に、バッファ内容(前後の空白を除去したもの)を返してバッファと時刻をリセットする。それ以外の場合はNoneを返す(まだ文が完成していない)。(3) flush(self) -\u003e Optional[str] メソッドを持ち、バッファが空でなければ現在の内容を返してリセットし、空ならNoneを返す(アプリ終了時などに未完成の断片を出力するため)。日本語コメントで各処理を説明すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T20:33:42+09:00"
+}
