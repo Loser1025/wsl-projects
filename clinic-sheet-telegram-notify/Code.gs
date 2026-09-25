@@ -7,8 +7,9 @@
  *
  * このスプレッドシートへの書き込みはGoogle Sheets API（サービスアカウント）経由で
  * 行われるため、通常のonEdit/onFormSubmitトリガーは発火しません。
- * そのため、インストール型の「変更時（onChange）」トリガーを使い、
- * 各シートの最終行番号を記録・比較する方式で新規行を検知します。
+ * また「変更時（onChange）」トリガーもAPI経由の編集に対して発火しない・遅延することが
+ * あるため、確実性を優先して「1分ごとの時間主導トリガー」でポーリングする方式にしている。
+ * 各シートの最終行番号を記録・比較する方式で新規行を検知する。
  *
  * ==== セットアップ手順 ====
  * 1. 対象スプレッドシートを開く → 拡張機能 → Apps Script
@@ -28,23 +29,16 @@ const TELEGRAM_CHAT_ID = '-1003920328257'; // グループ「SNS連携」（ス�
 const RESERVATION_THREAD_ID = 259; // フォーラム内トピック「予約通知」
 const QUESTIONNAIRE_THREAD_ID = 336; // フォーラム内トピック「問診表回答」
 
-// シート名 → 送信先トピックIDのマッピング
-const SHEET_THREAD_MAP = {
-  '国内': RESERVATION_THREAD_ID,
-  '韓国': RESERVATION_THREAD_ID,
-  '台湾': RESERVATION_THREAD_ID,
-  '問診票': QUESTIONNAIRE_THREAD_ID,
-  '問診票（韓国）': QUESTIONNAIRE_THREAD_ID,
-  '問診票（台湾）': QUESTIONNAIRE_THREAD_ID,
+// シート名 → { 送信先トピックID, 種別ラベル・アイコン } のマッピング
+const SHEET_CONFIG = {
+  '国内': { threadId: RESERVATION_THREAD_ID, icon: '📅', label: '新しい予約' },
+  '韓国': { threadId: RESERVATION_THREAD_ID, icon: '📅', label: '新しい予約' },
+  '台湾': { threadId: RESERVATION_THREAD_ID, icon: '📅', label: '新しい予約' },
+  '問診票': { threadId: QUESTIONNAIRE_THREAD_ID, icon: '🩺', label: '新しい問診回答' },
+  '問診票（韓国）': { threadId: QUESTIONNAIRE_THREAD_ID, icon: '🩺', label: '新しい問診回答' },
+  '問診票（台湾）': { threadId: QUESTIONNAIRE_THREAD_ID, icon: '🩺', label: '新しい問診回答' },
 };
-const SHEET_NAMES = Object.keys(SHEET_THREAD_MAP);
-
-/**
- * インストール型トリガー（onChange）から呼ばれるエントリーポイント。
- */
-function onChangeHandler(e) {
-  checkForNewRows();
-}
+const SHEET_NAMES = Object.keys(SHEET_CONFIG);
 
 /**
  * 各シートの最終行を確認し、前回記録した行数より増えていれば
@@ -80,9 +74,12 @@ function checkForNewRows() {
 
 /**
  * Telegramへ1件分の回答内容を通知する。
+ * シート名に応じて「予約通知」または「問診表回答」トピックへ振り分ける。
  */
 function sendTelegramNotification(sheetName, headers, values) {
-  let message = '📋 新しい回答が届きました（' + sheetName + '）\n\n';
+  const config = SHEET_CONFIG[sheetName] || { threadId: RESERVATION_THREAD_ID, icon: '📋', label: '新しい回答' };
+
+  let message = config.icon + ' ' + config.label + 'が届きました（' + sheetName + '）\n\n';
   for (let i = 0; i < headers.length; i++) {
     const label = headers[i];
     if (!label) continue;
@@ -90,10 +87,12 @@ function sendTelegramNotification(sheetName, headers, values) {
     message += '・' + label + '： ' + value + '\n';
   }
 
+  const threadId = config.threadId;
+
   const url = 'https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage';
   const payload = {
     chat_id: TELEGRAM_CHAT_ID,
-    message_thread_id: TELEGRAM_THREAD_ID,
+    message_thread_id: threadId,
     text: message,
   };
   const options = {
@@ -152,42 +151,49 @@ function initializeLastRows() {
 }
 
 /**
- * 初回セットアップ用：onChangeトリガーを1つ作成する。
- * 既に作成済みの場合は重複しないよう、既存の同名トリガーを削除してから作り直す。
+ * 初回セットアップ用：1分ごとに checkForNewRows を実行する時間主導トリガーを作成する。
+ *
+ * 「変更時（onChange）」トリガーはAPI（サービスアカウント）経由の編集に対して
+ * 発火しない・遅延することがあるため、より確実な時間主導トリガーに切り替えている。
+ * 既に作成済みの場合は重複しないよう、既存の同種トリガーを削除してから作り直す。
  */
 function setupTrigger() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-
   ScriptApp.getProjectTriggers().forEach(function (trigger) {
-    if (trigger.getHandlerFunction() === 'onChangeHandler') {
+    const fn = trigger.getHandlerFunction();
+    if (fn === 'onChangeHandler' || fn === 'checkForNewRows') {
       ScriptApp.deleteTrigger(trigger);
     }
   });
 
-  ScriptApp.newTrigger('onChangeHandler')
-    .forSpreadsheet(ss)
-    .onChange()
+  ScriptApp.newTrigger('checkForNewRows')
+    .timeBased()
+    .everyMinutes(1)
     .create();
 
-  console.log('トリガーを設定しました。');
+  console.log('1分間隔の時間主導トリガーを設定しました。');
 }
 
 /**
- * Telegram連携の動作確認用。手動実行してテストメッセージが届くか確認する。
+ * Telegram連携の動作確認用。手動実行して両トピックにテストメッセージが届くか確認する。
  */
 function testTelegram() {
-  const url = 'https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage';
-  const payload = {
-    chat_id: TELEGRAM_CHAT_ID,
-    message_thread_id: TELEGRAM_THREAD_ID,
-    text: '✅ テスト通知：このメッセージが届けば設定は正しく動作しています。',
-  };
-  const options = {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true,
-  };
-  const response = UrlFetchApp.fetch(url, options);
-  console.log(response.getContentText());
+  [
+    { label: '予約通知', threadId: RESERVATION_THREAD_ID },
+    { label: '問診表回答', threadId: QUESTIONNAIRE_THREAD_ID },
+  ].forEach(function (target) {
+    const url = 'https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage';
+    const payload = {
+      chat_id: TELEGRAM_CHAT_ID,
+      message_thread_id: target.threadId,
+      text: '✅ テスト通知（' + target.label + '）：このメッセージが届けば設定は正しく動作しています。',
+    };
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    };
+    const response = UrlFetchApp.fetch(url, options);
+    console.log(target.label + ': ' + response.getContentText());
+  });
 }
