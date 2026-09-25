@@ -22,10 +22,11 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import default_config
-from audio_capturer import AudioCapturer
+from audio_capturer import AudioCapturer, list_speaker_devices
 from translator_engine import TranslatorEngine
 from sentence_buffer import SentenceBuffer
 from gui import SubtitleWindow
+import settings_store
 
 # ロギングの設定 (自アプリのロガーはINFO)
 logging.basicConfig(
@@ -45,6 +46,61 @@ def main():
 
     # 設定の読み込み
     config = default_config
+    try:
+        settings_store.load_settings(config)
+        logger.info("前回保存された設定をロードしました。")
+    except Exception as e:
+        logger.error(f"設定のロード中にエラーが発生しました: {e}")
+
+    # 設定変更保存時のコールバック関数
+    def on_save_settings(source_lang: str, target_lang: str, device_name: str):
+        """
+        GUIの設定パネルから設定が保存されたときに呼ばれるコールバック。
+        設定をconfigに反映し、永続化し、AudioCapturerを再起動する。
+        """
+        try:
+            logger.info(f"設定保存コールバック受信: source={source_lang}, target={target_lang}, device={device_name}")
+            
+            # 言語ペアが変わったかどうかを判定
+            lang_changed = (config.SOURCE_LANG != source_lang) or (config.TARGET_LANG != target_lang)
+
+            # configの更新
+            config.SOURCE_LANG = source_lang
+            config.TARGET_LANG = target_lang
+            if device_name:
+                config.SPEAKER_DEVICE_NAME = device_name
+            else:
+                config.SPEAKER_DEVICE_NAME = None
+
+            # 設定の永続化
+            settings_store.save_settings(config)
+            logger.info("設定をsettings.jsonに保存しました。")
+
+            # 言語ペアが変わった場合、古い言語設定の残骸が混ざらないようsentence_bufferをフラッシュする
+            if lang_changed:
+                try:
+                    flushed = sentence_buffer.flush()
+                    if flushed:
+                        logger.info(f"言語ペア変更に伴うバッファフラッシュ: {flushed}")
+                except Exception as ex:
+                    logger.error(f"SentenceBufferフラッシュ時にエラー: {ex}")
+
+            # AudioCapturerの再起動 (stop -> start)
+            try:
+                audio_capturer.stop()
+                logger.info("新しい設定を適用するためAudioCapturerを一旦停止しました。")
+            except Exception as ex:
+                logger.error(f"AudioCapturer停止時にエラー: {ex}")
+
+            try:
+                audio_capturer.start()
+                logger.info("新しい設定でAudioCapturerを再起動しました。")
+            except Exception as ex:
+                logger.error(f"AudioCapturer再起動時にエラー: {ex}")
+
+        except Exception as e:
+            logger.error(f"on_save_settings処理中にエラーが発生しました: {e}")
+            logger.debug(traceback.format_exc())
 
     # 各コンポーネントの初期化
     translator_engine = TranslatorEngine(config=config)
@@ -114,7 +170,11 @@ def main():
 
     # SubtitleWindowのインスタンス化
     try:
-        window = SubtitleWindow(config=config)
+        window = SubtitleWindow(
+            config=config,
+            get_devices_fn=list_speaker_devices,
+            save_settings_fn=on_save_settings
+        )
     except Exception as e:
         logger.error(f"SubtitleWindowの初期化に失敗しました: {e}")
         traceback.print_exc()

@@ -369,9 +369,9 @@ class SubtitleWindow:
         # スクリーン解像度やウィンドウサイズの計算
         screen_width = 1920
         screen_height = 1080
-        window_width = 640
-        window_height = 160
-        bottom_margin = 40
+        window_width = self.config.GUI_WINDOW_WIDTH
+        window_height = self.config.GUI_WINDOW_HEIGHT
+        bottom_margin = self.config.GUI_BOTTOM_MARGIN
 
         if PYWEBVIEW_AVAILABLE and hasattr(webview, 'screens') and webview.screens:
             try:
