@@ -6,10 +6,10 @@
     "last_used": "2026-09-25T18:47:55+09:00"
   },
   "/home/loser/wsl-projects": {
-    "cmd": "python3 -m py_compile zoom_translator/audio_capturer.py",
+    "cmd": "python3 -m py_compile zoom_translator/settings_store.py",
     "passes": 1,
     "fails": 0,
-    "last_used": "2026-09-25T21:55:31+09:00"
+    "last_used": "2026-09-25T21:56:23+09:00"
   },
   "/home/loser/wsl-projects/google-workspace-mcp": {
     "cmd": "node -e \"console.log('Full scan up to 10k rows ready')\"",

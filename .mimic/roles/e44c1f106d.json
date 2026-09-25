@@ -1,0 +1,8 @@
+{
+  "role": "視点: Windows音声デバイス列挙を専門とするオーディオエンジニア。制約: 既存のAudioCapturerクラスの実装・インターフェースは一切変更しない。soundcardライブラリのみを使用する。完了基準: zoom_translator/audio_capturer.py に、モジュールレベルの関数 list_speaker_devices() -\u003e list[str] を追加すること。この関数はsoundcard未インストール環境でも例外を投げずに空リストを返す(try/exceptで保護)。sc.all_speakers(include_loopback=True)相当でループバック可能なスピーカーデバイスの名前一覧を取得して返す。取得に失敗した場合も空リストを返す(呼び出し元をクラッシュさせない)。既存のAudioCapturerクラスの定義やimport文、他のロジックには触れない(関数を追記するのみ)。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T21:55:34+09:00"
+}
