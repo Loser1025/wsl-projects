@@ -9,3 +9,11 @@ argostranslate
 
 # 数値配列処理
 numpy
+
+# 発話区切り検出(VAD) - 完全無料・オフライン
+# webrtcvad本家はWindowsでC拡張のビルドが必要(要Visual C++ Build Tools)なため、
+# 同じAPI(import webrtcvad)でビルド済みwheelを配布しているwebrtcvad-wheelsを使う
+webrtcvad-wheels
+
+# デスクトップUI(HTML/CSS/JS描画) - 完全無料
+pywebview

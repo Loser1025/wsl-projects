@@ -30,6 +30,10 @@ pyinstaller --onefile --windowed --name ZoomTranslator ^
     --collect-all argostranslate ^
     --collect-all soundcard ^
     --collect-all numpy ^
+    --collect-all webrtcvad ^
+    --collect-all webview ^
+    --collect-all clr_loader ^
+    --collect-all pythonnet ^
     main.py
 
 if errorlevel 1 (

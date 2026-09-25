@@ -19,11 +19,20 @@ class Config:
     # 音声チャンクの継続時間（秒）
     CHUNK_DURATION_SEC: float = 4.0
 
-    # Whisperモデルサイズ（例: 'tiny', 'base', 'small', 'medium', 'large'）
-    WHISPER_MODEL_SIZE: str = "small"
+    # Whisperモデルサイズ（例: 'tiny', 'base', 'small', 'medium', 'large-v3'）
+    WHISPER_MODEL_SIZE: str = "large-v3"
 
     # Whisperの演算データ型（例: 'int8', 'float16', 'float32'）
     WHISPER_COMPUTE_TYPE: str = "int8"
+
+    # ビームサーチの探索幅（大きいほど精度が上がるが処理が遅くなる）
+    BEAM_SIZE: int = 8
+
+    # VADで切り出した短い音声チャンクで前チャンクの文脈を引きずりハルシネーション（存在しない文の混入）が起きるのを防ぐためFalseにする
+    WHISPER_CONDITION_ON_PREVIOUS_TEXT: bool = False
+
+    # faster-whisper内蔵のVADフィルタで無音区間の誤認識を抑制する
+    WHISPER_VAD_FILTER: bool = True
 
     # 字幕フォントファミリー
     SUBTITLE_FONT_FAMILY: str = "Arial"
