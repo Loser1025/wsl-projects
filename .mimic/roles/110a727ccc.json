@@ -1,0 +1,8 @@
+{
+  "role": "視点: 設定管理を担当するエンジニア。制約: zoom_translator/config.pyの既存Config dataclassのフィールドは一切削除・変更せず、新しいフィールドを追記するだけに専念する。他ファイルには触れない。完了基準: 既存のConfigクラスに以下のフィールドが追加され、default_configインスタンスにも反映されていること。(1) VAD(発話区切り検出)用: VAD_AGGRESSIVENESS(int, 2, webrtcvadの0-3感度)、VAD_FRAME_MS(int, 30, webrtcvadが要求する10/20/30のいずれか)、VAD_SILENCE_MS(int, 500, これ以上無音が続いたら発話区切りとみなすミリ秒)、MAX_SEGMENT_SEC(float, 8.0, 無音が来なくても強制的にチャンクを区切る上限秒数)、MIN_SEGMENT_SEC(float, 0.5, これより短い音声はノイズとして破棄する秒数)。(2) 文単位バッファリング用: SENTENCE_END_CHARS(str, \".?!\", 文末とみなす記号)、SENTENCE_MAX_WAIT_SEC(float, 6.0, 句読点が来なくても強制的に翻訳に回す最大待ち秒数)。(3) GUI用: GUI_WINDOW_WIDTH(int, 900)、GUI_WINDOW_HEIGHT(int, 180)、GUI_BOTTOM_MARGIN(int, 60, 画面下端からの余白px)。各フィールドに日本語コメントで用途を説明すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T20:27:45+09:00"
+}
