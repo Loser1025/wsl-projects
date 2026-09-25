@@ -1,0 +1,8 @@
+{
+  "role": "視点: 完全無料・オフライン動作の音声認識(STT)+翻訳パイプラインを実装するMLエンジニア。制約: STTは`faster-whisper`(pip: faster-whisper)、翻訳は`argos-translate`(pip: argostranslate)のみを使用し、有料APIやAPIキー必須のサービスは一切使わないこと。他モジュール(audio_capturer.py, gui.py)には触れない。zoom_translator/config.pyとは同一ディレクトリのフラットな`from config import Config, default_config`形式でインポートすること(zoom_translator.config形式のドット付き絶対importは使わないこと)。完了基準: zoom_translator/translator_engine.pyにTranslatorEngineクラスが定義され、(1) __init__(self, config=default_config)でconfigを保持しWhisperModelとargos翻訳パッケージの実体はまだロードしない(遅延初期化)、(2) 内部で_load_whisper()と_ensure_argos_package()のようなヘルパーで初回呼び出し時にモデル/言語パッケージをロードする、(3) transcribe_and_translate(self, audio_np: np.ndarray) -\u003e tuple[str, str] を持ち、faster-whisperでaudio_np(float32, config.SAMPLE_RATEのモノラル)からconfig.SOURCE_LANGのテキストを認識し、argos-translateでconfig.SOURCE_LANGからconfig.TARGET_LANGへ翻訳し、(認識結果テキスト, 翻訳結果テキスト)のタプルを返す、という設計になっていること。空/無音チャンクの場合は空文字タプルを返すなど簡単な防御的処理を入れること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T19:27:08+09:00"
+}
