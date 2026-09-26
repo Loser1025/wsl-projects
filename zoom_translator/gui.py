@@ -23,7 +23,7 @@ class _SettingsAPI:
 
     def __init__(
         self,
-        save_settings_fn: Optional[Callable[[str, str, str], None]] = None,
+        save_settings_fn: Optional[Callable[[str, str], None]] = None,
         on_open_settings: Optional[Callable[[], None]] = None,
         on_close_settings: Optional[Callable[[], None]] = None,
     ):
@@ -35,18 +35,18 @@ class _SettingsAPI:
         self._on_open_settings = on_open_settings
         self._on_close_settings = on_close_settings
 
-    def save_settings(self, source_lang: str, target_lang: str, device_name: str) -> None:
+    def save_settings(self, speaker_device: str, mic_device: str) -> None:
         """設定保存コールバックを安全に呼び出す。"""
-        logger.info(f"[_SettingsAPI] save_settings called with source={source_lang}, target={target_lang}, device={device_name}")
+        logger.info(f"[_SettingsAPI] save_settings called with speaker={speaker_device}, mic={mic_device}")
         if self.save_settings_fn:
             try:
-                self.save_settings_fn(source_lang, target_lang, device_name)
+                self.save_settings_fn(speaker_device, mic_device)
             except Exception as e:
                 logger.error(f"Error in save_settings_fn: {e}")
 
     def open_settings_panel(self) -> None:
         """
-        設定パネル表示時に、通常の字幕バー(小さい)では設定項目が収まらないため、
+        設定パネル表示時に、通常の字幕バーでは設定項目が収まらないため、
         ウィンドウ自体を縦方向に拡大する(横幅は字幕バーと同じ幅を維持)。
         """
         if self._on_open_settings:
@@ -65,13 +65,14 @@ class _SettingsAPI:
 
 
 class SubtitleWindow:
-    """pywebviewを使用した画面下部中央固定のロワーサード型字幕表示ウィンドウクラス"""
+    """pywebviewを使用した画面下部中央固定のロワーサード型字幕表示ウィンドウクラス (2段構成: 上段=相手/スピーカー, 下段=あなた/マイク)"""
 
     def __init__(
         self,
         config: Config = default_config,
-        get_devices_fn: Optional[Callable[[], list]] = None,
-        save_settings_fn: Optional[Callable[[str, str, str], None]] = None,
+        get_speaker_devices_fn: Optional[Callable[[], list]] = None,
+        get_mic_devices_fn: Optional[Callable[[], list]] = None,
+        save_settings_fn: Optional[Callable[[str, str], None]] = None,
     ):
         self.config = config
         self.window = None
@@ -81,24 +82,34 @@ class SubtitleWindow:
             logger.error("pywebview is not available. Cannot create SubtitleWindow.")
             return
 
-        # デバイス一覧の取得（get_devices_fnがNoneの場合は空リスト）
-        devices = []
-        if get_devices_fn is not None:
+        # スピーカーデバイス一覧の取得（防御的処理: 失敗や未指定なら空リスト）
+        speaker_devices = []
+        if get_speaker_devices_fn is not None:
             try:
-                devices = get_devices_fn()
-                if not isinstance(devices, list):
-                    devices = list(devices)
+                speaker_devices = get_speaker_devices_fn()
+                if not isinstance(speaker_devices, list):
+                    speaker_devices = list(speaker_devices)
             except Exception as e:
-                logger.error(f"Failed to get devices via get_devices_fn: {e}")
-                devices = []
+                logger.error(f"Failed to get speaker devices via get_speaker_devices_fn: {e}")
+                speaker_devices = []
 
-        devices_json = json.dumps(devices)
-        current_source = getattr(self.config, "SOURCE_LANG", "en")
-        current_target = getattr(self.config, "TARGET_LANG", "ja")
-        current_device = getattr(self.config, "SPEAKER_DEVICE_NAME", "")
+        # マイクデバイス一覧の取得（防御的処理: 失敗や未指定なら空リスト）
+        mic_devices = []
+        if get_mic_devices_fn is not None:
+            try:
+                mic_devices = get_mic_devices_fn()
+                if not isinstance(mic_devices, list):
+                    mic_devices = list(mic_devices)
+            except Exception as e:
+                logger.error(f"Failed to get mic devices via get_mic_devices_fn: {e}")
+                mic_devices = []
 
-        # HTML / CSS / JS のロワーサード型字幕デザインおよび設定パネルオーバーレイ
-        # 字幕バー右上の歯車アイコン「⚙」をクリックすると字幕コンテナを隠し、設定パネルを表示する
+        speaker_devices_json = json.dumps(speaker_devices)
+        mic_devices_json = json.dumps(mic_devices)
+        current_speaker = getattr(self.config, "SPEAKER_DEVICE_NAME", "")
+        current_mic = getattr(self.config, "MIC_DEVICE_NAME", "")
+
+        # HTML / CSS / JS のロワーサード型字幕デザイン(上段=相手/スピーカー、下段=あなた/マイク)および設定パネルオーバーレイ
         html_content = """
         <!DOCTYPE html>
         <html>
@@ -109,7 +120,6 @@ class SubtitleWindow:
                     margin: 0;
                     padding: 0;
                     background-color: transparent;
-                    overflow: hidden;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
                     user-select: none;
                 }
@@ -129,7 +139,7 @@ class SubtitleWindow:
                     -webkit-backdrop-filter: blur(8px);
                     border-radius: 12px;
                     padding: 14px 24px;
-                    text-align: center;
+                    text-align: left;
                     max-width: 95%;
                     width: 1000px;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -138,8 +148,8 @@ class SubtitleWindow:
                 }
                 .settings-btn {
                     position: absolute;
-                    top: 8px;
-                    right: 12px;
+                    top: 10px;
+                    right: 14px;
                     background: transparent;
                     border: none;
                     color: #aaaaaa;
@@ -153,16 +163,42 @@ class SubtitleWindow:
                     color: #ffffff;
                     background: rgba(255, 255, 255, 0.1);
                 }
+                /* 2段構成のセクション共通スタイル */
+                .subtitle-row {
+                    margin-bottom: 10px;
+                }
+                .subtitle-row:last-child {
+                    margin-bottom: 0;
+                }
+                .row-header {
+                    display: flex;
+                    align-items: center;
+                    font-size: 13px;
+                    font-weight: 600;
+                    margin-bottom: 3px;
+                }
+                /* 相手側(スピーカー): 水色系 */
+                .speaker-header {
+                    color: #38bdf8;
+                }
+                /* あなた側(マイク): 緑系 */
+                .mic-header {
+                    color: #4ade80;
+                }
+                .divider {
+                    height: 1px;
+                    background: rgba(255, 255, 255, 0.12);
+                    margin: 10px 0;
+                }
                 .original {
-                    font-size: 14px;
-                    color: #aaaaaa;
-                    margin-bottom: 6px;
+                    font-size: 13px;
+                    color: #9ca3af;
+                    margin-bottom: 4px;
                     line-height: 1.3;
                     word-break: break-word;
                     opacity: 0;
                     transform: translateY(4px);
                     transition: opacity 0.4s ease, transform 0.4s ease;
-                    /* 長文でも固定ウィンドウからはみ出さないよう1行に収め、超過分は省略記号で切る */
                     display: -webkit-box;
                     -webkit-line-clamp: 1;
                     -webkit-box-orient: vertical;
@@ -170,18 +206,16 @@ class SubtitleWindow:
                     text-overflow: ellipsis;
                 }
                 .translated {
-                    font-size: 22px;
+                    font-size: 20px;
                     font-weight: 700;
                     color: #ffffff;
-                    line-height: 1.4;
+                    line-height: 1.35;
                     word-break: break-word;
                     opacity: 0;
                     transform: translateY(4px);
                     transition: opacity 0.4s ease, transform 0.4s ease;
-                    /* 長文でも固定ウィンドウからはみ出さないよう5行に収め、超過分は省略記号で切る
-                       (文字サイズは前の大きさに戻した分、行数を増やして表示できる文字量を増やす) */
                     display: -webkit-box;
-                    -webkit-line-clamp: 5;
+                    -webkit-line-clamp: 3;
                     -webkit-box-orient: vertical;
                     overflow: hidden;
                     text-overflow: ellipsis;
@@ -193,19 +227,20 @@ class SubtitleWindow:
                 /* 設定パネルオーバーレイ */
                 .settings-panel {
                     display: none;
-                    text-align: left;
-                    color: #ffffff;
-                    padding: 4px 8px;
+                    padding: 4px 6px;
                 }
-                .settings-panel h3 {
-                    margin: 0 0 12px 0;
-                    font-size: 16px;
-                    font-weight: 600;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-                    padding-bottom: 6px;
+                .settings-header {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
+                    margin-bottom: 14px;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                    padding-bottom: 8px;
+                }
+                .settings-title {
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: #ffffff;
                 }
                 .close-btn {
                     background: transparent;
@@ -219,7 +254,7 @@ class SubtitleWindow:
                     color: #ffffff;
                 }
                 .form-group {
-                    margin-bottom: 10px;
+                    margin-bottom: 12px;
                 }
                 .form-group label {
                     display: block;
@@ -229,7 +264,7 @@ class SubtitleWindow:
                 }
                 .form-group select {
                     width: 100%;
-                    padding: 6px 8px;
+                    padding: 8px;
                     background: rgba(40, 40, 40, 0.9);
                     border: 1px solid rgba(255, 255, 255, 0.2);
                     border-radius: 6px;
@@ -241,7 +276,7 @@ class SubtitleWindow:
                     display: flex;
                     justify-content: flex-end;
                     gap: 8px;
-                    margin-top: 14px;
+                    margin-top: 16px;
                 }
                 .btn {
                     padding: 6px 14px;
@@ -271,42 +306,45 @@ class SubtitleWindow:
         <body>
             <div class="container">
                 <div class="lower-third">
-                    <button class="settings-btn" id="gear-btn" title="Settings">⚙</button>
-                    
-                    <!-- 字幕表示ビュー -->
+                    <!-- 歯車ボタン (設定を開く) -->
+                    <button class="settings-btn" id="gear-btn" title="設定">&#9881; 設定</button>
+
+                    <!-- 字幕表示ビュー (2段構成) -->
                     <div id="subtitle-view">
-                        <div id="original-text" class="original">Waiting for speech...</div>
-                        <div id="translated-text" class="translated">音声入力を待機中...</div>
+                        <!-- 上段: 相手 (スピーカー側) -->
+                        <div class="subtitle-row">
+                            <div class="row-header speaker-header">🔊 相手 (スピーカー)</div>
+                            <div class="original" id="speaker-original"></div>
+                            <div class="translated" id="speaker-translated"></div>
+                        </div>
+
+                        <!-- 区切り線 -->
+                        <div class="divider"></div>
+
+                        <!-- 下段: あなた (マイク側) -->
+                        <div class="subtitle-row">
+                            <div class="row-header mic-header">🎤 あなた (マイク)</div>
+                            <div class="original" id="mic-original"></div>
+                            <div class="translated" id="mic-translated"></div>
+                        </div>
                     </div>
 
-                    <!-- 設定パネルオーバーレイ -->
+                    <!-- 設定パネルビュー -->
                     <div id="settings-view" class="settings-panel">
-                        <h3>
-                            <span>設定 (Settings)</span>
+                        <div class="settings-header">
+                            <span class="settings-title">⚙ 設定</span>
                             <button class="close-btn" id="panel-close-btn">&times;</button>
-                        </h3>
-                        <div class="form-group">
-                            <label for="source-lang-select">原文言語 (Source Language)</label>
-                            <select id="source-lang-select">
-                                <option value="en">English (en)</option>
-                                <option value="ja">日本語 (ja)</option>
-                                <option value="ko">한국어 (ko)</option>
-                                <option value="zh">中文 (zh)</option>
-                            </select>
                         </div>
                         <div class="form-group">
-                            <label for="target-lang-select">訳文言語 (Target Language)</label>
-                            <select id="target-lang-select">
-                                <option value="en">English (en)</option>
-                                <option value="ja">日本語 (ja)</option>
-                                <option value="ko">한국어 (ko)</option>
-                                <option value="zh">中文 (zh)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="device-select">録音デバイス (Audio Device)</label>
-                            <select id="device-select">
+                            <label for="speaker-device-select">スピーカー (相手の声) デバイス</label>
+                            <select id="speaker-device-select">
                                 <option value="">自動 (Default Loopback)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="mic-device-select">マイク (あなたの声) デバイス</label>
+                            <select id="mic-device-select">
+                                <option value="">自動 (Default Microphone)</option>
                             </select>
                         </div>
                         <div class="form-actions">
@@ -318,33 +356,42 @@ class SubtitleWindow:
             </div>
 
             <script>
-                // デバイス一覧をJavaScriptに埋め込み
-                const availableDevices = __DEVICES_JSON__;
-                const currentSource = __CURRENT_SOURCE__;
-                const currentTarget = __CURRENT_TARGET__;
-                const currentDevice = __CURRENT_DEVICE__;
+                const speakerDevices = __SPEAKER_DEVICES_JSON__;
+                const micDevices = __MIC_DEVICES_JSON__;
+                const currentSpeaker = __CURRENT_SPEAKER__;
+                const currentMic = __CURRENT_MIC__;
 
-                // 初期選択の反映
                 document.addEventListener('DOMContentLoaded', () => {
-                    const srcSel = document.getElementById('source-lang-select');
-                    const tgtSel = document.getElementById('target-lang-select');
-                    const devSel = document.getElementById('device-select');
+                    const speakerSel = document.getElementById('speaker-device-select');
+                    const micSel = document.getElementById('mic-device-select');
 
-                    if (srcSel) srcSel.value = currentSource;
-                    if (tgtSel) tgtSel.value = currentTarget;
+                    // スピーカーデバイス選択肢の構築
+                    if (speakerSel) {
+                        speakerDevices.forEach(dev => {
+                            const opt = document.createElement('option');
+                            opt.value = dev;
+                            opt.textContent = dev;
+                            if (dev === currentSpeaker) {
+                                opt.selected = true;
+                            }
+                            speakerSel.appendChild(opt);
+                        });
+                    }
 
-                    // デバイス選択肢の構築
-                    availableDevices.forEach(dev => {
-                        const opt = document.createElement('option');
-                        opt.value = dev;
-                        opt.textContent = dev;
-                        if (dev === currentDevice) {
-                            opt.selected = true;
-                        }
-                        devSel.appendChild(opt);
-                    });
+                    // マイクデバイス選択肢の構築
+                    if (micSel) {
+                        micDevices.forEach(dev => {
+                            const opt = document.createElement('option');
+                            opt.value = dev;
+                            opt.textContent = dev;
+                            if (dev === currentMic) {
+                                opt.selected = true;
+                            }
+                            micSel.appendChild(opt);
+                        });
+                    }
 
-                    // 歯車ボタンクリックで設定パネルを表示(ウィンドウ自体も操作可能なサイズへ拡大)
+                    // 設定パネルを開く
                     document.getElementById('gear-btn').addEventListener('click', () => {
                         document.getElementById('subtitle-view').style.display = 'none';
                         document.getElementById('settings-view').style.display = 'block';
@@ -353,7 +400,7 @@ class SubtitleWindow:
                         }
                     });
 
-                    // 閉じる・キャンセルボタンで字幕表示に戻す(ウィンドウも元のサイズへ)
+                    // 設定パネルを閉じる
                     const closePanel = () => {
                         document.getElementById('settings-view').style.display = 'none';
                         document.getElementById('subtitle-view').style.display = 'block';
@@ -365,54 +412,76 @@ class SubtitleWindow:
                     document.getElementById('panel-close-btn').addEventListener('click', closePanel);
                     document.getElementById('cancel-btn').addEventListener('click', closePanel);
 
-                    // 保存ボタンクリック
-                    document.getElementById('save-btn').addEventListener('click', async () => {
-                        const sourceLang = srcSel.value;
-                        const targetLang = tgtSel.value;
-                        const deviceName = devSel.value;
+                    // 保存ボタン押下
+                    document.getElementById('save-btn').addEventListener('click', () => {
+                        const speakerVal = speakerSel ? speakerSel.value : '';
+                        const micVal = micSel ? micSel.value : '';
 
-                        try {
-                            if (window.pywebview && window.pywebview.api) {
-                                await window.pywebview.api.save_settings(sourceLang, targetLang, deviceName);
-                            } else {
-                                console.log('pywebview.api not available, simulated save:', sourceLang, targetLang, deviceName);
-                            }
-                        } catch (e) {
-                            console.error('Failed to save settings:', e);
+                        if (window.pywebview && window.pywebview.api) {
+                            window.pywebview.api.save_settings(speakerVal, micVal);
                         }
-
                         closePanel();
                     });
                 });
 
-                function updateSubtitle(original, translated) {
-                    const origEl = document.getElementById('original-text');
-                    const transEl = document.getElementById('translated-text');
+                // 上段 (相手/スピーカー) 字幕更新用関数
+                function updateSpeakerSubtitle(original, translated) {
+                    const origEl = document.getElementById('speaker-original');
+                    const transEl = document.getElementById('speaker-translated');
 
-                    // 一旦フェードアウト
-                    origEl.classList.remove('fade-in');
-                    transEl.classList.remove('fade-in');
+                    if (origEl) {
+                        origEl.textContent = original || '';
+                        if (original && original.trim() !== '') {
+                            origEl.classList.add('fade-in');
+                        } else {
+                            origEl.classList.remove('fade-in');
+                        }
+                    }
 
-                    setTimeout(() => {
-                        origEl.textContent = original;
-                        transEl.textContent = translated;
+                    if (transEl) {
+                        transEl.textContent = translated || '';
+                        if (translated && translated.trim() !== '') {
+                            transEl.classList.add('fade-in');
+                        } else {
+                            transEl.classList.remove('fade-in');
+                        }
+                    }
+                }
 
-                        // フェードイン
-                        origEl.classList.add('fade-in');
-                        transEl.classList.add('fade-in');
-                    }, 50);
+                // 下段 (あなた/マイク) 字幕更新用関数
+                function updateMicSubtitle(original, translated) {
+                    const origEl = document.getElementById('mic-original');
+                    const transEl = document.getElementById('mic-translated');
+
+                    if (origEl) {
+                        origEl.textContent = original || '';
+                        if (original && original.trim() !== '') {
+                            origEl.classList.add('fade-in');
+                        } else {
+                            origEl.classList.remove('fade-in');
+                        }
+                    }
+
+                    if (transEl) {
+                        transEl.textContent = translated || '';
+                        if (translated && translated.trim() !== '') {
+                            transEl.classList.add('fade-in');
+                        } else {
+                            transEl.classList.remove('fade-in');
+                        }
+                    }
                 }
             </script>
         </body>
         </html>
         """
 
-        # プレースホルダーを置換
         html_content = (
-            html_content.replace("__DEVICES_JSON__", devices_json)
-            .replace("__CURRENT_SOURCE__", json.dumps(current_source))
-            .replace("__CURRENT_TARGET__", json.dumps(current_target))
-            .replace("__CURRENT_DEVICE__", json.dumps(current_device))
+            html_content
+            .replace("__SPEAKER_DEVICES_JSON__", speaker_devices_json)
+            .replace("__MIC_DEVICES_JSON__", mic_devices_json)
+            .replace("__CURRENT_SPEAKER__", json.dumps(current_speaker))
+            .replace("__CURRENT_MIC__", json.dumps(current_mic))
         )
 
         # スクリーン解像度やウィンドウサイズの計算
@@ -442,8 +511,8 @@ class SubtitleWindow:
         self.bottom_margin = bottom_margin
         self.x_coord = x_coord
         self.y_coord = y_coord
-        # 設定パネル(言語ペア2つ+デバイス選択+ボタン)が収まる高さ。横幅は字幕バーと同じに保つ
-        self.settings_panel_height = 420
+        # 設定パネル(デバイス選択2つ+ボタン等)が収まる高さ。横幅は字幕バーと同じに保つ
+        self.settings_panel_height = 340
 
         # 設定パネルの開閉時にウィンドウをリサイズ/移動するクロージャ。
         # self(SubtitleWindow)を直接js_apiの属性として持たせるとpywebviewが
@@ -482,25 +551,36 @@ class SubtitleWindow:
                 y=y_coord,
                 js_api=settings_api,
             )
-            logger.info("SubtitleWindow created successfully with settings API.")
+            logger.info("SubtitleWindow created successfully with settings API (2-row layout).")
         except Exception as e:
             logger.error(f"Failed to create pywebview window: {e}")
             self.window = None
 
-    def update_subtitle(self, original: str, translated: str) -> None:
-        """字幕の原文と訳文を更新する。JavaScriptのupdateSubtitle関数を呼び出す。"""
+    def update_speaker_subtitle(self, original: str, translated: str) -> None:
+        """上段 (相手/スピーカー) の字幕原文と訳文を更新する。JavaScriptのupdateSpeakerSubtitle関数を呼び出す。"""
         if not PYWEBVIEW_AVAILABLE or not self.window:
             return
 
         try:
-            # json.dumpsで適切にエスケープしてXSSや構文崩れを防ぐ
             orig_json = json.dumps(original if original else "")
             trans_json = json.dumps(translated if translated else "")
-            js_code = f"updateSubtitle({orig_json}, {trans_json});"
+            js_code = f"updateSpeakerSubtitle({orig_json}, {trans_json});"
             self.window.evaluate_js(js_code)
         except Exception as e:
-            # 呼び出し元をクラッシュさせないよう例外を握りつぶしてログ出力に留める
-            logger.debug(f"Failed to evaluate JS for subtitle update: {e}")
+            logger.debug(f"Failed to evaluate JS for speaker subtitle update: {e}")
+
+    def update_mic_subtitle(self, original: str, translated: str) -> None:
+        """下段 (あなた/マイク) の字幕原文と訳文を更新する。JavaScriptのupdateMicSubtitle関数を呼び出す。"""
+        if not PYWEBVIEW_AVAILABLE or not self.window:
+            return
+
+        try:
+            orig_json = json.dumps(original if original else "")
+            trans_json = json.dumps(translated if translated else "")
+            js_code = f"updateMicSubtitle({orig_json}, {trans_json});"
+            self.window.evaluate_js(js_code)
+        except Exception as e:
+            logger.debug(f"Failed to evaluate JS for mic subtitle update: {e}")
 
     def run(self, on_ready: Optional[Callable[[], None]] = None) -> None:
         """ウィンドウのイベントループを開始する。on_readyが指定されていれば別スレッドで実行する。"""
@@ -510,7 +590,6 @@ class SubtitleWindow:
 
         if on_ready:
             def _run_with_ready():
-                # ウィンドウ表示後に別スレッドでon_readyを実行するpywebview標準パターン
                 import time
                 time.sleep(0.5)
                 try:
@@ -540,37 +619,48 @@ class SubtitleWindow:
 if __name__ == "__main__":
     import time
 
-    print("=== SubtitleWindow 単体テスト実行 ===")
+    print("=== SubtitleWindow 単体テスト実行 (2段構成) ===")
 
-    def dummy_get_devices():
-        return ["Speakers (Realtek High Definition Audio)", "Virtual Audio Cable", "Zoom Audio Device"]
+    def dummy_get_speaker_devices():
+        return ["Speakers (Realtek Audio)", "Virtual Audio Cable"]
 
-    def dummy_save_settings(source_lang: str, target_lang: str, device_name: str):
-        print(f"[テスト保存コールバック成功] source={source_lang}, target={target_lang}, device={device_name}")
+    def dummy_get_mic_devices():
+        return ["Microphone (Realtek Audio)", "USB Microphone"]
+
+    def dummy_save_settings(speaker_device: str, mic_device: str):
+        print(f"[テスト保存コールバック成功] speaker={speaker_device}, mic={mic_device}")
 
     app = SubtitleWindow(
         config=default_config,
-        get_devices_fn=dummy_get_devices,
+        get_speaker_devices_fn=dummy_get_speaker_devices,
+        get_mic_devices_fn=dummy_get_mic_devices,
         save_settings_fn=dummy_save_settings,
     )
 
     def dummy_sequence():
         time.sleep(2.0)
-        print("-> ダミー字幕1を表示")
-        app.update_subtitle(
-            "Hello world, this is a test of pywebview lower third subtitle.",
-            "こんにちは世界、これはpywebviewロワーサード字幕のテストです。",
+        print("-> 上段(相手)にダミー字幕を表示")
+        app.update_speaker_subtitle(
+            "Hello from the speaker side!",
+            "スピーカー側からのこんにちは！",
+        )
+
+        time.sleep(3.0)
+        print("-> 下段(あなた)にダミー字幕を表示")
+        app.update_mic_subtitle(
+            "Hello from the microphone side!",
+            "マイク側からのこんにちは！",
         )
 
         time.sleep(4.0)
-        print("-> ダミー字幕2を表示")
-        app.update_subtitle(
-            "Real-time translation makes international meetings much easier.",
-            "リアルタイム翻訳により国際会議がはるかに簡単になります。",
+        print("-> 上段・下段を同時更新テスト")
+        app.update_speaker_subtitle(
+            "How is the meeting going?",
+            "会議の進捗はいかがですか？",
         )
-
-        time.sleep(5.0)
-        print("-> ダミー字幕3を表示")
-        app.update_subtitle("Enjoy your seamless communication experience!", "シームレスなコミュニケーション体験をお楽しみください！")
+        app.update_mic_subtitle(
+            "Everything is going very well.",
+            "すべて順調に進んでいます。",
+        )
 
     app.run(on_ready=dummy_sequence)

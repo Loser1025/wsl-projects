@@ -225,9 +225,9 @@ class AudioCapturer:
                                             try:
                                                 self.on_chunk(combined_segment)
                                             except Exception as e:
-                                                print(f"[AudioCapturer Error] Exception in on_chunk callback: {e}")
+                                                print(f"[AudioCapturer {prefix} Error] Exception in on_chunk callback: {e}")
                                     else:
-                                        print(f"[AudioCapturer] Discarded short segment (duration: {len(combined_segment)/sample_rate:.2f}s < {min_segment_sec}s)")
+                                        print(f"[AudioCapturer {prefix}] Discarded short segment (duration: {len(combined_segment)/sample_rate:.2f}s < {min_segment_sec}s)")
 
                                 # バッファ・状態のリセット
                                 segment_frames = []
@@ -240,7 +240,7 @@ class AudioCapturer:
 
                     # (2) 最大秒数 MAX_SEGMENT_SEC を超えた場合のフェイルセーフ
                     if in_speech and current_segment_duration >= max_segment_sec:
-                        print(f"[AudioCapturer] Max segment duration ({max_segment_sec}s) reached. Forcing chunk emission.")
+                        print(f"[AudioCapturer {prefix}] Max segment duration ({max_segment_sec}s) reached. Forcing chunk emission.")
                         if segment_frames:
                             combined_segment = np.concatenate(segment_frames)
                             if len(combined_segment) >= int(sample_rate * min_segment_sec):
@@ -248,18 +248,42 @@ class AudioCapturer:
                                     try:
                                         self.on_chunk(combined_segment)
                                     except Exception as e:
-                                        print(f"[AudioCapturer Error] Exception in on_chunk callback: {e}")
+                                        print(f"[AudioCapturer {prefix} Error] Exception in on_chunk callback: {e}")
                         segment_frames = []
                         in_speech = False
                         silent_frames_count = 0
                         current_segment_duration = 0.0
 
         except Exception as e:
-            print(f"[AudioCapturer Error] Exception in capture loop: {e}")
+            print(f"[AudioCapturer {prefix} Error] Exception in capture loop: {e}")
         finally:
             # 停止時に未処理のバッファがあれば必要に応じてフラッシュ（オプション、今回は破棄または処理）
             self._running = False
-            print("[AudioCapturer] VAD recording stopped.")
+            print(f"[AudioCapturer {prefix}] VAD recording stopped.")
+
+
+def list_speaker_devices() -> list[str]:
+    """
+    soundcardライブラリを使用してループバック対応スピーカーデバイスの名前一覧を取得する。
+    soundcard未インストール環境や取得失敗時は例外を投げずに空リストを返す。
+
+    Returns:
+        list[str]: スピーカー(ループバック)デバイス名のリスト
+    """
+    if sc is None:
+        return []
+    try:
+        devices = sc.all_microphones(include_loopback=True)
+        names = []
+        for dev in devices:
+            if hasattr(dev, 'name') and dev.name:
+                names.append(dev.name)
+            elif isinstance(dev, str):
+                names.append(dev)
+        return names
+    except Exception as e:
+        print(f"[AudioCapturer Error] Failed to list speaker devices: {e}")
+        return []
 
 
 def list_microphone_devices() -> list[str]:
