@@ -1,0 +1,36 @@
+[
+  {
+    "route": "/",
+    "firstLoadUncompressedJsBytes": 460710,
+    "firstLoadChunkPaths": [
+      "dist_next/static/chunks/3fntmmi971322.js",
+      "dist_next/static/chunks/3vsp-idu01y4o.js",
+      "dist_next/static/chunks/1f3e43dzvvblh.js",
+      "dist_next/static/chunks/0cegfsgm6lvdz.js",
+      "dist_next/static/chunks/0bma92pht_c97.js",
+      "dist_next/static/chunks/turbopack-275qii7efuy1r.js"
+    ]
+  },
+  {
+    "route": "/_not-found",
+    "firstLoadUncompressedJsBytes": 453121,
+    "firstLoadChunkPaths": [
+      "dist_next/static/chunks/3fntmmi971322.js",
+      "dist_next/static/chunks/1f3e43dzvvblh.js",
+      "dist_next/static/chunks/0cegfsgm6lvdz.js",
+      "dist_next/static/chunks/0bma92pht_c97.js",
+      "dist_next/static/chunks/turbopack-275qii7efuy1r.js"
+    ]
+  },
+  {
+    "route": "/login",
+    "firstLoadUncompressedJsBytes": 453121,
+    "firstLoadChunkPaths": [
+      "dist_next/static/chunks/3fntmmi971322.js",
+      "dist_next/static/chunks/1f3e43dzvvblh.js",
+      "dist_next/static/chunks/0cegfsgm6lvdz.js",
+      "dist_next/static/chunks/0bma92pht_c97.js",
+      "dist_next/static/chunks/turbopack-275qii7efuy1r.js"
+    ]
+  }
+]

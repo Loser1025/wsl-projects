@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  distDir: ".next_build",
+  distDir: "dist_next",
+  serverExternalPackages: ["googleapis", "google-auth-library"],
 };
 
 export default nextConfig;
