@@ -13,7 +13,8 @@ class Config:
     # 翻訳エンジンの選択（"nllb": NLLB-200で直接翻訳(推奨・高品質) / "argos": argos-translateのみ使用）
     TRANSLATION_ENGINE: str = "nllb"
     # NLLB-200のctranslate2変換済みモデル(HuggingFace Hub上のリポジトリ名)
-    NLLB_MODEL_REPO: str = "michaelfeil/ct2fast-nllb-200-distilled-600M"
+    # 実在確認済み: ct2-transformers-converterでfacebook/nllb-200-distilled-600Mから変換されたint8量子化版
+    NLLB_MODEL_REPO: str = "JustFrederik/nllb-200-distilled-600M-ct2-int8"
     # NLLBのトークナイザ取得元(オリジナルのtransformersリポジトリ)
     NLLB_TOKENIZER_REPO: str = "facebook/nllb-200-distilled-600M"
     # NLLBのCPU推論時の量子化タイプ
@@ -69,8 +70,9 @@ class Config:
     VAD_FRAME_MS: int = 30
     # 無音がこのミリ秒以上続いたら発話区切りとみなす
     VAD_SILENCE_MS: int = 500
-    # 無音が来なくても強制的にチャンクを区切る上限秒数
-    MAX_SEGMENT_SEC: float = 8.0
+    # 無音が来なくても強制的にチャンクを区切る上限秒数。
+    # 8秒だと体感の遅延が大きいため5秒に短縮(その分、文が途中で切られやすくなるトレードオフ)
+    MAX_SEGMENT_SEC: float = 5.0
     # これより短い音声はノイズとして破棄する秒数
     MIN_SEGMENT_SEC: float = 0.5
 
@@ -85,9 +87,9 @@ class Config:
 
     # --- GUI関連設定 ---
     # GUIウィンドウの幅（px）
-    GUI_WINDOW_WIDTH: int = 900
+    GUI_WINDOW_WIDTH: int = 1100
     # GUIウィンドウの高さ（px）
-    GUI_WINDOW_HEIGHT: int = 180
+    GUI_WINDOW_HEIGHT: int = 260
     # 画面下端からの余白（px）
     GUI_BOTTOM_MARGIN: int = 60
 

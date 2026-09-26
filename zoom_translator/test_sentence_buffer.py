@@ -50,3 +50,27 @@ def test_flush():
     buf.add_fragment("Incomplete sentence")
     assert buf.flush() == "Incomplete sentence"
     assert buf.flush() is None
+
+
+def test_peek():
+    config = Config()
+    buf = SentenceBuffer(config)
+
+    # 空バッファの場合
+    assert buf.peek() is None
+
+    # 断片追加後（まだ文完成前）
+    buf.add_fragment("  Hello  ")
+    assert buf.peek() == "Hello"
+    # peekしても内部バッファや状態が変わっていないことを確認（副作用なし）
+    assert buf.peek() == "Hello"
+    assert buf._buffer == "Hello"
+
+    # さらに追加
+    buf.add_fragment("world")
+    assert buf.peek() == "Hello world"
+
+    # flushしたらpeekもNoneになる
+    assert buf.flush() == "Hello world"
+    assert buf.peek() is None
+

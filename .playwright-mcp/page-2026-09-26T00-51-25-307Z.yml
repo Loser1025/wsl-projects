@@ -1,0 +1,84 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - img [ref=e5]:
+      - generic [ref=e30]: calling
+      - generic [ref=e67]:
+        - generic [ref=e68]: オンライン診療
+        - generic [ref=e69]: 自宅で完結。全国対応。
+  - main [ref=e70]:
+    - generic [ref=e71]:
+      - generic [ref=e72]:
+        - generic [ref=e73]:
+          - generic [ref=e74]: お名前（漢字）
+          - generic [ref=e75]: 必須
+        - textbox "お名前（漢字）" [ref=e76]:
+          - /placeholder: 例）銀座 花子
+      - generic [ref=e77]:
+        - generic [ref=e78]:
+          - generic [ref=e79]: フリガナ
+          - generic [ref=e80]: 必須
+        - textbox "フリガナ" [ref=e81]:
+          - /placeholder: 例）ギンザ ハナコ
+      - generic [ref=e82]:
+        - generic [ref=e83]:
+          - generic [ref=e84]: お電話番号
+          - generic [ref=e85]: 必須
+        - textbox "お電話番号" [ref=e86]:
+          - /placeholder: 例）090-1234-5678
+      - generic [ref=e87]:
+        - generic [ref=e88]:
+          - generic [ref=e89]: メールアドレス
+          - generic [ref=e90]: 必須
+        - textbox "メールアドレス" [ref=e91]:
+          - /placeholder: 例）counseling@example.com
+      - generic [ref=e92]:
+        - generic [ref=e93]:
+          - generic [ref=e94]: ご希望の診察形式
+          - generic [ref=e95]: 必須
+        - generic [ref=e96]:
+          - generic [ref=e97] [cursor=pointer]:
+            - radio "オンライン診察（ご自宅等から受診）" [ref=e98]
+            - generic [ref=e99]: オンライン診察（ご自宅等から受診）
+          - generic [ref=e100] [cursor=pointer]:
+            - radio "対面診察（クリニックへ来院）" [ref=e101]
+            - generic [ref=e102]: 対面診察（クリニックへ来院）
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - generic [ref=e105]: ご希望メニュー
+          - generic [ref=e106]: 必須
+        - generic [ref=e107]: 各カテゴリの「料金表を見る」から、ご希望の商材を1つ以上選択してください（複数選択可）。決めきれない場合は「カウンセリングにて決めたい」をお選びください。
+        - generic [ref=e108]:
+          - button "医療ダイエット" [ref=e110] [cursor=pointer]
+          - button "ED・男性ホルモン" [ref=e116] [cursor=pointer]
+          - button "AGA・頭皮ケア" [ref=e122] [cursor=pointer]
+          - button "美容内服" [ref=e128] [cursor=pointer]
+      - generic [ref=e133]:
+        - generic [ref=e134]:
+          - generic [ref=e135]: ご希望日時
+          - generic [ref=e136]: 必須
+        - generic [ref=e137]: スムーズな日程調整のため、第1〜第3ご希望日時をすべてご選択ください。受付時間は9:00〜19:00開始です（現在時刻の2時間後以降でご予約可能）。
+        - generic [ref=e138]:
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - generic [ref=e141]: 第1ご希望日時
+              - generic [ref=e142]: 必須
+            - textbox [ref=e143]
+          - generic [ref=e144]:
+            - generic [ref=e145]:
+              - generic [ref=e146]: 第2ご希望日時
+              - generic [ref=e147]: 必須
+            - textbox [ref=e148]
+          - generic [ref=e149]:
+            - generic [ref=e150]:
+              - generic [ref=e151]: 第3ご希望日時
+              - generic [ref=e152]: 必須
+            - textbox [ref=e153]
+      - generic [ref=e154]:
+        - generic [ref=e155]:
+          - generic [ref=e156]: ご質問・ご不安な点
+          - generic [ref=e157]: 任意
+        - textbox "ご質問・ご不安な点" [ref=e158]:
+          - /placeholder: アレルギーの有無やダウンタイムのご希望など、気になる点がございましたらご自由にご記入ください。
+      - generic [ref=e159]:
+        - button "診察を予約する" [ref=e160] [cursor=pointer]
+        - paragraph [ref=e164]: ※ ご入力いただいた個人情報は予約管理のみに使用し、厳重に管理いたします。

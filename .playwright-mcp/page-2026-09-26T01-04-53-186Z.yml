@@ -1,0 +1,156 @@
+- generic [ref=f1e2]:
+  - banner [ref=f1e3]:
+    - img [ref=f1e5]:
+      - generic [ref=f1e30]: calling
+      - generic [ref=f1e67]:
+        - generic [ref=f1e68]: オンライン診療
+        - generic [ref=f1e69]: 自宅で完結。全国対応。
+  - main [ref=f1e70]:
+    - generic [ref=f1e71]:
+      - generic [ref=f1e72]:
+        - generic [ref=f1e73]:
+          - generic [ref=f1e74]: お名前（漢字）
+          - generic [ref=f1e75]: 必須
+        - textbox "お名前（漢字）" [ref=f1e76]:
+          - /placeholder: 例）銀座 花子
+      - generic [ref=f1e77]:
+        - generic [ref=f1e78]:
+          - generic [ref=f1e79]: フリガナ
+          - generic [ref=f1e80]: 必須
+        - textbox "フリガナ" [ref=f1e81]:
+          - /placeholder: 例）ギンザ ハナコ
+      - generic [ref=f1e82]:
+        - generic [ref=f1e83]:
+          - generic [ref=f1e84]: お電話番号
+          - generic [ref=f1e85]: 必須
+        - textbox "お電話番号" [ref=f1e86]:
+          - /placeholder: 例）090-1234-5678
+      - generic [ref=f1e87]:
+        - generic [ref=f1e88]:
+          - generic [ref=f1e89]: メールアドレス
+          - generic [ref=f1e90]: 必須
+        - textbox "メールアドレス" [ref=f1e91]:
+          - /placeholder: 例）counseling@example.com
+      - generic [ref=f1e92]:
+        - generic [ref=f1e93]:
+          - generic [ref=f1e94]: ご希望の診察形式
+          - generic [ref=f1e95]: 必須
+        - generic [ref=f1e96]:
+          - generic [ref=f1e97] [cursor=pointer]:
+            - radio "オンライン診察（ご自宅等から受診）" [ref=f1e98]
+            - generic [ref=f1e99]: オンライン診察（ご自宅等から受診）
+          - generic [ref=f1e100] [cursor=pointer]:
+            - radio "対面診察（クリニックへ来院）" [ref=f1e101]
+            - generic [ref=f1e102]: 対面診察（クリニックへ来院）
+      - generic [ref=f1e103]:
+        - generic [ref=f1e104]:
+          - generic [ref=f1e105]: ご希望メニュー
+          - generic [ref=f1e106]: 必須
+        - generic [ref=f1e107]: 各カテゴリの「料金表を見る」から、ご希望の商材を1つ以上選択してください（複数選択可）。決めきれない場合は「カウンセリングにて決めたい」をお選びください。
+        - generic [ref=f1e108]:
+          - button "医療ダイエット" [ref=f1e110] [cursor=pointer]
+          - button "ED・男性ホルモン" [ref=f1e116] [cursor=pointer]
+          - button "AGA・頭皮ケア" [ref=f1e122] [cursor=pointer]
+          - button "美容内服" [ref=f1e128] [cursor=pointer]
+      - generic [ref=f1e133]:
+        - generic [ref=f1e134]:
+          - generic [ref=f1e135]: ご希望日時
+          - generic [ref=f1e136]: 必須
+        - generic [ref=f1e137]: スムーズな日程調整のため、第1〜第3ご希望日時をすべてご選択ください。受付時間は9:00〜19:00開始です（現在時刻の2時間後以降でご予約可能）。
+        - generic [ref=f1e138]:
+          - generic [ref=f1e139]:
+            - generic [ref=f1e140]:
+              - generic [ref=f1e141]: 第1ご希望日時
+              - generic [ref=f1e142]: 必須
+            - generic [ref=f1e143]:
+              - textbox [ref=f1e144]
+              - combobox [ref=f1e145]:
+                - option "時刻を選択" [disabled] [selected]
+                - option "09:00"
+                - option "09:30"
+                - option "10:00"
+                - option "10:30"
+                - option "11:00"
+                - option "11:30"
+                - option "12:00"
+                - option "12:30"
+                - option "13:00"
+                - option "13:30"
+                - option "14:00"
+                - option "14:30"
+                - option "15:00"
+                - option "15:30"
+                - option "16:00"
+                - option "16:30"
+                - option "17:00"
+                - option "17:30"
+                - option "18:00"
+                - option "18:30"
+                - option "19:00"
+          - generic [ref=f1e146]:
+            - generic [ref=f1e147]:
+              - generic [ref=f1e148]: 第2ご希望日時
+              - generic [ref=f1e149]: 必須
+            - generic [ref=f1e150]:
+              - textbox [ref=f1e151]
+              - combobox [ref=f1e152]:
+                - option "時刻を選択" [disabled] [selected]
+                - option "09:00"
+                - option "09:30"
+                - option "10:00"
+                - option "10:30"
+                - option "11:00"
+                - option "11:30"
+                - option "12:00"
+                - option "12:30"
+                - option "13:00"
+                - option "13:30"
+                - option "14:00"
+                - option "14:30"
+                - option "15:00"
+                - option "15:30"
+                - option "16:00"
+                - option "16:30"
+                - option "17:00"
+                - option "17:30"
+                - option "18:00"
+                - option "18:30"
+                - option "19:00"
+          - generic [ref=f1e153]:
+            - generic [ref=f1e154]:
+              - generic [ref=f1e155]: 第3ご希望日時
+              - generic [ref=f1e156]: 必須
+            - generic [ref=f1e157]:
+              - textbox [ref=f1e158]
+              - combobox [ref=f1e159]:
+                - option "時刻を選択" [disabled] [selected]
+                - option "09:00"
+                - option "09:30"
+                - option "10:00"
+                - option "10:30"
+                - option "11:00"
+                - option "11:30"
+                - option "12:00"
+                - option "12:30"
+                - option "13:00"
+                - option "13:30"
+                - option "14:00"
+                - option "14:30"
+                - option "15:00"
+                - option "15:30"
+                - option "16:00"
+                - option "16:30"
+                - option "17:00"
+                - option "17:30"
+                - option "18:00"
+                - option "18:30"
+                - option "19:00"
+      - generic [ref=f1e160]:
+        - generic [ref=f1e161]:
+          - generic [ref=f1e162]: ご質問・ご不安な点
+          - generic [ref=f1e163]: 任意
+        - textbox "ご質問・ご不安な点" [ref=f1e164]:
+          - /placeholder: アレルギーの有無やダウンタイムのご希望など、気になる点がございましたらご自由にご記入ください。
+      - generic [ref=f1e165]:
+        - button "診察を予約する" [ref=f1e166] [cursor=pointer]
+        - paragraph [ref=f1e170]: ※ ご入力いただいた個人情報は予約管理のみに使用し、厳重に管理いたします。

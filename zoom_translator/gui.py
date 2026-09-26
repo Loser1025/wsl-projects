@@ -5,8 +5,8 @@ from typing import Callable, Optional
 
 from config import Config, default_config
 
-# ロガーの設定
-logging.basicConfig(level=logging.INFO)
+# ロガーの設定(ルートロガーの設定はエントリーポイントのmain.pyが行うため、ここではbasicConfigを呼ばない。
+# 呼んでしまうとmain.py側の後続のlogging.basicConfig()呼び出しが無効化される)
 logger = logging.getLogger(__name__)
 
 # pywebviewが利用可能かどうかを安全にインポート・確認
@@ -19,10 +19,21 @@ except ImportError:
 
 
 class _SettingsAPI:
-    """pywebviewのjs_api用ブリッジクラス。JavaScriptからPythonの保存処理を呼び出すためのもの。"""
+    """pywebviewのjs_api用ブリッジクラス。JavaScriptからPythonの保存処理・ウィンドウリサイズを呼び出すためのもの。"""
 
-    def __init__(self, save_settings_fn: Optional[Callable[[str, str, str], None]] = None):
+    def __init__(
+        self,
+        save_settings_fn: Optional[Callable[[str, str, str], None]] = None,
+        on_open_settings: Optional[Callable[[], None]] = None,
+        on_close_settings: Optional[Callable[[], None]] = None,
+    ):
         self.save_settings_fn = save_settings_fn
+        # SubtitleWindowのインスタンス(ネイティブウィンドウを内部に持つ)を直接属性として
+        # 持たせると、pywebviewがjs_apiオブジェクトの属性をJS側へ公開しようとして
+        # ネイティブGUIオブジェクトの循環参照を再帰的に辿り無限再帰でクラッシュする
+        # (実機で確認済みの不具合)。そのため、必ず単純な関数(クロージャ)だけを保持する。
+        self._on_open_settings = on_open_settings
+        self._on_close_settings = on_close_settings
 
     def save_settings(self, source_lang: str, target_lang: str, device_name: str) -> None:
         """設定保存コールバックを安全に呼び出す。"""
@@ -32,6 +43,25 @@ class _SettingsAPI:
                 self.save_settings_fn(source_lang, target_lang, device_name)
             except Exception as e:
                 logger.error(f"Error in save_settings_fn: {e}")
+
+    def open_settings_panel(self) -> None:
+        """
+        設定パネル表示時に、通常の字幕バー(小さい)では設定項目が収まらないため、
+        ウィンドウ自体を縦方向に拡大する(横幅は字幕バーと同じ幅を維持)。
+        """
+        if self._on_open_settings:
+            try:
+                self._on_open_settings()
+            except Exception as e:
+                logger.warning(f"Failed to resize window for settings panel: {e}")
+
+    def close_settings_panel(self) -> None:
+        """設定パネルを閉じるとき、元の字幕バーサイズ・位置に戻す。"""
+        if self._on_close_settings:
+            try:
+                self._on_close_settings()
+            except Exception as e:
+                logger.warning(f"Failed to resize window back to subtitle bar: {e}")
 
 
 class SubtitleWindow:
@@ -101,7 +131,7 @@ class SubtitleWindow:
                     padding: 14px 24px;
                     text-align: center;
                     max-width: 95%;
-                    width: 600px;
+                    width: 1000px;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
                     border: 1px solid rgba(255, 255, 255, 0.1);
                     transition: all 0.3s ease-in-out;
@@ -132,6 +162,12 @@ class SubtitleWindow:
                     opacity: 0;
                     transform: translateY(4px);
                     transition: opacity 0.4s ease, transform 0.4s ease;
+                    /* 長文でも固定ウィンドウからはみ出さないよう1行に収め、超過分は省略記号で切る */
+                    display: -webkit-box;
+                    -webkit-line-clamp: 1;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
                 .translated {
                     font-size: 22px;
@@ -142,6 +178,13 @@ class SubtitleWindow:
                     opacity: 0;
                     transform: translateY(4px);
                     transition: opacity 0.4s ease, transform 0.4s ease;
+                    /* 長文でも固定ウィンドウからはみ出さないよう5行に収め、超過分は省略記号で切る
+                       (文字サイズは前の大きさに戻した分、行数を増やして表示できる文字量を増やす) */
+                    display: -webkit-box;
+                    -webkit-line-clamp: 5;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
                 .fade-in {
                     opacity: 1 !important;
@@ -301,16 +344,22 @@ class SubtitleWindow:
                         devSel.appendChild(opt);
                     });
 
-                    // 歯車ボタンクリックで設定パネルを表示
+                    // 歯車ボタンクリックで設定パネルを表示(ウィンドウ自体も操作可能なサイズへ拡大)
                     document.getElementById('gear-btn').addEventListener('click', () => {
                         document.getElementById('subtitle-view').style.display = 'none';
                         document.getElementById('settings-view').style.display = 'block';
+                        if (window.pywebview && window.pywebview.api) {
+                            window.pywebview.api.open_settings_panel();
+                        }
                     });
 
-                    // 閉じる・キャンセルボタンで字幕表示に戻す
+                    // 閉じる・キャンセルボタンで字幕表示に戻す(ウィンドウも元のサイズへ)
                     const closePanel = () => {
                         document.getElementById('settings-view').style.display = 'none';
                         document.getElementById('subtitle-view').style.display = 'block';
+                        if (window.pywebview && window.pywebview.api) {
+                            window.pywebview.api.close_settings_panel();
+                        }
                     };
 
                     document.getElementById('panel-close-btn').addEventListener('click', closePanel);
@@ -384,8 +433,40 @@ class SubtitleWindow:
         x_coord = (screen_width - window_width) // 2
         y_coord = screen_height - window_height - bottom_margin
 
+        # 設定パネル表示中はウィンドウを縦方向に拡大するため、後で_SettingsAPIから
+        # 参照できるようジオメトリ情報をインスタンス変数として保持しておく
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.window_width = window_width
+        self.window_height = window_height
+        self.bottom_margin = bottom_margin
+        self.x_coord = x_coord
+        self.y_coord = y_coord
+        # 設定パネル(言語ペア2つ+デバイス選択+ボタン)が収まる高さ。横幅は字幕バーと同じに保つ
+        self.settings_panel_height = 420
+
+        # 設定パネルの開閉時にウィンドウをリサイズ/移動するクロージャ。
+        # self(SubtitleWindow)を直接js_apiの属性として持たせるとpywebviewが
+        # ネイティブウィンドウを再帰的に辿ってクラッシュするため、単純な関数のみを渡す。
+        def _resize_for_settings() -> None:
+            if self.window is None:
+                return
+            y = self.screen_height - self.settings_panel_height - self.bottom_margin
+            self.window.resize(self.window_width, self.settings_panel_height)
+            self.window.move(self.x_coord, y)
+
+        def _resize_for_subtitle() -> None:
+            if self.window is None:
+                return
+            self.window.resize(self.window_width, self.window_height)
+            self.window.move(self.x_coord, self.y_coord)
+
         # js_apiインスタンスの生成
-        settings_api = _SettingsAPI(save_settings_fn=self.save_settings_fn)
+        settings_api = _SettingsAPI(
+            save_settings_fn=self.save_settings_fn,
+            on_open_settings=_resize_for_settings,
+            on_close_settings=_resize_for_subtitle,
+        )
 
         # ウィンドウの作成 (frameless=True, easy_drag=True, on_top=True, js_api=settings_api)
         try:

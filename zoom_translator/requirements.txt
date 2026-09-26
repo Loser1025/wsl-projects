@@ -17,3 +17,9 @@ webrtcvad-wheels
 
 # デスクトップUI(HTML/CSS/JS描画) - 完全無料
 pywebview
+
+# 高品質翻訳(NLLB-200, ja/ko/zh等を直接翻訳) - 完全無料・ローカル実行
+# ctranslate2(faster-whisperの依存として既に入る)+ transformersのトークナイザーで直接推論する
+# 読み込みに失敗した場合はargos-translateへ自動フォールバックする
+transformers
+sentencepiece

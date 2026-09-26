@@ -33,10 +33,24 @@ from sentence_buffer import SentenceBuffer
 from gui import SubtitleWindow
 import settings_store
 
-# ロギングの設定 (自アプリのロガーはINFO)
+# ログをファイルにも残す(zoom_translator/logs/latest.log、起動のたびに上書き)。
+# Windows実機で実行していても、このファイルはWSL側から直接読める場所にあるため、
+# コンソール出力を貼り付けてもらわなくても中身を確認できる。
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE_PATH = os.path.join(LOG_DIR, "latest.log")
+
+# ロギングの設定 (自アプリのロガーはINFO、コンソール+ファイルの両方に出力)
+# force=True: 他のライブラリがimport時に先にlogging.basicConfig()を呼んでいた場合でも
+# (これが原因でファイル出力が無効化されていたことがあったため)必ずこの設定で上書きする
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(LOG_FILE_PATH, mode="w", encoding="utf-8"),
+    ],
+    force=True,
 )
 logger = logging.getLogger("ZoomTranslatorMain")
 
@@ -236,11 +250,26 @@ def main():
     # pywebview起動時のコールバック（run()内でウィンドウが準備完了したときに呼ばれる）
     def start_pipeline():
         """
-        windowの準備完了時に呼ばれ、AudioCapturerを開始し、キュー消費者スレッドを起動する。
+        windowの準備完了時に呼ばれる。まずWhisper/NLLB/argos-translateをすべて事前ロードし
+        (warmup)、それが終わってからAudioCapturerを開始する。これにより、実際の音声処理中に
+        初回ロードの待ち時間でキューが詰まるのを防ぐ。
         """
-        logger.info("SubtitleWindowの準備が完了しました。パイプラインを開始します。")
-        
-        # 初期案内メッセージを表示
+        logger.info("SubtitleWindowの準備が完了しました。モデルの事前ロードを開始します。")
+
+        # モデル準備中であることを案内表示
+        try:
+            window.update_subtitle("Zoom Translator 準備中...", "モデルを読み込んでいます、少々お待ちください...")
+        except Exception:
+            pass
+
+        # Whisper・NLLB・argos-translateを起動時にまとめてロードしておく(warmup)
+        try:
+            translator_engine.warmup()
+            logger.info("モデルの事前ロードが完了しました。")
+        except Exception as e:
+            logger.error(f"モデルの事前ロード中にエラーが発生しました: {e}")
+
+        # 準備完了の案内表示
         try:
             window.update_subtitle("Zoom Translator 起動中...", "システム音声を待っています...")
         except Exception:
@@ -253,7 +282,7 @@ def main():
         worker_thread = threading.Thread(target=pipeline_worker, daemon=True)
         worker_thread.start()
 
-        # AudioCapturerの開始
+        # AudioCapturerの開始(モデル準備完了後に開始するので、初回セグメントから待ち時間なく処理できる)
         try:
             audio_capturer.start()
             logger.info("AudioCapturer (システム音声キャプチャ) を開始しました。")

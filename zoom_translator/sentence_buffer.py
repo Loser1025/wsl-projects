@@ -97,3 +97,18 @@ class SentenceBuffer:
         self._buffer = ""
         self._first_added_time = None
         return sentence if sentence else None
+
+    def peek(self) -> Optional[str]:
+        """文がまだ完成していない間の暫定表示用に、蓄積中のテキストを覗き見するためのメソッド。
+
+        現在self._bufferに蓄積されている内容を、前後の空白を除去した上で返す。
+        内部状態は一切変更せず、リセットもしない、副作用なしの読み取り専用メソッド。
+        バッファが空文字列の場合はNoneを返す。
+
+        Returns:
+            Optional[str]: 蓄積中のテキスト断片（空白除去済み）、または空ならNone
+        """
+        if not self._buffer:
+            return None
+        sentence = self._buffer.strip()
+        return sentence if sentence else None

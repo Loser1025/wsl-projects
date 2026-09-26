@@ -1,0 +1,146 @@
+- generic [ref=f1e3]:
+  - banner [ref=f1e4]:
+    - heading "Surim Clinic｜看診預約表" [level=1] [ref=f1e11]
+    - paragraph [ref=f1e12]: 請填寫以下資料，我們將依照您提供的時間與您聯繫，安排看診事宜。
+  - generic [ref=f1e13]:
+    - group [ref=f1e14]:
+      - generic [ref=f1e15]: 基本資料
+      - generic [ref=f1e16]:
+        - generic [ref=f1e17]:
+          - generic [ref=f1e18]:
+            - generic [ref=f1e19]: 您的姓名（中文）
+            - generic [ref=f1e20]: "*必填"
+          - textbox "您的姓名（中文） *必填" [ref=f1e21]:
+            - /placeholder: 例：王小明
+        - generic [ref=f1e22]:
+          - generic [ref=f1e23]:
+            - generic [ref=f1e24]: 護照英文姓名／拼音
+            - generic [ref=f1e25]: 建議填寫
+          - textbox "護照英文姓名／拼音 建議填寫" [ref=f1e26]:
+            - /placeholder: 例：WANG, XIAO-MING
+      - generic [ref=f1e27]:
+        - generic [ref=f1e28]:
+          - generic [ref=f1e29]: 電子信箱
+          - generic [ref=f1e30]: "*必填"
+        - textbox "電子信箱 *必填" [ref=f1e31]:
+          - /placeholder: 例：example@email.com
+    - group [ref=f1e32]:
+      - generic [ref=f1e33]: 看診方式與項目選擇
+      - generic [ref=f1e34]:
+        - generic [ref=f1e35]:
+          - generic [ref=f1e36]: 看診方式（診察形式）
+          - generic [ref=f1e37]: "*必填"
+        - generic [ref=f1e38]:
+          - generic [ref=f1e39] [cursor=pointer]:
+            - radio "線上看診 透過視訊／電話問診，免出門、隱私度高" [checked] [ref=f1e40]
+            - generic [ref=f1e41]:
+              - generic [ref=f1e42]: 線上看診
+              - generic [ref=f1e43]: 透過視訊／電話問診，免出門、隱私度高
+          - generic [ref=f1e44] [cursor=pointer]:
+            - radio "到院看診（實體對面） 親自至診所與醫師面對面諮詢" [ref=f1e45]
+            - generic [ref=f1e46]:
+              - generic [ref=f1e47]: 到院看診（實體對面）
+              - generic [ref=f1e48]: 親自至診所與醫師面對面諮詢
+      - generic [ref=f1e49]:
+        - generic [ref=f1e50]:
+          - generic [ref=f1e51]: 看診項目
+          - generic [ref=f1e52]: "*必填"
+        - generic [ref=f1e53]:
+          - button "醫療瘦身（口服減重藥）" [ref=f1e55] [cursor=pointer]
+          - button "AGA 雄性禿治療" [ref=f1e61] [cursor=pointer]
+          - button "ED 治療藥物" [ref=f1e67] [cursor=pointer]
+          - button "美容口服藥" [ref=f1e73] [cursor=pointer]
+        - paragraph [ref=f1e78]: 請在各項目的「查看價目表」中選擇至少一項具體商品（可複選）。若尚未決定，請選擇「諮詢時再決定」。
+    - group [ref=f1e79]:
+      - generic [ref=f1e80]: 希望診療日期與時段
+      - paragraph [ref=f1e81]: 為順利安排一對一諮詢，請盡量提供 2～3 個方便的時段。
+      - generic [ref=f1e82]:
+        - generic [ref=f1e83]: 第一希望時段（必填）
+        - generic [ref=f1e85]:
+          - textbox [ref=f1e86]
+          - combobox [ref=f1e87]:
+            - option "請選擇時段" [disabled] [selected]
+            - option "09:00"
+            - option "09:30"
+            - option "10:00"
+            - option "10:30"
+            - option "11:00"
+            - option "11:30"
+            - option "12:00"
+            - option "12:30"
+            - option "13:00"
+            - option "13:30"
+            - option "14:00"
+            - option "14:30"
+            - option "15:00"
+            - option "15:30"
+            - option "16:00"
+            - option "16:30"
+            - option "17:00"
+            - option "17:30"
+            - option "18:00"
+            - option "18:30"
+            - option "19:00"
+      - generic [ref=f1e88]:
+        - generic [ref=f1e89]: 第二希望時段（選填）
+        - generic [ref=f1e91]:
+          - textbox [ref=f1e92]
+          - combobox [ref=f1e93]:
+            - option "請選擇時段" [disabled] [selected]
+            - option "09:00"
+            - option "09:30"
+            - option "10:00"
+            - option "10:30"
+            - option "11:00"
+            - option "11:30"
+            - option "12:00"
+            - option "12:30"
+            - option "13:00"
+            - option "13:30"
+            - option "14:00"
+            - option "14:30"
+            - option "15:00"
+            - option "15:30"
+            - option "16:00"
+            - option "16:30"
+            - option "17:00"
+            - option "17:30"
+            - option "18:00"
+            - option "18:30"
+            - option "19:00"
+      - generic [ref=f1e94]:
+        - generic [ref=f1e95]: 第三希望時段（選填）
+        - generic [ref=f1e97]:
+          - textbox [ref=f1e98]
+          - combobox [ref=f1e99]:
+            - option "請選擇時段" [disabled] [selected]
+            - option "09:00"
+            - option "09:30"
+            - option "10:00"
+            - option "10:30"
+            - option "11:00"
+            - option "11:30"
+            - option "12:00"
+            - option "12:30"
+            - option "13:00"
+            - option "13:30"
+            - option "14:00"
+            - option "14:30"
+            - option "15:00"
+            - option "15:30"
+            - option "16:00"
+            - option "16:30"
+            - option "17:00"
+            - option "17:30"
+            - option "18:00"
+            - option "18:30"
+            - option "19:00"
+    - group [ref=f1e100]:
+      - generic [ref=f1e101]:
+        - generic [ref=f1e102]:
+          - generic [ref=f1e103]: 提問或特殊需求
+          - generic [ref=f1e104]: 選填
+        - textbox "提問或特殊需求 選填" [ref=f1e105]:
+          - /placeholder: 若有任何疑問或想諮詢的具體藥品，歡迎於此填寫...
+    - button "送出看診預約" [ref=f1e106] [cursor=pointer]
+    - paragraph [ref=f1e107]: 您的個人隱私與預約資料將受到加密保護

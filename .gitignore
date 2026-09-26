@@ -42,6 +42,7 @@ mimic_tui/mimic.log
 
 # zoom_translator ランタイム生成物
 zoom_translator/settings.json
+zoom_translator/logs/
 
 # GCP service account credentials
 slides_design_tool/credentials.json

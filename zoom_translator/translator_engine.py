@@ -26,6 +26,33 @@ class TranslatorEngine:
         self._nllb_tokenizer: Optional[Any] = None
         self._nllb_load_failed: bool = False
 
+    def warmup(self) -> None:
+        """
+        アプリ起動時にまとめて呼び出し、Whisper・NLLB-200・argos-translate(フォールバック用)を
+        すべて事前にロードしておくためのメソッド。これにより、実際の音声処理中に初回ロードの
+        待ち時間(数秒〜数十秒)が発生してキュー詰まりを起こすのを防ぐ。
+        各ロードは個別にtry/exceptで保護し、一部が失敗しても他の準備を続行する。
+        """
+        try:
+            self._load_whisper()
+            logger.info("Whisperモデルの事前ロードが完了しました。")
+        except Exception as e:
+            logger.error(f"Whisperモデルの事前ロードに失敗しました: {e}")
+
+        if getattr(self.config, "TRANSLATION_ENGINE", "argos") == "nllb":
+            try:
+                self._load_nllb()
+                logger.info("NLLB-200モデルの事前ロードが完了しました。")
+            except Exception as e:
+                logger.warning(f"NLLB-200モデルの事前ロードに失敗しました(argos-translateへフォールバックします): {e}")
+
+        # NLLBが失敗した場合の実行時フォールバック用に、argos-translateも事前に準備しておく
+        try:
+            self._ensure_argos_package()
+            logger.info("argos-translateパッケージの事前準備が完了しました。")
+        except Exception as e:
+            logger.warning(f"argos-translateパッケージの事前準備に失敗しました: {e}")
+
     def _load_whisper(self) -> None:
         """初回利用時にfaster-whisperのWhisperModelを遅延ロードする"""
         if self._whisper_model is None:
@@ -44,20 +71,21 @@ class TranslatorEngine:
         """
         if self._nllb_translator is None and not self._nllb_load_failed:
             try:
+                import ctranslate2
                 from transformers import AutoTokenizer
-                from hf_hub_ctranslate2 import TranslatorCT2fromHfHub
+                from huggingface_hub import snapshot_download
+
+                # ctranslate2形式のモデルディレクトリをHuggingFace Hubからダウンロード(2回目以降はキャッシュ利用)
+                logger.info("Downloading/locating NLLB-200 ctranslate2 model: %s", self.config.NLLB_MODEL_REPO)
+                model_dir = snapshot_download(self.config.NLLB_MODEL_REPO)
+
+                logger.info("Loading NLLB-200 ctranslate2 translator (compute_type=%s)", self.config.NLLB_COMPUTE_TYPE)
+                self._nllb_translator = ctranslate2.Translator(
+                    model_dir, device="cpu", compute_type=self.config.NLLB_COMPUTE_TYPE
+                )
 
                 logger.info("Loading NLLB-200 tokenizer from %s", self.config.NLLB_TOKENIZER_REPO)
                 self._nllb_tokenizer = AutoTokenizer.from_pretrained(self.config.NLLB_TOKENIZER_REPO)
-
-                logger.info("Loading NLLB-200 translator from %s (compute_type=%s)", 
-                            self.config.NLLB_MODEL_REPO, self.config.NLLB_COMPUTE_TYPE)
-                self._nllb_translator = TranslatorCT2fromHfHub(
-                    model_name_or_path=self.config.NLLB_MODEL_REPO,
-                    device="cpu",
-                    compute_type=self.config.NLLB_COMPUTE_TYPE,
-                    tokenizer=self._nllb_tokenizer
-                )
             except Exception as e:
                 self._nllb_load_failed = True
                 logger.warning("Failed to load NLLB-200 model/tokenizer: %s. Falling back to argos-translate.", e)
@@ -179,27 +207,20 @@ class TranslatorEngine:
         flores_src = _ISO_TO_FLORES[src_lang]
         flores_tgt = _ISO_TO_FLORES[tgt_lang]
 
-        output = self._nllb_translator.generate(
-            text=[text],
-            src_lang=[flores_src],
-            tgt_lang=[flores_tgt]
-        )
+        # NLLBのトークナイザーはsrc_langをエンコード前に設定する必要がある
+        # (言語切り替えUIで実行時にSOURCE_LANGが変わるケースに対応するため毎回設定し直す)
+        self._nllb_tokenizer.src_lang = flores_src
 
-        # 戻り値の構造（リストや文字列など）に対して防御的に処理して文字列を取り出す
-        if isinstance(output, list):
-            if len(output) > 0:
-                item = output[0]
-                if isinstance(item, list) and len(item) > 0:
-                    return str(item[0])
-                elif isinstance(item, str):
-                    return str(item)
-                else:
-                    return str(item)
-            return ""
-        elif isinstance(output, str):
-            return output
-        else:
-            return str(output)
+        source_tokens = self._nllb_tokenizer.convert_ids_to_tokens(self._nllb_tokenizer.encode(text))
+        results = self._nllb_translator.translate_batch(
+            [source_tokens], target_prefix=[[flores_tgt]]
+        )
+        # 出力の先頭トークンはtarget_prefixで指定した言語トークンなので除いてデコードする
+        target_tokens = results[0].hypotheses[0][1:]
+        translated_text = self._nllb_tokenizer.decode(
+            self._nllb_tokenizer.convert_tokens_to_ids(target_tokens)
+        )
+        return translated_text.strip()
 
     def _translate_via_argos(self, text: str) -> str:
         """

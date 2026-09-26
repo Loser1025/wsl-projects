@@ -729,6 +729,17 @@
       box-shadow: 0 2px 10px rgba(14, 165, 233, 0.1);
     }
 
+    .date-time-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .date-time-row .date-input,
+    .date-time-row .time-select {
+      flex: 1;
+      min-width: 0;
+    }
+
     .date-picker-label-row {
       display: flex;
       align-items: center;
@@ -1422,7 +1433,7 @@
             <label class="field-label">ご希望日時</label>
             <span class="badge-required">必須</span>
           </div>
-          <div class="field-hint">スムーズな日程調整のため、第1〜第3ご希望日時をすべてご選択ください。</div>
+          <div class="field-hint">スムーズな日程調整のため、第1〜第3ご希望日時をすべてご選択ください。受付時間は9:00〜19:00開始です（現在時刻の2時間後以降でご予約可能）。</div>
 
           <div class="date-pickers-list">
             <!-- 第1ご希望日時（必須） -->
@@ -1431,13 +1442,23 @@
                 <span class="sub-field-label">第1ご希望日時</span>
                 <span class="badge-required">必須</span>
               </div>
-              <input 
-                type="datetime-local" 
-                id="entry_date_1" 
-                name="preferred_date_1" 
-                class="input-text date-input"
-                required
-              >
+              <div class="date-time-row">
+                <input
+                  type="date"
+                  id="entry_date_1"
+                  name="preferred_date_1_date"
+                  class="input-text date-input"
+                  required
+                >
+                <select
+                  id="entry_time_1"
+                  name="preferred_date_1_time"
+                  class="input-select time-select"
+                  required
+                >
+                  <option value="" disabled selected>時刻を選択</option>
+                </select>
+              </div>
               <div class="field-error-text" id="dateError1">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                 <span>第1ご希望日時をご選択ください（現在時刻より後の日時）。</span>
@@ -1450,13 +1471,23 @@
                 <span class="sub-field-label">第2ご希望日時</span>
                 <span class="badge-required">必須</span>
               </div>
-              <input 
-                type="datetime-local" 
-                id="entry_date_2" 
-                name="preferred_date_2" 
-                class="input-text date-input"
-                required
-              >
+              <div class="date-time-row">
+                <input
+                  type="date"
+                  id="entry_date_2"
+                  name="preferred_date_2_date"
+                  class="input-text date-input"
+                  required
+                >
+                <select
+                  id="entry_time_2"
+                  name="preferred_date_2_time"
+                  class="input-select time-select"
+                  required
+                >
+                  <option value="" disabled selected>時刻を選択</option>
+                </select>
+              </div>
               <div class="field-error-text" id="dateError2">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                 <span>第2ご希望日時をご選択ください（現在時刻より後の日時）。</span>
@@ -1469,13 +1500,23 @@
                 <span class="sub-field-label">第3ご希望日時</span>
                 <span class="badge-required">必須</span>
               </div>
-              <input 
-                type="datetime-local" 
-                id="entry_date_3" 
-                name="preferred_date_3" 
-                class="input-text date-input"
-                required
-              >
+              <div class="date-time-row">
+                <input
+                  type="date"
+                  id="entry_date_3"
+                  name="preferred_date_3_date"
+                  class="input-text date-input"
+                  required
+                >
+                <select
+                  id="entry_time_3"
+                  name="preferred_date_3_time"
+                  class="input-select time-select"
+                  required
+                >
+                  <option value="" disabled selected>時刻を選択</option>
+                </select>
+              </div>
               <div class="field-error-text" id="dateError3">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                 <span>第3ご希望日時をご選択ください（現在時刻より後の日時）。</span>
@@ -1547,6 +1588,9 @@
     const dateInput1 = document.getElementById('entry_date_1');
     const dateInput2 = document.getElementById('entry_date_2');
     const dateInput3 = document.getElementById('entry_date_3');
+    const timeSelect1 = document.getElementById('entry_time_1');
+    const timeSelect2 = document.getElementById('entry_time_2');
+    const timeSelect3 = document.getElementById('entry_time_3');
     const dateError1 = document.getElementById('dateError1');
     const dateError2 = document.getElementById('dateError2');
     const dateError3 = document.getElementById('dateError3');
@@ -1599,17 +1643,26 @@
       return byCategory;
     }
 
+    const MIN_BOOKING_LEAD_HOURS = 2;
+
+    function getMinBookableDate() {
+      const min = new Date();
+      min.setHours(min.getHours() + MIN_BOOKING_LEAD_HOURS);
+      return min;
+    }
+
+    function formatDateForInput(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
     function updateMinDateTime() {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const minVal = `${year}-${month}-${day}T${hours}:${minutes}`;
+      const minDateStr = formatDateForInput(getMinBookableDate());
 
       [dateInput1, dateInput2, dateInput3].forEach(input => {
-        if (input) input.min = minVal;
+        if (input) input.min = minDateStr;
       });
     }
 
@@ -1618,30 +1671,50 @@
       input.addEventListener('focus', updateMinDateTime);
     });
 
-    function validateDateInput(input, errorElement, fieldLabelName = "ご希望日時") {
-      if (!input.value) {
+    // 9:00〜19:00開始・30分刻みの時刻プルダウンを生成
+    [timeSelect1, timeSelect2, timeSelect3].forEach(select => {
+      for (let h = 9; h <= 19; h++) {
+        for (const m of ['00', '30']) {
+          if (h === 19 && m === '30') continue;
+          const v = `${String(h).padStart(2, '0')}:${m}`;
+          const opt = document.createElement('option');
+          opt.value = v;
+          opt.textContent = v;
+          select.appendChild(opt);
+        }
+      }
+    });
+
+    function validateDateInput(dateInputEl, timeSelectEl, errorElement, fieldLabelName = "ご希望日時") {
+      if (!dateInputEl.value || !timeSelectEl.value) {
         errorElement.querySelector('span').textContent = `${fieldLabelName}をご選択ください。`;
         errorElement.classList.add('is-visible');
-        input.classList.add('input-error');
+        dateInputEl.classList.add('input-error');
+        timeSelectEl.classList.add('input-error');
         return false;
       }
 
-      const selected = new Date(input.value);
-      if (selected < new Date()) {
-        errorElement.querySelector('span').textContent = `${fieldLabelName}は現在時刻より後の日時をご選択ください。`;
+      const selected = new Date(`${dateInputEl.value}T${timeSelectEl.value}`);
+      if (selected < getMinBookableDate()) {
+        errorElement.querySelector('span').textContent = `${fieldLabelName}は現在時刻の${MIN_BOOKING_LEAD_HOURS}時間後以降の日時をご選択ください。`;
         errorElement.classList.add('is-visible');
-        input.classList.add('input-error');
+        dateInputEl.classList.add('input-error');
+        timeSelectEl.classList.add('input-error');
         return false;
-      } else {
-        errorElement.classList.remove('is-visible');
-        input.classList.remove('input-error');
-        return true;
       }
+
+      errorElement.classList.remove('is-visible');
+      dateInputEl.classList.remove('input-error');
+      timeSelectEl.classList.remove('input-error');
+      return true;
     }
 
-    dateInput1.addEventListener('input', () => validateDateInput(dateInput1, dateError1, "第1ご希望日時"));
-    dateInput2.addEventListener('input', () => validateDateInput(dateInput2, dateError2, "第2ご希望日時"));
-    dateInput3.addEventListener('input', () => validateDateInput(dateInput3, dateError3, "第3ご希望日時"));
+    dateInput1.addEventListener('input', () => validateDateInput(dateInput1, timeSelect1, dateError1, "第1ご希望日時"));
+    dateInput2.addEventListener('input', () => validateDateInput(dateInput2, timeSelect2, dateError2, "第2ご希望日時"));
+    dateInput3.addEventListener('input', () => validateDateInput(dateInput3, timeSelect3, dateError3, "第3ご希望日時"));
+    timeSelect1.addEventListener('change', () => validateDateInput(dateInput1, timeSelect1, dateError1, "第1ご希望日時"));
+    timeSelect2.addEventListener('change', () => validateDateInput(dateInput2, timeSelect2, dateError2, "第2ご希望日時"));
+    timeSelect3.addEventListener('change', () => validateDateInput(dateInput3, timeSelect3, dateError3, "第3ご希望日時"));
 
     const emailPattern = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 
@@ -1716,9 +1789,9 @@
         return;
       }
 
-      const isDate1Valid = validateDateInput(dateInput1, dateError1, "第1ご希望日時");
-      const isDate2Valid = validateDateInput(dateInput2, dateError2, "第2ご希望日時");
-      const isDate3Valid = validateDateInput(dateInput3, dateError3, "第3ご希望日時");
+      const isDate1Valid = validateDateInput(dateInput1, timeSelect1, dateError1, "第1ご希望日時");
+      const isDate2Valid = validateDateInput(dateInput2, timeSelect2, dateError2, "第2ご希望日時");
+      const isDate3Valid = validateDateInput(dateInput3, timeSelect3, dateError3, "第3ご希望日時");
 
       if (!isDate1Valid || !isDate2Valid || !isDate3Valid) {
         dateGroup.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1732,10 +1805,10 @@
       submitBtn.style.opacity = '0.7';
       submitBtn.innerHTML = '<span>送信中...</span>';
 
-      const formatDT = (dtVal) => dtVal ? dtVal.replace('T', ' ') : '';
-      const d1 = formatDT(dateInput1.value);
-      const d2 = formatDT(dateInput2.value);
-      const d3 = formatDT(dateInput3.value);
+      const buildDateTime = (dateVal, timeVal) => (dateVal && timeVal) ? `${dateVal} ${timeVal}` : '';
+      const d1 = buildDateTime(dateInput1.value, timeSelect1.value);
+      const d2 = buildDateTime(dateInput2.value, timeSelect2.value);
+      const d3 = buildDateTime(dateInput3.value, timeSelect3.value);
 
       let dateSummary = `第1希望: ${d1}`;
       if (d2) dateSummary += ` / 第2希望: ${d2}`;

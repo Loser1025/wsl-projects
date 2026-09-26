@@ -179,6 +179,21 @@
     grid-template-columns: 1fr 1fr;
     gap: 10px;
   }
+  .field-error-text {
+    color: var(--danger);
+    font-size: 12.5px;
+    font-weight: 600;
+    margin-top: 8px;
+    display: none;
+  }
+  .field-error-text.is-visible {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .input-error {
+    border-color: var(--danger) !important;
+  }
   @media (max-width: 480px) {
     .pref-grid {
       grid-template-columns: 1fr;
@@ -588,7 +603,7 @@
         <label class="q"><span>희망 날짜 및 시간</span><span class="req">*</span></label>
         <p class="hint" style="margin-top:-2px; margin-bottom:12px;">원활한 일정 조율을 위해 제1~제3희망을 모두 선택해 주세요.</p>
 
-        <div class="pref-slot">
+        <div class="pref-slot" id="slotGroup1">
           <div class="pref-slot-label"><span class="pref-dot"></span>제1희망 (필수)</div>
           <div class="pref-grid">
             <input type="date" id="date1" name="date1" required />
@@ -596,8 +611,12 @@
               <option value="" disabled selected>시간을 선택해 주세요</option>
             </select>
           </div>
+          <div class="field-error-text" id="slotError1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span></span>
+          </div>
         </div>
-        <div class="pref-slot">
+        <div class="pref-slot" id="slotGroup2">
           <div class="pref-slot-label"><span class="pref-dot optional"></span>제2희망 (선택)</div>
           <div class="pref-grid">
             <input type="date" id="date2" name="date2" />
@@ -605,14 +624,22 @@
               <option value="" disabled selected>시간을 선택해 주세요</option>
             </select>
           </div>
+          <div class="field-error-text" id="slotError2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span></span>
+          </div>
         </div>
-        <div class="pref-slot">
+        <div class="pref-slot" id="slotGroup3">
           <div class="pref-slot-label"><span class="pref-dot optional"></span>제3희망 (선택)</div>
           <div class="pref-grid">
             <input type="date" id="date3" name="date3" />
             <select id="time3" name="time3">
               <option value="" disabled selected>시간을 선택해 주세요</option>
             </select>
+          </div>
+          <div class="field-error-text" id="slotError3">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span></span>
           </div>
         </div>
       </fieldset>
@@ -628,6 +655,42 @@
   <div id="result"></div>
 
   <script>
+    const MIN_BOOKING_LEAD_HOURS = 2;
+
+    function getMinBookableDate() {
+      const min = new Date();
+      min.setHours(min.getHours() + MIN_BOOKING_LEAD_HOURS);
+      return min;
+    }
+
+    function formatDateForInput(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    const dateInputs = [document.getElementById('date1'), document.getElementById('date2'), document.getElementById('date3')];
+
+    function updateMinDate() {
+      const minDateStr = formatDateForInput(getMinBookableDate());
+      dateInputs.forEach((input) => { if (input) input.min = minDateStr; });
+    }
+
+    updateMinDate();
+    dateInputs.forEach((input) => input.addEventListener('focus', updateMinDate));
+
+    function getSlotError(dateStr, timeStr, label) {
+      if (!dateStr || !timeStr) return null;
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const [hh, mm] = timeStr.split(':').map(Number);
+      const selected = new Date(y, m - 1, d, hh, mm);
+      if (selected < getMinBookableDate()) {
+        return `${label} 시간은 현재 시각으로부터 ${MIN_BOOKING_LEAD_HOURS}시간 이후로 선택해 주세요.`;
+      }
+      return null;
+    }
+
     const timeSelects = [document.getElementById('time1'), document.getElementById('time2'), document.getElementById('time3')];
     timeSelects.forEach((timeSelect) => {
       for (let h = 9; h <= 19; h++) {
@@ -640,6 +703,32 @@
           timeSelect.appendChild(opt);
         }
       }
+    });
+
+    const slotDefs = [
+      { date: dateInputs[0], time: timeSelects[0], error: document.getElementById('slotError1'), label: '제1희망' },
+      { date: dateInputs[1], time: timeSelects[1], error: document.getElementById('slotError2'), label: '제2희망' },
+      { date: dateInputs[2], time: timeSelects[2], error: document.getElementById('slotError3'), label: '제3희망' },
+    ];
+
+    function validateSlot({ date, time, error, label }) {
+      const slotError = getSlotError(date.value, time.value, label);
+      if (slotError) {
+        error.querySelector('span').textContent = slotError;
+        error.classList.add('is-visible');
+        date.classList.add('input-error');
+        time.classList.add('input-error');
+        return false;
+      }
+      error.classList.remove('is-visible');
+      date.classList.remove('input-error');
+      time.classList.remove('input-error');
+      return true;
+    }
+
+    slotDefs.forEach((slot) => {
+      slot.date.addEventListener('input', () => validateSlot(slot));
+      slot.time.addEventListener('change', () => validateSlot(slot));
     });
 
     const form = document.getElementById('reserveForm');
@@ -699,6 +788,13 @@
       const detailByCategory = getSelectedDetailItemsByCategory();
       if (Object.keys(detailByCategory).length === 0) {
         alert('희망하시는 상품을 한 개 이상 선택해 주세요.');
+        return;
+      }
+      const slotResults = slotDefs.map((slot) => validateSlot(slot));
+      if (slotResults.includes(false)) {
+        const firstInvalid = slotDefs[slotResults.indexOf(false)];
+        firstInvalid.date.closest('.pref-slot').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        firstInvalid.date.focus();
         return;
       }
       const menu = Object.entries(detailByCategory).map(([cat, details]) => `${cat}(${details.join('・')})`);

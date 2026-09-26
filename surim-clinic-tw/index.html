@@ -127,6 +127,22 @@
   }
   .field { margin-bottom: 14px; }
 
+  .field-error-text {
+    color: var(--danger);
+    font-size: 12.5px;
+    font-weight: 600;
+    margin-top: 8px;
+    display: none;
+  }
+  .field-error-text.is-visible {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .input-error {
+    border-color: var(--danger) !important;
+  }
+
   .consult-options {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -459,25 +475,43 @@
         <div class="section-title">希望診療日期與時段</div>
         <p class="hint" style="margin-top:-6px; margin-bottom: 12px;">為順利安排一對一諮詢，請盡量提供 2～3 個方便的時段。</p>
 
-        <div class="pref-slot">
+        <div class="pref-slot" id="slotGroup1">
           <div class="pref-slot-label"><span class="pref-dot"></span>第一希望時段（必填）</div>
           <div class="grid2">
             <input type="date" id="date1" name="date1" required />
-            <input type="time" id="time1" name="time1" required value="18:00" />
+            <select id="time1" name="time1" required>
+              <option value="" disabled selected>請選擇時段</option>
+            </select>
+          </div>
+          <div class="field-error-text" id="slotError1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span></span>
           </div>
         </div>
-        <div class="pref-slot">
+        <div class="pref-slot" id="slotGroup2">
           <div class="pref-slot-label"><span class="pref-dot optional"></span>第二希望時段（選填）</div>
           <div class="grid2">
             <input type="date" id="date2" name="date2" />
-            <input type="time" id="time2" name="time2" value="19:00" />
+            <select id="time2" name="time2">
+              <option value="" disabled selected>請選擇時段</option>
+            </select>
+          </div>
+          <div class="field-error-text" id="slotError2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span></span>
           </div>
         </div>
-        <div class="pref-slot">
+        <div class="pref-slot" id="slotGroup3">
           <div class="pref-slot-label"><span class="pref-dot optional"></span>第三希望時段（選填）</div>
           <div class="grid2">
             <input type="date" id="date3" name="date3" />
-            <input type="time" id="time3" name="time3" value="20:00" />
+            <select id="time3" name="time3">
+              <option value="" disabled selected>請選擇時段</option>
+            </select>
+          </div>
+          <div class="field-error-text" id="slotError3">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span></span>
           </div>
         </div>
       </fieldset>
@@ -520,6 +554,84 @@
     });
   });
 
+  const MIN_BOOKING_LEAD_HOURS = 2;
+
+  function getMinBookableDate() {
+    const min = new Date();
+    min.setHours(min.getHours() + MIN_BOOKING_LEAD_HOURS);
+    return min;
+  }
+
+  function formatDateForInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  const dateInputs = [document.getElementById('date1'), document.getElementById('date2'), document.getElementById('date3')];
+
+  function updateMinDate() {
+    const minDateStr = formatDateForInput(getMinBookableDate());
+    dateInputs.forEach((input) => { if (input) input.min = minDateStr; });
+  }
+
+  updateMinDate();
+  dateInputs.forEach((input) => input.addEventListener('focus', updateMinDate));
+
+  // 9:00〜19:00開始・30分刻みの時刻プルダウンを生成
+  const timeSelects = [document.getElementById('time1'), document.getElementById('time2'), document.getElementById('time3')];
+  timeSelects.forEach((select) => {
+    for (let h = 9; h <= 19; h++) {
+      for (const m of ['00', '30']) {
+        if (h === 19 && m === '30') continue;
+        const v = `${String(h).padStart(2, '0')}:${m}`;
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        select.appendChild(opt);
+      }
+    }
+  });
+
+  function getSlotError(dateStr, timeStr, label) {
+    if (!dateStr || !timeStr) return null;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const [hh, mm] = timeStr.split(':').map(Number);
+    const selected = new Date(y, m - 1, d, hh, mm);
+
+    if (selected < getMinBookableDate()) {
+      return `${label}的時段請選擇在目前時間${MIN_BOOKING_LEAD_HOURS}小時後。`;
+    }
+    return null;
+  }
+
+  const slotDefs = [
+    { date: dateInputs[0], time: timeSelects[0], error: document.getElementById('slotError1'), label: '第一希望' },
+    { date: dateInputs[1], time: timeSelects[1], error: document.getElementById('slotError2'), label: '第二希望' },
+    { date: dateInputs[2], time: timeSelects[2], error: document.getElementById('slotError3'), label: '第三希望' },
+  ];
+
+  function validateSlot({ date, time, error, label }) {
+    const slotError = getSlotError(date.value, time.value, label);
+    if (slotError) {
+      error.querySelector('span').textContent = slotError;
+      error.classList.add('is-visible');
+      date.classList.add('input-error');
+      time.classList.add('input-error');
+      return false;
+    }
+    error.classList.remove('is-visible');
+    date.classList.remove('input-error');
+    time.classList.remove('input-error');
+    return true;
+  }
+
+  slotDefs.forEach((slot) => {
+    slot.date.addEventListener('input', () => validateSlot(slot));
+    slot.time.addEventListener('change', () => validateSlot(slot));
+  });
+
   const detailItemCheckboxes = document.querySelectorAll('.detail-item-checkbox');
 
   function getSelectedDetailItemsByCategory() {
@@ -559,6 +671,14 @@
     const menu = Object.entries(detailByCategory)
       .map(([cat, details]) => `${cat}(${details.join('・')})`)
       .join('、');
+
+    const slotResults = slotDefs.map((slot) => validateSlot(slot));
+    if (slotResults.includes(false)) {
+      const firstInvalid = slotDefs[slotResults.indexOf(false)];
+      firstInvalid.date.closest('.pref-slot').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      firstInvalid.date.focus();
+      return;
+    }
 
     let scheduleParts = [];
     if (form.date1.value) scheduleParts.push(`第1希望: ${form.date1.value} ${form.time1.value}`);
