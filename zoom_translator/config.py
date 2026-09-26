@@ -102,8 +102,8 @@ class Config:
     # --- GUI関連設定 ---
     # GUIウィンドウの幅（px）
     GUI_WINDOW_WIDTH: int = 1100
-    # GUIウィンドウの高さ（px）
-    GUI_WINDOW_HEIGHT: int = 260
+    # GUIウィンドウの高さ（px）。上段(相手)・下段(あなた)の2段構成になった分、高さを増やす
+    GUI_WINDOW_HEIGHT: int = 360
     # 画面下端からの余白（px）
     GUI_BOTTOM_MARGIN: int = 60
 

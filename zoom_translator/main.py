@@ -2,7 +2,7 @@
 zoom_translator/main.py
 
 AudioCapturer, TranslatorEngine, SentenceBuffer, SubtitleWindowをqueueで結合し、
-リアルタイム翻訳字幕アプリとして動作させるエントリーポイントモジュール。
+スピーカー(相手の声)とマイク(あなたの声)の2系統を並行実行するリアルタイム翻訳アプリのエントリーポイント。
 """
 
 import queue
@@ -27,22 +27,18 @@ logging.getLogger("stanza").setLevel(logging.WARNING)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import default_config
-from audio_capturer import AudioCapturer, list_speaker_devices
+from audio_capturer import AudioCapturer, list_speaker_devices, list_microphone_devices
 from translator_engine import TranslatorEngine
 from sentence_buffer import SentenceBuffer
 from gui import SubtitleWindow
 import settings_store
 
 # ログをファイルにも残す(zoom_translator/logs/latest.log、起動のたびに上書き)。
-# Windows実機で実行していても、このファイルはWSL側から直接読める場所にあるため、
-# コンソール出力を貼り付けてもらわなくても中身を確認できる。
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE_PATH = os.path.join(LOG_DIR, "latest.log")
 
 # ロギングの設定 (自アプリのロガーはINFO、コンソール+ファイルの両方に出力)
-# force=True: 他のライブラリがimport時に先にlogging.basicConfig()を呼んでいた場合でも
-# (これが原因でファイル出力が無効化されていたことがあったため)必ずこの設定で上書きする
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -58,221 +54,224 @@ logger = logging.getLogger("ZoomTranslatorMain")
 def main():
     """
     アプリケーションのエントリーポイント。
-    設定読み込み、各コンポーネント（AudioCapturer, TranslatorEngine, SentenceBuffer, SubtitleWindow, Queue）の
+    設定読み込み、各コンポーネント（AudioCapturerx2, TranslatorEngine(共有), SentenceBufferx2, SubtitleWindow, Queuex4）の
     初期化と接続、およびメインループの実行を行う。
     """
-    logger.info("Zoom Translator アプリケーションを起動しています...")
+    logger.info("Zoom Translator (2系統並行実行) アプリケーションを起動しています...")
 
-    # 設定の読み込み
+    # (1) config = default_config の直後で settings_store.load_settings(config) を呼ぶ
     config = default_config
     try:
         settings_store.load_settings(config)
-        logger.info("前回保存された設定をロードしました。")
+        logger.info(f"前回保存された設定をロードしました: SPEAKER_DEVICE={config.SPEAKER_DEVICE_NAME}, MIC_DEVICE={config.MIC_DEVICE_NAME}")
     except Exception as e:
         logger.error(f"設定のロード中にエラーが発生しました: {e}")
 
-    # 設定変更保存時のコールバック関数
-    def on_save_settings(source_lang: str, target_lang: str, device_name: str):
+    # (2) TranslatorEngine(config=config) は1インスタンスのみ作成し、スピーカー用・マイク用の両方の翻訳呼び出しで共有する
+    translator_engine = TranslatorEngine(config=config)
+
+    # 独立した2つの SentenceBuffer を作成 (バッファ状態は独立させる必要があるため)
+    speaker_sentence_buffer = SentenceBuffer(config=config)
+    mic_sentence_buffer = SentenceBuffer(config=config)
+
+    # (3) audio_queue・result_queueもスピーカー用・マイク用でそれぞれ独立させる
+    speaker_audio_queue = queue.Queue()
+    speaker_result_queue = queue.Queue()
+
+    mic_audio_queue = queue.Queue()
+    mic_result_queue = queue.Queue()
+
+    # (4) AudioCapturer用コールバック関数
+    def handle_speaker_chunk(audio_np):
+        """スピーカーからの音声チャンク受信時コールバック (キュー投入時刻・音声長を一緒に積む)"""
+        try:
+            now = time.monotonic()
+            duration_sec = float(len(audio_np)) / float(config.AUDIO_SAMPLE_RATE)
+            speaker_audio_queue.put((now, audio_np, duration_sec))
+        except Exception as e:
+            logger.error(f"[speaker] 音声チャンクのキュー投入時にエラー: {e}")
+
+    def handle_mic_chunk(audio_np):
+        """マイクからの音声チャンク受信時コールバック (キュー投入時刻・音声長を一緒に積む)"""
+        try:
+            now = time.monotonic()
+            duration_sec = float(len(audio_np)) / float(config.AUDIO_SAMPLE_RATE)
+            mic_audio_queue.put((now, audio_np, duration_sec))
+        except Exception as e:
+            logger.error(f"[mic] 音声チャンクのキュー投入時にエラー: {e}")
+
+    # AudioCapturerを2つ作成
+    speaker_audio_capturer = AudioCapturer(
+        config=config,
+        on_chunk=handle_speaker_chunk,
+        source_type="speaker"
+    )
+    mic_audio_capturer = AudioCapturer(
+        config=config,
+        on_chunk=handle_mic_chunk,
+        source_type="mic"
+    )
+
+    # (5) stt_worker相当の処理をパラメータ化して共通関数として定義
+    def stt_worker(audio_q, sentence_buf, result_q, source_lang, target_lang, label):
+        """
+        音声認識(STT)・文バッファリング・翻訳(Translate)を行うワーカー関数。
+        スピーカー用・マイク用でそれぞれ独立したスレッドとして起動する。
+        """
+        logger.info(f"{label} STTワーカーを開始しました。(source={source_lang}, target={target_lang})")
+        while True:
+            try:
+                item = audio_q.get()
+                if item is None:  # 終了シグナル
+                    audio_q.task_done()
+                    break
+
+                enqueued_time, audio_chunk, segment_duration_sec = item
+                queue_wait_sec = time.monotonic() - enqueued_time
+                backlog = audio_q.qsize()
+
+                # 1. 音声認識 (Whisper)
+                t0 = time.monotonic()
+                fragment = translator_engine.transcribe(audio_chunk, language=source_lang)
+                transcribe_sec = time.monotonic() - t0
+
+                if not fragment:
+                    logger.info(
+                        f"[TIMING] {label} 無音/認識結果なし | 音声長={segment_duration_sec:.2f}s "
+                        f"キュー待ち={queue_wait_sec:.2f}s 認識={transcribe_sec:.2f}s 未処理キュー残={backlog}"
+                    )
+                    audio_q.task_done()
+                    continue
+
+                logger.info(f"{label} 認識断片: {fragment}")
+
+                # 2. 文バッファに追加 (SentenceBuffer)
+                sentence = sentence_buf.add_fragment(fragment)
+                translate_sec = 0.0
+                if sentence:
+                    logger.info(f"{label} 完成文(原文): {sentence}")
+                    # 3. 翻訳 (Translate)
+                    t1 = time.monotonic()
+                    translated = translator_engine.translate(sentence, source_lang=source_lang, target_lang=target_lang)
+                    translate_sec = time.monotonic() - t1
+                    logger.info(f"{label} 翻訳文: {translated}")
+
+                    # 4. キューに格納 (original, translated)
+                    result_q.put((sentence, translated))
+                else:
+                    # 文が未完成の間も sentence_buffer.peek() で蓄積中テキストを取得し仮翻訳して即座に表示
+                    peeked_text = sentence_buf.peek()
+                    if peeked_text:
+                        t1 = time.monotonic()
+                        translated_peek = translator_engine.translate(peeked_text, source_lang=source_lang, target_lang=target_lang)
+                        translate_sec = time.monotonic() - t1
+                        logger.info(f"[TIMING] {label} [暫定] 蓄積中原文: {peeked_text} -> 暫定翻訳文: {translated_peek}")
+                        result_q.put((peeked_text, translated_peek))
+
+                total_sec = queue_wait_sec + transcribe_sec + translate_sec
+                logger.info(
+                    f"[TIMING] {label} 処理完了 | 音声長={segment_duration_sec:.2f}s "
+                    f"キュー待ち={queue_wait_sec:.2f}s 認識={transcribe_sec:.2f}s 翻訳={translate_sec:.2f}s "
+                    f"合計={total_sec:.2f}s 未処理キュー残={backlog}"
+                )
+
+                audio_q.task_done()
+            except Exception as e:
+                logger.error(f"{label} STTワーカー処理中にエラーが発生しました: {e}")
+                traceback.print_exc()
+
+    # (6) result_queueを消費してGUIを更新する処理をパラメータ化
+    def pipeline_worker(result_q, update_fn, label):
+        """
+        result_qを監視し、(original, translated)を取り出して指定されたGUI更新関数を呼び出すワーカー。
+        """
+        logger.info(f"{label} パイプラインワーカー（キュー消費者）を開始しました。")
+        while True:
+            try:
+                item = result_q.get()
+                if item is None:  # 終了シグナル
+                    result_q.task_done()
+                    break
+
+                original, translated = item
+                update_fn(original, translated)
+                result_q.task_done()
+            except Exception as e:
+                logger.error(f"{label} パイプラインワーカー処理中にエラーが発生しました: {e}")
+
+    # (8) on_save_settings(speaker_device: str, mic_device: str) の実装
+    def on_save_settings(speaker_device: str, mic_device: str):
         """
         GUIの設定パネルから設定が保存されたときに呼ばれるコールバック。
-        設定をconfigに反映し、永続化し、AudioCapturerを再起動する。
+        configのSPEAKER_DEVICE_NAMEとMIC_DEVICE_NAMEを更新(空文字ならNone)、settings_storeで永続化し、
+        スピーカー・マイク両方のAudioCapturerをstop→startして新デバイスで再接続する。
         """
         try:
-            logger.info(f"設定保存コールバック受信: source={source_lang}, target={target_lang}, device={device_name}")
-            
-            # 言語ペアが変わったかどうかを判定
-            lang_changed = (config.SOURCE_LANG != source_lang) or (config.TARGET_LANG != target_lang)
+            logger.info(f"設定保存コールバック受信: speaker_device={speaker_device}, mic_device={mic_device}")
 
             # configの更新
-            config.SOURCE_LANG = source_lang
-            config.TARGET_LANG = target_lang
-            if device_name:
-                config.SPEAKER_DEVICE_NAME = device_name
-            else:
-                config.SPEAKER_DEVICE_NAME = None
+            config.SPEAKER_DEVICE_NAME = speaker_device if speaker_device else None
+            config.MIC_DEVICE_NAME = mic_device if mic_device else None
 
             # 設定の永続化
             settings_store.save_settings(config)
             logger.info("設定をsettings.jsonに保存しました。")
 
-            # 言語ペアが変わった場合、古い言語設定の残骸が混ざらないようsentence_bufferをフラッシュする
-            if lang_changed:
-                try:
-                    flushed = sentence_buffer.flush()
-                    if flushed:
-                        logger.info(f"言語ペア変更に伴うバッファフラッシュ: {flushed}")
-                except Exception as ex:
-                    logger.error(f"SentenceBufferフラッシュ時にエラー: {ex}")
-
-            # AudioCapturerの再起動 (stop -> start)
+            # スピーカー用 AudioCapturerの再起動 (stop -> start)
             try:
-                audio_capturer.stop()
-                logger.info("新しい設定を適用するためAudioCapturerを一旦停止しました。")
+                speaker_audio_capturer.stop()
+                logger.info("スピーカー用 AudioCapturerを停止しました。")
             except Exception as ex:
-                logger.error(f"AudioCapturer停止時にエラー: {ex}")
+                logger.error(f"スピーカー用 AudioCapturer停止時にエラー: {ex}")
 
             try:
-                audio_capturer.start()
-                logger.info("新しい設定でAudioCapturerを再起動しました。")
+                speaker_audio_capturer.start()
+                logger.info("新しいデバイスでスピーカー用 AudioCapturerを再開始しました。")
             except Exception as ex:
-                logger.error(f"AudioCapturer再起動時にエラー: {ex}")
+                logger.error(f"スピーカー用 AudioCapturer再開始時にエラー: {ex}")
+
+            # マイク用 AudioCapturerの再起動 (stop -> start)
+            try:
+                mic_audio_capturer.stop()
+                logger.info("マイク用 AudioCapturerを停止しました。")
+            except Exception as ex:
+                logger.error(f"マイク用 AudioCapturer停止時にエラー: {ex}")
+
+            try:
+                mic_audio_capturer.start()
+                logger.info("新しいデバイスでマイク用 AudioCapturerを再開始しました。")
+            except Exception as ex:
+                logger.error(f"マイク用 AudioCapturer再開始時にエラー: {ex}")
 
         except Exception as e:
             logger.error(f"on_save_settings処理中にエラーが発生しました: {e}")
-            logger.debug(traceback.format_exc())
+            traceback.print_exc()
 
-    # 各コンポーネントの初期化
-    translator_engine = TranslatorEngine(config=config)
-    sentence_buffer = SentenceBuffer(config=config)
-    # 音声チャンクを受け渡すためのオーディオキューを新設
-    audio_queue = queue.Queue()
-    result_queue = queue.Queue()
+    # (7) SubtitleWindowのインスタンス化
+    window = SubtitleWindow(
+        config=config,
+        get_speaker_devices_fn=list_speaker_devices,
+        get_mic_devices_fn=list_microphone_devices,
+        save_settings_fn=on_save_settings
+    )
 
-    # AudioCapturerのon_chunkコールバック関数
-    def handle_audio_chunk(audio_chunk):
-        """
-        AudioCapturerのバックグラウンドスレッドから呼ばれる軽量コールバック。
-        音声チャンクを audio_queue に put するだけで即座に return し、
-        録音スレッドをブロックしない。
-        キュー投入時刻とチャンクの音声長(秒)も一緒に積み、stt_worker側で
-        「録音〜処理開始までの待ち時間」と「音声の実長」をログに出せるようにする。
-        """
-        try:
-            queued_at = time.monotonic()
-            segment_duration_sec = len(audio_chunk) / float(config.SAMPLE_RATE)
-            audio_queue.put((audio_chunk, queued_at, segment_duration_sec))
-        except Exception as e:
-            logger.error(f"音声チャンクのキュー投入中にエラーが発生しました: {e}")
-
-    # STT・翻訳処理を行うバックグラウンドワーカー関数を新設
-    def stt_worker():
-        """
-        audio_queueを監視し、音声チャンクを取り出して
-        transcribe → add_fragment → (文完成時) translate → result_queue.put
-        の一連の重い処理を非同期で行うワーカー関数。
-        """
-        logger.info("STTワーカー（音声処理スレッド）を開始しました。")
-        while True:
-            try:
-                # 音声チャンクがaudio_queueに積まれてから取り出されるまでの待ち時間を計測するため、
-                # AudioCapturer側でチャンクが確定した時刻(queued_at)も一緒に受け取る
-                item = audio_queue.get()
-                if item is None:  # 終了シグナル
-                    audio_queue.task_done()
-                    break
-                audio_chunk, queued_at, segment_duration_sec = item
-
-                dequeued_at = time.monotonic()
-                queue_wait_sec = dequeued_at - queued_at
-                backlog = audio_queue.qsize()
-
-                # 1. 音声認識 (Transcribe) の所要時間を計測
-                t0 = time.monotonic()
-                fragment = translator_engine.transcribe(audio_chunk)
-                transcribe_sec = time.monotonic() - t0
-
-                if not fragment:
-                    logger.info(
-                        f"[TIMING] 無音/認識結果なし | 音声長={segment_duration_sec:.2f}s "
-                        f"キュー待ち={queue_wait_sec:.2f}s 認識={transcribe_sec:.2f}s 未処理キュー残={backlog}"
-                    )
-                    audio_queue.task_done()
-                    continue
-
-                logger.info(f"認識断片: {fragment}")
-
-                # 2. 文バッファに追加 (SentenceBuffer)
-                sentence = sentence_buffer.add_fragment(fragment)
-                translate_sec = 0.0
-                if sentence:
-                    logger.info(f"完成文(原文): {sentence}")
-                    # 3. 翻訳 (Translate) の所要時間を計測
-                    t1 = time.monotonic()
-                    translated = translator_engine.translate(sentence)
-                    translate_sec = time.monotonic() - t1
-                    logger.info(f"翻訳文: {translated}")
-
-                    # 4. キューに格納 (original, translated)
-                    result_queue.put((sentence, translated))
-                else:
-                    # 文の完成を待たず、蓄積中のテキストを都度仮翻訳して即座に表示することで体感の遅延を減らすため、
-                    # sentence_buffer.peek() を用いて未完成テキストを取得し、仮翻訳してresult_queueに積む。
-                    peeked_text = sentence_buffer.peek()
-                    if peeked_text:
-                        t1 = time.monotonic()
-                        translated_peek = translator_engine.translate(peeked_text)
-                        translate_sec = time.monotonic() - t1
-                        logger.info(f"[暫定] 蓄積中原文: {peeked_text} -> 暫定翻訳文: {translated_peek}")
-                        result_queue.put((peeked_text, translated_peek))
-
-                # このチャンク1件にかかった総所要時間の内訳をログ出力する
-                # (queue_wait: 録音〜処理開始までの待ち行列時間, transcribe/translate: 各処理の実処理時間)
-                logger.info(
-                    f"[TIMING] 音声長={segment_duration_sec:.2f}s "
-                    f"キュー待ち={queue_wait_sec:.2f}s 認識={transcribe_sec:.2f}s 翻訳={translate_sec:.2f}s "
-                    f"未処理キュー残={backlog}"
-                )
-
-                audio_queue.task_done()
-
-            except Exception as e:
-                logger.error(f"STTワーカー処理中にエラーが発生しました: {e}")
-                logger.debug(traceback.format_exc())
-                try:
-                    audio_queue.task_done()
-                except Exception:
-                    pass
-
-    # AudioCapturerのインスタンス化
-    audio_capturer = AudioCapturer(config=config, on_chunk=handle_audio_chunk)
-
-    # SubtitleWindowのインスタンス化
-    try:
-        window = SubtitleWindow(
-            config=config,
-            get_devices_fn=list_speaker_devices,
-            save_settings_fn=on_save_settings
-        )
-    except Exception as e:
-        logger.error(f"SubtitleWindowの初期化に失敗しました: {e}")
-        traceback.print_exc()
-        sys.exit(1)
-
-    # バックグラウンドスレッドでresult_queueを消費してwindow.update_subtitle()を呼び出す関数
-    def pipeline_worker():
-        """
-        result_queueを監視し、(original, translated)を取り出してSubtitleWindowの字幕を更新するループ。
-        """
-        logger.info("パイプラインワーカー（キュー消費者）を開始しました。")
-        while True:
-            try:
-                item = result_queue.get()
-                if item is None: # 終了シグナル
-                    result_queue.task_done()
-                    break
-                
-                original, translated = item
-                window.update_subtitle(original, translated)
-                result_queue.task_done()
-            except Exception as e:
-                logger.error(f"パイプラインワーカー処理中にエラーが発生しました: {e}")
-
-    # pywebview起動時のコールバック（run()内でウィンドウが準備完了したときに呼ばれる）
+    # (9) start_pipeline()の実装
     def start_pipeline():
         """
-        windowの準備完了時に呼ばれる。まずWhisper/NLLB/argos-translateをすべて事前ロードし
-        (warmup)、それが終わってからAudioCapturerを開始する。これにより、実際の音声処理中に
-        初回ロードの待ち時間でキューが詰まるのを防ぐ。
+        windowの準備完了時に呼ばれる。まずtranslator_engine.warmup()を1回呼び、
+        完了後にスピーカー用・マイク用の両方のstt_workerスレッドとresult_queue消費スレッドを起動し、
+        両方のAudioCapturerをstart()する。
         """
         logger.info("SubtitleWindowの準備が完了しました。モデルの事前ロードを開始します。")
 
-        # モデル準備中であることを案内表示
+        # 準備中案内表示
         try:
-            window.update_subtitle("Zoom Translator 準備中...", "モデルを読み込んでいます、少々お待ちください...")
+            window.update_speaker_subtitle("Zoom Translator 準備中...", "モデルを読み込んでいます...")
+            window.update_mic_subtitle("Zoom Translator 準備中...", "모델을 로딩 중입니다...")
         except Exception:
             pass
 
-        # Whisper・NLLB・argos-translateを起動時にまとめてロードしておく(warmup)
+        # Whisper / NLLB / argos の事前ロード (1回呼び出しで共有)
         try:
             translator_engine.warmup()
             logger.info("モデルの事前ロードが完了しました。")
@@ -281,56 +280,109 @@ def main():
 
         # 準備完了の案内表示
         try:
-            window.update_subtitle("Zoom Translator 起動中...", "システム音声を待っています...")
+            window.update_speaker_subtitle("Zoom Translator 起動中...", "スピーカー音声を待っています...")
+            window.update_mic_subtitle("Zoom Translator 起動中...", "마이크 음성을 기다리고 있습니다...")
         except Exception:
             pass
 
-        # キュー消費スレッドの起動 (stt_worker と pipeline_worker)
-        stt_thread = threading.Thread(target=stt_worker, daemon=True)
-        stt_thread.start()
+        # スピーカー用スレッド起動
+        speaker_stt_thread = threading.Thread(
+            target=stt_worker,
+            args=(speaker_audio_queue, speaker_sentence_buffer, speaker_result_queue, config.SPEAKER_SOURCE_LANG, config.SPEAKER_TARGET_LANG, "[speaker]"),
+            daemon=True
+        )
+        speaker_stt_thread.start()
 
-        worker_thread = threading.Thread(target=pipeline_worker, daemon=True)
-        worker_thread.start()
+        speaker_worker_thread = threading.Thread(
+            target=pipeline_worker,
+            args=(speaker_result_queue, window.update_speaker_subtitle, "[speaker]"),
+            daemon=True
+        )
+        speaker_worker_thread.start()
 
-        # AudioCapturerの開始(モデル準備完了後に開始するので、初回セグメントから待ち時間なく処理できる)
+        # マイク用スレッド起動
+        mic_stt_thread = threading.Thread(
+            target=stt_worker,
+            args=(mic_audio_queue, mic_sentence_buffer, mic_result_queue, config.MIC_SOURCE_LANG, config.MIC_TARGET_LANG, "[mic]"),
+            daemon=True
+        )
+        mic_stt_thread.start()
+
+        mic_worker_thread = threading.Thread(
+            target=pipeline_worker,
+            args=(mic_result_queue, window.update_mic_subtitle, "[mic]"),
+            daemon=True
+        )
+        mic_worker_thread.start()
+
+        # 両方のAudioCapturerを開始
         try:
-            audio_capturer.start()
-            logger.info("AudioCapturer (システム音声キャプチャ) を開始しました。")
+            speaker_audio_capturer.start()
+            logger.info("スピーカー用 AudioCapturer を開始しました。")
         except Exception as e:
-            logger.error(f"AudioCapturerの起動に失敗しました: {e}")
+            logger.error(f"スピーカー用 AudioCapturerの起動に失敗しました: {e}")
 
-    # ウィンドウクローズ時のコールバック
+        try:
+            mic_audio_capturer.start()
+            logger.info("マイク用 AudioCapturer を開始しました。")
+        except Exception as e:
+            logger.error(f"マイク用 AudioCapturerの起動に失敗しました: {e}")
+
+    # (10) on_closing()の実装
     def on_closing():
         logger.info("アプリケーション終了処理を呼び出しています...")
-        
-        # AudioCapturerの停止
-        try:
-            audio_capturer.stop()
-            logger.info("AudioCapturerを停止しました。")
-        except Exception as e:
-            logger.error(f"AudioCapturer停止時にエラー: {e}")
 
-        # SentenceBufferに残ったフラグメントがあればflushしてログ出力
+        # 両方のAudioCapturerをstop()
         try:
-            remaining = sentence_buffer.flush()
-            if remaining:
-                logger.info(f"未完了のバッファ残り(フラッシュ): {remaining}")
-                # 必要であれば翻訳して表示またはログ出力
-                translated_rem = translator_engine.translate(remaining)
-                logger.info(f"残りフラグメント翻訳: {translated_rem}")
-                # キューに送信してウィンドウを更新
-                result_queue.put((remaining, translated_rem))
+            speaker_audio_capturer.stop()
+            logger.info("スピーカー用 AudioCapturerを停止しました。")
         except Exception as e:
-            logger.error(f"SentenceBufferフラッシュ時にエラー: {e}")
+            logger.error(f"スピーカー用 AudioCapturer停止時にエラー: {e}")
 
-        # キューに終了シグナルを入れてワーカーを終了させる
         try:
-            audio_queue.put(None)
+            mic_audio_capturer.stop()
+            logger.info("マイク用 AudioCapturerを停止しました。")
+        except Exception as e:
+            logger.error(f"マイク用 AudioCapturer停止時にエラー: {e}")
+
+        # スピーカー用 SentenceBuffer 残りフラッシュ
+        try:
+            remaining_spk = speaker_sentence_buffer.flush()
+            if remaining_spk:
+                logger.info(f"[speaker] 未完了バッファ残り(フラッシュ): {remaining_spk}")
+                translated_spk = translator_engine.translate(remaining_spk, source_lang=config.SPEAKER_SOURCE_LANG, target_lang=config.SPEAKER_TARGET_LANG)
+                speaker_result_queue.put((remaining_spk, translated_spk))
+        except Exception as e:
+            logger.error(f"[speaker] SentenceBufferフラッシュ時にエラー: {e}")
+
+        # マイク用 SentenceBuffer 残りフラッシュ
+        try:
+            remaining_mic = mic_sentence_buffer.flush()
+            if remaining_mic:
+                logger.info(f"[mic] 未完了バッファ残り(フラッシュ): {remaining_mic}")
+                translated_mic = translator_engine.translate(remaining_mic, source_lang=config.MIC_SOURCE_LANG, target_lang=config.MIC_TARGET_LANG)
+                mic_result_queue.put((remaining_mic, translated_mic))
+        except Exception as e:
+            logger.error(f"[mic] SentenceBufferフラッシュ時にエラー: {e}")
+
+        # キューに終了シグナル (None) を入れる
+        try:
+            speaker_audio_queue.put(None)
         except Exception:
             pass
 
         try:
-            result_queue.put(None)
+            speaker_result_queue.put(None)
+        except Exception:
+            pass
+
+        try:
+            mic_audio_queue.put(None)
+        except Exception:
+            pass
+
+        try:
+            mic_result_queue.put(None)
         except Exception:
             pass
 

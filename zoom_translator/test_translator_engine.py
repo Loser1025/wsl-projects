@@ -34,7 +34,7 @@ def test_nllb_fallback_to_argos_on_load_failure(monkeypatch):
 
     # _translate_via_argosをモックして成功を返すようにする
     called_argos = []
-    def mock_translate_via_argos(self, text):
+    def mock_translate_via_argos(self, text, source_lang=None, target_lang=None):
         called_argos.append(text)
         return "argos_translated_" + text
 

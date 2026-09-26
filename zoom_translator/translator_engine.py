@@ -21,7 +21,10 @@ class TranslatorEngine:
     def __init__(self, config: Config = default_config):
         self.config = config
         self._whisper_model: Optional[Any] = None
-        self._argos_initialized: bool = False
+        # (source_lang, target_lang)のペアごとにargosパッケージ準備済みかを追跡する。
+        # マイク用(ja->ko)・スピーカー用(ko->ja)など複数方向を1つのTranslatorEngineで
+        # 共有(Whisper/NLLBを2重ロードしないため)扱えるようにするため、単一boolではなくsetにする。
+        self._argos_initialized_pairs: set = set()
         self._nllb_translator: Optional[Any] = None
         self._nllb_tokenizer: Optional[Any] = None
         self._nllb_load_failed: bool = False
@@ -46,12 +49,19 @@ class TranslatorEngine:
             except Exception as e:
                 logger.warning(f"NLLB-200モデルの事前ロードに失敗しました(argos-translateへフォールバックします): {e}")
 
-        # NLLBが失敗した場合の実行時フォールバック用に、argos-translateも事前に準備しておく
-        try:
-            self._ensure_argos_package()
-            logger.info("argos-translateパッケージの事前準備が完了しました。")
-        except Exception as e:
-            logger.warning(f"argos-translateパッケージの事前準備に失敗しました: {e}")
+        # NLLBが失敗した場合の実行時フォールバック用に、argos-translateも事前に準備しておく。
+        # マイク用(例: ja->ko)・スピーカー用(例: ko->ja)の両方向を、設定にあれば両方とも準備する
+        # (どちらか一方しか使わない場合でも重複ペアはsetで自然にまとめられる)。
+        mic_src = getattr(self.config, "MIC_SOURCE_LANG", self.config.SOURCE_LANG)
+        mic_tgt = getattr(self.config, "MIC_TARGET_LANG", self.config.TARGET_LANG)
+        speaker_src = getattr(self.config, "SPEAKER_SOURCE_LANG", self.config.SOURCE_LANG)
+        speaker_tgt = getattr(self.config, "SPEAKER_TARGET_LANG", self.config.TARGET_LANG)
+        for src, tgt in {(mic_src, mic_tgt), (speaker_src, speaker_tgt)}:
+            try:
+                self._ensure_argos_package(src, tgt)
+                logger.info(f"argos-translateパッケージの事前準備が完了しました({src}->{tgt})。")
+            except Exception as e:
+                logger.warning(f"argos-translateパッケージの事前準備に失敗しました({src}->{tgt}): {e}")
 
     def _load_whisper(self) -> None:
         """初回利用時にfaster-whisperのWhisperModelを遅延ロードする"""
@@ -91,14 +101,19 @@ class TranslatorEngine:
                 logger.warning("Failed to load NLLB-200 model/tokenizer: %s. Falling back to argos-translate.", e)
                 raise
 
-    def _ensure_argos_package(self) -> None:
-        """初回利用時にargos-translateの翻訳パッケージを確認し、必要に応じてインストールする"""
-        if not self._argos_initialized:
+    def _ensure_argos_package(self, source_lang: Optional[str] = None, target_lang: Optional[str] = None) -> None:
+        """
+        指定された言語ペア(省略時はself.config.SOURCE_LANG/TARGET_LANG)について、
+        argos-translateの翻訳パッケージを確認し、必要に応じてインストールする。
+        ペアごとに準備済みかを_argos_initialized_pairsで管理し、二重処理を避ける。
+        """
+        source_lang = source_lang or self.config.SOURCE_LANG
+        target_lang = target_lang or self.config.TARGET_LANG
+        pair = (source_lang, target_lang)
+
+        if pair not in self._argos_initialized_pairs:
             import argostranslate.package
             import argostranslate.translate
-
-            source_lang = self.config.SOURCE_LANG
-            target_lang = self.config.TARGET_LANG
 
             # ステップ1: 直接の言語ペアパッケージ（例: source_lang -> target_lang）がインストール済みか確認し、なければインストールする
             try:
@@ -161,9 +176,9 @@ class TranslatorEngine:
                     except Exception:
                         pass
 
-            self._argos_initialized = True
+            self._argos_initialized_pairs.add(pair)
 
-    def transcribe(self, audio_np: np.ndarray) -> str:
+    def transcribe(self, audio_np: np.ndarray, language: Optional[str] = None) -> str:
         """
         numpy配列の音声データを入力として受け取り、
         faster-whisperで音声認識（文字起こし）を行い、認識結果テキストを返す。
@@ -178,7 +193,7 @@ class TranslatorEngine:
 
         segments, info = self._whisper_model.transcribe(
             audio_np,
-            language=self.config.SOURCE_LANG,
+            language=language or self.config.SOURCE_LANG,
             beam_size=self.config.BEAM_SIZE,
             condition_on_previous_text=self.config.WHISPER_CONDITION_ON_PREVIOUS_TEXT,
             vad_filter=self.config.WHISPER_VAD_FILTER
@@ -187,17 +202,19 @@ class TranslatorEngine:
         transcript_text = " ".join([segment.text.strip() for segment in segments]).strip()
         return transcript_text
 
-    def _translate_via_nllb(self, text: str) -> str:
+    def _translate_via_nllb(self, text: str, source_lang: Optional[str] = None, target_lang: Optional[str] = None) -> str:
         """
         NLLB-200を使用してテキストを翻訳する。
         _load_nllb()を呼び出し、ISOコードをFLORES-200コードに変換して翻訳を実行する。
+        source_lang/target_langを指定すればself.config.SOURCE_LANG/TARGET_LANGを上書きできる
+        (1つのTranslatorEngineでマイク用/スピーカー用など複数方向を共有するため)。
         """
         self._load_nllb()
         if self._nllb_translator is None:
             raise RuntimeError("NLLB-200 translator is not initialized.")
 
-        src_lang = self.config.SOURCE_LANG
-        tgt_lang = self.config.TARGET_LANG
+        src_lang = source_lang or self.config.SOURCE_LANG
+        tgt_lang = target_lang or self.config.TARGET_LANG
 
         if src_lang not in _ISO_TO_FLORES:
             raise ValueError(f"Source language '{src_lang}' is not supported in _ISO_TO_FLORES.")
@@ -222,12 +239,16 @@ class TranslatorEngine:
         )
         return translated_text.strip()
 
-    def _translate_via_argos(self, text: str) -> str:
+    def _translate_via_argos(self, text: str, source_lang: Optional[str] = None, target_lang: Optional[str] = None) -> str:
         """
         既存のargos-translateによる翻訳ロジック（温存されたフォールバック経路）。
+        source_lang/target_langを指定すればself.config.SOURCE_LANG/TARGET_LANGを上書きできる。
         """
+        source_lang = source_lang or self.config.SOURCE_LANG
+        target_lang = target_lang or self.config.TARGET_LANG
+
         try:
-            self._ensure_argos_package()
+            self._ensure_argos_package(source_lang, target_lang)
         except Exception:
             pass
 
@@ -235,16 +256,17 @@ class TranslatorEngine:
             import argostranslate.translate
             translated_text = argostranslate.translate.translate(
                 text,
-                self.config.SOURCE_LANG,
-                self.config.TARGET_LANG
+                source_lang,
+                target_lang
             )
             return translated_text
         except Exception:
             return text
 
-    def translate(self, text: str) -> str:
+    def translate(self, text: str, source_lang: Optional[str] = None, target_lang: Optional[str] = None) -> str:
         """
-        テキストを翻訳する。
+        テキストを翻訳する。source_lang/target_langを指定すればself.config.SOURCE_LANG/TARGET_LANGを
+        上書きできる(1つのTranslatorEngineでマイク用/スピーカー用など複数方向を共有するため)。
         TRANSLATION_ENGINE が "nllb" の場合はまず _translate_via_nllb(text) を試み、
         例外が発生した場合はログに warning を出力して _translate_via_argos(text) にフォールバックする。
         TRANSLATION_ENGINE が "nllb" 以外の場合は従来通り _translate_via_argos(text) を直接呼ぶ。
@@ -256,9 +278,9 @@ class TranslatorEngine:
 
         if engine == "nllb":
             try:
-                return self._translate_via_nllb(text)
+                return self._translate_via_nllb(text, source_lang, target_lang)
             except Exception as e:
                 logger.warning("NLLB translation failed (%s). Safely falling back to argos-translate.", e)
-                return self._translate_via_argos(text)
+                return self._translate_via_argos(text, source_lang, target_lang)
         else:
-            return self._translate_via_argos(text)
+            return self._translate_via_argos(text, source_lang, target_lang)
