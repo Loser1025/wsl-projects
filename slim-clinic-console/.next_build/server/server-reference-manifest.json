@@ -1,0 +1,17 @@
+{
+  "node": {
+    "0094c49864ab15f9aa7bb6d6e2edad3622deda0d3b": {
+      "workers": {
+        "app/login/page": {
+          "moduleId": 22542,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/app/login/page.tsx",
+      "exportedName": "$$RSC_SERVER_ACTION_0"
+    }
+  },
+  "edge": {},
+  "encryptionKey": "89nJhdj4bYdPVyd9N54aNMzA8mFSYujazAoWWzK41NY="
+}

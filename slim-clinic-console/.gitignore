@@ -43,3 +43,8 @@ token.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 委任ハーネス(mimic-go)の内部セッションログ・サンドボックスの一時ビルド出力(混入防止)
+.mimic/
+.next_custom/
+.next_old/
