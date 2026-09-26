@@ -1,0 +1,3 @@
+module.exports=[88813,a=>{"use strict";var b=a.i(87924);a.s(["default",0,function({records:a}){return(0,b.jsxs)("div",{className:"p-6 bg-white rounded-lg shadow border border-zinc-200 text-zinc-500 text-sm",children:["確定済みの予約 (",a.length,"件)"]})}])},41317,a=>{"use strict";var b=a.i(87924);a.s(["default",0,function({records:a}){return(0,b.jsxs)("div",{className:"p-6 bg-white rounded-lg shadow border border-zinc-200 text-zinc-500 text-sm",children:["未確定の申込み (",a.length,"件)"]})}])}];
+
+//# sourceMappingURL=src_app_components_0pyrqlt._.js.map

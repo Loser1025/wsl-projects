@@ -105,7 +105,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "/tmp/mimic_workroom_1064643273/merged",
+    "outputFileTracingRoot": "/tmp/mimic_workroom_2276198540/merged",
     "enablePrerenderSourceMaps": true,
     "cacheComponents": false,
     "cacheLife": {
@@ -320,13 +320,13 @@
     "htmlLimitedBots": "[\\w-]+-Google|Google-[\\w-]+|Chrome-Lighthouse|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti|googleweblight",
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
-    "repoRoot": "/tmp/mimic_workroom_1064643273/merged",
+    "repoRoot": "/tmp/mimic_workroom_2276198540/merged",
     "turbopack": {
-      "root": "/tmp/mimic_workroom_1064643273/merged"
+      "root": "/tmp/mimic_workroom_2276198540/merged"
     },
     "distDirRoot": ".next_build"
   },
-  "appDir": "/tmp/mimic_workroom_1064643273/merged",
+  "appDir": "/tmp/mimic_workroom_2276198540/merged",
   "relativeAppDir": "",
   "files": [
     ".next_build/package.json",
