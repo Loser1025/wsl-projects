@@ -13,11 +13,15 @@ import sys
 import os
 import time
 
-# サードパーティの大量のINFOログを抑制 (HTTPX, HTTPCore, HuggingFace Hub, Urllib3)
+# サードパーティの大量のINFOログを抑制 (HTTPX, HTTPCore, HuggingFace Hub, Urllib3,
+# argostranslateの内部処理詳細ログ, faster-whisperの音声区間ログ)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("argostranslate.utils").setLevel(logging.WARNING)
+logging.getLogger("faster_whisper").setLevel(logging.WARNING)
+logging.getLogger("stanza").setLevel(logging.WARNING)
 
 # プロジェクトルートディレクトリをsys.pathに追加してフラットインポート可能にする
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

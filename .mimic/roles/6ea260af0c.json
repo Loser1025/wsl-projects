@@ -1,0 +1,8 @@
+{
+  "role": "視点: argos-translateの言語パッケージ管理を専門とするMLエンジニア。制約: TranslatorEngineのtranscribe()メソッドや他のクラス構造は変更しない。_ensure_argos_package()メソッドのロジックのみを変更する。他ファイルには触れない。完了基準: zoom_translator/translator_engine.pyの_ensure_argos_package()を、以下のロジックに拡張すること。(1) 現状通り、まずconfig.SOURCE_LANG→config.TARGET_LANGの直接パッケージが利用可能なパッケージ一覧(argostranslate.package.get_available_packages())にあるか確認し、あればダウンロード・インストールする(既存ロジック維持)。(2) 直接パッケージが見つからなかった場合、config.SOURCE_LANGが\"en\"でなければ config.SOURCE_LANG→\"en\" のパッケージを探してインストールし、config.TARGET_LANGが\"en\"でなければ \"en\"→config.TARGET_LANG のパッケージを探してインストールする(英語経由のピボット翻訳を可能にするため。argostranslate.translate.translate()はインストール済みパッケージのグラフから自動的に経由ルートを探索する仕様のため、ja→enとen→koの両方がインストールされていればja→koの呼び出し自体は変更不要でそのまま動く)。(3) いずれの探索・インストールも個別にtry/exceptで保護し、一部が失敗しても処理全体を継続する(呼び出し元をクラッシュさせない)。(4) 既存の_argos_initializedフラグによる「初回のみ実行」の仕組みは維持する。日本語コメントで各ステップの意図を説明すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-25T23:36:36+09:00"
+}

@@ -1,16 +1,30 @@
 import numpy as np
+import logging
 from typing import Tuple, Optional, Any
 from config import Config, default_config
 
+logger = logging.getLogger(__name__)
+
+# モジュールレベルに、ISO 639-1相当の2文字言語コードからNLLB-200が使用するFLORES-200言語コードへのマッピング辞書を定義
+_ISO_TO_FLORES = {
+    "ja": "jpn_Jpan",
+    "ko": "kor_Hang",
+    "en": "eng_Latn",
+    "zh": "zho_Hans",
+}
+
 class TranslatorEngine:
     """
-    faster-whisperによる音声認識とargos-translateによる翻訳を行うエンジンクラス。
+    faster-whisperによる音声認識と、NLLB-200(ctranslate2)またはargos-translateによる翻訳を行うエンジンクラス。
     モデルや言語パッケージのロードは初回利用時に遅延初期化（Lazy Initialization）されます。
     """
     def __init__(self, config: Config = default_config):
         self.config = config
         self._whisper_model: Optional[Any] = None
         self._argos_initialized: bool = False
+        self._nllb_translator: Optional[Any] = None
+        self._nllb_tokenizer: Optional[Any] = None
+        self._nllb_load_failed: bool = False
 
     def _load_whisper(self) -> None:
         """初回利用時にfaster-whisperのWhisperModelを遅延ロードする"""
@@ -20,6 +34,34 @@ class TranslatorEngine:
                 self.config.WHISPER_MODEL_SIZE,
                 compute_type=self.config.WHISPER_COMPUTE_TYPE
             )
+
+    def _load_nllb(self) -> None:
+        """
+        NLLB-200モデルおよびトークナイザーを遅延ロードする。
+        self._nllb_translator is None かつ self._nllb_load_failed が False の場合のみロードを試みる。
+        一度失敗した場合は _nllb_load_failed = True を設定し、以降のリトライを防ぐとともに
+        argos-translate へのフォールバック経路へ安全に移行する。
+        """
+        if self._nllb_translator is None and not self._nllb_load_failed:
+            try:
+                from transformers import AutoTokenizer
+                from hf_hub_ctranslate2 import TranslatorCT2fromHfHub
+
+                logger.info("Loading NLLB-200 tokenizer from %s", self.config.NLLB_TOKENIZER_REPO)
+                self._nllb_tokenizer = AutoTokenizer.from_pretrained(self.config.NLLB_TOKENIZER_REPO)
+
+                logger.info("Loading NLLB-200 translator from %s (compute_type=%s)", 
+                            self.config.NLLB_MODEL_REPO, self.config.NLLB_COMPUTE_TYPE)
+                self._nllb_translator = TranslatorCT2fromHfHub(
+                    model_name_or_path=self.config.NLLB_MODEL_REPO,
+                    device="cpu",
+                    compute_type=self.config.NLLB_COMPUTE_TYPE,
+                    tokenizer=self._nllb_tokenizer
+                )
+            except Exception as e:
+                self._nllb_load_failed = True
+                logger.warning("Failed to load NLLB-200 model/tokenizer: %s. Falling back to argos-translate.", e)
+                raise
 
     def _ensure_argos_package(self) -> None:
         """初回利用時にargos-translateの翻訳パッケージを確認し、必要に応じてインストールする"""
@@ -49,12 +91,10 @@ class TranslatorEngine:
                         download_path = target_package.download()
                         argostranslate.package.install_from_path(download_path)
             except Exception:
-                # 一部の処理が失敗してもクラッシュさせない
                 pass
 
-            # ステップ2: 直接パッケージが見つからない、またはインストールできない場合で、ソース言語やターゲット言語が英語("en")以外の場合、英語経由のピボット翻訳（source_lang -> "en" および "en" -> target_lang）を確認・インストールする
+            # ステップ2: 英語経由のピボット翻訳確認・インストール
             if source_lang != "en" or target_lang != "en":
-                # ソースから英語へのパッケージ確認・インストール
                 if source_lang != "en":
                     try:
                         installed_packages = argostranslate.package.get_installed_packages()
@@ -74,7 +114,6 @@ class TranslatorEngine:
                     except Exception:
                         pass
 
-                # 英語からターゲットへのパッケージ確認・インストール
                 if target_lang != "en":
                     try:
                         installed_packages = argostranslate.package.get_installed_packages()
@@ -94,20 +133,12 @@ class TranslatorEngine:
                     except Exception:
                         pass
 
-            # ステップ3: 初回初期化フラグをTrueに設定
             self._argos_initialized = True
 
     def transcribe(self, audio_np: np.ndarray) -> str:
         """
         numpy配列の音声データを入力として受け取り、
         faster-whisperで音声認識（文字起こし）を行い、認識結果テキストを返す。
-        空または無音の場合は空文字を返す。
-
-        Args:
-            audio_np (np.ndarray): float32型、config.SAMPLE_RATEのモノラル音声配列
-
-        Returns:
-            str: 認識されたテキスト（無音・空の場合は空文字）
         """
         if audio_np is None or audio_np.size == 0:
             return ""
@@ -128,21 +159,52 @@ class TranslatorEngine:
         transcript_text = " ".join([segment.text.strip() for segment in segments]).strip()
         return transcript_text
 
-    def translate(self, text: str) -> str:
+    def _translate_via_nllb(self, text: str) -> str:
         """
-        与えられたテキストを config.SOURCE_LANG から config.TARGET_LANG へ
-        argos-translate で翻訳して返す。
-        空文字入力なら空文字を返す。翻訳失敗時は元のテキストをそのまま返す。
-
-        Args:
-            text (str): 翻訳対象のテキスト
-
-        Returns:
-            str: 翻訳されたテキスト（失敗時または空文字の場合はそのまま）
+        NLLB-200を使用してテキストを翻訳する。
+        _load_nllb()を呼び出し、ISOコードをFLORES-200コードに変換して翻訳を実行する。
         """
-        if not text:
+        self._load_nllb()
+        if self._nllb_translator is None:
+            raise RuntimeError("NLLB-200 translator is not initialized.")
+
+        src_lang = self.config.SOURCE_LANG
+        tgt_lang = self.config.TARGET_LANG
+
+        if src_lang not in _ISO_TO_FLORES:
+            raise ValueError(f"Source language '{src_lang}' is not supported in _ISO_TO_FLORES.")
+        if tgt_lang not in _ISO_TO_FLORES:
+            raise ValueError(f"Target language '{tgt_lang}' is not supported in _ISO_TO_FLORES.")
+
+        flores_src = _ISO_TO_FLORES[src_lang]
+        flores_tgt = _ISO_TO_FLORES[tgt_lang]
+
+        output = self._nllb_translator.generate(
+            text=[text],
+            src_lang=[flores_src],
+            tgt_lang=[flores_tgt]
+        )
+
+        # 戻り値の構造（リストや文字列など）に対して防御的に処理して文字列を取り出す
+        if isinstance(output, list):
+            if len(output) > 0:
+                item = output[0]
+                if isinstance(item, list) and len(item) > 0:
+                    return str(item[0])
+                elif isinstance(item, str):
+                    return str(item)
+                else:
+                    return str(item)
             return ""
+        elif isinstance(output, str):
+            return output
+        else:
+            return str(output)
 
+    def _translate_via_argos(self, text: str) -> str:
+        """
+        既存のargos-translateによる翻訳ロジック（温存されたフォールバック経路）。
+        """
         try:
             self._ensure_argos_package()
         except Exception:
@@ -158,3 +220,24 @@ class TranslatorEngine:
             return translated_text
         except Exception:
             return text
+
+    def translate(self, text: str) -> str:
+        """
+        テキストを翻訳する。
+        TRANSLATION_ENGINE が "nllb" の場合はまず _translate_via_nllb(text) を試み、
+        例外が発生した場合はログに warning を出力して _translate_via_argos(text) にフォールバックする。
+        TRANSLATION_ENGINE が "nllb" 以外の場合は従来通り _translate_via_argos(text) を直接呼ぶ。
+        """
+        if not text:
+            return ""
+
+        engine = getattr(self.config, "TRANSLATION_ENGINE", "argos")
+
+        if engine == "nllb":
+            try:
+                return self._translate_via_nllb(text)
+            except Exception as e:
+                logger.warning("NLLB translation failed (%s). Safely falling back to argos-translate.", e)
+                return self._translate_via_argos(text)
+        else:
+            return self._translate_via_argos(text)

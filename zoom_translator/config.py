@@ -6,9 +6,18 @@ from typing import Optional
 class Config:
     """Zoomなどのシステム音声をリアルタイム翻訳字幕表示するデスクトップアプリの設定を保持するデータクラス"""
 
-    # argos-translate用の言語コード（例: 'en', 'ja'）
+    # 言語コード（例: 'en', 'ja', 'ko', 'zh'）
     SOURCE_LANG: str = "ja"
     TARGET_LANG: str = "ko"
+
+    # 翻訳エンジンの選択（"nllb": NLLB-200で直接翻訳(推奨・高品質) / "argos": argos-translateのみ使用）
+    TRANSLATION_ENGINE: str = "nllb"
+    # NLLB-200のctranslate2変換済みモデル(HuggingFace Hub上のリポジトリ名)
+    NLLB_MODEL_REPO: str = "michaelfeil/ct2fast-nllb-200-distilled-600M"
+    # NLLBのトークナイザ取得元(オリジナルのtransformersリポジトリ)
+    NLLB_TOKENIZER_REPO: str = "facebook/nllb-200-distilled-600M"
+    # NLLBのCPU推論時の量子化タイプ
+    NLLB_COMPUTE_TYPE: str = "int8"
 
     # スピーカーデバイス名（Noneの場合はデフォルト出力デバイスを使用）
     SPEAKER_DEVICE_NAME: Optional[str] = None
@@ -27,8 +36,9 @@ class Config:
     # Whisperの演算データ型（例: 'int8', 'float16', 'float32'）
     WHISPER_COMPUTE_TYPE: str = "int8"
 
-    # ビームサーチの探索幅（大きいほど精度が上がるが処理が遅くなる）。速度優先で1(貪欲探索)に抑える
-    BEAM_SIZE: int = 1
+    # ビームサーチの探索幅（大きいほど精度が上がるが処理が遅くなる）。
+    # 実測でsmallモデルは8秒の音声を3〜5秒程度で処理でき余裕があったため、3に引き上げて精度を少し取り戻す
+    BEAM_SIZE: int = 3
 
     # VADで切り出した短い音声チャンクで前チャンクの文脈を引きずりハルシネーション（存在しない文の混入）が起きるのを防ぐためFalseにする
     WHISPER_CONDITION_ON_PREVIOUS_TEXT: bool = False
@@ -69,8 +79,9 @@ class Config:
     # Whisperの認識結果は「。」「！」「？」で終わることが多く、半角記号だけだと
     # 文単位バッファリングが文の完成を検出できなくなるため）
     SENTENCE_END_CHARS: str = ".?!。！？"
-    # 句読点が来なくても強制的に翻訳に回す最大待ち秒数
-    SENTENCE_MAX_WAIT_SEC: float = 6.0
+    # 句読点が来なくても強制的に翻訳に回す最大待ち秒数。
+    # 実況・雑談など句点が少ない話し方では短すぎると文脈途中で切られ翻訳精度が落ちるため9.0に緩和
+    SENTENCE_MAX_WAIT_SEC: float = 9.0
 
     # --- GUI関連設定 ---
     # GUIウィンドウの幅（px）
