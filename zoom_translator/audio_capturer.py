@@ -28,7 +28,7 @@ class AudioCapturer:
     コールバック関数に渡すクラス。
     """
 
-    def __init__(self, config: Config = default_config, on_chunk: Optional[Callable[[np.ndarray], None]] = None):
+    def __init__(self, config: Config = default_config, on_chunk: Optional[Callable[[np.ndarray], None]] = None, source_type: str = "speaker"):
         """
         AudioCapturerの初期化。
 
@@ -36,9 +36,11 @@ class AudioCapturer:
             config (Config): 設定オブジェクト (default_config)
             on_chunk (Callable[[np.ndarray], None], optional): チャンク取得時に呼ばれるコールバック関数。
                                                                  引数としてfloat32のnumpy配列(モノラル)を受け取る。
+            source_type (str): 録音ソース種別 ("speaker" または "mic")
         """
         self.config = config
         self.on_chunk = on_chunk
+        self.source_type = source_type
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
@@ -82,16 +84,26 @@ class AudioCapturer:
             print(f"[AudioCapturer Error] Unsupported sample rate for webrtcvad: {sample_rate}Hz. Supported: 8000, 16000, 32000, 48000")
             return
 
-        device_name = self.config.SPEAKER_DEVICE_NAME
+        if self.source_type == "mic":
+            device_name = self.config.MIC_DEVICE_NAME
+            prefix = "[mic]"
+        else:
+            device_name = self.config.SPEAKER_DEVICE_NAME
+            prefix = "[speaker]"
+
         vad_aggressiveness = self.config.VAD_AGGRESSIVENESS
         vad_frame_ms = self.config.VAD_FRAME_MS  # 10, 20, 30 ms
 
         if vad_frame_ms not in (10, 20, 30):
-            print(f"[AudioCapturer Error] Unsupported VAD frame ms: {vad_frame_ms}. Supported: 10, 20, 30")
+            print(f"[AudioCapturer {prefix} Error] Unsupported VAD frame ms: {vad_frame_ms}. Supported: 10, 20, 30")
             return
 
         # webrtcvad初期化
-        vad = webrtcvad.Vad(vad_aggressiveness)
+        try:
+            vad = webrtcvad.Vad(vad_aggressiveness)
+        except Exception as e:
+            print(f"[AudioCapturer {prefix} Error] Failed to initialize webrtcvad (mode {vad_aggressiveness}): {e}")
+            return
 
         # 1フレームあたりのサンプル数 (例: 16000Hz * 0.03s = 480 samples)
         frame_samples = int(sample_rate * (vad_frame_ms / 1000.0))
@@ -105,38 +117,59 @@ class AudioCapturer:
 
         required_silent_frames = int(silence_ms / vad_frame_ms)
 
-        print(f"[AudioCapturer] Starting VAD recording. Device: {device_name or 'Default'}, Sample Rate: {sample_rate}Hz, VAD Mode: {vad_aggressiveness}")
+        print(f"[AudioCapturer {prefix}] Starting VAD recording. Device: {device_name or 'Default'}, Sample Rate: {sample_rate}Hz, VAD Mode: {vad_aggressiveness}")
 
         try:
-            # ループバック録音はsoundcardでは「マイク」側API(all_microphones/get_microphone)に
-            # include_loopback=Trueを渡す形で提供される（all_speakers/default_speakerには
-            # include_loopback引数は存在しない）。
             speaker = None
-            if device_name:
-                try:
-                    mics = sc.all_microphones(include_loopback=True)
-                    for m in mics:
-                        if device_name.lower() in m.name.lower():
+            if self.source_type == "mic":
+                if device_name:
+                    try:
+                        mics = sc.all_microphones(include_loopback=False)
+                        for m in mics:
+                            if device_name.lower() in m.name.lower():
+                                speaker = m
+                                break
+                        if speaker is None:
+                            print(f"[AudioCapturer {prefix} Warning] Microphone device '{device_name}' not found. Falling back to default microphone.")
+                    except Exception as e:
+                        print(f"[AudioCapturer {prefix} Warning] Failed to find microphone '{device_name}': {e}. Falling back to default.")
+
+                if speaker is None:
+                    try:
+                        speaker = sc.default_microphone()
+                    except Exception as e:
+                        print(f"[AudioCapturer {prefix} Error] Failed to get default microphone: {e}")
+                if speaker is None:
+                    raise RuntimeError("No microphone device available.")
+            else:
+                # ループバック録音はsoundcardでは「マイク」側API(all_microphones/get_microphone)に
+                # include_loopback=Trueを渡す形で提供される（all_speakers/default_speakerには
+                # include_loopback引数は存在しない）。
+                if device_name:
+                    try:
+                        mics = sc.all_microphones(include_loopback=True)
+                        for m in mics:
+                            if device_name.lower() in m.name.lower():
+                                speaker = m
+                                break
+                        if speaker is None:
+                            print(f"[AudioCapturer {prefix} Warning] Speaker device '{device_name}' not found. Falling back to default loopback.")
+                    except Exception as e:
+                        print(f"[AudioCapturer {prefix} Warning] Failed to find speaker '{device_name}': {e}. Falling back to default.")
+
+                if speaker is None:
+                    # デフォルトスピーカーの名前を取得し、ループバック対応マイク一覧の中から
+                    # 同名のものを探す（見つからなければ先頭のループバックデバイスにフォールバック）
+                    default_spk = sc.default_speaker()
+                    loopback_mics = sc.all_microphones(include_loopback=True)
+                    for m in loopback_mics:
+                        if m.name == default_spk.name:
                             speaker = m
                             break
+                    if speaker is None and loopback_mics:
+                        speaker = loopback_mics[0]
                     if speaker is None:
-                        print(f"[AudioCapturer Warning] Speaker device '{device_name}' not found. Falling back to default loopback.")
-                except Exception as e:
-                    print(f"[AudioCapturer Warning] Failed to find speaker '{device_name}': {e}. Falling back to default.")
-
-            if speaker is None:
-                # デフォルトスピーカーの名前を取得し、ループバック対応マイク一覧の中から
-                # 同名のものを探す（見つからなければ先頭のループバックデバイスにフォールバック）
-                default_spk = sc.default_speaker()
-                loopback_mics = sc.all_microphones(include_loopback=True)
-                for m in loopback_mics:
-                    if m.name == default_spk.name:
-                        speaker = m
-                        break
-                if speaker is None and loopback_mics:
-                    speaker = loopback_mics[0]
-                if speaker is None:
-                    raise RuntimeError("No loopback speaker device available.")
+                        raise RuntimeError("No loopback speaker device available.")
 
             # soundcardのレコーダーを開始
             # blocksizeはframe_samplesに合わせるのが効率的
@@ -229,19 +262,18 @@ class AudioCapturer:
             print("[AudioCapturer] VAD recording stopped.")
 
 
-def list_speaker_devices() -> list[str]:
+def list_microphone_devices() -> list[str]:
     """
-    soundcardライブラリを使用してループバック可能なスピーカーデバイスの名前一覧を取得する。
+    soundcardライブラリを使用して実マイクデバイスの名前一覧を取得する（ループバックは含めない）。
     soundcard未インストール環境や取得失敗時は例外を投げずに空リストを返す。
 
     Returns:
-        list[str]: スピーカーデバイス名のリスト
+        list[str]: 実マイクデバイス名のリスト
     """
     if sc is None:
         return []
     try:
-        # include_loopbackはall_microphones/get_microphone側の引数(all_speakersには存在しない)
-        devices = sc.all_microphones(include_loopback=True)
+        devices = sc.all_microphones(include_loopback=False)
         names = []
         for dev in devices:
             if hasattr(dev, 'name') and dev.name:
@@ -250,5 +282,5 @@ def list_speaker_devices() -> list[str]:
                 names.append(dev)
         return names
     except Exception as e:
-        print(f"[AudioCapturer Error] Failed to list speaker devices: {e}")
+        print(f"[AudioCapturer Error] Failed to list microphone devices: {e}")
         return []

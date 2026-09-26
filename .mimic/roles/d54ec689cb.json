@@ -1,0 +1,8 @@
+{
+  "role": "視点: リアルタイムパイプラインの応答性改善を担当するエンジニア。制約: config.py, audio_capturer.py, translator_engine.py, sentence_buffer.py, gui.pyの各インターフェースは一切変更しない。main.py内のstt_worker()関数のロジックのみを変更する(他の関数は変更しない)。既存のTIMINGログ・result_queueへの格納形式(sentence, translated)のタプルという形は維持する。前提: sentence_buffer.peek() -\u003e Optional[str] が追加済み(蓄積中の未完成テキストを副作用なく取得できる)。完了基準: zoom_translator/main.pyのstt_worker()内、現在は「sentence = sentence_buffer.add_fragment(fragment)」で文が完成した場合(sentenceが非None)のみtranslateしてresult_queueに積んでいる箇所を、以下のように拡張すること。(1) sentenceが完成した場合(非None)は、現状通りtranslator_engine.translate(sentence)して(sentence, translated)をresult_queueに積む(これが「確定版」)。(2) sentenceがNone(まだ未完成)の場合、sentence_buffer.peek()で現在蓄積中のテキストを取得し、それが空でなければtranslator_engine.translate(peeked_text)して(peeked_text, translated)をresult_queueに積む(これは「暫定版」であり、後で文が完成した際に確定版で上書き表示される想定。ログには[暫定]のようなラベルを付けて完成文と区別できるようにする)。(3) 暫定表示の翻訳処理も含めて[TIMING]ログの翻訳時間計測(translate_sec)に反映すること。(4) 既存の例外処理(try/except)・audio_queue.task_done()の呼び出しタイミングは崩さないこと。日本語コメントで、この変更が「文の完成を待たず、蓄積中のテキストを都度仮翻訳して即座に表示することで体感の遅延を減らすため」であることを説明すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-26T12:41:28+09:00"
+}

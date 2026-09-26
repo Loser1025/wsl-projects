@@ -6,7 +6,11 @@ from typing import Optional
 class Config:
     """Zoomなどのシステム音声をリアルタイム翻訳字幕表示するデスクトップアプリの設定を保持するデータクラス"""
 
-    # 言語コード（例: 'en', 'ja', 'ko', 'zh'）
+    # 言語コード（例: 'en', 'ja', 'ko', 'zh'）。
+    # TranslatorEngineが実際に読む「その時点のアクティブな言語ペア」。
+    # マイク用・スピーカー用の2系統を並行実行する際は、main.py側でdataclasses.replace()を使い、
+    # 下記のMIC_SOURCE_LANG等/SPEAKER_SOURCE_LANG等の値でこのフィールドを上書きした
+    # Configインスタンスをそれぞれ作ってTranslatorEngineに渡す(このフィールド自体はテンプレート)。
     SOURCE_LANG: str = "ja"
     TARGET_LANG: str = "ko"
 
@@ -20,8 +24,18 @@ class Config:
     # NLLBのCPU推論時の量子化タイプ
     NLLB_COMPUTE_TYPE: str = "int8"
 
-    # スピーカーデバイス名（Noneの場合はデフォルト出力デバイスを使用）
+    # スピーカーデバイス名(相手の声=システム音声のループバック録音対象。Noneの場合はデフォルト出力デバイスを使用)
     SPEAKER_DEVICE_NAME: Optional[str] = None
+    # マイクデバイス名(あなた自身の声=実マイク入力の録音対象。Noneの場合はデフォルトマイクを使用)
+    MIC_DEVICE_NAME: Optional[str] = None
+
+    # --- 商談用2系統翻訳(マイク/スピーカー)のデフォルト言語ペア ---
+    # マイク(あなたの声)側: 日本語 -> 韓国語
+    MIC_SOURCE_LANG: str = "ja"
+    MIC_TARGET_LANG: str = "ko"
+    # スピーカー(相手の声)側: 韓国語 -> 日本語
+    SPEAKER_SOURCE_LANG: str = "ko"
+    SPEAKER_TARGET_LANG: str = "ja"
 
     # 音声サンプリングレート（Hz）
     SAMPLE_RATE: int = 16000
