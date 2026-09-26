@@ -194,6 +194,16 @@ def main():
 
                     # 4. キューに格納 (original, translated)
                     result_queue.put((sentence, translated))
+                else:
+                    # 文の完成を待たず、蓄積中のテキストを都度仮翻訳して即座に表示することで体感の遅延を減らすため、
+                    # sentence_buffer.peek() を用いて未完成テキストを取得し、仮翻訳してresult_queueに積む。
+                    peeked_text = sentence_buffer.peek()
+                    if peeked_text:
+                        t1 = time.monotonic()
+                        translated_peek = translator_engine.translate(peeked_text)
+                        translate_sec = time.monotonic() - t1
+                        logger.info(f"[暫定] 蓄積中原文: {peeked_text} -> 暫定翻訳文: {translated_peek}")
+                        result_queue.put((peeked_text, translated_peek))
 
                 # このチャンク1件にかかった総所要時間の内訳をログ出力する
                 # (queue_wait: 録音〜処理開始までの待ち行列時間, transcribe/translate: 各処理の実処理時間)

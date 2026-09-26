@@ -1,0 +1,8 @@
+{
+  "role": "視点: リアルタイム音声認識テキストの後処理を担当するエンジニア。制約: 既存のadd_fragment()・flush()メソッドの動作(バッファの蓄積・リセット条件)は一切変更しない。新しいメソッドを1つ追加するだけに専念する。他ファイルには触れない。zoom_translator/config.pyとは同一ディレクトリのフラットな`from config import Config, default_config`形式でインポートすること(既に使われている)。完了基準: zoom_translator/sentence_buffer.pyのSentenceBufferクラスに、peek(self) -\u003e Optional[str] というメソッドを追加すること。このメソッドは現在self._bufferに蓄積されている内容を、前後の空白を除去した上で返す(内部状態は一切変更しない、リセットもしない、副作用なしの読み取り専用メソッド)。バッファが空文字列の場合はNoneを返す。docstringで「文がまだ完成していない間の暫定表示用に、蓄積中のテキストを覗き見するためのメソッド」であることを説明すること。",
+  "uses": 1,
+  "pass_count": 1,
+  "fail_count": 0,
+  "mode": "write",
+  "last_used": "2026-09-26T12:40:21+09:00"
+}
