@@ -74,29 +74,91 @@ export type ConfirmationEmailInput = {
   customerName: string;
   confirmedDateTime: string;
   questionnaireUrl: string;
-  meetLink: string;
+  meetLink?: string;
 };
 
 export async function sendConfirmationEmail(
   input: ConfirmationEmailInput
 ): Promise<void> {
-  const body = `${input.customerName} 様
+  const isOnline = !!input.meetLink;
 
-このたびはご予約いただき誠にありがとうございます。
-下記の内容でご予約が確定いたしました。
-
-■ 確定日時
-${input.confirmedDateTime}
-
-■ 事前問診票（ご来院前にご記入ください）
-${input.questionnaireUrl}
-
-■ オンライン診療用リンク（Google Meet）
+  const meetSection = isOnline
+    ? `■ オンライン診療用リンク（Google Meet）
+当日は下記URLよりご入室ください。
 ${input.meetLink}
 
-ご不明な点がございましたらお気軽にお問い合わせください。`;
+`
+    : `■ ご来院について
+当日はクリニックまでご来院くださいませ。
 
-  await sendPlainTextEmail(input.to, "【ご予約確定のお知らせ】", body);
+`;
+
+  const body = `${input.customerName} 様
+
+平素より格別のご高配を賜り、厚く御礼申し上げます。
+このたびはご予約を賜り、誠にありがとうございます。
+
+下記の内容にて、ご予約が確定いたしましたのでご案内申し上げます。
+
+■ ご予約確定日時
+${input.confirmedDateTime}
+
+■ 事前問診票のご入力のお願い
+恐れ入りますが、当日スムーズにご案内させていただくため、
+ご来院（またはオンライン診療開始）前までに下記URLより
+事前問診票のご入力をお願いいたします。
+${input.questionnaireUrl}
+※本メールとLINEの両方でご案内をお送りしておりますが、
+　事前問診票のご入力は一回で結構です。
+
+${meetSection}ご不明な点やご不安な点がございましたら、
+どうぞお気軽にお問い合わせくださいませ。
+
+当日${input.customerName}様にお会いできますことを、
+スタッフ一同心よりお待ち申し上げております。
+
+今後とも何卒よろしくお願い申し上げます。`;
+
+  await sendPlainTextEmail(input.to, "【ご予約確定のご案内】", body);
+}
+
+export type ReminderEmailInput = {
+  to: string;
+  customerName: string;
+  confirmedDateTime: string;
+  questionnaireUrl: string;
+  meetLink?: string;
+};
+
+export async function sendReminderEmail(input: ReminderEmailInput): Promise<void> {
+  const isOnline = !!input.meetLink;
+
+  const meetSection = isOnline
+    ? `■ オンライン診療用リンク（Google Meet）
+まもなくのお時間になりましたら、下記URLよりご入室ください。
+${input.meetLink}
+
+`
+    : `■ ご来院について
+まもなくのお時間になりましたら、クリニックまでご来院くださいませ。
+
+`;
+
+  const body = `${input.customerName} 様
+
+まもなくご予約のお時間です。
+
+■ ご予約日時
+${input.confirmedDateTime}（10分後にご案内予定です）
+
+${meetSection}事前問診票のご入力がまだお済みでない場合は、
+お手数ですが下記URLより当日までにご入力をお願いいたします。
+${input.questionnaireUrl}
+
+当日${input.customerName}様にお会いできますことを、
+スタッフ一同心よりお待ち申し上げております。`;
+
+  await sendPlainTextEmail(input.to, "【まもなくご予約のお時間です】", body);
 }
 
 export async function cancelNotificationEmail(
@@ -105,8 +167,15 @@ export async function cancelNotificationEmail(
 ): Promise<void> {
   const body = `${customerName} 様
 
-ご予約がキャンセルされましたのでお知らせいたします。
-改めてのご予約をお待ちしております。`;
+平素よりお世話になっております。
 
-  await sendPlainTextEmail(to, "【ご予約キャンセルのお知らせ】", body);
+ご予約につきまして、キャンセルのお手続きが完了いたしましたので
+ご連絡申し上げます。
+
+またのご来院を心よりお待ち申し上げております。
+改めてご予約をご希望の際は、どうぞお気軽にお申し込みくださいませ。
+
+今後とも何卒よろしくお願い申し上げます。`;
+
+  await sendPlainTextEmail(to, "【ご予約キャンセルのご案内】", body);
 }

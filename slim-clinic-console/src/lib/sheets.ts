@@ -1,96 +1,19 @@
 import { google } from "googleapis";
+import { RESERVATION_SHEET_NAMES, ReservationSheetName, ReservationRecord } from "@/lib/reservation-fields";
 
-export const RESERVATION_SHEET_NAMES = ["国内", "韓国", "台湾"] as const;
-export type ReservationSheetName = typeof RESERVATION_SHEET_NAMES[number];
-
-export type ReservationRecord = {
-  sheetName: ReservationSheetName;
-  rowNumber: number;
-  values: Record<string, string>;
-};
-
-export type Candidate = { label: string; dateTime: string };
-
-type SheetFieldMapping = {
-  name: string;
-  email: string;
-  menu: string;
-  candidates:
-    | { type: "combined"; field: string }
-    | { type: "separate"; pairs: [string, string][] };
-};
-
-// 実際のシートのヘッダー行(2026-09-26に実データを確認済み)に基づく。
-// 国内・台湾は希望日時が1列に結合された文字列、韓国のみ列が分かれている。
-const SHEET_FIELD_MAP: Record<ReservationSheetName, SheetFieldMapping> = {
-  "国内": {
-    name: "お名前",
-    email: "メールアドレス",
-    menu: "ご希望メニュー",
-    candidates: { type: "combined", field: "ご希望日時" },
-  },
-  "台湾": {
-    name: "姓名",
-    email: "電子信箱",
-    menu: "看診項目",
-    candidates: { type: "combined", field: "希望時段" },
-  },
-  "韓国": {
-    name: "이름",
-    email: "이메일",
-    menu: "희망 메뉴",
-    candidates: {
-      type: "separate",
-      pairs: [
-        ["제1희망 날짜", "제1희망 시간"],
-        ["제2희망 날짜", "제2희망 시간"],
-        ["제3희망 날짜", "제3희망 시간"],
-      ],
-    },
-  },
-};
-
-export function getCustomerName(record: ReservationRecord): string {
-  return record.values[SHEET_FIELD_MAP[record.sheetName].name] || "";
-}
-
-export function getCustomerEmail(record: ReservationRecord): string {
-  return record.values[SHEET_FIELD_MAP[record.sheetName].email] || "";
-}
-
-export function getMenuSummary(record: ReservationRecord): string {
-  return record.values[SHEET_FIELD_MAP[record.sheetName].menu] || "";
-}
-
-export function getCandidates(record: ReservationRecord): Candidate[] {
-  const mapping = SHEET_FIELD_MAP[record.sheetName].candidates;
-
-  if (mapping.type === "combined") {
-    const raw = record.values[mapping.field] || "";
-    return raw
-      .split("/")
-      .map((segment) => segment.trim())
-      .filter(Boolean)
-      .map((segment) => {
-        const idx = segment.indexOf(":");
-        if (idx === -1) return { label: segment, dateTime: segment };
-        return {
-          label: segment.slice(0, idx).trim(),
-          dateTime: segment.slice(idx + 1).trim(),
-        };
-      });
-  }
-
-  const candidates: Candidate[] = [];
-  mapping.pairs.forEach(([dateField, timeField], i) => {
-    const date = record.values[dateField];
-    const time = record.values[timeField];
-    if (date && time) {
-      candidates.push({ label: `第${i + 1}希望`, dateTime: `${date} ${time}` });
-    }
-  });
-  return candidates;
-}
+export type { ReservationSheetName, ReservationRecord, Candidate } from "@/lib/reservation-fields";
+export {
+  RESERVATION_SHEET_NAMES,
+  QUESTIONNAIRE_URL_MAP,
+  getCustomerName,
+  getCustomerEmail,
+  getMenuSummary,
+  getCandidates,
+  getConfirmedDateTime,
+  getMeetLink,
+  getReminderSentFlag,
+  parseConfirmedDateTime,
+} from "@/lib/reservation-fields";
 
 function getSheetsClient() {
   const auth = new google.auth.JWT({
@@ -124,9 +47,9 @@ async function getHeaderRow(sheetName: ReservationSheetName): Promise<string[]> 
   return rows[0].map(String);
 }
 
-async function ensureStatusColumns(sheetName: ReservationSheetName): Promise<void> {
-  const headers = await getHeaderRow(sheetName);
-  const needed = ["ステータス", "確定日時", "Meetリンク"];
+async function ensureStatusColumns(sheetName: ReservationSheetName, knownHeaders?: string[]): Promise<void> {
+  const headers = knownHeaders ?? (await getHeaderRow(sheetName));
+  const needed = ["ステータス", "確定日時", "Meetリンク", "スタッフ備考", "リマインド送信済み"];
   const missing = needed.filter((col) => !headers.includes(col));
   if (missing.length === 0) return;
 
@@ -144,24 +67,22 @@ async function ensureStatusColumns(sheetName: ReservationSheetName): Promise<voi
   });
 }
 
-async function listReservationsByStatus(
-  isMatch: (status: string) => boolean
-): Promise<ReservationRecord[]> {
+async function fetchAllReservations(): Promise<ReservationRecord[]> {
   const records: ReservationRecord[] = [];
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+  const sheets = getSheetsClient();
 
   for (const sheetName of RESERVATION_SHEET_NAMES) {
-    await ensureStatusColumns(sheetName);
-    const sheets = getSheetsClient();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `${sheetName}!A:ZZ`,
     });
     const rows = res.data.values;
-    if (!rows || rows.length <= 1) continue;
+    if (!rows || rows.length === 0) continue;
 
     const headers = rows[0].map(String);
-    const statusIndex = headers.indexOf("ステータス");
+    await ensureStatusColumns(sheetName, headers);
+    if (rows.length <= 1) continue;
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -173,27 +94,36 @@ async function listReservationsByStatus(
           values[headerName] = row && row[j] !== undefined && row[j] !== null ? String(row[j]) : "";
         }
       }
-
-      const status = statusIndex >= 0 && row && row[statusIndex] !== undefined && row[statusIndex] !== null ? String(row[statusIndex]).trim() : "";
-      if (isMatch(status)) {
-        records.push({
-          sheetName,
-          rowNumber,
-          values,
-        });
-      }
+      records.push({ sheetName, rowNumber, values });
     }
   }
 
   return records;
 }
 
+export async function listAllReservationsGrouped(): Promise<{
+  pending: ReservationRecord[];
+  confirmed: ReservationRecord[];
+}> {
+  const all = await fetchAllReservations();
+  const pending: ReservationRecord[] = [];
+  const confirmed: ReservationRecord[] = [];
+
+  for (const record of all) {
+    const status = (record.values["ステータス"] || "").trim();
+    if (status === "" || status === "未確定") pending.push(record);
+    else if (status === "確定") confirmed.push(record);
+  }
+
+  return { pending, confirmed };
+}
+
 export async function listPendingReservations(): Promise<ReservationRecord[]> {
-  return listReservationsByStatus((status) => status === "" || status === "未確定");
+  return (await listAllReservationsGrouped()).pending;
 }
 
 export async function listConfirmedReservations(): Promise<ReservationRecord[]> {
-  return listReservationsByStatus((status) => status === "確定");
+  return (await listAllReservationsGrouped()).confirmed;
 }
 
 export async function confirmReservation(
@@ -257,6 +187,136 @@ export async function cancelReservation(sheetName: ReservationSheetName, rowNumb
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values: [["キャンセル"]],
+    },
+  });
+}
+
+function normalizePhone(value: string): string {
+  return value.replace(/[^\d]/g, "");
+}
+
+export async function findJpReservationRowByContact(
+  email: string,
+  phone: string
+): Promise<number | null> {
+  const sheetName: ReservationSheetName = "国内";
+  await ensureStatusColumns(sheetName);
+  const sheets = getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${sheetName}!A:ZZ`,
+  });
+  const rows = res.data.values;
+  if (!rows || rows.length <= 1) return null;
+
+  const headers = rows[0].map(String);
+  const emailIdx = headers.indexOf("メールアドレス");
+  const phoneIdx = headers.indexOf("お電話番号");
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedPhone = normalizePhone(phone);
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row) continue;
+    const rowEmail = emailIdx >= 0 ? String(row[emailIdx] || "").trim().toLowerCase() : "";
+    const rowPhone = phoneIdx >= 0 ? normalizePhone(String(row[phoneIdx] || "")) : "";
+
+    if (normalizedEmail && rowEmail && rowEmail === normalizedEmail) return i + 1;
+    if (normalizedPhone && rowPhone && rowPhone === normalizedPhone) return i + 1;
+  }
+  return null;
+}
+
+export async function setJpLineFriendId(rowNumber: number, friendId: string): Promise<void> {
+  const sheetName: ReservationSheetName = "国内";
+  const headers = await getHeaderRow(sheetName);
+  let idx = headers.indexOf("LINE Friend ID");
+
+  const sheets = getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+  if (idx === -1) {
+    idx = headers.length;
+    const newHeaders = [...headers, "LINE Friend ID"];
+    const endCol = columnIndexToA1(newHeaders.length - 1);
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${sheetName}!A1:${endCol}1`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [newHeaders] },
+    });
+  }
+
+  const colA1 = columnIndexToA1(idx);
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${colA1}${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[friendId]] },
+  });
+}
+
+export async function getJpLineFriendId(rowNumber: number): Promise<string> {
+  const sheetName: ReservationSheetName = "国内";
+  const headers = await getHeaderRow(sheetName);
+  const idx = headers.indexOf("LINE Friend ID");
+  if (idx === -1) return "";
+
+  const sheets = getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+  const colA1 = columnIndexToA1(idx);
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${sheetName}!${colA1}${rowNumber}`,
+  });
+  return res.data.values?.[0]?.[0] ? String(res.data.values[0][0]) : "";
+}
+
+export async function markReminderSent(sheetName: ReservationSheetName, rowNumber: number): Promise<void> {
+  await ensureStatusColumns(sheetName);
+  const headers = await getHeaderRow(sheetName);
+  const idx = headers.indexOf("リマインド送信済み");
+  if (idx === -1) {
+    throw new Error("Reminder column not found");
+  }
+
+  const sheets = getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+  const colA1 = columnIndexToA1(idx);
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${colA1}${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [["済み"]],
+    },
+  });
+}
+
+export async function updateStaffNotes(
+  sheetName: ReservationSheetName,
+  rowNumber: number,
+  notes: string
+): Promise<void> {
+  await ensureStatusColumns(sheetName);
+  const headers = await getHeaderRow(sheetName);
+  const notesIdx = headers.indexOf("スタッフ備考");
+  if (notesIdx === -1) {
+    throw new Error("Notes column not found");
+  }
+
+  const sheets = getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+  const colA1 = columnIndexToA1(notesIdx);
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${colA1}${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[notes]],
     },
   });
 }

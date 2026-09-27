@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ReservationRecord, ReservationSheetName, getCustomerName, getCustomerEmail, getMenuSummary, getCandidates, Candidate } from "@/app/components/types";
+import { ReservationRecord, ReservationSheetName, QUESTIONNAIRE_URL_MAP, getCustomerName, getCustomerEmail, getMenuSummary, getStaffNotes, getCandidates, isOnlineConsultation, Candidate } from "@/lib/reservation-fields";
 
 const SHEET_LABEL_MAP: Record<ReservationSheetName, string> = {
   "国内": "JP",
@@ -9,14 +9,11 @@ const SHEET_LABEL_MAP: Record<ReservationSheetName, string> = {
   "台湾": "TW",
 };
 
-const QUESTIONNAIRE_URL_MAP: Record<ReservationSheetName, string> = {
-  "国内": "https://surim-pre-questionnaire.pages.dev",
-  "韓国": "https://surim-pre-questionnaire-kr.pages.dev",
-  "台湾": "https://surim-pre-questionnaire-tw.pages.dev",
-};
-
 export default function ReservationTable({ records }: { records: ReservationRecord[] }) {
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const [customDateTimes, setCustomDateTimes] = useState<Record<string, string>>({});
+  const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({});
+  const [savingNotesKey, setSavingNotesKey] = useState<string | null>(null);
 
   if (!records || records.length === 0) {
     return (
@@ -26,16 +23,17 @@ export default function ReservationTable({ records }: { records: ReservationReco
     );
   }
 
-  const handleConfirm = async (record: ReservationRecord, candidate: Candidate) => {
+  const handleConfirm = async (record: ReservationRecord, dateTime: string) => {
     const customerName = getCustomerName(record);
     const customerEmail = getCustomerEmail(record);
     const questionnaireUrl = QUESTIONNAIRE_URL_MAP[record.sheetName];
+    const isOnline = isOnlineConsultation(record);
 
-    if (!window.confirm(`${customerName} 様の予約を「${candidate.dateTime}」で確定しますか？`)) {
+    if (!window.confirm(`${customerName} 様の予約を「${dateTime}」で確定しますか？`)) {
       return;
     }
 
-    const key = `${record.sheetName}-${record.rowNumber}-${candidate.dateTime}`;
+    const key = `${record.sheetName}-${record.rowNumber}-${dateTime}`;
     setLoadingKey(key);
 
     try {
@@ -45,10 +43,11 @@ export default function ReservationTable({ records }: { records: ReservationReco
         body: JSON.stringify({
           sheetName: record.sheetName,
           rowNumber: record.rowNumber,
-          confirmedDateTime: candidate.dateTime,
+          confirmedDateTime: dateTime,
           customerName,
           customerEmail,
           questionnaireUrl,
+          isOnline,
         }),
       });
     } catch {
@@ -56,6 +55,23 @@ export default function ReservationTable({ records }: { records: ReservationReco
     } finally {
       setLoadingKey(null);
       window.location.reload();
+    }
+  };
+
+  const handleSaveNotes = async (record: ReservationRecord, rowKey: string, notes: string) => {
+    setSavingNotesKey(rowKey);
+    try {
+      await fetch("/api/reservations/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sheetName: record.sheetName,
+          rowNumber: record.rowNumber,
+          notes,
+        }),
+      });
+    } finally {
+      setSavingNotesKey(null);
     }
   };
 
@@ -68,7 +84,9 @@ export default function ReservationTable({ records }: { records: ReservationReco
             <th scope="col" className="px-4 py-3">氏名</th>
             <th scope="col" className="px-4 py-3">メールアドレス</th>
             <th scope="col" className="px-4 py-3">メニュー</th>
+            <th scope="col" className="px-4 py-3">備考</th>
             <th scope="col" className="px-4 py-3">希望日時・確定操作</th>
+            <th scope="col" className="px-4 py-3">任意の日時で確定</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -78,9 +96,16 @@ export default function ReservationTable({ records }: { records: ReservationReco
             const menu = getMenuSummary(record);
             const candidates = getCandidates(record);
             const label = SHEET_LABEL_MAP[record.sheetName] || record.sheetName;
+            const rowKey = `${record.sheetName}-${record.rowNumber}`;
+            const savedNotes = getStaffNotes(record);
+            const notesValue = rowKey in notesDrafts ? notesDrafts[rowKey] : savedNotes;
+            const isSavingNotes = savingNotesKey === rowKey;
+            const customValue = customDateTimes[rowKey] || "";
+            const customKey = customValue ? `${rowKey}-${customValue.replace("T", " ")}` : null;
+            const customIsLoading = customKey !== null && loadingKey === customKey;
 
             return (
-              <tr key={`${record.sheetName}-${record.rowNumber}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50">
+              <tr key={rowKey} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50">
                 <td className="px-4 py-3 font-medium">
                   <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${
                     record.sheetName === "国内" ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" :
@@ -94,17 +119,36 @@ export default function ReservationTable({ records }: { records: ReservationReco
                 <td className="px-4 py-3">{email}</td>
                 <td className="px-4 py-3">{menu}</td>
                 <td className="px-4 py-3">
+                  <div className="flex flex-col gap-1">
+                    <textarea
+                      value={notesValue}
+                      onChange={(e) =>
+                        setNotesDrafts((prev) => ({ ...prev, [rowKey]: e.target.value }))
+                      }
+                      rows={2}
+                      className="w-40 rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                    <button
+                      onClick={() => handleSaveNotes(record, rowKey, notesValue)}
+                      disabled={isSavingNotes || notesValue === savedNotes}
+                      className="self-start rounded bg-zinc-200 px-2 py-0.5 text-[11px] font-medium text-zinc-700 hover:bg-zinc-300 disabled:opacity-40 dark:bg-zinc-700 dark:text-zinc-200"
+                    >
+                      {isSavingNotes ? "保存中..." : "保存"}
+                    </button>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
                   {candidates.length === 0 ? (
                     <span className="text-zinc-400">希望日時なし</span>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {candidates.map((cand, idx) => {
-                        const key = `${record.sheetName}-${record.rowNumber}-${cand.dateTime}`;
+                        const key = `${rowKey}-${cand.dateTime}`;
                         const isLoading = loadingKey === key;
                         return (
                           <button
                             key={idx}
-                            onClick={() => handleConfirm(record, cand)}
+                            onClick={() => handleConfirm(record, cand.dateTime)}
                             disabled={isLoading}
                             className="inline-flex items-center rounded bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
                           >
@@ -114,6 +158,25 @@ export default function ReservationTable({ records }: { records: ReservationReco
                       })}
                     </div>
                   )}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="datetime-local"
+                      value={customValue}
+                      onChange={(e) =>
+                        setCustomDateTimes((prev) => ({ ...prev, [rowKey]: e.target.value }))
+                      }
+                      className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                    <button
+                      onClick={() => handleConfirm(record, customValue.replace("T", " "))}
+                      disabled={!customValue || customIsLoading}
+                      className="inline-flex items-center rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
+                    >
+                      {customIsLoading ? "処理中..." : "この日時で確定"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             );
