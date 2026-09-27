@@ -78,6 +78,59 @@ function getEmailLanguage(sheetName: ReservationSheetName): EmailLanguage {
   return "ja";
 }
 
+export type UnreadMessage = {
+  id: string;
+  from: string;
+  subject: string;
+  snippet: string;
+};
+
+export async function listUnreadInboxMessages(): Promise<UnreadMessage[]> {
+  const auth = getOAuth2Client();
+  const gmail = google.gmail({ version: "v1", auth });
+
+  const listRes = await gmail.users.messages.list({
+    userId: "me",
+    q: "is:unread in:inbox",
+    maxResults: 20,
+  });
+
+  const messages = listRes.data.messages || [];
+  const results: UnreadMessage[] = [];
+
+  for (const message of messages) {
+    if (!message.id) continue;
+    const detail = await gmail.users.messages.get({
+      userId: "me",
+      id: message.id,
+      format: "metadata",
+      metadataHeaders: ["From", "Subject"],
+    });
+
+    const headers = detail.data.payload?.headers || [];
+    const from = headers.find((h) => h.name === "From")?.value || "(不明な送信者)";
+    const subject = headers.find((h) => h.name === "Subject")?.value || "(件名なし)";
+    const snippet = detail.data.snippet || "";
+
+    results.push({ id: message.id, from, subject, snippet });
+  }
+
+  return results;
+}
+
+export async function markInboxMessageRead(messageId: string): Promise<void> {
+  const auth = getOAuth2Client();
+  const gmail = google.gmail({ version: "v1", auth });
+
+  await gmail.users.messages.modify({
+    userId: "me",
+    id: messageId,
+    requestBody: {
+      removeLabelIds: ["UNREAD"],
+    },
+  });
+}
+
 export type ConfirmationEmailInput = {
   to: string;
   customerName: string;
