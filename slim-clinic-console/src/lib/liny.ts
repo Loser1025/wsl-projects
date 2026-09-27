@@ -47,6 +47,16 @@ export async function sendLineReminderPush(friendId: string, params: LinePushPar
   await postToLinyCustomApi(url, token, friendId, params);
 }
 
+// リスケ(日時変更)通知用の専用トリガー。confirmed_datetimeには変更後の日時を渡す。
+export async function sendLineReschedulePush(friendId: string, params: LinePushParams): Promise<void> {
+  const url = process.env.LINY_RESCHEDULE_API_URL;
+  const token = process.env.LINY_RESCHEDULE_API_TOKEN;
+  if (!url || !token) {
+    throw new Error("LINY_RESCHEDULE_API_URL or LINY_RESCHEDULE_API_TOKEN is not set");
+  }
+  await postToLinyCustomApi(url, token, friendId, params);
+}
+
 export function verifyLinyWebhookSecret(headerValue: string | null): boolean {
   const expected = process.env.LINY_WEBHOOK_SECRET;
   if (!expected || !headerValue) return false;

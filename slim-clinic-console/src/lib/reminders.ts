@@ -49,6 +49,7 @@ export async function processReminders(): Promise<ReminderResult> {
           confirmedDateTime,
           questionnaireUrl: QUESTIONNAIRE_URL_MAP[record.sheetName],
           meetLink: meetLink || undefined,
+          sheetName: record.sheetName,
         });
       }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ReservationRecord, ReservationSheetName, getCustomerName, getMenuSummary } from "@/app/components/types";
+import { ReservationRecord, ReservationSheetName, QUESTIONNAIRE_URL_MAP, getCustomerName, getCustomerEmail, getMenuSummary, getMeetLink } from "@/lib/reservation-fields";
 
 const SHEET_LABEL_MAP: Record<ReservationSheetName, string> = {
   "国内": "JP",
@@ -11,6 +11,75 @@ const SHEET_LABEL_MAP: Record<ReservationSheetName, string> = {
 
 export default function ReservationCalendar({ records }: { records: ReservationRecord[] }) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
+
+  const handleCancel = async (record: ReservationRecord, name: string) => {
+    if (!window.confirm(`${name} 様の予約をキャンセルしますか？`)) return;
+    try {
+      await fetch("/api/reservations/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sheetName: record.sheetName,
+          rowNumber: record.rowNumber,
+          customerName: name,
+          customerEmail: getCustomerEmail(record),
+        }),
+      });
+    } finally {
+      window.location.reload();
+    }
+  };
+
+  const handleNoShow = async (record: ReservationRecord, name: string) => {
+    const meetLink = getMeetLink(record);
+    const confirmMessage = meetLink
+      ? `${name} 様を「無断キャンセル」扱いにしますか？(日程再調整メールが自動送信されます)`
+      : `${name} 様を「無断キャンセル」扱いにしますか？(対面のため通知は送信されません)`;
+    if (!window.confirm(confirmMessage)) return;
+    try {
+      await fetch("/api/reservations/no-show", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sheetName: record.sheetName,
+          rowNumber: record.rowNumber,
+          customerName: name,
+          customerEmail: getCustomerEmail(record),
+          meetLink,
+        }),
+      });
+    } finally {
+      window.location.reload();
+    }
+  };
+
+  const handleReschedule = async (record: ReservationRecord, name: string) => {
+    const currentDateTime = record.values["確定日時"] || "";
+    const newDateTime = window.prompt(
+      `${name} 様の新しい予約日時を入力してください(例: 2026-10-01 14:00)`,
+      currentDateTime
+    );
+    if (!newDateTime || newDateTime.trim() === "" || newDateTime === currentDateTime) return;
+    if (!window.confirm(`${name} 様の予約を「${newDateTime}」に変更し、お客様へ通知しますか？`)) return;
+
+    try {
+      await fetch("/api/reservations/reschedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sheetName: record.sheetName,
+          rowNumber: record.rowNumber,
+          newDateTime: newDateTime.trim(),
+          customerName: name,
+          customerEmail: getCustomerEmail(record),
+          questionnaireUrl: QUESTIONNAIRE_URL_MAP[record.sheetName],
+          meetLink: getMeetLink(record),
+        }),
+      });
+    } finally {
+      window.location.reload();
+    }
+  };
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -114,11 +183,31 @@ export default function ReservationCalendar({ records }: { records: ReservationR
                 {reservations.map((res, rIdx) => (
                   <div
                     key={rIdx}
-                    className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-800 text-[10px] leading-tight text-zinc-800 dark:text-zinc-200"
+                    className="group rounded bg-zinc-100 px-1 py-0.5 dark:bg-zinc-800 text-[10px] leading-tight text-zinc-800 dark:text-zinc-200"
                     title={`${res.time} ${res.name} (${res.menu})`}
                   >
                     <span className="font-bold mr-1 text-indigo-600 dark:text-indigo-400">{res.sheetLabel}</span>
                     <span className="font-medium">{res.time}</span> {res.name}
+                    <span className="opacity-0 group-hover:opacity-100">
+                      <button
+                        onClick={() => handleReschedule(res.record, res.name)}
+                        className="ml-1 text-amber-600 hover:underline dark:text-amber-400"
+                      >
+                        リスケ
+                      </button>
+                      <button
+                        onClick={() => handleNoShow(res.record, res.name)}
+                        className="ml-1 text-orange-600 hover:underline dark:text-orange-400"
+                      >
+                        バックレ
+                      </button>
+                      <button
+                        onClick={() => handleCancel(res.record, res.name)}
+                        className="ml-1 text-red-500 hover:underline"
+                      >
+                        取消
+                      </button>
+                    </span>
                   </div>
                 ))}
               </div>

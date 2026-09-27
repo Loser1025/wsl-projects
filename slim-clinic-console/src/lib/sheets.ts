@@ -191,6 +191,61 @@ export async function cancelReservation(sheetName: ReservationSheetName, rowNumb
   });
 }
 
+export async function rescheduleReservation(
+  sheetName: ReservationSheetName,
+  rowNumber: number,
+  newDateTime: string
+): Promise<void> {
+  await ensureStatusColumns(sheetName);
+  const headers = await getHeaderRow(sheetName);
+  const confirmedAtIdx = headers.indexOf("確定日時");
+  const reminderIdx = headers.indexOf("リマインド送信済み");
+  if (confirmedAtIdx === -1 || reminderIdx === -1) {
+    throw new Error("Required columns not found");
+  }
+
+  const sheets = getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+  // 確定日時とリマインド送信済みは隣接していない場合があるため、
+  // 他の列(Meetリンク等)を巻き込まないよう1セルずつ更新する
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${columnIndexToA1(confirmedAtIdx)}${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[newDateTime]] },
+  });
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${columnIndexToA1(reminderIdx)}${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[""]] },
+  });
+}
+
+export async function markNoShow(sheetName: ReservationSheetName, rowNumber: number): Promise<void> {
+  await ensureStatusColumns(sheetName);
+  const headers = await getHeaderRow(sheetName);
+  const statusIdx = headers.indexOf("ステータス");
+  if (statusIdx === -1) {
+    throw new Error("Status column not found");
+  }
+
+  const sheets = getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+  const colA1 = columnIndexToA1(statusIdx);
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${colA1}${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [["無断キャンセル"]],
+    },
+  });
+}
+
 function normalizePhone(value: string): string {
   return value.replace(/[^\d]/g, "");
 }
