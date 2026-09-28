@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ReservationRecord, ReservationSheetName, QUESTIONNAIRE_URL_MAP, getCustomerName, getCustomerEmail, getMenuSummary, getStaffNotes, getCandidates, isOnlineConsultation, Candidate } from "@/lib/reservation-fields";
+import { ReservationRecord, ReservationSheetName, QUESTIONNAIRE_URL_MAP, getCustomerName, getCustomerEmail, getMenuSummary, getStaffNotes, getCandidates, getConfirmedDateTime, getMeetLink, isOnlineConsultation } from "@/lib/reservation-fields";
+
+export type ReservationStatus = "pending" | "confirmed" | "cancelled" | "noShow";
 
 const SHEET_LABEL_MAP: Record<ReservationSheetName, string> = {
   "国内": "JP",
@@ -9,7 +11,20 @@ const SHEET_LABEL_MAP: Record<ReservationSheetName, string> = {
   "台湾": "TW",
 };
 
-export default function ReservationTable({ records }: { records: ReservationRecord[] }) {
+const EMPTY_MESSAGE: Record<ReservationStatus, string> = {
+  pending: "現在、未確定の申込みはありません",
+  confirmed: "現在、確定済みの予約はありません",
+  cancelled: "現在、キャンセル済みの予約はありません",
+  noShow: "現在、無断キャンセルの予約はありません",
+};
+
+export default function ReservationTable({
+  records,
+  status,
+}: {
+  records: ReservationRecord[];
+  status: ReservationStatus;
+}) {
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [customDateTimes, setCustomDateTimes] = useState<Record<string, string>>({});
   const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({});
@@ -18,7 +33,7 @@ export default function ReservationTable({ records }: { records: ReservationReco
   if (!records || records.length === 0) {
     return (
       <div className="rounded-lg border border-zinc-200 bg-white p-6 text-center text-zinc-500 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-        現在、未確定の申込みはありません
+        {EMPTY_MESSAGE[status]}
       </div>
     );
   }
@@ -58,6 +73,31 @@ export default function ReservationTable({ records }: { records: ReservationReco
     }
   };
 
+  const handleCancelBeforeConfirm = async (record: ReservationRecord, name: string) => {
+    if (!window.confirm(`${name} 様の申込みを確定前にキャンセルしますか？(お客様へキャンセルメールが送信されます)`)) {
+      return;
+    }
+
+    const key = `${record.sheetName}-${record.rowNumber}-precancel`;
+    setLoadingKey(key);
+
+    try {
+      await fetch("/api/reservations/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sheetName: record.sheetName,
+          rowNumber: record.rowNumber,
+          customerName: name,
+          customerEmail: getCustomerEmail(record),
+        }),
+      });
+    } finally {
+      setLoadingKey(null);
+      window.location.reload();
+    }
+  };
+
   const handleSaveNotes = async (record: ReservationRecord, rowKey: string, notes: string) => {
     setSavingNotesKey(rowKey);
     try {
@@ -85,8 +125,19 @@ export default function ReservationTable({ records }: { records: ReservationReco
             <th scope="col" className="px-4 py-3">メールアドレス</th>
             <th scope="col" className="px-4 py-3">メニュー</th>
             <th scope="col" className="px-4 py-3">備考</th>
-            <th scope="col" className="px-4 py-3">希望日時・確定操作</th>
-            <th scope="col" className="px-4 py-3">任意の日時で確定</th>
+            {status === "pending" && (
+              <>
+                <th scope="col" className="px-4 py-3">希望日時・確定操作</th>
+                <th scope="col" className="px-4 py-3">任意の日時で確定</th>
+                <th scope="col" className="px-4 py-3">確定前キャンセル</th>
+              </>
+            )}
+            {status !== "pending" && (
+              <th scope="col" className="px-4 py-3">確定日時</th>
+            )}
+            {status === "confirmed" && (
+              <th scope="col" className="px-4 py-3">Meetリンク</th>
+            )}
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -94,7 +145,7 @@ export default function ReservationTable({ records }: { records: ReservationReco
             const name = getCustomerName(record);
             const email = getCustomerEmail(record);
             const menu = getMenuSummary(record);
-            const candidates = getCandidates(record);
+            const candidates = status === "pending" ? getCandidates(record) : [];
             const label = SHEET_LABEL_MAP[record.sheetName] || record.sheetName;
             const rowKey = `${record.sheetName}-${record.rowNumber}`;
             const savedNotes = getStaffNotes(record);
@@ -103,6 +154,8 @@ export default function ReservationTable({ records }: { records: ReservationReco
             const customValue = customDateTimes[rowKey] || "";
             const customKey = customValue ? `${rowKey}-${customValue.replace("T", " ")}` : null;
             const customIsLoading = customKey !== null && loadingKey === customKey;
+            const precancelKey = `${rowKey}-precancel`;
+            const precancelIsLoading = loadingKey === precancelKey;
 
             return (
               <tr key={rowKey} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50">
@@ -137,47 +190,79 @@ export default function ReservationTable({ records }: { records: ReservationReco
                     </button>
                   </div>
                 </td>
-                <td className="px-4 py-3">
-                  {candidates.length === 0 ? (
-                    <span className="text-zinc-400">希望日時なし</span>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {candidates.map((cand, idx) => {
-                        const key = `${rowKey}-${cand.dateTime}`;
-                        const isLoading = loadingKey === key;
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => handleConfirm(record, cand.dateTime)}
-                            disabled={isLoading}
-                            className="inline-flex items-center rounded bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-                          >
-                            {isLoading ? "処理中..." : `${cand.label}: ${cand.dateTime}`}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="datetime-local"
-                      value={customValue}
-                      onChange={(e) =>
-                        setCustomDateTimes((prev) => ({ ...prev, [rowKey]: e.target.value }))
-                      }
-                      className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                    />
-                    <button
-                      onClick={() => handleConfirm(record, customValue.replace("T", " "))}
-                      disabled={!customValue || customIsLoading}
-                      className="inline-flex items-center rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
-                    >
-                      {customIsLoading ? "処理中..." : "この日時で確定"}
-                    </button>
-                  </div>
-                </td>
+                {status === "pending" && (
+                  <>
+                    <td className="px-4 py-3">
+                      {candidates.length === 0 ? (
+                        <span className="text-zinc-400">希望日時なし</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {candidates.map((cand, idx) => {
+                            const key = `${rowKey}-${cand.dateTime}`;
+                            const isLoading = loadingKey === key;
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => handleConfirm(record, cand.dateTime)}
+                                disabled={isLoading}
+                                className="inline-flex items-center rounded bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+                              >
+                                {isLoading ? "処理中..." : `${cand.label}: ${cand.dateTime}`}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="datetime-local"
+                          value={customValue}
+                          onChange={(e) =>
+                            setCustomDateTimes((prev) => ({ ...prev, [rowKey]: e.target.value }))
+                          }
+                          className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        />
+                        <button
+                          onClick={() => handleConfirm(record, customValue.replace("T", " "))}
+                          disabled={!customValue || customIsLoading}
+                          className="inline-flex items-center rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
+                        >
+                          {customIsLoading ? "処理中..." : "この日時で確定"}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleCancelBeforeConfirm(record, name)}
+                        disabled={precancelIsLoading}
+                        className="inline-flex items-center rounded bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-40"
+                      >
+                        {precancelIsLoading ? "処理中..." : "キャンセル"}
+                      </button>
+                    </td>
+                  </>
+                )}
+                {status !== "pending" && (
+                  <td className="px-4 py-3">{getConfirmedDateTime(record) || "-"}</td>
+                )}
+                {status === "confirmed" && (
+                  <td className="px-4 py-3">
+                    {getMeetLink(record) ? (
+                      <a
+                        href={getMeetLink(record)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-indigo-600 hover:underline dark:text-indigo-400"
+                      >
+                        Meetリンク
+                      </a>
+                    ) : (
+                      <span className="text-zinc-400">対面</span>
+                    )}
+                  </td>
+                )}
               </tr>
             );
           })}

@@ -104,18 +104,24 @@ async function fetchAllReservations(): Promise<ReservationRecord[]> {
 export async function listAllReservationsGrouped(): Promise<{
   pending: ReservationRecord[];
   confirmed: ReservationRecord[];
+  cancelled: ReservationRecord[];
+  noShow: ReservationRecord[];
 }> {
   const all = await fetchAllReservations();
   const pending: ReservationRecord[] = [];
   const confirmed: ReservationRecord[] = [];
+  const cancelled: ReservationRecord[] = [];
+  const noShow: ReservationRecord[] = [];
 
   for (const record of all) {
     const status = (record.values["ステータス"] || "").trim();
     if (status === "" || status === "未確定") pending.push(record);
     else if (status === "確定") confirmed.push(record);
+    else if (status === "キャンセル") cancelled.push(record);
+    else if (status === "無断キャンセル") noShow.push(record);
   }
 
-  return { pending, confirmed };
+  return { pending, confirmed, cancelled, noShow };
 }
 
 export async function listPendingReservations(): Promise<ReservationRecord[]> {
