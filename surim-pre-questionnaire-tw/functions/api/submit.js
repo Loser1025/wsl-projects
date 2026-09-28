@@ -31,7 +31,23 @@ async function getAccessToken(env) {
   return tokenJson.access_token;
 }
 
-const REQUIRED_FIELDS = ['postal', 'address', 'name', 'kana', 'dob', 'gender', 'bloodType', 'height', 'weight', 'pregnancy', 'breastfeeding'];
+const REQUIRED_FIELDS = ['postal', 'address', 'name', 'kana', 'dob', 'gender', 'bloodType', 'height', 'weight', 'pregnancy', 'breastfeeding', 'nationality', 'passportNumber'];
+
+async function notifyTelegram(env, text) {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  const chatId = env.TELEGRAM_CHAT_ID;
+  const threadId = env.TELEGRAM_QUESTIONNAIRE_THREAD_ID;
+  if (!token || !chatId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, message_thread_id: threadId ? Number(threadId) : undefined, text }),
+    });
+  } catch (err) {
+    console.error('telegram_notify_failed', err);
+  }
+}
 
 export async function onRequestPost({ request, env }) {
   let body;
@@ -50,6 +66,7 @@ export async function onRequestPost({ request, env }) {
       body.symptomConcern, body.majorHistory, body.medicalHistory, body.chronicOngoing, body.currentMeds, body.allergies, body.metalImplant,
       body.cancerStatus, body.cancerYears, body.otherDiseaseName,
       body.pregnancy, body.breastfeeding, body.pillUse, body.childbirth, body.childbirthDetail, body.finalConcern,
+      body.nationality, body.passportNumber,
     ].map((v) => v ?? '');
 
     const range = encodeURIComponent('問診票（台湾）!A:AZ');
@@ -61,6 +78,18 @@ export async function onRequestPost({ request, env }) {
       console.error('sheets_error', await sheetsRes.text());
       return new Response(JSON.stringify({ error: 'sheet_write_failed' }), { status: 500 });
     }
+    await notifyTelegram(
+      env,
+      `🩺 新しい問診回答が届きました（台湾）\n\n` +
+      `・氏名： ${body.name}（${body.kana}）\n` +
+      `・国籍： ${body.nationality}\n` +
+      `・パスポート番号： ${body.passportNumber}\n` +
+      `・生年月日： ${body.dob}\n` +
+      `・性別： ${body.gender}\n` +
+      `・ご来院歴： ${body.visitHistory || '-'}\n` +
+      `・ご希望メニュー： ${body.interest || '-'}`
+    );
+
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (err) {
     console.error(err);

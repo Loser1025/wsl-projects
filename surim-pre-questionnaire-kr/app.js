@@ -50,6 +50,7 @@ form.addEventListener('submit', async (e) => {
     cancerStatus: radioVal('cancerStatus'), cancerYears: val('cancerYears'), otherDiseaseName: val('otherDiseaseName'),
     pregnancy: radioVal('pregnancy'), breastfeeding: radioVal('breastfeeding'), pillUse: val('pillUse'),
     childbirth: radioVal('childbirth'), childbirthDetail: val('childbirthDetail'), finalConcern: val('finalConcern'),
+    nationality: val('nationality'), passportNumber: val('passportNumber'),
   };
 
   submitBtn.disabled = true;
