@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ReservationRecord } from "@/lib/reservation-fields";
 import ReservationTable, { ReservationStatus } from "@/app/components/ReservationTable";
+import type { HistoryMatch } from "@/lib/sheets";
 
 const TAB_LABELS: Record<ReservationStatus, string> = {
   pending: "未確定",
@@ -18,11 +19,13 @@ export default function ReservationStatusTabs({
   confirmed,
   cancelled,
   noShow,
+  pendingMatches,
 }: {
   pending: ReservationRecord[];
   confirmed: ReservationRecord[];
   cancelled: ReservationRecord[];
   noShow: ReservationRecord[];
+  pendingMatches: Record<string, HistoryMatch>;
 }) {
   const [activeTab, setActiveTab] = useState<ReservationStatus>("pending");
 
@@ -50,7 +53,11 @@ export default function ReservationStatusTabs({
           </button>
         ))}
       </div>
-      <ReservationTable records={groups[activeTab]} status={activeTab} />
+      <ReservationTable
+        records={groups[activeTab]}
+        status={activeTab}
+        historyMatches={activeTab === "pending" ? pendingMatches : undefined}
+      />
     </div>
   );
 }

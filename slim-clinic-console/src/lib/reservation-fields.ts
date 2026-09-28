@@ -64,6 +64,17 @@ export function getStaffNotes(record: ReservationRecord): string {
   return record.values["スタッフ備考"] || "";
 }
 
+// 韓国シートには電話番号列が存在しないため、意図的にマッピングを持たない(取得結果は常に空文字)
+const PHONE_FIELD: Partial<Record<ReservationSheetName, string>> = {
+  "国内": "お電話番号",
+  "台湾": "電話號碼",
+};
+
+export function getCustomerPhone(record: ReservationRecord): string {
+  const field = PHONE_FIELD[record.sheetName];
+  return field ? record.values[field] || "" : "";
+}
+
 const CONSULTATION_TYPE_FIELD: Record<ReservationSheetName, { field: string; onlineValue: string }> = {
   "国内": { field: "診察形式", onlineValue: "オンライン診察" },
   "台湾": { field: "看診方式", onlineValue: "線上看診" },

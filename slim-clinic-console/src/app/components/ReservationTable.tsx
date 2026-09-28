@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ReservationRecord, ReservationSheetName, QUESTIONNAIRE_URL_MAP, getCustomerName, getCustomerEmail, getMenuSummary, getStaffNotes, getCandidates, getConfirmedDateTime, getMeetLink, isOnlineConsultation } from "@/lib/reservation-fields";
+import type { HistoryMatch } from "@/lib/sheets";
 
 export type ReservationStatus = "pending" | "confirmed" | "cancelled" | "noShow";
 
@@ -21,14 +22,17 @@ const EMPTY_MESSAGE: Record<ReservationStatus, string> = {
 export default function ReservationTable({
   records,
   status,
+  historyMatches,
 }: {
   records: ReservationRecord[];
   status: ReservationStatus;
+  historyMatches?: Record<string, HistoryMatch>;
 }) {
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [customDateTimes, setCustomDateTimes] = useState<Record<string, string>>({});
   const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({});
   const [savingNotesKey, setSavingNotesKey] = useState<string | null>(null);
+  const [appliedMatchKeys, setAppliedMatchKeys] = useState<Record<string, boolean>>({});
 
   if (!records || records.length === 0) {
     return (
@@ -98,6 +102,34 @@ export default function ReservationTable({
     }
   };
 
+  const handleApplyHistoryMatch = async (record: ReservationRecord, rowKey: string, match: HistoryMatch) => {
+    if (
+      !window.confirm(
+        `過去の予約(行${match.matchedRowNumber})のLINE ID・スタッフ備考をこの申込みに引き継ぎますか？`
+      )
+    ) {
+      return;
+    }
+
+    const key = `${rowKey}-history-match`;
+    setLoadingKey(key);
+    try {
+      await fetch("/api/reservations/apply-history-match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sheetName: record.sheetName,
+          rowNumber: record.rowNumber,
+          lineFriendId: match.lineFriendId,
+          staffNotes: match.staffNotes,
+        }),
+      });
+      setAppliedMatchKeys((prev) => ({ ...prev, [rowKey]: true }));
+    } finally {
+      setLoadingKey(null);
+    }
+  };
+
   const handleSaveNotes = async (record: ReservationRecord, rowKey: string, notes: string) => {
     setSavingNotesKey(rowKey);
     try {
@@ -127,6 +159,7 @@ export default function ReservationTable({
             <th scope="col" className="px-4 py-3">備考</th>
             {status === "pending" && (
               <>
+                <th scope="col" className="px-4 py-3">過去の予約</th>
                 <th scope="col" className="px-4 py-3">希望日時・確定操作</th>
                 <th scope="col" className="px-4 py-3">任意の日時で確定</th>
                 <th scope="col" className="px-4 py-3">確定前キャンセル</th>
@@ -156,6 +189,10 @@ export default function ReservationTable({
             const customIsLoading = customKey !== null && loadingKey === customKey;
             const precancelKey = `${rowKey}-precancel`;
             const precancelIsLoading = loadingKey === precancelKey;
+            const historyMatch = historyMatches?.[rowKey];
+            const historyMatchKey = `${rowKey}-history-match`;
+            const historyMatchIsLoading = loadingKey === historyMatchKey;
+            const historyMatchApplied = appliedMatchKeys[rowKey];
 
             return (
               <tr key={rowKey} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50">
@@ -192,6 +229,28 @@ export default function ReservationTable({
                 </td>
                 {status === "pending" && (
                   <>
+                    <td className="px-4 py-3">
+                      {!historyMatch ? (
+                        <span className="text-zinc-400">-</span>
+                      ) : historyMatchApplied ? (
+                        <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                          引き継ぎ済み
+                        </span>
+                      ) : (
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="rounded bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                            過去の予約と一致(行{historyMatch.matchedRowNumber})
+                          </span>
+                          <button
+                            onClick={() => handleApplyHistoryMatch(record, rowKey, historyMatch)}
+                            disabled={historyMatchIsLoading}
+                            className="rounded bg-amber-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-amber-500 disabled:opacity-40"
+                          >
+                            {historyMatchIsLoading ? "処理中..." : "LINE ID・備考を引き継ぐ"}
+                          </button>
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       {candidates.length === 0 ? (
                         <span className="text-zinc-400">希望日時なし</span>

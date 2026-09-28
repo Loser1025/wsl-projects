@@ -1,5 +1,12 @@
 import { google } from "googleapis";
-import { RESERVATION_SHEET_NAMES, ReservationSheetName, ReservationRecord } from "@/lib/reservation-fields";
+import {
+  RESERVATION_SHEET_NAMES,
+  ReservationSheetName,
+  ReservationRecord,
+  getCustomerName,
+  getCustomerEmail,
+  getCustomerPhone,
+} from "@/lib/reservation-fields";
 
 export type { ReservationSheetName, ReservationRecord, Candidate } from "@/lib/reservation-fields";
 export {
@@ -7,6 +14,7 @@ export {
   QUESTIONNAIRE_URL_MAP,
   getCustomerName,
   getCustomerEmail,
+  getCustomerPhone,
   getMenuSummary,
   getCandidates,
   getConfirmedDateTime,
@@ -101,11 +109,67 @@ async function fetchAllReservations(): Promise<ReservationRecord[]> {
   return records;
 }
 
+export type HistoryMatch = {
+  matchedRowNumber: number;
+  lineFriendId: string;
+  staffNotes: string;
+};
+
+function countFieldMatches(a: ReservationRecord, b: ReservationRecord): number {
+  let count = 0;
+
+  const nameA = getCustomerName(a).trim();
+  const nameB = getCustomerName(b).trim();
+  if (nameA && nameA === nameB) count++;
+
+  const emailA = getCustomerEmail(a).trim().toLowerCase();
+  const emailB = getCustomerEmail(b).trim().toLowerCase();
+  if (emailA && emailA === emailB) count++;
+
+  const phoneA = normalizePhone(getCustomerPhone(a));
+  const phoneB = normalizePhone(getCustomerPhone(b));
+  if (phoneA && phoneA === phoneB) count++;
+
+  return count;
+}
+
+// 氏名・メール・電話番号(存在するシートのみ)のうち2つ以上一致する同一シート内の過去行を探す。
+// 韓国シートは電話番号列がないため実質「氏名とメール両方一致」が条件になる。
+// 複数候補がある場合はLINE Friend IDを持つ行を優先し、次に新しい行(行番号が大きい方)を優先する。
+function findHistoryMatch(target: ReservationRecord, sameSheetRecords: ReservationRecord[]): HistoryMatch | null {
+  let best: ReservationRecord | null = null;
+
+  for (const candidate of sameSheetRecords) {
+    if (candidate.rowNumber === target.rowNumber) continue;
+    if (countFieldMatches(target, candidate) < 2) continue;
+
+    if (!best) {
+      best = candidate;
+      continue;
+    }
+    const bestHasLine = !!(best.values["LINE Friend ID"] || "");
+    const candHasLine = !!(candidate.values["LINE Friend ID"] || "");
+    if (candHasLine && !bestHasLine) {
+      best = candidate;
+    } else if (candHasLine === bestHasLine && candidate.rowNumber > best.rowNumber) {
+      best = candidate;
+    }
+  }
+
+  if (!best) return null;
+  return {
+    matchedRowNumber: best.rowNumber,
+    lineFriendId: best.values["LINE Friend ID"] || "",
+    staffNotes: best.values["スタッフ備考"] || "",
+  };
+}
+
 export async function listAllReservationsGrouped(): Promise<{
   pending: ReservationRecord[];
   confirmed: ReservationRecord[];
   cancelled: ReservationRecord[];
   noShow: ReservationRecord[];
+  pendingMatches: Record<string, HistoryMatch>;
 }> {
   const all = await fetchAllReservations();
   const pending: ReservationRecord[] = [];
@@ -121,7 +185,16 @@ export async function listAllReservationsGrouped(): Promise<{
     else if (status === "無断キャンセル") noShow.push(record);
   }
 
-  return { pending, confirmed, cancelled, noShow };
+  const pendingMatches: Record<string, HistoryMatch> = {};
+  for (const p of pending) {
+    const sameSheet = all.filter((r) => r.sheetName === p.sheetName);
+    const match = findHistoryMatch(p, sameSheet);
+    if (match) {
+      pendingMatches[`${p.sheetName}-${p.rowNumber}`] = match;
+    }
+  }
+
+  return { pending, confirmed, cancelled, noShow, pendingMatches };
 }
 
 export async function listPendingReservations(): Promise<ReservationRecord[]> {
@@ -354,6 +427,22 @@ export async function markReminderSent(sheetName: ReservationSheetName, rowNumbe
       values: [["済み"]],
     },
   });
+}
+
+export async function applyHistoryMatch(
+  sheetName: ReservationSheetName,
+  rowNumber: number,
+  lineFriendId: string,
+  staffNotes: string
+): Promise<void> {
+  // LINE Friend IDは国内シートのみに存在する列。マッチングはシート内限定のため、
+  // lineFriendIdが渡ってくる時点でsheetNameは必ず「国内」のはず。
+  if (lineFriendId) {
+    await setJpLineFriendId(rowNumber, lineFriendId);
+  }
+  if (staffNotes) {
+    await updateStaffNotes(sheetName, rowNumber, staffNotes);
+  }
 }
 
 export async function updateStaffNotes(

@@ -5,7 +5,7 @@ import ReservationCalendar from "@/app/components/ReservationCalendar";
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const { pending, confirmed, cancelled, noShow } = await listAllReservationsGrouped();
+  const { pending, confirmed, cancelled, noShow, pendingMatches } = await listAllReservationsGrouped();
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 font-sans dark:bg-black">
@@ -22,6 +22,7 @@ export default async function Page() {
             confirmed={confirmed}
             cancelled={cancelled}
             noShow={noShow}
+            pendingMatches={pendingMatches}
           />
         </section>
 
