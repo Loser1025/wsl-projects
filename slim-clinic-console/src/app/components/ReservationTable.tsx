@@ -14,8 +14,8 @@ const SHEET_LABEL_MAP: Record<ReservationSheetName, string> = {
 const EMPTY_MESSAGE: Record<ReservationStatus, string> = {
   pending: "現在、未確定の申込みはありません",
   confirmed: "現在、確定済みの予約はありません",
-  cancelled: "現在、キャンセル済みの予約はありません",
-  noShow: "現在、無断キャンセルの予約はありません",
+  cancelled: "現在、確定前キャンセルはありません",
+  noShow: "現在、バックレはありません",
 };
 
 export default function ReservationTable({

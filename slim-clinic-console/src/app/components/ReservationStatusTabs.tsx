@@ -7,8 +7,8 @@ import ReservationTable, { ReservationStatus } from "@/app/components/Reservatio
 const TAB_LABELS: Record<ReservationStatus, string> = {
   pending: "未確定",
   confirmed: "確定",
-  cancelled: "キャンセル",
-  noShow: "無断キャンセル",
+  cancelled: "確定前キャンセル",
+  noShow: "バックレ",
 };
 
 const TAB_ORDER: ReservationStatus[] = ["pending", "confirmed", "cancelled", "noShow"];
