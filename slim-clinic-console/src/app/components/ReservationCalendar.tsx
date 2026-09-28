@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ReservationRecord, ReservationSheetName, QUESTIONNAIRE_URL_MAP, getCustomerName, getCustomerEmail, getMenuSummary, getMeetLink } from "@/lib/reservation-fields";
+import CustomerDetailModal from "@/app/components/CustomerDetailModal";
 
 const SHEET_LABEL_MAP: Record<ReservationSheetName, string> = {
   "国内": "JP",
@@ -11,6 +12,7 @@ const SHEET_LABEL_MAP: Record<ReservationSheetName, string> = {
 
 export default function ReservationCalendar({ records }: { records: ReservationRecord[] }) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [detailRecord, setDetailRecord] = useState<ReservationRecord | null>(null);
 
   const handleCancel = async (record: ReservationRecord, name: string) => {
     if (!window.confirm(`${name} 様の予約をキャンセルしますか？`)) return;
@@ -136,6 +138,7 @@ export default function ReservationCalendar({ records }: { records: ReservationR
   const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
 
   return (
+    <>
     <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-zinc-800 dark:text-zinc-100">
@@ -187,7 +190,13 @@ export default function ReservationCalendar({ records }: { records: ReservationR
                     title={`${res.time} ${res.name} (${res.menu})`}
                   >
                     <span className="font-bold mr-1 text-indigo-600 dark:text-indigo-400">{res.sheetLabel}</span>
-                    <span className="font-medium">{res.time}</span> {res.name}
+                    <span className="font-medium">{res.time}</span>{" "}
+                    <button
+                      onClick={() => setDetailRecord(res.record)}
+                      className="hover:underline"
+                    >
+                      {res.name}
+                    </button>
                     <span className="opacity-0 group-hover:opacity-100">
                       <button
                         onClick={() => handleReschedule(res.record, res.name)}
@@ -216,5 +225,9 @@ export default function ReservationCalendar({ records }: { records: ReservationR
         })}
       </div>
     </div>
+    {detailRecord && (
+      <CustomerDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} />
+    )}
+    </>
   );
 }

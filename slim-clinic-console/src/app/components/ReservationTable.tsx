@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ReservationRecord, ReservationSheetName, QUESTIONNAIRE_URL_MAP, getCustomerName, getCustomerEmail, getMenuSummary, getStaffNotes, getCandidates, getConfirmedDateTime, getMeetLink, isOnlineConsultation } from "@/lib/reservation-fields";
 import type { HistoryMatch } from "@/lib/sheets";
+import CustomerDetailModal from "@/app/components/CustomerDetailModal";
 
 export type ReservationStatus = "pending" | "confirmed" | "cancelled" | "noShow";
 
@@ -33,6 +34,7 @@ export default function ReservationTable({
   const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({});
   const [savingNotesKey, setSavingNotesKey] = useState<string | null>(null);
   const [appliedMatchKeys, setAppliedMatchKeys] = useState<Record<string, boolean>>({});
+  const [detailRecord, setDetailRecord] = useState<ReservationRecord | null>(null);
 
   if (!records || records.length === 0) {
     return (
@@ -148,6 +150,7 @@ export default function ReservationTable({
   };
 
   return (
+    <>
     <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
       <table className="w-full text-left text-sm text-zinc-600 dark:text-zinc-300">
         <thead className="border-b border-zinc-200 bg-zinc-50 text-xs uppercase text-zinc-700 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-300">
@@ -205,7 +208,14 @@ export default function ReservationTable({
                     {label}
                   </span>
                 </td>
-                <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">{name}</td>
+                <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">
+                  <button
+                    onClick={() => setDetailRecord(record)}
+                    className="hover:underline"
+                  >
+                    {name}
+                  </button>
+                </td>
                 <td className="px-4 py-3">{email}</td>
                 <td className="px-4 py-3">{menu}</td>
                 <td className="px-4 py-3">
@@ -328,5 +338,9 @@ export default function ReservationTable({
         </tbody>
       </table>
     </div>
+    {detailRecord && (
+      <CustomerDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} />
+    )}
+    </>
   );
 }
