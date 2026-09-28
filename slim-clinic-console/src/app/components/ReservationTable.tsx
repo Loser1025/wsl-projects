@@ -132,6 +132,29 @@ export default function ReservationTable({
     }
   };
 
+  const handleReopen = async (record: ReservationRecord, name: string) => {
+    if (!window.confirm(`${name} 様を「未確定」に戻して再予約の対応を開始しますか？`)) {
+      return;
+    }
+
+    const key = `${record.sheetName}-${record.rowNumber}-reopen`;
+    setLoadingKey(key);
+
+    try {
+      await fetch("/api/reservations/reopen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sheetName: record.sheetName,
+          rowNumber: record.rowNumber,
+        }),
+      });
+    } finally {
+      setLoadingKey(null);
+      window.location.reload();
+    }
+  };
+
   const handleSaveNotes = async (record: ReservationRecord, rowKey: string, notes: string) => {
     setSavingNotesKey(rowKey);
     try {
@@ -173,6 +196,9 @@ export default function ReservationTable({
             )}
             {status === "confirmed" && (
               <th scope="col" className="px-4 py-3">Meetリンク</th>
+            )}
+            {(status === "cancelled" || status === "noShow") && (
+              <th scope="col" className="px-4 py-3">再予約</th>
             )}
           </tr>
         </thead>
@@ -330,6 +356,17 @@ export default function ReservationTable({
                     ) : (
                       <span className="text-zinc-400">対面</span>
                     )}
+                  </td>
+                )}
+                {(status === "cancelled" || status === "noShow") && (
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => handleReopen(record, name)}
+                      disabled={loadingKey === `${rowKey}-reopen`}
+                      className="inline-flex items-center rounded bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
+                    >
+                      {loadingKey === `${rowKey}-reopen` ? "処理中..." : "再予約"}
+                    </button>
                   </td>
                 )}
               </tr>

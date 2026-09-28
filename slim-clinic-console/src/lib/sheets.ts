@@ -431,6 +431,40 @@ export async function markReminderSent(sheetName: ReservationSheetName, rowNumbe
   });
 }
 
+export async function reopenReservation(sheetName: ReservationSheetName, rowNumber: number): Promise<void> {
+  await ensureStatusColumns(sheetName);
+  const headers = await getHeaderRow(sheetName);
+  const statusIdx = headers.indexOf("ステータス");
+  const confirmedAtIdx = headers.indexOf("確定日時");
+  const reminderIdx = headers.indexOf("リマインド送信済み");
+  if (statusIdx === -1 || confirmedAtIdx === -1 || reminderIdx === -1) {
+    throw new Error("Required columns not found");
+  }
+
+  const sheets = getSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+  // 列が隣接していない場合があるため、他の列(Meetリンク等)を巻き込まないよう1セルずつ更新する
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${columnIndexToA1(statusIdx)}${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [["未確定"]] },
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${columnIndexToA1(confirmedAtIdx)}${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[""]] },
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${columnIndexToA1(reminderIdx)}${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[""]] },
+  });
+}
+
 export async function applyHistoryMatch(
   sheetName: ReservationSheetName,
   rowNumber: number,
