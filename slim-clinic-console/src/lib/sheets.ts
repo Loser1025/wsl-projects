@@ -185,8 +185,10 @@ export async function listAllReservationsGrouped(): Promise<{
     else if (status === "無断キャンセル") noShow.push(record);
   }
 
+  // 過去の予約とのマッチング(LINE ID・スタッフ備考の引き継ぎ)は国内のみで運用する(韓国・台湾はLINE運用がないため不要)
   const pendingMatches: Record<string, HistoryMatch> = {};
   for (const p of pending) {
+    if (p.sheetName !== "国内") continue;
     const sameSheet = all.filter((r) => r.sheetName === p.sheetName);
     const match = findHistoryMatch(p, sameSheet);
     if (match) {
